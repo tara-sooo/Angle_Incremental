@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Angel Incremental</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="stage-panel" aria-label="Angel Incremental game">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Angel Incremental</p>
+            <h1>The Angle</h1>
+          </div>
+          <div class="generation-status" id="generationStatus">Generation locked</div>
+        </header>
+
+        <div class="playfield-wrap">
+          <canvas id="gameCanvas" width="900" height="620" aria-label="The Angle playfield"></canvas>
+        </div>
+      </section>
+
+      <aside class="control-panel" aria-label="Controls and statistics">
+        <section class="stats">
+          <div class="metric primary">
+            <span>Score</span>
+            <strong id="scoreValue">0</strong>
+          </div>
+          <div class="metric">
+            <span>Gain on core</span>
+            <strong id="gainValue">1</strong>
+          </div>
+          <div class="metric">
+            <span>Per vertex</span>
+            <strong id="vertexGainValue">+0.01</strong>
+          </div>
+          <div class="metric">
+            <span>Lap time</span>
+            <strong id="lapValue">6.00s</strong>
+          </div>
+        </section>
+
+        <section class="upgrades" aria-label="Angle upgrades">
+          <button id="speedUpgrade" class="upgrade-button" type="button">
+            <span>
+              <b>Lap speed</b>
+              <small id="speedLevel">Lv.0</small>
+            </span>
+            <em id="speedCost">Cost 25</em>
+          </button>
+          <button id="vertexUpgrade" class="upgrade-button" type="button">
+            <span>
+              <b>Add angle</b>
+              <small id="vertexCount">3 vertices</small>
+            </span>
+            <em id="vertexCost">Cost 50</em>
+          </button>
+          <button id="gainUpgrade" class="upgrade-button" type="button">
+            <span>
+              <b>Vertex gain</b>
+              <small id="gainLevel">Lv.0</small>
+            </span>
+            <em id="gainCost">Cost 75</em>
+          </button>
+        </section>
+
+        <section class="generation">
+          <div>
+            <span>Generation</span>
+            <strong id="generationCount">0</strong>
+          </div>
+          <div>
+            <span>Score multiplier</span>
+            <strong id="generationMultiplier">x1.00</strong>
+          </div>
+          <div>
+            <span>Cost factor</span>
+            <strong id="generationCostFactor">x1.00</strong>
+          </div>
+          <button id="generationButton" class="generation-button" type="button" disabled>
+            Generate
+          </button>
+        </section>
+      </aside>
+    </main>
+
+    <script src="game.js"></script>
+  </body>
+</html>
