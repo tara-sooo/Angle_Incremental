@@ -8,6 +8,7 @@ Original prompt: では、中核ループを完成させてください
 - Ran initial Playwright/canvas and full-page screenshot checks. Desktop and mobile layouts rendered correctly.
 - Tuned early upgrade costs down so the first purchases are reachable in a short play session.
 - Re-ran Playwright validation after tuning. Confirmed score loop, upgrade purchases, Generation reset/boost, and no console errors.
+- Fixed two review findings: high-speed updates now process multiple vertex crossings per frame, and Generation status now distinguishes unlocked from ready.
 
 ## TODO
 

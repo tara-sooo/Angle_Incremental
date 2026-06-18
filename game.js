@@ -35,6 +35,7 @@ const state = {
   gainLevel: 0,
   currentGain: 1,
   pointProgress: 0,
+  totalVertexProgress: 0,
   lastVertexIndex: 0,
   generationCount: 0,
   generationScoreMultiplier: 1,
@@ -110,15 +111,12 @@ function passVertex(index) {
 }
 
 function update(dt) {
-  const previousProgress = state.pointProgress;
-  state.pointProgress = (state.pointProgress + dt / lapDuration()) % 1;
-
-  const previousAbsolute = previousProgress * state.vertices;
-  let currentAbsolute = state.pointProgress * state.vertices;
-  if (state.pointProgress < previousProgress) currentAbsolute += state.vertices;
+  const previousAbsolute = state.totalVertexProgress;
+  state.totalVertexProgress += (dt / lapDuration()) * state.vertices;
+  state.pointProgress = (state.totalVertexProgress / state.vertices) % 1;
 
   const start = Math.floor(previousAbsolute) + 1;
-  const end = Math.floor(currentAbsolute);
+  const end = Math.floor(state.totalVertexProgress);
   for (let vertex = start; vertex <= end; vertex += 1) {
     passVertex(vertex % state.vertices);
   }
@@ -248,8 +246,13 @@ function updateUi() {
   elements.gainUpgrade.disabled = state.score < currentCosts.gain;
 
   const unlocked = state.totalScore >= GENERATION_UNLOCK_SCORE;
-  elements.generationStatus.textContent = unlocked ? "Generation ready" : "Generation locked";
-  elements.generationButton.disabled = !unlocked || state.generationScore < GENERATION_UNLOCK_SCORE;
+  const ready = state.generationScore >= GENERATION_UNLOCK_SCORE;
+  elements.generationStatus.textContent = ready
+    ? "Generation ready"
+    : unlocked
+      ? "Generation unlocked"
+      : "Generation locked";
+  elements.generationButton.disabled = !ready;
   elements.generationCount.textContent = String(state.generationCount);
   elements.generationMultiplier.textContent = `x${state.generationScoreMultiplier.toFixed(2)}`;
   elements.generationCostFactor.textContent = `x${state.generationCostFactor.toFixed(2)}`;
@@ -273,6 +276,7 @@ function buyVertex() {
   if (!spend(price)) return;
   state.vertices += 1;
   state.pointProgress = 0;
+  state.totalVertexProgress = 0;
   state.lastVertexIndex = 0;
   updateUi();
 }
@@ -299,6 +303,7 @@ function runGeneration() {
   state.gainLevel = 0;
   state.currentGain = 1;
   state.pointProgress = 0;
+  state.totalVertexProgress = 0;
   state.lastVertexIndex = 0;
   state.floatingTexts = [];
   updateUi();
