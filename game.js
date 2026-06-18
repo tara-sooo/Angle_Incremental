@@ -359,7 +359,7 @@ window.advanceTime = (ms) => {
   updateUi();
   draw();
 };
-window.__angelDebug = {
+window.__angleDebug = {
   state,
   addScore,
   runGeneration,

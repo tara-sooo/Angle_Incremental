@@ -1,8 +1,8 @@
-# Angel Incremental 仕様書
+# Angle Incremental 仕様書
 
 ## 1. ゲーム概要
 
-**Angel Incremental** は、画面中央に表示される図形 **The Angle** を強化し、スコアを増やしていくインクリメンタルゲームである。
+**Angle Incremental** は、画面中央に表示される図形 **The Angle** を強化し、スコアを増やしていくインクリメンタルゲームである。
 
 プレイヤーはスコアを消費して The Angle を強化し、より効率よくスコアを獲得する。累計スコアが一定値に到達すると **Generation** が解放され、進行度をリセットする代わりに恒久的なブーストを得られる。
 
