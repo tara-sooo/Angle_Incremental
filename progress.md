@@ -11,6 +11,7 @@ Original prompt: では、中核ループを完成させてください
 - Fixed two review findings: high-speed updates now process multiple vertex crossings per frame, and Generation status now distinguishes unlocked from ready.
 - Added `localStorage` save/load support with versioned save data, 5-second autosave, immediate saves after purchases/Generation, before-unload save, and a reset-save button.
 - Verified autosave writes, manual save survives reload, reset clears storage, and the updated UI renders correctly.
+- Localized the visible UI to Japanese and added a Japanese-capable web font so canvas and DOM text render correctly in environments without system Japanese fonts.
 
 ## TODO
 

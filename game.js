@@ -109,11 +109,11 @@ function saveGame(reason = "auto") {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(serializeSaveData()));
     autoSaveElapsed = 0;
-    setSaveStatus(reason === "auto" ? "Autosaved" : "Saved");
+    setSaveStatus(reason === "auto" ? "自動保存済み" : "保存済み");
     return true;
   } catch (error) {
     autoSaveElapsed = 0;
-    setSaveStatus("Save failed");
+    setSaveStatus("保存失敗");
     return false;
   }
 }
@@ -122,26 +122,26 @@ function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) {
-      setSaveStatus("Not saved yet");
+      setSaveStatus("未保存");
       return;
     }
 
     const parsed = JSON.parse(raw);
     if (parsed.version !== SAVE_VERSION || !parsed.state || typeof parsed.state !== "object") {
-      setSaveStatus("Save outdated");
+      setSaveStatus("セーブ形式が古い");
       return;
     }
 
     applySaveData(parsed.state);
     autoSaveElapsed = 0;
-    setSaveStatus("Loaded");
+    setSaveStatus("ロード済み");
   } catch (error) {
-    setSaveStatus("Save unreadable");
+    setSaveStatus("読み込み失敗");
   }
 }
 
 function resetSave() {
-  const confirmed = window.confirm("Reset all saved progress?");
+  const confirmed = window.confirm("保存済みの進行状況をすべてリセットしますか？");
   if (!confirmed) return;
   localStorage.removeItem(SAVE_KEY);
   Object.assign(state, {
@@ -162,7 +162,7 @@ function resetSave() {
     lastEarned: 0,
   });
   autoSaveElapsed = 0;
-  setSaveStatus("Reset");
+  setSaveStatus("リセット済み");
   updateUi();
   draw();
 }
@@ -185,7 +185,7 @@ function formatGainExpression(value) {
   const parts = Math.min(Math.floor(Math.sqrt(state.vertices)), 10);
   if (parts <= 1) return formatNumber(value);
   const factor = Math.pow(Math.max(value, 1), 1 / parts);
-  return Array.from({ length: parts }, () => formatNumber(factor)).join(" x ");
+  return Array.from({ length: parts }, () => formatNumber(factor)).join(" × ");
 }
 
 function lapSpeedMultiplier() {
@@ -331,22 +331,22 @@ function draw() {
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  ctx.font = "700 16px Inter, sans-serif";
+  ctx.font = "700 16px 'Noto Sans JP', sans-serif";
   ctx.fillStyle = "#18211f";
   ctx.textAlign = "center";
-  ctx.fillText("CORE", points[0].x, points[0].y - 22);
+  ctx.fillText("核", points[0].x, points[0].y - 22);
 
-  ctx.font = "800 28px Inter, sans-serif";
+  ctx.font = "800 28px 'Noto Sans JP', sans-serif";
   ctx.fillStyle = "#b73527";
   ctx.fillText(formatGainExpression(state.currentGain), canvas.width / 2, canvas.height - 58);
 
-  ctx.font = "700 15px Inter, sans-serif";
+  ctx.font = "700 15px 'Noto Sans JP', sans-serif";
   ctx.fillStyle = "#66716d";
-  ctx.fillText("current gain expression", canvas.width / 2, canvas.height - 32);
+  ctx.fillText("現在の獲得量", canvas.width / 2, canvas.height - 32);
 
   state.floatingTexts.forEach((item) => {
     ctx.globalAlpha = Math.max(item.life, 0);
-    ctx.font = "900 24px Inter, sans-serif";
+    ctx.font = "900 24px 'Noto Sans JP', sans-serif";
     ctx.fillStyle = "#d64f38";
     ctx.fillText(item.text, item.x, item.y);
     ctx.globalAlpha = 1;
@@ -360,13 +360,13 @@ function updateUi() {
   elements.scoreValue.textContent = formatNumber(state.score);
   elements.gainValue.textContent = formatGainExpression(state.currentGain * state.generationScoreMultiplier);
   elements.vertexGainValue.textContent = `+${vertexGainIncrease().toFixed(2)}`;
-  elements.lapValue.textContent = `${lapDuration().toFixed(2)}s`;
-  elements.speedLevel.textContent = `Lv.${state.speedLevel}`;
-  elements.vertexCount.textContent = `${state.vertices} vertices`;
-  elements.gainLevel.textContent = `Lv.${state.gainLevel}`;
-  elements.speedCost.textContent = `Cost ${formatNumber(currentCosts.speed)}`;
-  elements.vertexCost.textContent = `Cost ${formatNumber(currentCosts.vertex)}`;
-  elements.gainCost.textContent = `Cost ${formatNumber(currentCosts.gain)}`;
+  elements.lapValue.textContent = `${lapDuration().toFixed(2)}秒`;
+  elements.speedLevel.textContent = `レベル${state.speedLevel}`;
+  elements.vertexCount.textContent = `${state.vertices}頂点`;
+  elements.gainLevel.textContent = `レベル${state.gainLevel}`;
+  elements.speedCost.textContent = `必要 ${formatNumber(currentCosts.speed)}`;
+  elements.vertexCost.textContent = `必要 ${formatNumber(currentCosts.vertex)}`;
+  elements.gainCost.textContent = `必要 ${formatNumber(currentCosts.gain)}`;
   elements.speedUpgrade.disabled = state.score < currentCosts.speed;
   elements.vertexUpgrade.disabled = state.score < currentCosts.vertex;
   elements.gainUpgrade.disabled = state.score < currentCosts.gain;
@@ -374,14 +374,14 @@ function updateUi() {
   const unlocked = state.totalScore >= GENERATION_UNLOCK_SCORE;
   const ready = state.generationScore >= GENERATION_UNLOCK_SCORE;
   elements.generationStatus.textContent = ready
-    ? "Generation ready"
+    ? "世代交代 可能"
     : unlocked
-      ? "Generation unlocked"
-      : "Generation locked";
+      ? "世代 解放済み"
+      : "世代 未解放";
   elements.generationButton.disabled = !ready;
   elements.generationCount.textContent = String(state.generationCount);
-  elements.generationMultiplier.textContent = `x${state.generationScoreMultiplier.toFixed(2)}`;
-  elements.generationCostFactor.textContent = `x${state.generationCostFactor.toFixed(2)}`;
+  elements.generationMultiplier.textContent = `×${state.generationScoreMultiplier.toFixed(2)}`;
+  elements.generationCostFactor.textContent = `×${state.generationCostFactor.toFixed(2)}`;
 }
 
 function spend(amount) {
@@ -520,4 +520,10 @@ window.addEventListener("keydown", (event) => {
 loadGame();
 resizeCanvas();
 updateUi();
+if (document.fonts) {
+  document.fonts.ready.then(() => {
+    updateUi();
+    draw();
+  });
+}
 requestAnimationFrame(frame);

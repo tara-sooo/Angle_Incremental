@@ -3,94 +3,97 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Angle Incremental</title>
+    <title>アングル・インクリメンタル</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="shell">
-      <section class="stage-panel" aria-label="Angle Incremental game">
+      <section class="stage-panel" aria-label="アングル・インクリメンタル">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Angle Incremental</p>
+            <p class="eyebrow">アングル・インクリメンタル</p>
             <h1>The Angle</h1>
           </div>
-          <div class="generation-status" id="generationStatus">Generation locked</div>
+          <div class="generation-status" id="generationStatus">世代 未解放</div>
         </header>
 
         <div class="playfield-wrap">
-          <canvas id="gameCanvas" width="900" height="620" aria-label="The Angle playfield"></canvas>
+          <canvas id="gameCanvas" width="900" height="620" aria-label="The Angle のプレイ領域"></canvas>
         </div>
       </section>
 
-      <aside class="control-panel" aria-label="Controls and statistics">
+      <aside class="control-panel" aria-label="操作と統計">
         <section class="stats">
           <div class="metric primary">
-            <span>Score</span>
+            <span>スコア</span>
             <strong id="scoreValue">0</strong>
           </div>
           <div class="metric">
-            <span>Gain on core</span>
+            <span>核到達時の獲得量</span>
             <strong id="gainValue">1</strong>
           </div>
           <div class="metric">
-            <span>Per vertex</span>
+            <span>頂点通過ごとの増加</span>
             <strong id="vertexGainValue">+0.01</strong>
           </div>
           <div class="metric">
-            <span>Lap time</span>
-            <strong id="lapValue">6.00s</strong>
+            <span>1周の時間</span>
+            <strong id="lapValue">6.00秒</strong>
           </div>
         </section>
 
-        <section class="upgrades" aria-label="Angle upgrades">
+        <section class="upgrades" aria-label="The Angle の強化">
           <button id="speedUpgrade" class="upgrade-button" type="button">
             <span>
-              <b>Lap speed</b>
-              <small id="speedLevel">Lv.0</small>
+              <b>周回速度</b>
+              <small id="speedLevel">レベル0</small>
             </span>
-            <em id="speedCost">Cost 25</em>
+            <em id="speedCost">必要 25</em>
           </button>
           <button id="vertexUpgrade" class="upgrade-button" type="button">
             <span>
-              <b>Add angle</b>
-              <small id="vertexCount">3 vertices</small>
+              <b>角の追加</b>
+              <small id="vertexCount">3頂点</small>
             </span>
-            <em id="vertexCost">Cost 50</em>
+            <em id="vertexCost">必要 50</em>
           </button>
           <button id="gainUpgrade" class="upgrade-button" type="button">
             <span>
-              <b>Vertex gain</b>
-              <small id="gainLevel">Lv.0</small>
+              <b>頂点獲得量</b>
+              <small id="gainLevel">レベル0</small>
             </span>
-            <em id="gainCost">Cost 75</em>
+            <em id="gainCost">必要 75</em>
           </button>
         </section>
 
         <section class="generation">
           <div>
-            <span>Generation</span>
+            <span>世代</span>
             <strong id="generationCount">0</strong>
           </div>
           <div>
-            <span>Score multiplier</span>
-            <strong id="generationMultiplier">x1.00</strong>
+            <span>スコア倍率</span>
+            <strong id="generationMultiplier">×1.00</strong>
           </div>
           <div>
-            <span>Cost factor</span>
-            <strong id="generationCostFactor">x1.00</strong>
+            <span>コスト倍率</span>
+            <strong id="generationCostFactor">×1.00</strong>
           </div>
           <button id="generationButton" class="generation-button" type="button" disabled>
-            Generate
+            世代交代
           </button>
         </section>
 
-        <section class="save-panel" aria-label="Save data">
+        <section class="save-panel" aria-label="セーブデータ">
           <div>
-            <span>Save</span>
-            <strong id="saveStatus">Not saved yet</strong>
+            <span>セーブ</span>
+            <strong id="saveStatus">未保存</strong>
           </div>
           <button id="resetSaveButton" class="reset-button" type="button">
-            Reset save
+            セーブをリセット
           </button>
         </section>
       </aside>
