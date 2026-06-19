@@ -185,10 +185,24 @@ function formatNumber(value) {
 }
 
 function formatGainExpression(value) {
-  const parts = Math.min(Math.floor(Math.sqrt(state.vertices)), 10);
+  const parts = gainExpressionParts();
   if (parts <= 1) return formatNumber(value);
   const factor = Math.pow(Math.max(value, 1), 1 / parts);
   return Array.from({ length: parts }, () => formatNumber(factor)).join(" × ");
+}
+
+function gainExpressionParts() {
+  return Math.min(Math.floor(Math.sqrt(state.vertices)), 10);
+}
+
+function hasMultiplicativeGainExpression() {
+  return gainExpressionParts() > 1;
+}
+
+function formatGainExpressionSummary(value) {
+  const expression = formatGainExpression(value);
+  if (expression.length <= 42) return expression;
+  return `${formatNumber(Math.pow(Math.max(value, 1), 1 / gainExpressionParts()))} × ... × ${gainExpressionParts()}項`;
 }
 
 function lapSpeedMultiplier() {
@@ -385,12 +399,16 @@ function draw() {
 
   ctx.font = "800 28px 'Noto Sans JP', sans-serif";
   ctx.fillStyle = "#b73527";
-  ctx.fillText(formatGainExpression(state.currentGain), canvas.width / 2, canvas.height - 58);
+  ctx.fillText(formatNumber(state.currentGain), canvas.width / 2, canvas.height - 68);
 
   if (canDrawJapanese) {
     ctx.font = "700 15px 'Noto Sans JP', sans-serif";
     ctx.fillStyle = "#66716d";
-    ctx.fillText("現在の獲得量", canvas.width / 2, canvas.height - 32);
+    ctx.fillText("現在の獲得量", canvas.width / 2, canvas.height - 42);
+    if (hasMultiplicativeGainExpression()) {
+      ctx.font = "700 13px 'Noto Sans JP', sans-serif";
+      ctx.fillText(`乗算表記: ${formatGainExpressionSummary(state.currentGain)}`, canvas.width / 2, canvas.height - 20);
+    }
   }
 
   state.floatingTexts.forEach((item) => {
@@ -407,7 +425,7 @@ function draw() {
 function updateUi() {
   const currentCosts = costs();
   elements.scoreValue.textContent = formatNumber(state.score);
-  elements.gainValue.textContent = formatGainExpression(state.currentGain * state.generationScoreMultiplier);
+  elements.gainValue.textContent = formatNumber(state.currentGain * state.generationScoreMultiplier);
   elements.vertexGainValue.textContent = `+${vertexGainIncrease().toFixed(2)}`;
   elements.lapValue.textContent = formatDuration(lapDuration());
   elements.speedLevel.textContent = `レベル${state.speedLevel}`;

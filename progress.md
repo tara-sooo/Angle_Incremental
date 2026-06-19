@@ -14,6 +14,7 @@ Original prompt: では、中核ループを完成させてください
 - Localized the visible UI to Japanese and added a Japanese-capable web font so canvas and DOM text render correctly in environments without system Japanese fonts.
 - Fixed late-game performance risk by batching very large vertex-crossing updates, and changed very short lap times to sub-10ms display instead of `0.00秒`.
 - Fixed vertex-boundary precision drift so exact boundary advances consistently apply the per-vertex gain increase.
+- Changed gain display to show the total gain as the primary value, with multiplicative notation as secondary text, so gain upgrades no longer appear to add only 0.01 when vertex count enables split notation.
 
 ## TODO
 
