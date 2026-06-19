@@ -9,8 +9,10 @@ Original prompt: では、中核ループを完成させてください
 - Tuned early upgrade costs down so the first purchases are reachable in a short play session.
 - Re-ran Playwright validation after tuning. Confirmed score loop, upgrade purchases, Generation reset/boost, and no console errors.
 - Fixed two review findings: high-speed updates now process multiple vertex crossings per frame, and Generation status now distinguishes unlocked from ready.
+- Added `localStorage` save/load support with versioned save data, 5-second autosave, immediate saves after purchases/Generation, before-unload save, and a reset-save button.
+- Verified autosave writes, manual save survives reload, reset clears storage, and the updated UI renders correctly.
 
 ## TODO
 
 - Future balance pass: tune late-game growth toward the 1,000,000 Generation target through real playtesting.
-- Future polish: add save/load once the loop balance is settled.
+- Future polish: add explicit import/export save text if players need to move saves between browsers.

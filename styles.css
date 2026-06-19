@@ -110,13 +110,15 @@ canvas {
 
 .stats,
 .upgrades,
-.generation {
+.generation,
+.save-panel {
   display: grid;
   gap: 10px;
 }
 
 .metric,
-.generation > div {
+.generation > div,
+.save-panel > div {
   display: flex;
   justify-content: space-between;
   gap: 14px;
@@ -126,14 +128,16 @@ canvas {
 }
 
 .metric span,
-.generation span {
+.generation span,
+.save-panel span {
   color: var(--muted);
   font-size: 0.84rem;
   font-weight: 700;
 }
 
 .metric strong,
-.generation strong {
+.generation strong,
+.save-panel strong {
   text-align: right;
   font-size: 1rem;
 }
@@ -196,7 +200,8 @@ canvas {
   align-self: end;
 }
 
-.generation-button {
+.generation-button,
+.reset-button {
   justify-content: center;
   color: white;
   background: var(--accent);
@@ -208,6 +213,26 @@ canvas {
   cursor: not-allowed;
   background: #a9aaa4;
   border-color: #a9aaa4;
+}
+
+.save-panel {
+  padding-top: 4px;
+}
+
+.save-panel strong {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.reset-button {
+  min-height: 48px;
+  color: var(--accent-strong);
+  background: transparent;
+}
+
+.reset-button:hover {
+  color: white;
+  background: var(--accent);
 }
 
 @media (max-width: 980px) {

@@ -14,6 +14,8 @@ const elements = {
   speedUpgrade: document.getElementById("speedUpgrade"),
   vertexUpgrade: document.getElementById("vertexUpgrade"),
   gainUpgrade: document.getElementById("gainUpgrade"),
+  saveStatus: document.getElementById("saveStatus"),
+  resetSaveButton: document.getElementById("resetSaveButton"),
   speedLevel: document.getElementById("speedLevel"),
   vertexCount: document.getElementById("vertexCount"),
   gainLevel: document.getElementById("gainLevel"),
@@ -24,6 +26,8 @@ const elements = {
 
 const BASE_LAP_SECONDS = 6;
 const GENERATION_UNLOCK_SCORE = 1_000_000;
+const SAVE_KEY = "angle-incremental-save";
+const SAVE_VERSION = 1;
 const TAU = Math.PI * 2;
 
 const state = {
@@ -43,6 +47,125 @@ const state = {
   floatingTexts: [],
   lastEarned: 0,
 };
+
+const SAVE_FIELDS = [
+  "score",
+  "totalScore",
+  "generationScore",
+  "vertices",
+  "speedLevel",
+  "gainLevel",
+  "currentGain",
+  "pointProgress",
+  "totalVertexProgress",
+  "lastVertexIndex",
+  "generationCount",
+  "generationScoreMultiplier",
+  "generationCostFactor",
+  "lastEarned",
+];
+
+let autoSaveElapsed = 0;
+
+function setSaveStatus(text) {
+  elements.saveStatus.textContent = text;
+}
+
+function sanitizeNumber(value, fallback, min = 0) {
+  return Number.isFinite(value) && value >= min ? value : fallback;
+}
+
+function applySaveData(data) {
+  state.score = sanitizeNumber(data.score, 0);
+  state.totalScore = sanitizeNumber(data.totalScore, state.score);
+  state.generationScore = sanitizeNumber(data.generationScore, state.score);
+  state.vertices = Math.max(3, Math.floor(sanitizeNumber(data.vertices, 3, 3)));
+  state.speedLevel = Math.floor(sanitizeNumber(data.speedLevel, 0));
+  state.gainLevel = Math.floor(sanitizeNumber(data.gainLevel, 0));
+  state.currentGain = sanitizeNumber(data.currentGain, 1);
+  state.pointProgress = sanitizeNumber(data.pointProgress, 0) % 1;
+  state.totalVertexProgress = sanitizeNumber(data.totalVertexProgress, state.pointProgress * state.vertices);
+  state.lastVertexIndex = Math.floor(sanitizeNumber(data.lastVertexIndex, 0));
+  state.generationCount = Math.floor(sanitizeNumber(data.generationCount, 0));
+  state.generationScoreMultiplier = sanitizeNumber(data.generationScoreMultiplier, 1, 1);
+  state.generationCostFactor = Math.min(1, sanitizeNumber(data.generationCostFactor, 1, 0.25));
+  state.lastEarned = sanitizeNumber(data.lastEarned, 0);
+  state.floatingTexts = [];
+}
+
+function serializeSaveData() {
+  const data = {};
+  SAVE_FIELDS.forEach((field) => {
+    data[field] = state[field];
+  });
+  return {
+    version: SAVE_VERSION,
+    savedAt: Date.now(),
+    state: data,
+  };
+}
+
+function saveGame(reason = "auto") {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(serializeSaveData()));
+    autoSaveElapsed = 0;
+    setSaveStatus(reason === "auto" ? "Autosaved" : "Saved");
+    return true;
+  } catch (error) {
+    autoSaveElapsed = 0;
+    setSaveStatus("Save failed");
+    return false;
+  }
+}
+
+function loadGame() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) {
+      setSaveStatus("Not saved yet");
+      return;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (parsed.version !== SAVE_VERSION || !parsed.state || typeof parsed.state !== "object") {
+      setSaveStatus("Save outdated");
+      return;
+    }
+
+    applySaveData(parsed.state);
+    autoSaveElapsed = 0;
+    setSaveStatus("Loaded");
+  } catch (error) {
+    setSaveStatus("Save unreadable");
+  }
+}
+
+function resetSave() {
+  const confirmed = window.confirm("Reset all saved progress?");
+  if (!confirmed) return;
+  localStorage.removeItem(SAVE_KEY);
+  Object.assign(state, {
+    score: 0,
+    totalScore: 0,
+    generationScore: 0,
+    vertices: 3,
+    speedLevel: 0,
+    gainLevel: 0,
+    currentGain: 1,
+    pointProgress: 0,
+    totalVertexProgress: 0,
+    lastVertexIndex: 0,
+    generationCount: 0,
+    generationScoreMultiplier: 1,
+    generationCostFactor: 1,
+    floatingTexts: [],
+    lastEarned: 0,
+  });
+  autoSaveElapsed = 0;
+  setSaveStatus("Reset");
+  updateUi();
+  draw();
+}
 
 function formatNumber(value) {
   if (!Number.isFinite(value)) return "0";
@@ -125,6 +248,9 @@ function update(dt) {
   state.floatingTexts = state.floatingTexts
     .map((item) => ({ ...item, life: item.life - dt, y: item.y - dt * 26 }))
     .filter((item) => item.life > 0);
+
+  autoSaveElapsed += dt;
+  if (autoSaveElapsed >= 5) saveGame("auto");
 }
 
 function polygonPoints() {
@@ -269,6 +395,7 @@ function buySpeed() {
   if (!spend(price)) return;
   state.speedLevel += 1;
   updateUi();
+  saveGame("manual");
 }
 
 function buyVertex() {
@@ -279,6 +406,7 @@ function buyVertex() {
   state.totalVertexProgress = 0;
   state.lastVertexIndex = 0;
   updateUi();
+  saveGame("manual");
 }
 
 function buyGain() {
@@ -286,6 +414,7 @@ function buyGain() {
   if (!spend(price)) return;
   state.gainLevel += 1;
   updateUi();
+  saveGame("manual");
 }
 
 function runGeneration() {
@@ -307,6 +436,7 @@ function runGeneration() {
   state.lastVertexIndex = 0;
   state.floatingTexts = [];
   updateUi();
+  saveGame("manual");
 }
 
 function resizeCanvas() {
@@ -368,12 +498,17 @@ window.__angleDebug = {
   state,
   addScore,
   runGeneration,
+  saveGame,
+  loadGame,
+  resetSave,
 };
 
 elements.speedUpgrade.addEventListener("click", buySpeed);
 elements.vertexUpgrade.addEventListener("click", buyVertex);
 elements.gainUpgrade.addEventListener("click", buyGain);
 elements.generationButton.addEventListener("click", runGeneration);
+elements.resetSaveButton.addEventListener("click", resetSave);
+window.addEventListener("beforeunload", () => saveGame("manual"));
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("keydown", (event) => {
   if (event.key.toLowerCase() === "f") {
@@ -382,6 +517,7 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
+loadGame();
 resizeCanvas();
 updateUi();
 requestAnimationFrame(frame);
