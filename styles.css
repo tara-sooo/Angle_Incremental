@@ -2,12 +2,12 @@
   color-scheme: light;
   --ink: #18211f;
   --muted: #66716d;
-  --paper: #f7f5ef;
-  --surface: #fffdf8;
-  --line: #d8d3c7;
+  --paper: #dce4f3;
+  --surface: #fbfcff;
+  --line: #c9d0dd;
   --accent: #d64f38;
   --accent-strong: #b73527;
-  --blue: #2e6f8f;
+  --blue: #254a88;
   --green: #3f7c54;
   --shadow: 0 18px 45px rgba(25, 31, 29, 0.12);
   font-family: "Noto Sans JP", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -22,8 +22,9 @@ body {
   min-height: 100svh;
   color: var(--ink);
   background:
-    linear-gradient(115deg, rgba(214, 79, 56, 0.13), transparent 34%),
-    linear-gradient(245deg, rgba(46, 111, 143, 0.14), transparent 38%),
+    radial-gradient(circle at 18% 12%, rgba(57, 84, 161, 0.42), transparent 30%),
+    radial-gradient(circle at 86% 4%, rgba(20, 36, 91, 0.42), transparent 28%),
+    linear-gradient(135deg, rgba(17, 31, 82, 0.3), rgba(47, 69, 137, 0.2) 42%, rgba(244, 247, 253, 0.45) 100%),
     var(--paper);
 }
 
@@ -44,9 +45,9 @@ button {
 
 .stage-panel,
 .control-panel {
-  background: rgba(255, 253, 248, 0.88);
-  border: 1px solid rgba(216, 211, 199, 0.88);
-  box-shadow: var(--shadow);
+  background: rgba(251, 252, 255, 0.9);
+  border: 1px solid rgba(201, 208, 221, 0.9);
+  box-shadow: 0 18px 45px rgba(18, 32, 75, 0.18);
 }
 
 .stage-panel {
@@ -96,7 +97,7 @@ canvas {
   width: 100%;
   height: 100%;
   min-height: 480px;
-  background: #fbfaf5;
+  background: #f8faff;
   border: 1px solid var(--line);
 }
 
