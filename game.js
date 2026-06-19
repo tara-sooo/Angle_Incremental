@@ -11,6 +11,11 @@ const elements = {
   generationMultiplier: document.getElementById("generationMultiplier"),
   generationCostFactor: document.getElementById("generationCostFactor"),
   generationButton: document.getElementById("generationButton"),
+  coreBoostCount: document.getElementById("coreBoostCount"),
+  coreBoostRequirement: document.getElementById("coreBoostRequirement"),
+  coreBoostGainBoost: document.getElementById("coreBoostGainBoost"),
+  coreBoostExponent: document.getElementById("coreBoostExponent"),
+  coreBoostButton: document.getElementById("coreBoostButton"),
   speedUpgrade: document.getElementById("speedUpgrade"),
   vertexUpgrade: document.getElementById("vertexUpgrade"),
   gainUpgrade: document.getElementById("gainUpgrade"),
@@ -26,6 +31,7 @@ const elements = {
 
 const BASE_LAP_SECONDS = 6;
 const GENERATION_UNLOCK_SCORE = 1_000_000;
+const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
@@ -46,6 +52,7 @@ const state = {
   generationCount: 0,
   generationScoreMultiplier: 1,
   generationCostFactor: 1,
+  coreBoostCount: 0,
   floatingTexts: [],
   lastEarned: 0,
 };
@@ -64,6 +71,7 @@ const SAVE_FIELDS = [
   "generationCount",
   "generationScoreMultiplier",
   "generationCostFactor",
+  "coreBoostCount",
   "lastEarned",
 ];
 
@@ -92,6 +100,7 @@ function applySaveData(data) {
   state.generationCount = Math.floor(sanitizeNumber(data.generationCount, 0));
   state.generationScoreMultiplier = sanitizeNumber(data.generationScoreMultiplier, 1, 1);
   state.generationCostFactor = Math.min(1, sanitizeNumber(data.generationCostFactor, 1, 0.25));
+  state.coreBoostCount = Math.floor(sanitizeNumber(data.coreBoostCount, 0));
   state.lastEarned = sanitizeNumber(data.lastEarned, 0);
   state.floatingTexts = [];
 }
@@ -161,6 +170,7 @@ function resetSave() {
     generationCount: 0,
     generationScoreMultiplier: 1,
     generationCostFactor: 1,
+    coreBoostCount: 0,
     floatingTexts: [],
     lastEarned: 0,
   });
@@ -171,9 +181,11 @@ function resetSave() {
 }
 
 function formatNumber(value) {
+  if (value === Infinity) return "∞";
   if (!Number.isFinite(value)) return "0";
   if (value < 1000) return value.toFixed(value < 10 ? 2 : 0).replace(/\.00$/, "");
   if (value < 1_000_000) return Math.floor(value).toLocaleString("en-US");
+  if (value >= 1e18) return value.toExponential(2).replace("e+", "e");
   const units = ["M", "B", "T", "Qa", "Qi", "Sx"];
   let scaled = value;
   let unitIndex = -1;
@@ -182,6 +194,10 @@ function formatNumber(value) {
     unitIndex += 1;
   }
   return `${scaled.toFixed(scaled >= 100 ? 1 : 2)}${units[unitIndex]}`;
+}
+
+function formatSmallDecimal(value) {
+  return value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function formatGainExpression(value) {
@@ -220,7 +236,23 @@ function formatDuration(seconds) {
 }
 
 function vertexGainIncrease() {
-  return 0.01 + state.gainLevel * 0.01;
+  return (0.01 + state.gainLevel * 0.01) * coreBoostGainIncreaseMultiplier();
+}
+
+function coreBoostRequirement() {
+  return CORE_BOOST_BASE_REQUIREMENT ** (2 ** state.coreBoostCount);
+}
+
+function coreBoostGainIncreaseMultiplier() {
+  return 1 + state.coreBoostCount * 0.5;
+}
+
+function coreBoostGainExponent() {
+  return 1 + state.coreBoostCount * 0.05;
+}
+
+function finalScoreGain(baseGain = state.currentGain) {
+  return Math.pow(baseGain, coreBoostGainExponent()) * state.generationScoreMultiplier;
 }
 
 function cost(base, level, growth) {
@@ -245,7 +277,7 @@ function addScore(amount) {
 function passVertex(index) {
   state.currentGain += vertexGainIncrease();
   if (index === 0) {
-    const earned = state.currentGain * state.generationScoreMultiplier;
+    const earned = finalScoreGain();
     addScore(earned);
     state.floatingTexts.push({
       text: `+${formatNumber(earned)}`,
@@ -269,7 +301,7 @@ function processManyVertices(start, end) {
     const lastCoreStep = firstCoreStep + (coreHits - 1) * state.vertices;
     const firstGain = state.currentGain + increase * firstCoreStep;
     const lastGain = state.currentGain + increase * lastCoreStep;
-    const earned = ((firstGain + lastGain) * coreHits * 0.5) * state.generationScoreMultiplier;
+    const earned = ((finalScoreGain(firstGain) + finalScoreGain(lastGain)) * coreHits * 0.5);
     addScore(earned);
     state.floatingTexts.push({
       text: `+${formatNumber(earned)}`,
@@ -399,7 +431,7 @@ function draw() {
 
   ctx.font = "800 28px 'Noto Sans JP', sans-serif";
   ctx.fillStyle = "#b73527";
-  ctx.fillText(formatNumber(state.currentGain), canvas.width / 2, canvas.height - 68);
+  ctx.fillText(formatNumber(finalScoreGain()), canvas.width / 2, canvas.height - 68);
 
   if (canDrawJapanese) {
     ctx.font = "700 15px 'Noto Sans JP', sans-serif";
@@ -407,7 +439,7 @@ function draw() {
     ctx.fillText("現在の獲得量", canvas.width / 2, canvas.height - 42);
     if (hasMultiplicativeGainExpression()) {
       ctx.font = "700 13px 'Noto Sans JP', sans-serif";
-      ctx.fillText(`乗算表記: ${formatGainExpressionSummary(state.currentGain)}`, canvas.width / 2, canvas.height - 20);
+      ctx.fillText(`基礎乗算表記: ${formatGainExpressionSummary(state.currentGain)}`, canvas.width / 2, canvas.height - 20);
     }
   }
 
@@ -425,8 +457,8 @@ function draw() {
 function updateUi() {
   const currentCosts = costs();
   elements.scoreValue.textContent = formatNumber(state.score);
-  elements.gainValue.textContent = formatNumber(state.currentGain * state.generationScoreMultiplier);
-  elements.vertexGainValue.textContent = `+${vertexGainIncrease().toFixed(2)}`;
+  elements.gainValue.textContent = formatNumber(finalScoreGain());
+  elements.vertexGainValue.textContent = `+${formatSmallDecimal(vertexGainIncrease())}`;
   elements.lapValue.textContent = formatDuration(lapDuration());
   elements.speedLevel.textContent = `レベル${state.speedLevel}`;
   elements.vertexCount.textContent = `${state.vertices}頂点`;
@@ -449,6 +481,13 @@ function updateUi() {
   elements.generationCount.textContent = String(state.generationCount);
   elements.generationMultiplier.textContent = `×${state.generationScoreMultiplier.toFixed(2)}`;
   elements.generationCostFactor.textContent = `×${state.generationCostFactor.toFixed(2)}`;
+
+  const currentCoreBoostRequirement = coreBoostRequirement();
+  elements.coreBoostCount.textContent = String(state.coreBoostCount);
+  elements.coreBoostRequirement.textContent = formatNumber(currentCoreBoostRequirement);
+  elements.coreBoostGainBoost.textContent = `×${coreBoostGainIncreaseMultiplier().toFixed(2)}`;
+  elements.coreBoostExponent.textContent = `^${coreBoostGainExponent().toFixed(2)}`;
+  elements.coreBoostButton.disabled = state.score < currentCoreBoostRequirement;
 }
 
 function spend(amount) {
@@ -506,6 +545,31 @@ function runGeneration() {
   saveGame("manual");
 }
 
+function resetBelowCoreBoost() {
+  state.score = 0;
+  state.totalScore = 0;
+  state.generationScore = 0;
+  state.vertices = 3;
+  state.speedLevel = 0;
+  state.gainLevel = 0;
+  state.currentGain = 1;
+  state.pointProgress = 0;
+  state.totalVertexProgress = 0;
+  state.lastVertexIndex = 0;
+  state.generationCount = 0;
+  state.generationScoreMultiplier = 1;
+  state.generationCostFactor = 1;
+  state.floatingTexts = [];
+}
+
+function runCoreBoost() {
+  if (state.score < coreBoostRequirement()) return;
+  state.coreBoostCount += 1;
+  resetBelowCoreBoost();
+  updateUi();
+  saveGame("manual");
+}
+
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
   const scale = window.devicePixelRatio || 1;
@@ -534,7 +598,7 @@ function renderGameToText() {
     totalScore: Number(state.totalScore.toFixed(2)),
     generationScore: Number(state.generationScore.toFixed(2)),
     currentGain: Number(state.currentGain.toFixed(2)),
-    finalGainOnCore: Number((state.currentGain * state.generationScoreMultiplier).toFixed(2)),
+    finalGainOnCore: Number(finalScoreGain().toPrecision(6)),
     vertices: state.vertices,
     lapSeconds: Number(lapDuration().toPrecision(6)),
     point: { x: Number(point.x.toFixed(1)), y: Number(point.y.toFixed(1)), progress: Number(state.pointProgress.toFixed(3)) },
@@ -551,6 +615,13 @@ function renderGameToText() {
       scoreMultiplier: Number(state.generationScoreMultiplier.toFixed(2)),
       costFactor: Number(state.generationCostFactor.toFixed(2)),
     },
+    coreBoost: {
+      canBoost: state.score >= coreBoostRequirement(),
+      count: state.coreBoostCount,
+      requirement: coreBoostRequirement(),
+      gainIncreaseMultiplier: Number(coreBoostGainIncreaseMultiplier().toFixed(2)),
+      gainExponent: Number(coreBoostGainExponent().toFixed(2)),
+    },
   });
 }
 
@@ -565,6 +636,7 @@ window.__angleDebug = {
   state,
   addScore,
   runGeneration,
+  runCoreBoost,
   saveGame,
   loadGame,
   resetSave,
@@ -574,6 +646,7 @@ elements.speedUpgrade.addEventListener("click", buySpeed);
 elements.vertexUpgrade.addEventListener("click", buyVertex);
 elements.gainUpgrade.addEventListener("click", buyGain);
 elements.generationButton.addEventListener("click", runGeneration);
+elements.coreBoostButton.addEventListener("click", runCoreBoost);
 elements.resetSaveButton.addEventListener("click", resetSave);
 window.addEventListener("beforeunload", () => saveGame("manual"));
 window.addEventListener("resize", resizeCanvas);

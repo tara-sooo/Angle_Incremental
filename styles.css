@@ -112,6 +112,7 @@ canvas {
 .stats,
 .upgrades,
 .generation,
+.core-boost,
 .save-panel {
   display: grid;
   gap: 10px;
@@ -119,6 +120,7 @@ canvas {
 
 .metric,
 .generation > div,
+.core-boost > div,
 .save-panel > div {
   display: flex;
   justify-content: space-between;
@@ -130,6 +132,7 @@ canvas {
 
 .metric span,
 .generation span,
+.core-boost span,
 .save-panel span {
   color: var(--muted);
   font-size: 0.84rem;
@@ -138,6 +141,7 @@ canvas {
 
 .metric strong,
 .generation strong,
+.core-boost strong,
 .save-panel strong {
   text-align: right;
   font-size: 1rem;
@@ -173,7 +177,8 @@ canvas {
 }
 
 .upgrade-button:hover,
-.generation-button:hover:not(:disabled) {
+.generation-button:hover:not(:disabled),
+.core-boost-button:hover:not(:disabled) {
   transform: translateY(-1px);
   border-color: var(--accent);
 }
@@ -202,6 +207,7 @@ canvas {
 }
 
 .generation-button,
+.core-boost-button,
 .reset-button {
   justify-content: center;
   color: white;
@@ -214,6 +220,18 @@ canvas {
   cursor: not-allowed;
   background: #a9aaa4;
   border-color: #a9aaa4;
+}
+
+.core-boost-button {
+  min-height: 56px;
+  background: #254a88;
+  border-color: #254a88;
+}
+
+.core-boost-button:disabled {
+  cursor: not-allowed;
+  background: #8f98a9;
+  border-color: #8f98a9;
 }
 
 .save-panel {

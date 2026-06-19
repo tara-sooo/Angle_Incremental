@@ -15,8 +15,10 @@ Original prompt: では、中核ループを完成させてください
 - Fixed late-game performance risk by batching very large vertex-crossing updates, and changed very short lap times to sub-10ms display instead of `0.00秒`.
 - Fixed vertex-boundary precision drift so exact boundary advances consistently apply the per-vertex gain increase.
 - Changed gain display to show the total gain as the primary value, with multiplicative notation as secondary text, so gain upgrades no longer appear to add only 0.01 when vertex count enables split notation.
+- Added Core Boost as a second reset layer at 1.00e20 current score, with requirement squaring, lower-layer reset, vertex-gain increase multiplier, and score-gain exponent boost.
 
 ## TODO
 
 - Future balance pass: tune late-game growth toward the 1,000,000 Generation target through real playtesting.
+- Future balance pass: tune Core Boost gain multiplier/exponent formulas and the path to 1.00e20.
 - Future polish: add explicit import/export save text if players need to move saves between browsers.

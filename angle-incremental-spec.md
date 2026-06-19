@@ -269,7 +269,72 @@ Generation 実行時、現在の世代で稼いだ累計スコアを参照する
 Generation倍率増加 = sqrt(今回の世代スコア / 1,000,000)
 ```
 
-## 12. 推奨データ構造
+## 12. Core Boost
+
+### 12.1 解放条件
+
+所持スコアが以下に到達すると、1回目の Core Boost を実行できる。
+
+```text
+所持スコア >= 1.00e20
+```
+
+### 12.2 役割
+
+Core Boost は、Generation より上位の2つ目のリセットレイヤーである。
+
+Core Boost を実行すると、Core Boost 未満の進行度をリセットする代わりに、より強力な恒久ブーストを得る。
+
+### 12.3 リセット対象
+
+Core Boost 実行時、以下を初期化する。
+
+| 項目 | リセット後 |
+| --- | --- |
+| 現在スコア | 0 |
+| 累計スコア | 0 |
+| 今回の世代スコア | 0 |
+| The Angle の強化 | 初期化 |
+| 頂点数 | 3 |
+| Generation 回数 | 0 |
+| Generation 由来のブースト | 初期化 |
+
+Core Boost の累計獲得量はリセットされない。
+
+### 12.4 Core Boost ブースト
+
+Core Boost によって、以下のブーストが得られる。
+
+| 強化内容 | 効果 |
+| --- | --- |
+| スコア獲得量増加の増加 | 頂点通過ごとの獲得量増加値を乗算する。 |
+| スコア獲得量の指数増加 | 核到達時のスコア獲得量に指数補正をかける。 |
+
+実装上の初期式は以下とする。
+
+```text
+頂点通過ごとの増加倍率 = 1 + CoreBoost数 x 0.5
+スコア獲得量指数 = 1 + CoreBoost数 x 0.05
+最終獲得スコア = (現在の獲得量 ^ スコア獲得量指数) x Generationスコア倍率
+```
+
+### 12.5 次回要求量
+
+Core Boost を1回獲得するたびに、次回の必要スコアは2乗される。
+
+```text
+次回CoreBoost必要スコア = 今回CoreBoost必要スコア ^ 2
+```
+
+例:
+
+```text
+1回目: 1.00e20
+2回目: 1.00e40
+3回目: 1.00e80
+```
+
+## 13. 推奨データ構造
 
 ```text
 score
@@ -288,9 +353,14 @@ lapSpeedMultiplier
 generationCount
 generationScoreMultiplier
 generationCostReductionMultiplier
+
+coreBoostCount
+coreBoostRequirement
+coreBoostGainIncreaseMultiplier
+coreBoostGainExponent
 ```
 
-## 13. ゲームループ
+## 14. ゲームループ
 
 ```text
 1. Point が The Angle の外周を移動する
@@ -303,9 +373,11 @@ generationCostReductionMultiplier
 8. Generation が解放される
 9. Generation を実行してブーストを得る
 10. 強化された状態で再スタートする
+11. 所持スコアが 1.00e20 に到達する
+12. Core Boost を実行して、Generation 以下をリセットしつつ恒久ブーストを得る
 ```
 
-## 14. 最小実装範囲
+## 15. 最小実装範囲
 
 最初の実装では、以下の範囲を満たせば中核ループが成立する。
 
@@ -319,9 +391,11 @@ generationCostReductionMultiplier
 ・スコア獲得量増加強化
 ・累計スコア 1,000,000 で Generation 解放
 ・Generation 実行でリセットと倍率付与
+・所持スコア 1.00e20 で Core Boost 解放
+・Core Boost 実行で Generation 以下をリセットし、獲得量増加倍率と獲得量指数を付与
 ```
 
-## 15. 未確定・調整項目
+## 16. 未確定・調整項目
 
 | 項目 | 内容 |
 | --- | --- |
@@ -332,4 +406,5 @@ generationCostReductionMultiplier
 | 乗算表記の開始条件 | 何頂点から表示を変えるか。 |
 | Generation 倍率式 | 世代スコアから倍率をどう算出するか。 |
 | Generation 実行条件 | 1,000,000 到達後いつでも実行可能にするか。 |
+| Core Boost 効果式 | CB数から増加倍率・指数をどう伸ばすか。 |
 | 複数 Point の有無 | 後半要素として追加するか。 |
