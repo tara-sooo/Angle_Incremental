@@ -36,6 +36,8 @@ const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
+const MAX_EXACT_CORE_HITS = 50000;
+const CORE_HIT_APPROX_SEGMENTS = 2048;
 const VERTEX_EPSILON = 1e-9;
 const TAU = Math.PI * 2;
 
@@ -282,6 +284,17 @@ function sumCoreHitGains(firstCoreStep, coreHits, increase) {
   const multiplier = state.generationScoreMultiplier;
   const stride = state.vertices;
   const baseGain = state.currentGain;
+
+  if (coreHits > MAX_EXACT_CORE_HITS) {
+    let earned = 0;
+    const segmentSize = coreHits / CORE_HIT_APPROX_SEGMENTS;
+    for (let segment = 0; segment < CORE_HIT_APPROX_SEGMENTS; segment += 1) {
+      const midHit = (segment + 0.5) * segmentSize;
+      const stepAtMid = firstCoreStep + midHit * stride;
+      earned += Math.pow(baseGain + increase * stepAtMid, exponent) * multiplier * segmentSize;
+    }
+    return earned;
+  }
 
   let earned = 0;
   for (let hit = 0; hit < coreHits; hit += 1) {
