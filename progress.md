@@ -18,9 +18,12 @@ Original prompt: では、中核ループを完成させてください
 - Added Core Boost as a second reset layer at 1.00e20 current score, with requirement squaring, lower-layer reset, vertex-gain increase multiplier, and score-gain exponent boost.
 - Fixed Core Boost review issues: batched core-hit score now sums nonlinear gains per core hit, and Core Boost requirements use capped log-space comparison to avoid Infinity requirements.
 - Bounded Core Boost batch scoring: normal core-hit batches are summed exactly, while extreme batches use a fixed-segment midpoint approximation to avoid browser main-thread freezes.
+- Added the Infinity layer with log-space score tracking past JavaScript's normal number range, first-Infinity auto reset, repeatable manual Infinity, IP, Infinity Upgrades, three starter Infinity Challenges, Break Infinite Cap, and Infinite Angle conversion.
+- Verified Infinity flows through Firefox/Playwright: forced first Infinity, manual Infinity, IP upgrade purchases, Infinite Angle conversion, IC completion, Break Infinite Cap, desktop/mobile layout screenshots, and no console errors.
 
 ## TODO
 
 - Future balance pass: tune late-game growth toward the 1,000,000 Generation target through real playtesting.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas and the path to 1.00e20.
+- Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle conversion rates.
 - Future polish: add explicit import/export save text if players need to move saves between browsers.

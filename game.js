@@ -16,6 +16,23 @@ const elements = {
   coreBoostGainBoost: document.getElementById("coreBoostGainBoost"),
   coreBoostExponent: document.getElementById("coreBoostExponent"),
   coreBoostButton: document.getElementById("coreBoostButton"),
+  infinityCount: document.getElementById("infinityCount"),
+  infinityPoints: document.getElementById("infinityPoints"),
+  infiniteScore: document.getElementById("infiniteScore"),
+  infiniteAngleBoost: document.getElementById("infiniteAngleBoost"),
+  infinityPointGain: document.getElementById("infinityPointGain"),
+  infinityButton: document.getElementById("infinityButton"),
+  ipGainUpgrade: document.getElementById("ipGainUpgrade"),
+  ipGainUpgradeCost: document.getElementById("ipGainUpgradeCost"),
+  infiniteAngleUpgrade: document.getElementById("infiniteAngleUpgrade"),
+  infiniteAngleUpgradeCost: document.getElementById("infiniteAngleUpgradeCost"),
+  softcapUpgrade: document.getElementById("softcapUpgrade"),
+  softcapUpgradeCost: document.getElementById("softcapUpgradeCost"),
+  convertIpButton: document.getElementById("convertIpButton"),
+  convertIpGain: document.getElementById("convertIpGain"),
+  challengeButton: document.getElementById("challengeButton"),
+  challengeStatus: document.getElementById("challengeStatus"),
+  breakCapButton: document.getElementById("breakCapButton"),
   speedUpgrade: document.getElementById("speedUpgrade"),
   vertexUpgrade: document.getElementById("vertexUpgrade"),
   gainUpgrade: document.getElementById("gainUpgrade"),
@@ -33,6 +50,9 @@ const BASE_LAP_SECONDS = 6;
 const GENERATION_UNLOCK_SCORE = 1_000_000;
 const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
+const INFINITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
+const BREAK_CAP_REQUIREMENT_LOG10 = 333;
+const INFINITY_CHALLENGE_COUNT = 3;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
@@ -43,6 +63,7 @@ const TAU = Math.PI * 2;
 
 const state = {
   score: 0,
+  scoreLog10: -Infinity,
   totalScore: 0,
   generationScore: 0,
   vertices: 3,
@@ -56,12 +77,22 @@ const state = {
   generationScoreMultiplier: 1,
   generationCostFactor: 1,
   coreBoostCount: 0,
+  infinityCount: 0,
+  infinityPoints: 0,
+  infiniteScore: 0,
+  ipGainUpgradeLevel: 0,
+  infiniteAngleUpgradeLevel: 0,
+  softcapUpgradeLevel: 0,
+  activeChallenge: 0,
+  completedChallenges: 0,
+  infiniteCapBroken: false,
   floatingTexts: [],
   lastEarned: 0,
 };
 
 const SAVE_FIELDS = [
   "score",
+  "scoreLog10",
   "totalScore",
   "generationScore",
   "vertices",
@@ -75,6 +106,15 @@ const SAVE_FIELDS = [
   "generationScoreMultiplier",
   "generationCostFactor",
   "coreBoostCount",
+  "infinityCount",
+  "infinityPoints",
+  "infiniteScore",
+  "ipGainUpgradeLevel",
+  "infiniteAngleUpgradeLevel",
+  "softcapUpgradeLevel",
+  "activeChallenge",
+  "completedChallenges",
+  "infiniteCapBroken",
   "lastEarned",
 ];
 
@@ -91,6 +131,7 @@ function sanitizeNumber(value, fallback, min = 0) {
 
 function applySaveData(data) {
   state.score = sanitizeNumber(data.score, 0);
+  state.scoreLog10 = sanitizeNumber(data.scoreLog10, log10Value(state.score), -Infinity);
   state.totalScore = sanitizeNumber(data.totalScore, state.score);
   state.generationScore = sanitizeNumber(data.generationScore, state.score);
   state.vertices = Math.max(3, Math.floor(sanitizeNumber(data.vertices, 3, 3)));
@@ -104,6 +145,15 @@ function applySaveData(data) {
   state.generationScoreMultiplier = sanitizeNumber(data.generationScoreMultiplier, 1, 1);
   state.generationCostFactor = Math.min(1, sanitizeNumber(data.generationCostFactor, 1, 0.25));
   state.coreBoostCount = Math.floor(sanitizeNumber(data.coreBoostCount, 0));
+  state.infinityCount = Math.floor(sanitizeNumber(data.infinityCount, 0));
+  state.infinityPoints = Math.floor(sanitizeNumber(data.infinityPoints, 0));
+  state.infiniteScore = sanitizeNumber(data.infiniteScore, 0);
+  state.ipGainUpgradeLevel = Math.floor(sanitizeNumber(data.ipGainUpgradeLevel, 0));
+  state.infiniteAngleUpgradeLevel = Math.floor(sanitizeNumber(data.infiniteAngleUpgradeLevel, 0));
+  state.softcapUpgradeLevel = Math.floor(sanitizeNumber(data.softcapUpgradeLevel, 0));
+  state.activeChallenge = Math.min(INFINITY_CHALLENGE_COUNT, Math.floor(sanitizeNumber(data.activeChallenge, 0)));
+  state.completedChallenges = Math.floor(sanitizeNumber(data.completedChallenges, 0));
+  state.infiniteCapBroken = Boolean(data.infiniteCapBroken);
   state.lastEarned = sanitizeNumber(data.lastEarned, 0);
   state.floatingTexts = [];
 }
@@ -161,6 +211,7 @@ function resetSave() {
   localStorage.removeItem(SAVE_KEY);
   Object.assign(state, {
     score: 0,
+    scoreLog10: -Infinity,
     totalScore: 0,
     generationScore: 0,
     vertices: 3,
@@ -174,6 +225,15 @@ function resetSave() {
     generationScoreMultiplier: 1,
     generationCostFactor: 1,
     coreBoostCount: 0,
+    infinityCount: 0,
+    infinityPoints: 0,
+    infiniteScore: 0,
+    ipGainUpgradeLevel: 0,
+    infiniteAngleUpgradeLevel: 0,
+    softcapUpgradeLevel: 0,
+    activeChallenge: 0,
+    completedChallenges: 0,
+    infiniteCapBroken: false,
     floatingTexts: [],
     lastEarned: 0,
   });
@@ -199,11 +259,17 @@ function formatNumber(value) {
   return `${scaled.toFixed(scaled >= 100 ? 1 : 2)}${units[unitIndex]}`;
 }
 
-function formatPowerOfTen(log10Value) {
-  if (!Number.isFinite(log10Value)) return "∞";
+function formatLogNumber(log10Value, capSuffix = false) {
+  if (!Number.isFinite(log10Value)) return log10Value === -Infinity ? "0" : "∞";
   if (log10Value < 18) return formatNumber(10 ** log10Value);
-  const suffix = log10Value >= MAX_CORE_BOOST_REQUIREMENT_LOG10 ? "以上" : "";
-  return `1.00e${Math.floor(log10Value).toLocaleString("en-US")}${suffix}`;
+  const exponent = Math.floor(log10Value);
+  const mantissa = 10 ** (log10Value - exponent);
+  const suffix = capSuffix ? "以上" : "";
+  return `${mantissa.toFixed(2)}e${exponent.toLocaleString("en-US")}${suffix}`;
+}
+
+function formatPowerOfTen(log10Value) {
+  return formatLogNumber(log10Value, log10Value >= MAX_CORE_BOOST_REQUIREMENT_LOG10);
 }
 
 function formatSmallDecimal(value) {
@@ -232,11 +298,13 @@ function formatGainExpressionSummary(value) {
 }
 
 function lapSpeedMultiplier() {
-  return Math.pow(1.22, state.speedLevel);
+  const challengeReward = isChallengeCompleted(2) ? 1.2 : 1;
+  return Math.pow(1.22, state.speedLevel) * challengeReward;
 }
 
 function lapDuration() {
-  return BASE_LAP_SECONDS / lapSpeedMultiplier();
+  const challengePenalty = state.activeChallenge === 2 ? 3 : 1;
+  return (BASE_LAP_SECONDS / lapSpeedMultiplier()) * challengePenalty;
 }
 
 function formatDuration(seconds) {
@@ -245,8 +313,43 @@ function formatDuration(seconds) {
   return "10ミリ秒未満";
 }
 
+function log10Value(value) {
+  if (value === Infinity) return Infinity;
+  return value > 0 && Number.isFinite(value) ? Math.log10(value) : -Infinity;
+}
+
+function combineLog10(a, b) {
+  if (a === -Infinity) return b;
+  if (b === -Infinity) return a;
+  const high = Math.max(a, b);
+  const low = Math.min(a, b);
+  if (high - low > 15) return high;
+  return high + Math.log10(1 + 10 ** (low - high));
+}
+
+function currentScoreLog10() {
+  return Math.max(log10Value(state.score), Number.isFinite(state.scoreLog10) ? state.scoreLog10 : -Infinity);
+}
+
+function scoreDisplay() {
+  const scoreLog = currentScoreLog10();
+  if (scoreLog >= 18) return formatLogNumber(scoreLog);
+  return formatNumber(state.score);
+}
+
+function infinitySoftcapPower() {
+  if (state.infiniteCapBroken) return 1;
+  return Math.min(0.32, 0.08 + state.softcapUpgradeLevel * 0.035 + completedChallengeCount() * 0.02);
+}
+
+function applyInfinitySoftcap(rawLog10) {
+  if (state.infiniteCapBroken || rawLog10 <= INFINITY_REQUIREMENT_LOG10) return rawLog10;
+  return INFINITY_REQUIREMENT_LOG10 + (rawLog10 - INFINITY_REQUIREMENT_LOG10) * infinitySoftcapPower();
+}
+
 function vertexGainIncrease() {
-  return (0.01 + state.gainLevel * 0.01) * coreBoostGainIncreaseMultiplier();
+  const challengeFactor = state.activeChallenge === 3 ? 0.35 : 1;
+  return (0.01 + state.gainLevel * 0.01) * coreBoostGainIncreaseMultiplier() * infiniteAngleBoost() * challengeFactor;
 }
 
 function coreBoostRequirementLog10() {
@@ -258,13 +361,8 @@ function coreBoostRequirement() {
   return requirementLog10 > 308 ? Infinity : 10 ** requirementLog10;
 }
 
-function log10Value(value) {
-  if (value === Infinity) return Infinity;
-  return value > 0 && Number.isFinite(value) ? Math.log10(value) : -Infinity;
-}
-
 function canCoreBoost() {
-  return log10Value(state.score) >= coreBoostRequirementLog10();
+  return currentScoreLog10() >= coreBoostRequirementLog10();
 }
 
 function coreBoostGainIncreaseMultiplier() {
@@ -272,11 +370,84 @@ function coreBoostGainIncreaseMultiplier() {
 }
 
 function coreBoostGainExponent() {
-  return 1 + state.coreBoostCount * 0.05;
+  const challengeReward = isChallengeCompleted(1) ? 0.02 : 0;
+  return 1 + state.coreBoostCount * 0.05 + challengeReward;
 }
 
 function finalScoreGain(baseGain = state.currentGain) {
   return Math.pow(baseGain, coreBoostGainExponent()) * state.generationScoreMultiplier;
+}
+
+function finalScoreGainLog10(baseGain = state.currentGain) {
+  return log10Value(Math.max(baseGain, 0)) * coreBoostGainExponent() + log10Value(state.generationScoreMultiplier);
+}
+
+function isChallengeCompleted(index) {
+  return (state.completedChallenges & (1 << (index - 1))) !== 0;
+}
+
+function completedChallengeCount() {
+  let count = 0;
+  for (let index = 1; index <= INFINITY_CHALLENGE_COUNT; index += 1) {
+    if (isChallengeCompleted(index)) count += 1;
+  }
+  return count;
+}
+
+function nextChallengeIndex() {
+  for (let index = 1; index <= INFINITY_CHALLENGE_COUNT; index += 1) {
+    if (!isChallengeCompleted(index)) return index;
+  }
+  return 1;
+}
+
+function challengeName(index) {
+  if (index === 1) return "IC1 角追加禁止";
+  if (index === 2) return "IC2 周回低速";
+  if (index === 3) return "IC3 増加低下";
+  return "未挑戦";
+}
+
+function infiniteAngleEfficiency() {
+  const challengeReward = isChallengeCompleted(3) ? 1.5 : 1;
+  return (1 + state.infiniteAngleUpgradeLevel) * challengeReward;
+}
+
+function infiniteAngleBoost() {
+  return 1 + Math.log10(1 + state.infiniteScore) * 0.25;
+}
+
+function ipGainUpgradeCost() {
+  return Math.floor(1 * 2 ** state.ipGainUpgradeLevel);
+}
+
+function infiniteAngleUpgradeCost() {
+  return Math.floor(2 * 2 ** state.infiniteAngleUpgradeLevel);
+}
+
+function softcapUpgradeCost() {
+  return Math.floor(4 * 3 ** state.softcapUpgradeLevel);
+}
+
+function canInfinity() {
+  return currentScoreLog10() >= INFINITY_REQUIREMENT_LOG10;
+}
+
+function infinityPointGain() {
+  if (!canInfinity()) return 0;
+  const scoreLog = currentScoreLog10();
+  const depth = Math.max(0, scoreLog - INFINITY_REQUIREMENT_LOG10);
+  const base = 1 + Math.floor(depth / 25);
+  const upgradeMultiplier = 1 + state.ipGainUpgradeLevel;
+  return Math.max(1, base * upgradeMultiplier);
+}
+
+function infiniteScoreGainPerIp() {
+  return 10 * infiniteAngleEfficiency();
+}
+
+function canBreakInfiniteCap() {
+  return !state.infiniteCapBroken && currentScoreLog10() >= BREAK_CAP_REQUIREMENT_LOG10;
 }
 
 function sumCoreHitGains(firstCoreStep, coreHits, increase) {
@@ -315,18 +486,32 @@ function costs() {
   };
 }
 
-function addScore(amount) {
-  state.score += amount;
-  state.totalScore += amount;
-  state.generationScore += amount;
+function addScore(amount, amountLog10 = log10Value(amount)) {
+  const previousScoreLog = currentScoreLog10();
+  const rawScoreLog = combineLog10(previousScoreLog, amountLog10);
+  const cappedScoreLog = applyInfinitySoftcap(rawScoreLog);
+
+  state.scoreLog10 = cappedScoreLog;
+  state.score = cappedScoreLog <= 308 ? 10 ** cappedScoreLog : Number.MAX_VALUE;
+  if (Number.isFinite(amount)) {
+    state.totalScore += amount;
+    state.generationScore += amount;
+  } else {
+    state.totalScore = Number.MAX_VALUE;
+    state.generationScore = Number.MAX_VALUE;
+  }
   state.lastEarned = amount;
+
+  if (state.infinityCount === 0 && canInfinity()) {
+    runInfinity(true);
+  }
 }
 
 function passVertex(index) {
   state.currentGain += vertexGainIncrease();
   if (index === 0) {
     const earned = finalScoreGain();
-    addScore(earned);
+    addScore(earned, finalScoreGainLog10());
     state.floatingTexts.push({
       text: `+${formatNumber(earned)}`,
       life: 1,
@@ -347,7 +532,9 @@ function processManyVertices(start, end) {
   if (coreHits > 0) {
     const firstCoreStep = coreOffset + 1;
     const earned = sumCoreHitGains(firstCoreStep, coreHits, increase);
-    addScore(earned);
+    const lastCoreStep = firstCoreStep + (coreHits - 1) * state.vertices;
+    const batchLog = log10Value(Math.max(coreHits, 1)) + finalScoreGainLog10(state.currentGain + increase * lastCoreStep);
+    addScore(earned, Number.isFinite(earned) ? log10Value(earned) : batchLog);
     state.floatingTexts.push({
       text: `+${formatNumber(earned)}`,
       life: 1,
@@ -501,7 +688,7 @@ function draw() {
 
 function updateUi() {
   const currentCosts = costs();
-  elements.scoreValue.textContent = formatNumber(state.score);
+  elements.scoreValue.textContent = scoreDisplay();
   elements.gainValue.textContent = formatNumber(finalScoreGain());
   elements.vertexGainValue.textContent = `+${formatSmallDecimal(vertexGainIncrease())}`;
   elements.lapValue.textContent = formatDuration(lapDuration());
@@ -512,7 +699,7 @@ function updateUi() {
   elements.vertexCost.textContent = `必要 ${formatNumber(currentCosts.vertex)}`;
   elements.gainCost.textContent = `必要 ${formatNumber(currentCosts.gain)}`;
   elements.speedUpgrade.disabled = state.score < currentCosts.speed;
-  elements.vertexUpgrade.disabled = state.score < currentCosts.vertex;
+  elements.vertexUpgrade.disabled = state.score < currentCosts.vertex || state.activeChallenge === 1;
   elements.gainUpgrade.disabled = state.score < currentCosts.gain;
 
   const unlocked = state.totalScore >= GENERATION_UNLOCK_SCORE;
@@ -532,11 +719,35 @@ function updateUi() {
   elements.coreBoostGainBoost.textContent = `×${coreBoostGainIncreaseMultiplier().toFixed(2)}`;
   elements.coreBoostExponent.textContent = `^${coreBoostGainExponent().toFixed(2)}`;
   elements.coreBoostButton.disabled = !canCoreBoost();
+
+  elements.infinityCount.textContent = String(state.infinityCount);
+  elements.infinityPoints.textContent = formatNumber(state.infinityPoints);
+  elements.infiniteScore.textContent = formatNumber(state.infiniteScore);
+  elements.infiniteAngleBoost.textContent = `×${infiniteAngleBoost().toFixed(2)}`;
+  elements.infinityPointGain.textContent = `+${formatNumber(infinityPointGain())} IP`;
+  elements.infinityButton.disabled = state.infinityCount === 0 || !canInfinity();
+  elements.ipGainUpgradeCost.textContent = `${formatNumber(ipGainUpgradeCost())} IP`;
+  elements.infiniteAngleUpgradeCost.textContent = `${formatNumber(infiniteAngleUpgradeCost())} IP`;
+  elements.softcapUpgradeCost.textContent = `${formatNumber(softcapUpgradeCost())} IP`;
+  elements.ipGainUpgrade.disabled = state.infinityPoints < ipGainUpgradeCost();
+  elements.infiniteAngleUpgrade.disabled = state.infinityPoints < infiniteAngleUpgradeCost();
+  elements.softcapUpgrade.disabled = state.infinityPoints < softcapUpgradeCost();
+  elements.convertIpButton.disabled = state.infinityPoints < 1;
+  elements.convertIpGain.textContent = `+${formatNumber(infiniteScoreGainPerIp())}`;
+  const completed = completedChallengeCount();
+  elements.challengeStatus.textContent = state.activeChallenge > 0
+    ? `${challengeName(state.activeChallenge)}中`
+    : `${completed}/${INFINITY_CHALLENGE_COUNT}完了`;
+  elements.challengeButton.textContent = state.activeChallenge > 0 ? "IC中止" : challengeName(nextChallengeIndex());
+  elements.breakCapButton.disabled = !canBreakInfiniteCap();
+  elements.breakCapButton.textContent = state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 }
 
 function spend(amount) {
   if (state.score < amount) return false;
+  if (currentScoreLog10() > 18 && amount < state.score * 1e-12) return true;
   state.score -= amount;
+  state.scoreLog10 = log10Value(state.score);
   return true;
 }
 
@@ -549,6 +760,7 @@ function buySpeed() {
 }
 
 function buyVertex() {
+  if (state.activeChallenge === 1) return;
   const price = costs().vertex;
   if (!spend(price)) return;
   state.vertices += 1;
@@ -576,6 +788,7 @@ function runGeneration() {
   state.generationCostFactor = Math.max(0.25, state.generationCostFactor * (1 - Math.min(0.35, earnedPower * 0.08)));
 
   state.score = 0;
+  state.scoreLog10 = -Infinity;
   state.generationScore = 0;
   state.vertices = 3;
   state.speedLevel = 0;
@@ -591,6 +804,7 @@ function runGeneration() {
 
 function resetBelowCoreBoost() {
   state.score = 0;
+  state.scoreLog10 = -Infinity;
   state.totalScore = 0;
   state.generationScore = 0;
   state.vertices = 3;
@@ -610,6 +824,96 @@ function runCoreBoost() {
   if (!canCoreBoost()) return;
   state.coreBoostCount += 1;
   resetBelowCoreBoost();
+  updateUi();
+  saveGame("manual");
+}
+
+function resetBelowInfinity() {
+  state.score = 0;
+  state.scoreLog10 = -Infinity;
+  state.totalScore = 0;
+  state.generationScore = 0;
+  state.vertices = 3;
+  state.speedLevel = 0;
+  state.gainLevel = 0;
+  state.currentGain = 1;
+  state.pointProgress = 0;
+  state.totalVertexProgress = 0;
+  state.lastVertexIndex = 0;
+  state.generationCount = 0;
+  state.generationScoreMultiplier = 1;
+  state.generationCostFactor = 1;
+  state.coreBoostCount = 0;
+  state.infiniteScore = 0;
+  state.floatingTexts = [];
+}
+
+function runInfinity(forced = false) {
+  if (!canInfinity()) return;
+  if (!forced && state.infinityCount === 0) return;
+
+  const gained = infinityPointGain();
+  if (state.activeChallenge > 0) {
+    state.completedChallenges |= 1 << (state.activeChallenge - 1);
+    state.activeChallenge = 0;
+  }
+
+  state.infinityCount += 1;
+  state.infinityPoints += gained;
+  resetBelowInfinity();
+  updateUi();
+  saveGame("manual");
+}
+
+function buyIpGainUpgrade() {
+  const price = ipGainUpgradeCost();
+  if (state.infinityPoints < price) return;
+  state.infinityPoints -= price;
+  state.ipGainUpgradeLevel += 1;
+  updateUi();
+  saveGame("manual");
+}
+
+function buyInfiniteAngleUpgrade() {
+  const price = infiniteAngleUpgradeCost();
+  if (state.infinityPoints < price) return;
+  state.infinityPoints -= price;
+  state.infiniteAngleUpgradeLevel += 1;
+  updateUi();
+  saveGame("manual");
+}
+
+function buySoftcapUpgrade() {
+  const price = softcapUpgradeCost();
+  if (state.infinityPoints < price) return;
+  state.infinityPoints -= price;
+  state.softcapUpgradeLevel += 1;
+  updateUi();
+  saveGame("manual");
+}
+
+function convertIpToInfiniteScore() {
+  if (state.infinityPoints < 1) return;
+  state.infinityPoints -= 1;
+  state.infiniteScore += infiniteScoreGainPerIp();
+  updateUi();
+  saveGame("manual");
+}
+
+function toggleInfinityChallenge() {
+  if (state.activeChallenge > 0) {
+    state.activeChallenge = 0;
+  } else {
+    state.activeChallenge = nextChallengeIndex();
+    resetBelowInfinity();
+  }
+  updateUi();
+  saveGame("manual");
+}
+
+function breakInfiniteCap() {
+  if (!canBreakInfiniteCap()) return;
+  state.infiniteCapBroken = true;
   updateUi();
   saveGame("manual");
 }
@@ -636,9 +940,11 @@ function frame(now) {
 function renderGameToText() {
   const points = polygonPoints();
   const point = pointPosition(points);
+  const scoreLog = currentScoreLog10();
   return JSON.stringify({
     coordinateSystem: "canvas pixels, origin top-left, x right, y down",
-    score: Number(state.score.toFixed(2)),
+    score: scoreDisplay(),
+    scoreLog10: Number.isFinite(scoreLog) ? Number(scoreLog.toPrecision(6)) : null,
     totalScore: Number(state.totalScore.toFixed(2)),
     generationScore: Number(state.generationScore.toFixed(2)),
     currentGain: Number(state.currentGain.toFixed(2)),
@@ -668,6 +974,19 @@ function renderGameToText() {
       gainIncreaseMultiplier: Number(coreBoostGainIncreaseMultiplier().toFixed(2)),
       gainExponent: Number(coreBoostGainExponent().toFixed(2)),
     },
+    infinity: {
+      canInfinity: canInfinity(),
+      count: state.infinityCount,
+      points: state.infinityPoints,
+      pointGain: infinityPointGain(),
+      infiniteScore: Number(state.infiniteScore.toPrecision(6)),
+      infiniteAngleBoost: Number(infiniteAngleBoost().toFixed(2)),
+      activeChallenge: state.activeChallenge,
+      completedChallenges: completedChallengeCount(),
+      softcapPower: Number(infinitySoftcapPower().toFixed(3)),
+      capBroken: state.infiniteCapBroken,
+      canBreakCap: canBreakInfiniteCap(),
+    },
   });
 }
 
@@ -683,6 +1002,13 @@ window.__angleDebug = {
   addScore,
   runGeneration,
   runCoreBoost,
+  runInfinity,
+  buyIpGainUpgrade,
+  buyInfiniteAngleUpgrade,
+  buySoftcapUpgrade,
+  convertIpToInfiniteScore,
+  toggleInfinityChallenge,
+  breakInfiniteCap,
   saveGame,
   loadGame,
   resetSave,
@@ -693,6 +1019,13 @@ elements.vertexUpgrade.addEventListener("click", buyVertex);
 elements.gainUpgrade.addEventListener("click", buyGain);
 elements.generationButton.addEventListener("click", runGeneration);
 elements.coreBoostButton.addEventListener("click", runCoreBoost);
+elements.infinityButton.addEventListener("click", () => runInfinity(false));
+elements.ipGainUpgrade.addEventListener("click", buyIpGainUpgrade);
+elements.infiniteAngleUpgrade.addEventListener("click", buyInfiniteAngleUpgrade);
+elements.softcapUpgrade.addEventListener("click", buySoftcapUpgrade);
+elements.convertIpButton.addEventListener("click", convertIpToInfiniteScore);
+elements.challengeButton.addEventListener("click", toggleInfinityChallenge);
+elements.breakCapButton.addEventListener("click", breakInfiniteCap);
 elements.resetSaveButton.addEventListener("click", resetSave);
 window.addEventListener("beforeunload", () => saveGame("manual"));
 window.addEventListener("resize", resizeCanvas);
