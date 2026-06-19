@@ -49,6 +49,9 @@ const elements = {
   floatingTextToggle: document.getElementById("floatingTextToggle"),
   lightEffectsToggle: document.getElementById("lightEffectsToggle"),
   detailedNumbersToggle: document.getElementById("detailedNumbersToggle"),
+  infinityTabState: document.getElementById("infinityTabState"),
+  infinityTabBadge: document.getElementById("infinityTabBadge"),
+  infinityUnlockNote: document.getElementById("infinityUnlockNote"),
 };
 
 const BASE_LAP_SECONDS = 6;
@@ -759,6 +762,11 @@ function updateUi() {
   elements.coreBoostButton.disabled = !canCoreBoost();
 
   elements.infinityCount.textContent = String(state.infinityCount);
+  const infinityReady = canInfinity();
+  const infinityUnlocked = state.infinityCount > 0;
+  elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";
+  elements.infinityTabBadge.classList.toggle("is-visible", infinityReady);
+  elements.infinityUnlockNote.hidden = infinityUnlocked;
   elements.infinityPoints.textContent = formatUiNumber(state.infinityPoints);
   elements.infiniteScore.textContent = formatUiNumber(state.infiniteScore);
   elements.infiniteAngleBoost.textContent = `×${infiniteAngleBoost().toFixed(2)}`;

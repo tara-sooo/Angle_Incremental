@@ -67,7 +67,7 @@ button {
   min-height: calc(100svh - 18px);
   padding: 0;
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: 68px minmax(0, 1fr);
   gap: 0;
   overflow: hidden;
 }
@@ -317,25 +317,27 @@ canvas {
 
 .side-tabs {
   display: grid;
-  grid-auto-rows: 54px;
+  grid-auto-rows: 78px;
   align-content: start;
-  gap: 6px;
-  padding: 10px 6px;
+  gap: 8px;
+  padding: 10px 8px;
   border-right: 2px solid var(--line);
   background: rgba(5, 9, 19, 0.35);
 }
 
 .side-tab {
+  position: relative;
   display: grid;
+  grid-template-rows: auto auto auto;
   place-items: center;
-  min-height: 48px;
+  min-height: 72px;
   border: 2px solid var(--line);
   background: linear-gradient(180deg, #19253e, #0f182a);
   color: var(--muted);
-  font-size: 1.2rem;
   font-weight: 900;
   cursor: pointer;
-  transition: transform 120ms ease, filter 120ms ease, border-color 120ms ease, color 120ms ease;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  transition: transform 120ms ease, filter 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
 .side-tab:hover,
@@ -347,6 +349,41 @@ canvas {
 
 .side-tab.is-active {
   background: linear-gradient(180deg, #4f6fb8, #253f82);
+  box-shadow: inset 4px 0 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+}
+
+.tab-icon {
+  font-size: 1.28rem;
+  line-height: 1;
+}
+
+.tab-code {
+  font-size: 0.68rem;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+
+.side-tab small {
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.54rem;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.side-tab i {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  box-shadow: 0 0 12px rgba(255, 118, 89, 0.85);
+  opacity: 0;
+}
+
+.side-tab i.is-visible {
+  opacity: 1;
 }
 
 .side-panels {
@@ -374,6 +411,7 @@ canvas {
   min-height: 36px;
   padding-bottom: 8px;
   border-bottom: 2px solid var(--line);
+  background: linear-gradient(180deg, rgba(32, 48, 82, 0.45), rgba(10, 16, 29, 0));
 }
 
 .panel-heading span {
@@ -387,6 +425,19 @@ canvas {
   color: var(--ink);
   overflow-wrap: anywhere;
   text-align: right;
+}
+
+.unlock-note {
+  color: var(--gold);
+  font-size: 0.82rem;
+  font-weight: 900;
+  border: 1px solid var(--line);
+  background: rgba(242, 184, 75, 0.08);
+  padding: 8px 10px;
+}
+
+.unlock-note[hidden] {
+  display: none;
 }
 
 .infinity-panel {
@@ -504,7 +555,7 @@ canvas {
 
   .infinity-rail {
     grid-column: 1 / -1;
-    grid-template-columns: 46px minmax(0, 1fr);
+    grid-template-columns: 68px minmax(0, 1fr);
     min-height: auto;
   }
 
@@ -565,9 +616,28 @@ canvas {
 
   .side-tabs {
     grid-template-columns: repeat(3, 1fr);
-    grid-auto-rows: 44px;
+    grid-auto-rows: 54px;
     border-right: 0;
     border-bottom: 2px solid var(--line);
+  }
+
+  .side-tab {
+    min-height: 48px;
+    grid-template-columns: auto auto auto;
+    grid-template-rows: 1fr;
+    gap: 7px;
+  }
+
+  .tab-icon {
+    font-size: 1rem;
+  }
+
+  .tab-code {
+    font-size: 0.62rem;
+  }
+
+  .side-tab small {
+    font-size: 0.48rem;
   }
 
   .metric.primary {

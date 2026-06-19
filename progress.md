@@ -25,6 +25,7 @@ Original prompt: では、中核ループを完成させてください
 - Verified the new layout with desktop and mobile screenshots plus button-path checks for normal upgrades, Generation, Core Boost, Infinity upgrades, Infinite Angle conversion, and Infinity Challenge start.
 - Added Revolution Idle-style right-side tabs for Infinity, Help, and Settings; Settings now includes saved display toggles for floating text, lightweight effects, and detailed numbers.
 - Gated Infinity Challenges behind at least one Infinity and corrected old save data that had an active challenge before Infinity.
+- Polished side tabs closer to Revolution Idle: icon+abbreviation labels, LOCKED/READY/OPEN Infinity state, a readiness badge, and an Infinity unlock note.
 
 ## TODO
 

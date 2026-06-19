@@ -114,17 +114,31 @@
 
       <aside class="infinity-rail" aria-label="サイドメニュー">
         <nav class="side-tabs" aria-label="サイドタブ">
-          <button class="side-tab is-active" type="button" data-tab="infinity" title="Infinity" aria-label="Infinity">∞</button>
-          <button class="side-tab" type="button" data-tab="help" title="Help" aria-label="Help">?</button>
-          <button class="side-tab" type="button" data-tab="settings" title="Settings" aria-label="Settings">⚙</button>
+          <button class="side-tab is-active" type="button" data-tab="infinity" title="Infinity" aria-label="Infinity">
+            <span class="tab-icon">∞</span>
+            <span class="tab-code">INF</span>
+            <small id="infinityTabState">LOCKED</small>
+            <i id="infinityTabBadge" aria-hidden="true"></i>
+          </button>
+          <button class="side-tab" type="button" data-tab="help" title="Help" aria-label="Help">
+            <span class="tab-icon">?</span>
+            <span class="tab-code">HELP</span>
+            <small>INFO</small>
+          </button>
+          <button class="side-tab" type="button" data-tab="settings" title="Settings" aria-label="Settings">
+            <span class="tab-icon">⚙</span>
+            <span class="tab-code">SET</span>
+            <small>SYS</small>
+          </button>
         </nav>
 
         <div class="side-panels">
           <section class="side-panel is-active" data-panel="infinity" aria-label="Infinity">
             <div class="panel-heading">
-              <span>Infinity</span>
+              <span>INFINITY</span>
               <strong id="infinityCount">0</strong>
             </div>
+            <div class="unlock-note" id="infinityUnlockNote">1.80e308で解放</div>
             <section class="infinity-panel">
               <div>
                 <span>Infinity Point</span>
@@ -173,8 +187,8 @@
 
           <section class="side-panel help-panel" data-panel="help" aria-label="ヘルプ">
             <div class="panel-heading">
-              <span>Help</span>
-              <strong>進行</strong>
+              <span>HELP</span>
+              <strong>GUIDE</strong>
             </div>
             <dl class="help-list">
               <dt>The Angle</dt>
@@ -196,8 +210,8 @@
 
           <section class="side-panel settings-panel" data-panel="settings" aria-label="設定">
             <div class="panel-heading">
-              <span>Settings</span>
-              <strong>表示</strong>
+              <span>SETTINGS</span>
+              <strong>SYSTEM</strong>
             </div>
             <div class="setting-row">
               <label for="floatingTextToggle">浮遊テキスト</label>
