@@ -21,6 +21,8 @@ Original prompt: では、中核ループを完成させてください
 - Added the Infinity layer with log-space score tracking past JavaScript's normal number range, first-Infinity auto reset, repeatable manual Infinity, IP, Infinity Upgrades, three starter Infinity Challenges, Break Infinite Cap, and Infinite Angle conversion.
 - Verified Infinity flows through Firefox/Playwright: forced first Infinity, manual Infinity, IP upgrade purchases, Infinite Angle conversion, IC completion, Break Infinite Cap, desktop/mobile layout screenshots, and no console errors.
 - Fixed Infinity review issues: forced first-Infinity resets now abort remaining vertex processing in the current update, and purchases above e308 preserve `scoreLog10` instead of collapsing back to JavaScript's saturated number value.
+- Redesigned the UI toward a Revolution Idle-style layout: normal upgrades and core stats on the left, The Angle in the center, Generation/Core Boost in a bottom reset dock, and Infinity systems on the right.
+- Verified the new layout with desktop and mobile screenshots plus button-path checks for normal upgrades, Generation, Core Boost, Infinity upgrades, Infinite Angle conversion, and Infinity Challenge start.
 
 ## TODO
 

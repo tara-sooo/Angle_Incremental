@@ -11,21 +11,7 @@
   </head>
   <body>
     <main class="shell">
-      <section class="stage-panel" aria-label="Angle Incremental">
-        <header class="topbar">
-          <div>
-            <p class="eyebrow">Angle Incremental</p>
-            <h1>The Angle</h1>
-          </div>
-          <div class="generation-status" id="generationStatus">世代 未解放</div>
-        </header>
-
-        <div class="playfield-wrap">
-          <canvas id="gameCanvas" width="900" height="620" aria-label="The Angle のプレイ領域"></canvas>
-        </div>
-      </section>
-
-      <aside class="control-panel" aria-label="操作と統計">
+      <aside class="upgrade-rail" aria-label="The Angle の強化">
         <section class="stats">
           <div class="metric primary">
             <span>スコア</span>
@@ -68,46 +54,65 @@
             <em id="gainCost">必要 75</em>
           </button>
         </section>
+      </aside>
 
-        <section class="generation">
+      <section class="stage-panel" aria-label="Angle Incremental">
+        <header class="topbar">
           <div>
-            <span>世代</span>
-            <strong id="generationCount">0</strong>
+            <p class="eyebrow">Angle Incremental</p>
+            <h1>The Angle</h1>
           </div>
-          <div>
-            <span>スコア倍率</span>
-            <strong id="generationMultiplier">×1.00</strong>
-          </div>
-          <div>
-            <span>コスト倍率</span>
-            <strong id="generationCostFactor">×1.00</strong>
-          </div>
-          <button id="generationButton" class="generation-button" type="button" disabled>
-            世代交代
-          </button>
-        </section>
+          <div class="generation-status" id="generationStatus">世代 未解放</div>
+        </header>
 
-        <section class="core-boost">
-          <div>
-            <span>核増幅</span>
-            <strong id="coreBoostCount">0</strong>
-          </div>
-          <div>
-            <span>必要スコア</span>
-            <strong id="coreBoostRequirement">1.00e20</strong>
-          </div>
-          <div>
-            <span>増加倍率</span>
-            <strong id="coreBoostGainBoost">×1.00</strong>
-          </div>
-          <div>
-            <span>獲得指数</span>
-            <strong id="coreBoostExponent">^1.00</strong>
-          </div>
-          <button id="coreBoostButton" class="core-boost-button" type="button" disabled>
-            核増幅
-          </button>
-        </section>
+        <div class="playfield-wrap">
+          <canvas id="gameCanvas" width="900" height="620" aria-label="The Angle のプレイ領域"></canvas>
+        </div>
+
+        <div class="reset-dock" aria-label="リセットレイヤー">
+          <section class="generation">
+            <div>
+              <span>世代</span>
+              <strong id="generationCount">0</strong>
+            </div>
+            <div>
+              <span>スコア倍率</span>
+              <strong id="generationMultiplier">×1.00</strong>
+            </div>
+            <div>
+              <span>コスト倍率</span>
+              <strong id="generationCostFactor">×1.00</strong>
+            </div>
+            <button id="generationButton" class="generation-button" type="button" disabled>
+              世代交代
+            </button>
+          </section>
+
+          <section class="core-boost">
+            <div>
+              <span>核増幅</span>
+              <strong id="coreBoostCount">0</strong>
+            </div>
+            <div>
+              <span>必要スコア</span>
+              <strong id="coreBoostRequirement">1.00e20</strong>
+            </div>
+            <div>
+              <span>増加倍率</span>
+              <strong id="coreBoostGainBoost">×1.00</strong>
+            </div>
+            <div>
+              <span>獲得指数</span>
+              <strong id="coreBoostExponent">^1.00</strong>
+            </div>
+            <button id="coreBoostButton" class="core-boost-button" type="button" disabled>
+              核増幅
+            </button>
+          </section>
+        </div>
+      </section>
+
+      <aside class="infinity-rail" aria-label="Infinity とセーブ">
 
         <section class="infinity-panel">
           <div>
