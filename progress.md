@@ -16,6 +16,7 @@ Original prompt: では、中核ループを完成させてください
 - Fixed vertex-boundary precision drift so exact boundary advances consistently apply the per-vertex gain increase.
 - Changed gain display to show the total gain as the primary value, with multiplicative notation as secondary text, so gain upgrades no longer appear to add only 0.01 when vertex count enables split notation.
 - Added Core Boost as a second reset layer at 1.00e20 current score, with requirement squaring, lower-layer reset, vertex-gain increase multiplier, and score-gain exponent boost.
+- Fixed Core Boost review issues: batched core-hit score now sums nonlinear gains per core hit, and Core Boost requirements use capped log-space comparison to avoid Infinity requirements.
 
 ## TODO
 

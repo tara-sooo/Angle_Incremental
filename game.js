@@ -32,6 +32,7 @@ const elements = {
 const BASE_LAP_SECONDS = 6;
 const GENERATION_UNLOCK_SCORE = 1_000_000;
 const CORE_BOOST_BASE_REQUIREMENT = 1e20;
+const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
@@ -196,6 +197,13 @@ function formatNumber(value) {
   return `${scaled.toFixed(scaled >= 100 ? 1 : 2)}${units[unitIndex]}`;
 }
 
+function formatPowerOfTen(log10Value) {
+  if (!Number.isFinite(log10Value)) return "∞";
+  if (log10Value < 18) return formatNumber(10 ** log10Value);
+  const suffix = log10Value >= MAX_CORE_BOOST_REQUIREMENT_LOG10 ? "以上" : "";
+  return `1.00e${Math.floor(log10Value).toLocaleString("en-US")}${suffix}`;
+}
+
 function formatSmallDecimal(value) {
   return value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 }
@@ -239,8 +247,22 @@ function vertexGainIncrease() {
   return (0.01 + state.gainLevel * 0.01) * coreBoostGainIncreaseMultiplier();
 }
 
+function coreBoostRequirementLog10() {
+  return Math.min(Math.log10(CORE_BOOST_BASE_REQUIREMENT) * (2 ** state.coreBoostCount), MAX_CORE_BOOST_REQUIREMENT_LOG10);
+}
+
 function coreBoostRequirement() {
-  return CORE_BOOST_BASE_REQUIREMENT ** (2 ** state.coreBoostCount);
+  const requirementLog10 = coreBoostRequirementLog10();
+  return requirementLog10 > 308 ? Infinity : 10 ** requirementLog10;
+}
+
+function log10Value(value) {
+  if (value === Infinity) return Infinity;
+  return value > 0 && Number.isFinite(value) ? Math.log10(value) : -Infinity;
+}
+
+function canCoreBoost() {
+  return log10Value(state.score) >= coreBoostRequirementLog10();
 }
 
 function coreBoostGainIncreaseMultiplier() {
@@ -253,6 +275,19 @@ function coreBoostGainExponent() {
 
 function finalScoreGain(baseGain = state.currentGain) {
   return Math.pow(baseGain, coreBoostGainExponent()) * state.generationScoreMultiplier;
+}
+
+function sumCoreHitGains(firstCoreStep, coreHits, increase) {
+  const exponent = coreBoostGainExponent();
+  const multiplier = state.generationScoreMultiplier;
+  const stride = state.vertices;
+  const baseGain = state.currentGain;
+
+  let earned = 0;
+  for (let hit = 0; hit < coreHits; hit += 1) {
+    earned += Math.pow(baseGain + increase * (firstCoreStep + hit * stride), exponent) * multiplier;
+  }
+  return earned;
 }
 
 function cost(base, level, growth) {
@@ -298,10 +333,7 @@ function processManyVertices(start, end) {
 
   if (coreHits > 0) {
     const firstCoreStep = coreOffset + 1;
-    const lastCoreStep = firstCoreStep + (coreHits - 1) * state.vertices;
-    const firstGain = state.currentGain + increase * firstCoreStep;
-    const lastGain = state.currentGain + increase * lastCoreStep;
-    const earned = ((finalScoreGain(firstGain) + finalScoreGain(lastGain)) * coreHits * 0.5);
+    const earned = sumCoreHitGains(firstCoreStep, coreHits, increase);
     addScore(earned);
     state.floatingTexts.push({
       text: `+${formatNumber(earned)}`,
@@ -482,12 +514,11 @@ function updateUi() {
   elements.generationMultiplier.textContent = `×${state.generationScoreMultiplier.toFixed(2)}`;
   elements.generationCostFactor.textContent = `×${state.generationCostFactor.toFixed(2)}`;
 
-  const currentCoreBoostRequirement = coreBoostRequirement();
   elements.coreBoostCount.textContent = String(state.coreBoostCount);
-  elements.coreBoostRequirement.textContent = formatNumber(currentCoreBoostRequirement);
+  elements.coreBoostRequirement.textContent = formatPowerOfTen(coreBoostRequirementLog10());
   elements.coreBoostGainBoost.textContent = `×${coreBoostGainIncreaseMultiplier().toFixed(2)}`;
   elements.coreBoostExponent.textContent = `^${coreBoostGainExponent().toFixed(2)}`;
-  elements.coreBoostButton.disabled = state.score < currentCoreBoostRequirement;
+  elements.coreBoostButton.disabled = !canCoreBoost();
 }
 
 function spend(amount) {
@@ -563,7 +594,7 @@ function resetBelowCoreBoost() {
 }
 
 function runCoreBoost() {
-  if (state.score < coreBoostRequirement()) return;
+  if (!canCoreBoost()) return;
   state.coreBoostCount += 1;
   resetBelowCoreBoost();
   updateUi();
@@ -616,9 +647,11 @@ function renderGameToText() {
       costFactor: Number(state.generationCostFactor.toFixed(2)),
     },
     coreBoost: {
-      canBoost: state.score >= coreBoostRequirement(),
+      canBoost: canCoreBoost(),
       count: state.coreBoostCount,
       requirement: coreBoostRequirement(),
+      requirementLog10: coreBoostRequirementLog10(),
+      requirementText: formatPowerOfTen(coreBoostRequirementLog10()),
       gainIncreaseMultiplier: Number(coreBoostGainIncreaseMultiplier().toFixed(2)),
       gainExponent: Number(coreBoostGainExponent().toFixed(2)),
     },
