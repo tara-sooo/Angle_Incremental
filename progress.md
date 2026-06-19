@@ -20,6 +20,7 @@ Original prompt: では、中核ループを完成させてください
 - Bounded Core Boost batch scoring: normal core-hit batches are summed exactly, while extreme batches use a fixed-segment midpoint approximation to avoid browser main-thread freezes.
 - Added the Infinity layer with log-space score tracking past JavaScript's normal number range, first-Infinity auto reset, repeatable manual Infinity, IP, Infinity Upgrades, three starter Infinity Challenges, Break Infinite Cap, and Infinite Angle conversion.
 - Verified Infinity flows through Firefox/Playwright: forced first Infinity, manual Infinity, IP upgrade purchases, Infinite Angle conversion, IC completion, Break Infinite Cap, desktop/mobile layout screenshots, and no console errors.
+- Fixed Infinity review issues: forced first-Infinity resets now abort remaining vertex processing in the current update, and purchases above e308 preserve `scoreLog10` instead of collapsing back to JavaScript's saturated number value.
 
 ## TODO
 

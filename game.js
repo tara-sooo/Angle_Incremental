@@ -504,14 +504,18 @@ function addScore(amount, amountLog10 = log10Value(amount)) {
 
   if (state.infinityCount === 0 && canInfinity()) {
     runInfinity(true);
+    return true;
   }
+
+  return false;
 }
 
 function passVertex(index) {
   state.currentGain += vertexGainIncrease();
   if (index === 0) {
     const earned = finalScoreGain();
-    addScore(earned, finalScoreGainLog10());
+    const resetByInfinity = addScore(earned, finalScoreGainLog10());
+    if (resetByInfinity) return true;
     state.floatingTexts.push({
       text: `+${formatNumber(earned)}`,
       life: 1,
@@ -519,6 +523,7 @@ function passVertex(index) {
       y: canvas.height * 0.16,
     });
   }
+  return false;
 }
 
 function processManyVertices(start, end) {
@@ -534,7 +539,8 @@ function processManyVertices(start, end) {
     const earned = sumCoreHitGains(firstCoreStep, coreHits, increase);
     const lastCoreStep = firstCoreStep + (coreHits - 1) * state.vertices;
     const batchLog = log10Value(Math.max(coreHits, 1)) + finalScoreGainLog10(state.currentGain + increase * lastCoreStep);
-    addScore(earned, Number.isFinite(earned) ? log10Value(earned) : batchLog);
+    const resetByInfinity = addScore(earned, Number.isFinite(earned) ? log10Value(earned) : batchLog);
+    if (resetByInfinity) return true;
     state.floatingTexts.push({
       text: `+${formatNumber(earned)}`,
       life: 1,
@@ -544,6 +550,7 @@ function processManyVertices(start, end) {
   }
 
   state.currentGain += increase * count;
+  return false;
 }
 
 function update(dt) {
@@ -559,10 +566,10 @@ function update(dt) {
   const end = Math.floor(state.totalVertexProgress + VERTEX_EPSILON);
   const vertexSteps = end - start + 1;
   if (vertexSteps > MAX_VERTEX_STEPS_PER_FRAME) {
-    processManyVertices(start, end);
+    if (processManyVertices(start, end)) return;
   } else {
     for (let vertex = start; vertex <= end; vertex += 1) {
-      passVertex(vertex % state.vertices);
+      if (passVertex(vertex % state.vertices)) return;
     }
   }
 
@@ -744,8 +751,26 @@ function updateUi() {
 }
 
 function spend(amount) {
+  const scoreLog = currentScoreLog10();
+  const amountLog = log10Value(amount);
+
+  if (scoreLog > 308) {
+    if (amountLog > scoreLog) return false;
+    if (scoreLog - amountLog > 15) return true;
+
+    const remainingFactor = 1 - 10 ** (amountLog - scoreLog);
+    if (remainingFactor <= 0) {
+      state.score = 0;
+      state.scoreLog10 = -Infinity;
+    } else {
+      state.scoreLog10 = scoreLog + Math.log10(remainingFactor);
+      state.score = state.scoreLog10 <= 308 ? 10 ** state.scoreLog10 : Number.MAX_VALUE;
+    }
+    return true;
+  }
+
   if (state.score < amount) return false;
-  if (currentScoreLog10() > 18 && amount < state.score * 1e-12) return true;
+  if (scoreLog > 18 && amount < state.score * 1e-12) return true;
   state.score -= amount;
   state.scoreLog10 = log10Value(state.score);
   return true;
