@@ -28,6 +28,7 @@ const BASE_LAP_SECONDS = 6;
 const GENERATION_UNLOCK_SCORE = 1_000_000;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
+const MAX_VERTEX_STEPS_PER_FRAME = 5000;
 const TAU = Math.PI * 2;
 
 const state = {
@@ -66,6 +67,7 @@ const SAVE_FIELDS = [
 ];
 
 let autoSaveElapsed = 0;
+let japaneseFontReady = false;
 
 function setSaveStatus(text) {
   elements.saveStatus.textContent = text;
@@ -196,6 +198,12 @@ function lapDuration() {
   return BASE_LAP_SECONDS / lapSpeedMultiplier();
 }
 
+function formatDuration(seconds) {
+  if (seconds >= 1) return `${seconds.toFixed(2)}秒`;
+  if (seconds >= 0.01) return `${Math.round(seconds * 1000)}ミリ秒`;
+  return "10ミリ秒未満";
+}
+
 function vertexGainIncrease() {
   return 0.01 + state.gainLevel * 0.01;
 }
@@ -233,6 +241,32 @@ function passVertex(index) {
   }
 }
 
+function processManyVertices(start, end) {
+  const count = end - start + 1;
+  if (count <= 0) return;
+
+  const increase = vertexGainIncrease();
+  const coreOffset = ((state.vertices - (start % state.vertices)) % state.vertices);
+  const coreHits = coreOffset >= count ? 0 : Math.floor((count - 1 - coreOffset) / state.vertices) + 1;
+
+  if (coreHits > 0) {
+    const firstCoreStep = coreOffset + 1;
+    const lastCoreStep = firstCoreStep + (coreHits - 1) * state.vertices;
+    const firstGain = state.currentGain + increase * firstCoreStep;
+    const lastGain = state.currentGain + increase * lastCoreStep;
+    const earned = ((firstGain + lastGain) * coreHits * 0.5) * state.generationScoreMultiplier;
+    addScore(earned);
+    state.floatingTexts.push({
+      text: `+${formatNumber(earned)}`,
+      life: 1,
+      x: canvas.width / 2,
+      y: canvas.height * 0.16,
+    });
+  }
+
+  state.currentGain += increase * count;
+}
+
 function update(dt) {
   const previousAbsolute = state.totalVertexProgress;
   state.totalVertexProgress += (dt / lapDuration()) * state.vertices;
@@ -240,8 +274,13 @@ function update(dt) {
 
   const start = Math.floor(previousAbsolute) + 1;
   const end = Math.floor(state.totalVertexProgress);
-  for (let vertex = start; vertex <= end; vertex += 1) {
-    passVertex(vertex % state.vertices);
+  const vertexSteps = end - start + 1;
+  if (vertexSteps > MAX_VERTEX_STEPS_PER_FRAME) {
+    processManyVertices(start, end);
+  } else {
+    for (let vertex = start; vertex <= end; vertex += 1) {
+      passVertex(vertex % state.vertices);
+    }
   }
 
   state.lastVertexIndex = Math.floor(state.pointProgress * state.vertices) % state.vertices;
@@ -300,6 +339,7 @@ function draw() {
   drawBackground();
   const points = polygonPoints();
   const point = pointPosition(points);
+  const canDrawJapanese = japaneseFontReady || !document.fonts;
 
   ctx.save();
   ctx.lineJoin = "round";
@@ -331,18 +371,22 @@ function draw() {
   ctx.lineWidth = 3;
   ctx.stroke();
 
-  ctx.font = "700 16px 'Noto Sans JP', sans-serif";
-  ctx.fillStyle = "#18211f";
   ctx.textAlign = "center";
-  ctx.fillText("核", points[0].x, points[0].y - 22);
+  if (canDrawJapanese) {
+    ctx.font = "700 16px 'Noto Sans JP', sans-serif";
+    ctx.fillStyle = "#18211f";
+    ctx.fillText("核", points[0].x, points[0].y - 22);
+  }
 
   ctx.font = "800 28px 'Noto Sans JP', sans-serif";
   ctx.fillStyle = "#b73527";
   ctx.fillText(formatGainExpression(state.currentGain), canvas.width / 2, canvas.height - 58);
 
-  ctx.font = "700 15px 'Noto Sans JP', sans-serif";
-  ctx.fillStyle = "#66716d";
-  ctx.fillText("現在の獲得量", canvas.width / 2, canvas.height - 32);
+  if (canDrawJapanese) {
+    ctx.font = "700 15px 'Noto Sans JP', sans-serif";
+    ctx.fillStyle = "#66716d";
+    ctx.fillText("現在の獲得量", canvas.width / 2, canvas.height - 32);
+  }
 
   state.floatingTexts.forEach((item) => {
     ctx.globalAlpha = Math.max(item.life, 0);
@@ -360,7 +404,7 @@ function updateUi() {
   elements.scoreValue.textContent = formatNumber(state.score);
   elements.gainValue.textContent = formatGainExpression(state.currentGain * state.generationScoreMultiplier);
   elements.vertexGainValue.textContent = `+${vertexGainIncrease().toFixed(2)}`;
-  elements.lapValue.textContent = `${lapDuration().toFixed(2)}秒`;
+  elements.lapValue.textContent = formatDuration(lapDuration());
   elements.speedLevel.textContent = `レベル${state.speedLevel}`;
   elements.vertexCount.textContent = `${state.vertices}頂点`;
   elements.gainLevel.textContent = `レベル${state.gainLevel}`;
@@ -469,7 +513,7 @@ function renderGameToText() {
     currentGain: Number(state.currentGain.toFixed(2)),
     finalGainOnCore: Number((state.currentGain * state.generationScoreMultiplier).toFixed(2)),
     vertices: state.vertices,
-    lapSeconds: Number(lapDuration().toFixed(2)),
+    lapSeconds: Number(lapDuration().toPrecision(6)),
     point: { x: Number(point.x.toFixed(1)), y: Number(point.y.toFixed(1)), progress: Number(state.pointProgress.toFixed(3)) },
     core: { x: Number(points[0].x.toFixed(1)), y: Number(points[0].y.toFixed(1)) },
     upgrades: {
@@ -522,8 +566,11 @@ resizeCanvas();
 updateUi();
 if (document.fonts) {
   document.fonts.ready.then(() => {
+    japaneseFontReady = true;
     updateUi();
     draw();
   });
+} else {
+  japaneseFontReady = true;
 }
 requestAnimationFrame(frame);
