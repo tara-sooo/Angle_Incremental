@@ -23,6 +23,8 @@ Original prompt: では、中核ループを完成させてください
 - Fixed Infinity review issues: forced first-Infinity resets now abort remaining vertex processing in the current update, and purchases above e308 preserve `scoreLog10` instead of collapsing back to JavaScript's saturated number value.
 - Redesigned the UI toward a Revolution Idle-style layout: normal upgrades and core stats on the left, The Angle in the center, Generation/Core Boost in a bottom reset dock, and Infinity systems on the right.
 - Verified the new layout with desktop and mobile screenshots plus button-path checks for normal upgrades, Generation, Core Boost, Infinity upgrades, Infinite Angle conversion, and Infinity Challenge start.
+- Added Revolution Idle-style right-side tabs for Infinity, Help, and Settings; Settings now includes saved display toggles for floating text, lightweight effects, and detailed numbers.
+- Gated Infinity Challenges behind at least one Infinity and corrected old save data that had an active challenge before Infinity.
 
 ## TODO
 

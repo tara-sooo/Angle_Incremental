@@ -44,6 +44,11 @@ const elements = {
   speedCost: document.getElementById("speedCost"),
   vertexCost: document.getElementById("vertexCost"),
   gainCost: document.getElementById("gainCost"),
+  sideTabs: Array.from(document.querySelectorAll(".side-tab")),
+  sidePanels: Array.from(document.querySelectorAll(".side-panel")),
+  floatingTextToggle: document.getElementById("floatingTextToggle"),
+  lightEffectsToggle: document.getElementById("lightEffectsToggle"),
+  detailedNumbersToggle: document.getElementById("detailedNumbersToggle"),
 };
 
 const BASE_LAP_SECONDS = 6;
@@ -86,6 +91,9 @@ const state = {
   activeChallenge: 0,
   completedChallenges: 0,
   infiniteCapBroken: false,
+  showFloatingText: true,
+  lightEffects: false,
+  detailedNumbers: false,
   floatingTexts: [],
   lastEarned: 0,
 };
@@ -115,11 +123,15 @@ const SAVE_FIELDS = [
   "activeChallenge",
   "completedChallenges",
   "infiniteCapBroken",
+  "showFloatingText",
+  "lightEffects",
+  "detailedNumbers",
   "lastEarned",
 ];
 
 let autoSaveElapsed = 0;
 let japaneseFontReady = false;
+let activeSideTab = "infinity";
 
 function setSaveStatus(text) {
   elements.saveStatus.textContent = text;
@@ -154,6 +166,10 @@ function applySaveData(data) {
   state.activeChallenge = Math.min(INFINITY_CHALLENGE_COUNT, Math.floor(sanitizeNumber(data.activeChallenge, 0)));
   state.completedChallenges = Math.floor(sanitizeNumber(data.completedChallenges, 0));
   state.infiniteCapBroken = Boolean(data.infiniteCapBroken);
+  if (state.infinityCount <= 0) state.activeChallenge = 0;
+  state.showFloatingText = data.showFloatingText !== false;
+  state.lightEffects = Boolean(data.lightEffects);
+  state.detailedNumbers = Boolean(data.detailedNumbers);
   state.lastEarned = sanitizeNumber(data.lastEarned, 0);
   state.floatingTexts = [];
 }
@@ -234,6 +250,9 @@ function resetSave() {
     activeChallenge: 0,
     completedChallenges: 0,
     infiniteCapBroken: false,
+    showFloatingText: true,
+    lightEffects: false,
+    detailedNumbers: false,
     floatingTexts: [],
     lastEarned: 0,
   });
@@ -257,6 +276,13 @@ function formatNumber(value) {
     unitIndex += 1;
   }
   return `${scaled.toFixed(scaled >= 100 ? 1 : 2)}${units[unitIndex]}`;
+}
+
+function formatUiNumber(value) {
+  if (!state.detailedNumbers || value <= 0 || !Number.isFinite(value)) return formatNumber(value);
+  const valueLog = log10Value(value);
+  if (valueLog < 3) return formatNumber(value);
+  return formatLogNumber(valueLog);
 }
 
 function formatLogNumber(log10Value, capSuffix = false) {
@@ -333,7 +359,7 @@ function currentScoreLog10() {
 
 function scoreDisplay() {
   const scoreLog = currentScoreLog10();
-  if (scoreLog >= 18) return formatLogNumber(scoreLog);
+  if (scoreLog >= (state.detailedNumbers ? 3 : 18)) return formatLogNumber(scoreLog);
   return formatNumber(state.score);
 }
 
@@ -516,12 +542,14 @@ function passVertex(index) {
     const earned = finalScoreGain();
     const resetByInfinity = addScore(earned, finalScoreGainLog10());
     if (resetByInfinity) return true;
-    state.floatingTexts.push({
-      text: `+${formatNumber(earned)}`,
-      life: 1,
-      x: canvas.width / 2,
-      y: canvas.height * 0.16,
-    });
+    if (state.showFloatingText && !state.lightEffects) {
+      state.floatingTexts.push({
+        text: `+${formatUiNumber(earned)}`,
+        life: 1,
+        x: canvas.width / 2,
+        y: canvas.height * 0.16,
+      });
+    }
   }
   return false;
 }
@@ -541,12 +569,14 @@ function processManyVertices(start, end) {
     const batchLog = log10Value(Math.max(coreHits, 1)) + finalScoreGainLog10(state.currentGain + increase * lastCoreStep);
     const resetByInfinity = addScore(earned, Number.isFinite(earned) ? log10Value(earned) : batchLog);
     if (resetByInfinity) return true;
-    state.floatingTexts.push({
-      text: `+${formatNumber(earned)}`,
-      life: 1,
-      x: canvas.width / 2,
-      y: canvas.height * 0.16,
-    });
+    if (state.showFloatingText && !state.lightEffects) {
+      state.floatingTexts.push({
+        text: `+${formatUiNumber(earned)}`,
+        life: 1,
+        x: canvas.width / 2,
+        y: canvas.height * 0.16,
+      });
+    }
   }
 
   state.currentGain += increase * count;
@@ -670,7 +700,7 @@ function draw() {
 
   ctx.font = "800 28px 'Noto Sans JP', sans-serif";
   ctx.fillStyle = "#b73527";
-  ctx.fillText(formatNumber(finalScoreGain()), canvas.width / 2, canvas.height - 68);
+  ctx.fillText(formatUiNumber(finalScoreGain()), canvas.width / 2, canvas.height - 68);
 
   if (canDrawJapanese) {
     ctx.font = "700 15px 'Noto Sans JP', sans-serif";
@@ -695,16 +725,17 @@ function draw() {
 
 function updateUi() {
   const currentCosts = costs();
+  document.documentElement.classList.toggle("light-effects", state.lightEffects);
   elements.scoreValue.textContent = scoreDisplay();
-  elements.gainValue.textContent = formatNumber(finalScoreGain());
+  elements.gainValue.textContent = formatUiNumber(finalScoreGain());
   elements.vertexGainValue.textContent = `+${formatSmallDecimal(vertexGainIncrease())}`;
   elements.lapValue.textContent = formatDuration(lapDuration());
   elements.speedLevel.textContent = `レベル${state.speedLevel}`;
   elements.vertexCount.textContent = `${state.vertices}頂点`;
   elements.gainLevel.textContent = `レベル${state.gainLevel}`;
-  elements.speedCost.textContent = `必要 ${formatNumber(currentCosts.speed)}`;
-  elements.vertexCost.textContent = `必要 ${formatNumber(currentCosts.vertex)}`;
-  elements.gainCost.textContent = `必要 ${formatNumber(currentCosts.gain)}`;
+  elements.speedCost.textContent = `必要 ${formatUiNumber(currentCosts.speed)}`;
+  elements.vertexCost.textContent = `必要 ${formatUiNumber(currentCosts.vertex)}`;
+  elements.gainCost.textContent = `必要 ${formatUiNumber(currentCosts.gain)}`;
   elements.speedUpgrade.disabled = state.score < currentCosts.speed;
   elements.vertexUpgrade.disabled = state.score < currentCosts.vertex || state.activeChallenge === 1;
   elements.gainUpgrade.disabled = state.score < currentCosts.gain;
@@ -728,26 +759,33 @@ function updateUi() {
   elements.coreBoostButton.disabled = !canCoreBoost();
 
   elements.infinityCount.textContent = String(state.infinityCount);
-  elements.infinityPoints.textContent = formatNumber(state.infinityPoints);
-  elements.infiniteScore.textContent = formatNumber(state.infiniteScore);
+  elements.infinityPoints.textContent = formatUiNumber(state.infinityPoints);
+  elements.infiniteScore.textContent = formatUiNumber(state.infiniteScore);
   elements.infiniteAngleBoost.textContent = `×${infiniteAngleBoost().toFixed(2)}`;
-  elements.infinityPointGain.textContent = `+${formatNumber(infinityPointGain())} IP`;
+  elements.infinityPointGain.textContent = `+${formatUiNumber(infinityPointGain())} IP`;
   elements.infinityButton.disabled = state.infinityCount === 0 || !canInfinity();
-  elements.ipGainUpgradeCost.textContent = `${formatNumber(ipGainUpgradeCost())} IP`;
-  elements.infiniteAngleUpgradeCost.textContent = `${formatNumber(infiniteAngleUpgradeCost())} IP`;
-  elements.softcapUpgradeCost.textContent = `${formatNumber(softcapUpgradeCost())} IP`;
+  elements.ipGainUpgradeCost.textContent = `${formatUiNumber(ipGainUpgradeCost())} IP`;
+  elements.infiniteAngleUpgradeCost.textContent = `${formatUiNumber(infiniteAngleUpgradeCost())} IP`;
+  elements.softcapUpgradeCost.textContent = `${formatUiNumber(softcapUpgradeCost())} IP`;
   elements.ipGainUpgrade.disabled = state.infinityPoints < ipGainUpgradeCost();
   elements.infiniteAngleUpgrade.disabled = state.infinityPoints < infiniteAngleUpgradeCost();
   elements.softcapUpgrade.disabled = state.infinityPoints < softcapUpgradeCost();
   elements.convertIpButton.disabled = state.infinityPoints < 1;
-  elements.convertIpGain.textContent = `+${formatNumber(infiniteScoreGainPerIp())}`;
+  elements.convertIpGain.textContent = `+${formatUiNumber(infiniteScoreGainPerIp())}`;
   const completed = completedChallengeCount();
   elements.challengeStatus.textContent = state.activeChallenge > 0
     ? `${challengeName(state.activeChallenge)}中`
-    : `${completed}/${INFINITY_CHALLENGE_COUNT}完了`;
+    : state.infinityCount <= 0
+      ? "未解放"
+      : `${completed}/${INFINITY_CHALLENGE_COUNT}完了`;
   elements.challengeButton.textContent = state.activeChallenge > 0 ? "IC中止" : challengeName(nextChallengeIndex());
+  elements.challengeButton.disabled = state.infinityCount <= 0;
   elements.breakCapButton.disabled = !canBreakInfiniteCap();
   elements.breakCapButton.textContent = state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
+
+  elements.floatingTextToggle.checked = state.showFloatingText;
+  elements.lightEffectsToggle.checked = state.lightEffects;
+  elements.detailedNumbersToggle.checked = state.detailedNumbers;
 }
 
 function spend(amount) {
@@ -926,6 +964,7 @@ function convertIpToInfiniteScore() {
 }
 
 function toggleInfinityChallenge() {
+  if (state.infinityCount <= 0) return;
   if (state.activeChallenge > 0) {
     state.activeChallenge = 0;
   } else {
@@ -933,6 +972,27 @@ function toggleInfinityChallenge() {
     resetBelowInfinity();
   }
   updateUi();
+  saveGame("manual");
+}
+
+function switchSideTab(tab) {
+  activeSideTab = tab;
+  elements.sideTabs.forEach((button) => {
+    const active = button.dataset.tab === activeSideTab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  elements.sidePanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.panel === activeSideTab);
+  });
+}
+
+function applySetting(key, value) {
+  state[key] = value;
+  if (key === "showFloatingText" && !value) state.floatingTexts = [];
+  if (key === "lightEffects" && value) state.floatingTexts = [];
+  updateUi();
+  draw();
   saveGame("manual");
 }
 
@@ -1012,6 +1072,12 @@ function renderGameToText() {
       capBroken: state.infiniteCapBroken,
       canBreakCap: canBreakInfiniteCap(),
     },
+    settings: {
+      showFloatingText: state.showFloatingText,
+      lightEffects: state.lightEffects,
+      detailedNumbers: state.detailedNumbers,
+      activeSideTab,
+    },
   });
 }
 
@@ -1034,6 +1100,8 @@ window.__angleDebug = {
   convertIpToInfiniteScore,
   toggleInfinityChallenge,
   breakInfiniteCap,
+  switchSideTab,
+  applySetting,
   saveGame,
   loadGame,
   resetSave,
@@ -1052,6 +1120,12 @@ elements.convertIpButton.addEventListener("click", convertIpToInfiniteScore);
 elements.challengeButton.addEventListener("click", toggleInfinityChallenge);
 elements.breakCapButton.addEventListener("click", breakInfiniteCap);
 elements.resetSaveButton.addEventListener("click", resetSave);
+elements.sideTabs.forEach((button) => {
+  button.addEventListener("click", () => switchSideTab(button.dataset.tab));
+});
+elements.floatingTextToggle.addEventListener("change", () => applySetting("showFloatingText", elements.floatingTextToggle.checked));
+elements.lightEffectsToggle.addEventListener("change", () => applySetting("lightEffects", elements.lightEffectsToggle.checked));
+elements.detailedNumbersToggle.addEventListener("change", () => applySetting("detailedNumbers", elements.detailedNumbersToggle.checked));
 window.addEventListener("beforeunload", () => saveGame("manual"));
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("keydown", (event) => {
@@ -1062,6 +1136,7 @@ window.addEventListener("keydown", (event) => {
 });
 
 loadGame();
+switchSideTab(activeSideTab);
 resizeCanvas();
 updateUi();
 if (document.fonts) {

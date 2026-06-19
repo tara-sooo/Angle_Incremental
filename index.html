@@ -112,66 +112,116 @@
         </div>
       </section>
 
-      <aside class="infinity-rail" aria-label="Infinity とセーブ">
+      <aside class="infinity-rail" aria-label="サイドメニュー">
+        <nav class="side-tabs" aria-label="サイドタブ">
+          <button class="side-tab is-active" type="button" data-tab="infinity" title="Infinity" aria-label="Infinity">∞</button>
+          <button class="side-tab" type="button" data-tab="help" title="Help" aria-label="Help">?</button>
+          <button class="side-tab" type="button" data-tab="settings" title="Settings" aria-label="Settings">⚙</button>
+        </nav>
 
-        <section class="infinity-panel">
-          <div>
-            <span>Infinity</span>
-            <strong id="infinityCount">0</strong>
-          </div>
-          <div>
-            <span>Infinity Point</span>
-            <strong id="infinityPoints">0</strong>
-          </div>
-          <div>
-            <span>Infinite Score</span>
-            <strong id="infiniteScore">0</strong>
-          </div>
-          <div>
-            <span>Infinite Angle倍率</span>
-            <strong id="infiniteAngleBoost">×1.00</strong>
-          </div>
-          <div>
-            <span>Infinity獲得</span>
-            <strong id="infinityPointGain">+0 IP</strong>
-          </div>
-          <button id="infinityButton" class="infinity-button" type="button" disabled>
-            Infinity
-          </button>
-          <div class="upgrade-row">
-            <button id="ipGainUpgrade" class="mini-button" type="button" disabled>IP倍率</button>
-            <strong id="ipGainUpgradeCost">1 IP</strong>
-          </div>
-          <div class="upgrade-row">
-            <button id="infiniteAngleUpgrade" class="mini-button" type="button" disabled>IA効率</button>
-            <strong id="infiniteAngleUpgradeCost">2 IP</strong>
-          </div>
-          <div class="upgrade-row">
-            <button id="softcapUpgrade" class="mini-button" type="button" disabled>軟上限緩和</button>
-            <strong id="softcapUpgradeCost">4 IP</strong>
-          </div>
-          <div class="upgrade-row">
-            <button id="convertIpButton" class="mini-button" type="button" disabled>IPをIAへ</button>
-            <strong id="convertIpGain">+0</strong>
-          </div>
-          <div class="upgrade-row">
-            <button id="challengeButton" class="mini-button" type="button">IC開始</button>
-            <strong id="challengeStatus">未挑戦</strong>
-          </div>
-          <button id="breakCapButton" class="break-button" type="button" disabled>
-            Break Infinite Cap
-          </button>
-        </section>
+        <div class="side-panels">
+          <section class="side-panel is-active" data-panel="infinity" aria-label="Infinity">
+            <div class="panel-heading">
+              <span>Infinity</span>
+              <strong id="infinityCount">0</strong>
+            </div>
+            <section class="infinity-panel">
+              <div>
+                <span>Infinity Point</span>
+                <strong id="infinityPoints">0</strong>
+              </div>
+              <div>
+                <span>Infinite Score</span>
+                <strong id="infiniteScore">0</strong>
+              </div>
+              <div>
+                <span>Infinite Angle倍率</span>
+                <strong id="infiniteAngleBoost">×1.00</strong>
+              </div>
+              <div>
+                <span>Infinity獲得</span>
+                <strong id="infinityPointGain">+0 IP</strong>
+              </div>
+              <button id="infinityButton" class="infinity-button" type="button" disabled>
+                Infinity
+              </button>
+              <div class="upgrade-row">
+                <button id="ipGainUpgrade" class="mini-button" type="button" disabled>IP倍率</button>
+                <strong id="ipGainUpgradeCost">1 IP</strong>
+              </div>
+              <div class="upgrade-row">
+                <button id="infiniteAngleUpgrade" class="mini-button" type="button" disabled>IA効率</button>
+                <strong id="infiniteAngleUpgradeCost">2 IP</strong>
+              </div>
+              <div class="upgrade-row">
+                <button id="softcapUpgrade" class="mini-button" type="button" disabled>軟上限緩和</button>
+                <strong id="softcapUpgradeCost">4 IP</strong>
+              </div>
+              <div class="upgrade-row">
+                <button id="convertIpButton" class="mini-button" type="button" disabled>IPをIAへ</button>
+                <strong id="convertIpGain">+0</strong>
+              </div>
+              <div class="upgrade-row">
+                <button id="challengeButton" class="mini-button" type="button" disabled>IC開始</button>
+                <strong id="challengeStatus">未解放</strong>
+              </div>
+              <button id="breakCapButton" class="break-button" type="button" disabled>
+                Break Infinite Cap
+              </button>
+            </section>
+          </section>
 
-        <section class="save-panel" aria-label="セーブデータ">
-          <div>
-            <span>セーブ</span>
-            <strong id="saveStatus">未保存</strong>
-          </div>
-          <button id="resetSaveButton" class="reset-button" type="button">
-            セーブをリセット
-          </button>
-        </section>
+          <section class="side-panel help-panel" data-panel="help" aria-label="ヘルプ">
+            <div class="panel-heading">
+              <span>Help</span>
+              <strong>進行</strong>
+            </div>
+            <dl class="help-list">
+              <dt>The Angle</dt>
+              <dd>左の強化で周回速度、角、頂点獲得量を伸ばします。</dd>
+              <dt>世代</dt>
+              <dd>世代スコアが 1,000,000 に届いたら、下部の世代交代で倍率を得ます。</dd>
+              <dt>核増幅</dt>
+              <dd>1.00e20 スコアから実行でき、世代以下をリセットして指数と増加倍率を得ます。</dd>
+              <dt>Infinity</dt>
+              <dd>1.80e308 到達で初回は自動発動し、以降は任意発動で IP を得ます。</dd>
+              <dt>Infinity Challenge</dt>
+              <dd>Infinity 後に挑戦できます。縛り状態で Infinity に到達すると報酬を得ます。</dd>
+              <dt>Break Infinite Cap</dt>
+              <dd>1.00e333 到達で、Infinity 以降の強いソフトキャップを破壊します。</dd>
+              <dt>Infinite Angle</dt>
+              <dd>IP を Infinite Score に変換し、頂点通過ごとの増加を伸ばします。</dd>
+            </dl>
+          </section>
+
+          <section class="side-panel settings-panel" data-panel="settings" aria-label="設定">
+            <div class="panel-heading">
+              <span>Settings</span>
+              <strong>表示</strong>
+            </div>
+            <div class="setting-row">
+              <label for="floatingTextToggle">浮遊テキスト</label>
+              <input id="floatingTextToggle" type="checkbox" checked />
+            </div>
+            <div class="setting-row">
+              <label for="lightEffectsToggle">軽量演出</label>
+              <input id="lightEffectsToggle" type="checkbox" />
+            </div>
+            <div class="setting-row">
+              <label for="detailedNumbersToggle">詳細数値</label>
+              <input id="detailedNumbersToggle" type="checkbox" />
+            </div>
+            <section class="save-panel" aria-label="セーブデータ">
+              <div>
+                <span>セーブ</span>
+                <strong id="saveStatus">未保存</strong>
+              </div>
+              <button id="resetSaveButton" class="reset-button" type="button">
+                セーブをリセット
+              </button>
+            </section>
+          </section>
+        </div>
       </aside>
     </main>
 
