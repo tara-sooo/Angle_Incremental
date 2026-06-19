@@ -29,6 +29,7 @@ const GENERATION_UNLOCK_SCORE = 1_000_000;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
+const VERTEX_EPSILON = 1e-9;
 const TAU = Math.PI * 2;
 
 const state = {
@@ -270,10 +271,14 @@ function processManyVertices(start, end) {
 function update(dt) {
   const previousAbsolute = state.totalVertexProgress;
   state.totalVertexProgress += (dt / lapDuration()) * state.vertices;
+  const nearestVertex = Math.round(state.totalVertexProgress);
+  if (Math.abs(state.totalVertexProgress - nearestVertex) < VERTEX_EPSILON) {
+    state.totalVertexProgress = nearestVertex;
+  }
   state.pointProgress = (state.totalVertexProgress / state.vertices) % 1;
 
-  const start = Math.floor(previousAbsolute) + 1;
-  const end = Math.floor(state.totalVertexProgress);
+  const start = Math.floor(previousAbsolute + VERTEX_EPSILON) + 1;
+  const end = Math.floor(state.totalVertexProgress + VERTEX_EPSILON);
   const vertexSteps = end - start + 1;
   if (vertexSteps > MAX_VERTEX_STEPS_PER_FRAME) {
     processManyVertices(start, end);
