@@ -26,6 +26,11 @@ Original prompt: では、中核ループを完成させてください
 - Added Revolution Idle-style right-side tabs for Infinity, Help, and Settings; Settings now includes saved display toggles for floating text, lightweight effects, and detailed numbers.
 - Gated Infinity Challenges behind at least one Infinity and corrected old save data that had an active challenge before Infinity.
 - Polished side tabs closer to Revolution Idle: icon+abbreviation labels, LOCKED/READY/OPEN Infinity state, a readiness badge, and an Infinity unlock note.
+- Converted the UI to full-screen main tabs: The Angle, Infinity, Help, and Settings now swap the main content area while the tab rail stays persistent.
+- Recolored the Angle canvas to an indigo playfield and adjusted figure, point, core, and canvas text colors for dark-background readability.
+- Added unit/display settings for language, number format, and time unit, with saved preferences and canvas text localization.
+- Added a normal-upgrade Buy All button with speed -> vertex -> gain priority, a 1000-purchase cap, and IC1 vertex-purchase skipping.
+- Verified the tabbed UI with Firefox/Playwright on desktop and mobile, including settings persistence, Buy All behavior, IC1 skipping, canvas pixel color, and screenshot/overflow checks.
 
 ## TODO
 

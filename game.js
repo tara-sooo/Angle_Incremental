@@ -2,6 +2,8 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 const elements = {
+  mainTabs: Array.from(document.querySelectorAll(".main-tab")),
+  mainPanels: Array.from(document.querySelectorAll(".main-panel")),
   scoreValue: document.getElementById("scoreValue"),
   gainValue: document.getElementById("gainValue"),
   vertexGainValue: document.getElementById("vertexGainValue"),
@@ -33,6 +35,7 @@ const elements = {
   challengeButton: document.getElementById("challengeButton"),
   challengeStatus: document.getElementById("challengeStatus"),
   breakCapButton: document.getElementById("breakCapButton"),
+  buyAllUpgrade: document.getElementById("buyAllUpgrade"),
   speedUpgrade: document.getElementById("speedUpgrade"),
   vertexUpgrade: document.getElementById("vertexUpgrade"),
   gainUpgrade: document.getElementById("gainUpgrade"),
@@ -44,11 +47,12 @@ const elements = {
   speedCost: document.getElementById("speedCost"),
   vertexCost: document.getElementById("vertexCost"),
   gainCost: document.getElementById("gainCost"),
-  sideTabs: Array.from(document.querySelectorAll(".side-tab")),
-  sidePanels: Array.from(document.querySelectorAll(".side-panel")),
   floatingTextToggle: document.getElementById("floatingTextToggle"),
   lightEffectsToggle: document.getElementById("lightEffectsToggle"),
-  detailedNumbersToggle: document.getElementById("detailedNumbersToggle"),
+  languageSelect: document.getElementById("languageSelect"),
+  numberFormatSelect: document.getElementById("numberFormatSelect"),
+  timeUnitSelect: document.getElementById("timeUnitSelect"),
+  i18nNodes: Array.from(document.querySelectorAll("[data-i18n]")),
   infinityTabState: document.getElementById("infinityTabState"),
   infinityTabBadge: document.getElementById("infinityTabBadge"),
   infinityUnlockNote: document.getElementById("infinityUnlockNote"),
@@ -68,6 +72,167 @@ const MAX_EXACT_CORE_HITS = 50000;
 const CORE_HIT_APPROX_SEGMENTS = 2048;
 const VERTEX_EPSILON = 1e-9;
 const TAU = Math.PI * 2;
+const BUY_ALL_LIMIT = 1000;
+const TEXT = {
+  ja: {
+    tabAngle: "図形",
+    tabHelp: "説明",
+    tabSettings: "設定",
+    score: "スコア",
+    coreGain: "核到達時の獲得量",
+    vertexGain: "頂点通過ごとの増加",
+    lapTime: "1周の時間",
+    buyAll: "全購入",
+    buyAllHint: "通常強化を順番に購入",
+    speedUpgrade: "周回速度",
+    vertexUpgrade: "角の追加",
+    gainUpgrade: "頂点獲得量",
+    generation: "世代",
+    scoreMultiplier: "スコア倍率",
+    costMultiplier: "コスト倍率",
+    generationButton: "世代交代",
+    coreBoost: "核増幅",
+    requiredScore: "必要スコア",
+    gainBoost: "増加倍率",
+    gainExponent: "獲得指数",
+    coreBoostButton: "核増幅",
+    infiniteAngleBoost: "Infinite Angle倍率",
+    infinityGain: "Infinity獲得",
+    ipGainUpgrade: "IP倍率",
+    infiniteAngleUpgrade: "IA効率",
+    softcapUpgrade: "軟上限緩和",
+    convertIp: "IPをIAへ",
+    language: "言語",
+    numberFormat: "数値表記",
+    timeUnit: "時間単位",
+    floatingText: "浮遊テキスト",
+    lightEffects: "軽量演出",
+    save: "セーブ",
+    resetSave: "セーブをリセット",
+    helpAngle: "左の強化で周回速度、角、頂点獲得量を伸ばします。",
+    helpGeneration: "世代スコアが 1,000,000 に届いたら、下部の世代交代で倍率を得ます。",
+    helpCoreBoost: "1.00e20 スコアから実行でき、世代以下をリセットして指数と増加倍率を得ます。",
+    helpInfinity: "1.80e308 到達で初回は自動発動し、以降は任意発動で IP を得ます。",
+    helpChallenge: "Infinity 後に挑戦できます。縛り状態で Infinity に到達すると報酬を得ます。",
+    helpBreakCap: "1.00e333 到達で、Infinity 以降の強いソフトキャップを破壊します。",
+    helpInfiniteAngle: "IP を Infinite Score に変換し、頂点通過ごとの増加を伸ばします。",
+    level: "レベル",
+    vertices: "頂点",
+    cost: "必要",
+    generationReady: "世代交代 可能",
+    generationUnlocked: "世代 解放済み",
+    generationLocked: "世代 未解放",
+    locked: "未解放",
+    completed: "完了",
+    challengeRunning: "中",
+    stopChallenge: "IC中止",
+    challengeNone: "未挑戦",
+    challenge1: "IC1 角追加禁止",
+    challenge2: "IC2 周回低速",
+    challenge3: "IC3 増加低下",
+    core: "核",
+    currentGain: "現在の獲得量",
+    baseExpression: "基礎乗算表記",
+    savedAuto: "自動保存済み",
+    savedManual: "保存済み",
+    saveFailed: "保存失敗",
+    noSave: "未保存",
+    loaded: "ロード済み",
+    oldSave: "セーブ形式が古い",
+    loadFailed: "読み込み失敗",
+    resetDone: "リセット済み",
+    resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
+    under10ms: "10ミリ秒未満",
+    secondsUnit: "秒",
+    millisecondsUnit: "ミリ秒",
+    capSuffix: "以上",
+    numberCompact: "省略",
+    numberScientific: "科学表記",
+    numberDetailed: "詳細",
+    timeAuto: "自動",
+    timeSeconds: "秒",
+    timeMilliseconds: "ミリ秒",
+  },
+  en: {
+    tabAngle: "Angle",
+    tabHelp: "Info",
+    tabSettings: "System",
+    score: "Score",
+    coreGain: "Gain on core hit",
+    vertexGain: "Gain per vertex",
+    lapTime: "Lap time",
+    buyAll: "Buy All",
+    buyAllHint: "Buys normal upgrades in order",
+    speedUpgrade: "Lap Speed",
+    vertexUpgrade: "Add Vertex",
+    gainUpgrade: "Vertex Gain",
+    generation: "Generation",
+    scoreMultiplier: "Score multiplier",
+    costMultiplier: "Cost multiplier",
+    generationButton: "Generate",
+    coreBoost: "Core Boost",
+    requiredScore: "Required score",
+    gainBoost: "Gain boost",
+    gainExponent: "Gain exponent",
+    coreBoostButton: "Core Boost",
+    infiniteAngleBoost: "Infinite Angle boost",
+    infinityGain: "Infinity gain",
+    ipGainUpgrade: "IP Multiplier",
+    infiniteAngleUpgrade: "IA Efficiency",
+    softcapUpgrade: "Soften Cap",
+    convertIp: "Convert IP to IA",
+    language: "Language",
+    numberFormat: "Number format",
+    timeUnit: "Time unit",
+    floatingText: "Floating text",
+    lightEffects: "Reduced effects",
+    save: "Save",
+    resetSave: "Reset save",
+    helpAngle: "Use normal upgrades to improve lap speed, vertices, and vertex gain.",
+    helpGeneration: "Reach 1,000,000 generation score, then generate for permanent lower-layer boosts.",
+    helpCoreBoost: "Starts at 1.00e20 score and resets Generation progress for gain growth and exponent boosts.",
+    helpInfinity: "First triggers automatically at 1.80e308, then can be run manually for IP.",
+    helpChallenge: "Available after Infinity. Reach Infinity under a restriction to claim a reward.",
+    helpBreakCap: "Reach 1.00e333 to break the heavy post-Infinity softcap.",
+    helpInfiniteAngle: "Convert IP into Infinite Score to improve gain per vertex.",
+    level: "Level",
+    vertices: "vertices",
+    cost: "Cost",
+    generationReady: "Generation ready",
+    generationUnlocked: "Generation unlocked",
+    generationLocked: "Generation locked",
+    locked: "Locked",
+    completed: "complete",
+    challengeRunning: "running",
+    stopChallenge: "Stop IC",
+    challengeNone: "No challenge",
+    challenge1: "IC1 No Added Vertices",
+    challenge2: "IC2 Slow Lap",
+    challenge3: "IC3 Lower Growth",
+    core: "Core",
+    currentGain: "Current gain",
+    baseExpression: "Base product",
+    savedAuto: "Autosaved",
+    savedManual: "Saved",
+    saveFailed: "Save failed",
+    noSave: "No save",
+    loaded: "Loaded",
+    oldSave: "Old save format",
+    loadFailed: "Load failed",
+    resetDone: "Reset",
+    resetConfirm: "Reset all saved progress?",
+    under10ms: "<10 ms",
+    secondsUnit: "s",
+    millisecondsUnit: "ms",
+    capSuffix: "+",
+    numberCompact: "Compact",
+    numberScientific: "Scientific",
+    numberDetailed: "Detailed",
+    timeAuto: "Auto",
+    timeSeconds: "Seconds",
+    timeMilliseconds: "Milliseconds",
+  },
+};
 
 const state = {
   score: 0,
@@ -96,7 +261,9 @@ const state = {
   infiniteCapBroken: false,
   showFloatingText: true,
   lightEffects: false,
-  detailedNumbers: false,
+  language: "ja",
+  numberFormat: "compact",
+  timeUnit: "auto",
   floatingTexts: [],
   lastEarned: 0,
 };
@@ -128,16 +295,26 @@ const SAVE_FIELDS = [
   "infiniteCapBroken",
   "showFloatingText",
   "lightEffects",
-  "detailedNumbers",
+  "language",
+  "numberFormat",
+  "timeUnit",
   "lastEarned",
 ];
 
 let autoSaveElapsed = 0;
 let japaneseFontReady = false;
-let activeSideTab = "infinity";
+let activeMainTab = "angle";
+
+function t(key) {
+  return (TEXT[state.language] && TEXT[state.language][key]) || TEXT.ja[key] || key;
+}
 
 function setSaveStatus(text) {
   elements.saveStatus.textContent = text;
+}
+
+function normalizeChoice(value, allowed, fallback) {
+  return allowed.includes(value) ? value : fallback;
 }
 
 function sanitizeNumber(value, fallback, min = 0) {
@@ -172,7 +349,9 @@ function applySaveData(data) {
   if (state.infinityCount <= 0) state.activeChallenge = 0;
   state.showFloatingText = data.showFloatingText !== false;
   state.lightEffects = Boolean(data.lightEffects);
-  state.detailedNumbers = Boolean(data.detailedNumbers);
+  state.language = normalizeChoice(data.language, ["ja", "en"], "ja");
+  state.numberFormat = normalizeChoice(data.numberFormat, ["compact", "scientific", "detailed"], data.detailedNumbers ? "detailed" : "compact");
+  state.timeUnit = normalizeChoice(data.timeUnit, ["auto", "seconds", "milliseconds"], "auto");
   state.lastEarned = sanitizeNumber(data.lastEarned, 0);
   state.floatingTexts = [];
 }
@@ -193,11 +372,11 @@ function saveGame(reason = "auto") {
   try {
     localStorage.setItem(SAVE_KEY, JSON.stringify(serializeSaveData()));
     autoSaveElapsed = 0;
-    setSaveStatus(reason === "auto" ? "自動保存済み" : "保存済み");
+    setSaveStatus(reason === "auto" ? t("savedAuto") : t("savedManual"));
     return true;
   } catch (error) {
     autoSaveElapsed = 0;
-    setSaveStatus("保存失敗");
+    setSaveStatus(t("saveFailed"));
     return false;
   }
 }
@@ -206,26 +385,26 @@ function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) {
-      setSaveStatus("未保存");
+      setSaveStatus(t("noSave"));
       return;
     }
 
     const parsed = JSON.parse(raw);
     if (parsed.version !== SAVE_VERSION || !parsed.state || typeof parsed.state !== "object") {
-      setSaveStatus("セーブ形式が古い");
+      setSaveStatus(t("oldSave"));
       return;
     }
 
     applySaveData(parsed.state);
     autoSaveElapsed = 0;
-    setSaveStatus("ロード済み");
+    setSaveStatus(t("loaded"));
   } catch (error) {
-    setSaveStatus("読み込み失敗");
+    setSaveStatus(t("loadFailed"));
   }
 }
 
 function resetSave() {
-  const confirmed = window.confirm("保存済みの進行状況をすべてリセットしますか？");
+  const confirmed = window.confirm(t("resetConfirm"));
   if (!confirmed) return;
   localStorage.removeItem(SAVE_KEY);
   Object.assign(state, {
@@ -255,12 +434,14 @@ function resetSave() {
     infiniteCapBroken: false,
     showFloatingText: true,
     lightEffects: false,
-    detailedNumbers: false,
+    language: "ja",
+    numberFormat: "compact",
+    timeUnit: "auto",
     floatingTexts: [],
     lastEarned: 0,
   });
   autoSaveElapsed = 0;
-  setSaveStatus("リセット済み");
+  setSaveStatus(t("resetDone"));
   updateUi();
   draw();
 }
@@ -282,9 +463,10 @@ function formatNumber(value) {
 }
 
 function formatUiNumber(value) {
-  if (!state.detailedNumbers || value <= 0 || !Number.isFinite(value)) return formatNumber(value);
+  if (state.numberFormat === "compact" || value <= 0 || !Number.isFinite(value)) return formatNumber(value);
   const valueLog = log10Value(value);
-  if (valueLog < 3) return formatNumber(value);
+  if (state.numberFormat === "scientific") return formatScientificLog(valueLog);
+  if (state.numberFormat === "detailed" && valueLog < 3) return formatNumber(value);
   return formatLogNumber(valueLog);
 }
 
@@ -293,8 +475,16 @@ function formatLogNumber(log10Value, capSuffix = false) {
   if (log10Value < 18) return formatNumber(10 ** log10Value);
   const exponent = Math.floor(log10Value);
   const mantissa = 10 ** (log10Value - exponent);
-  const suffix = capSuffix ? "以上" : "";
+  const suffix = capSuffix ? t("capSuffix") : "";
   return `${mantissa.toFixed(2)}e${exponent.toLocaleString("en-US")}${suffix}`;
+}
+
+function formatScientificLog(log10Value) {
+  if (!Number.isFinite(log10Value)) return log10Value === -Infinity ? "0" : "∞";
+  if (log10Value < 3) return formatNumber(10 ** log10Value);
+  const exponent = Math.floor(log10Value);
+  const mantissa = 10 ** (log10Value - exponent);
+  return `${mantissa.toFixed(2)}e${exponent.toLocaleString("en-US")}`;
 }
 
 function formatPowerOfTen(log10Value) {
@@ -309,7 +499,7 @@ function formatGainExpression(value) {
   const parts = gainExpressionParts();
   if (parts <= 1) return formatNumber(value);
   const factor = Math.pow(Math.max(value, 1), 1 / parts);
-  return Array.from({ length: parts }, () => formatNumber(factor)).join(" × ");
+  return Array.from({ length: parts }, () => formatUiNumber(factor)).join(" × ");
 }
 
 function gainExpressionParts() {
@@ -323,7 +513,8 @@ function hasMultiplicativeGainExpression() {
 function formatGainExpressionSummary(value) {
   const expression = formatGainExpression(value);
   if (expression.length <= 42) return expression;
-  return `${formatNumber(Math.pow(Math.max(value, 1), 1 / gainExpressionParts()))} × ... × ${gainExpressionParts()}項`;
+  const term = state.language === "ja" ? "項" : " terms";
+  return `${formatUiNumber(Math.pow(Math.max(value, 1), 1 / gainExpressionParts()))} × ... × ${gainExpressionParts()}${term}`;
 }
 
 function lapSpeedMultiplier() {
@@ -337,9 +528,14 @@ function lapDuration() {
 }
 
 function formatDuration(seconds) {
-  if (seconds >= 1) return `${seconds.toFixed(2)}秒`;
-  if (seconds >= 0.01) return `${Math.round(seconds * 1000)}ミリ秒`;
-  return "10ミリ秒未満";
+  if (state.timeUnit === "seconds") return `${seconds.toFixed(2)}${t("secondsUnit")}`;
+  if (state.timeUnit === "milliseconds") {
+    const milliseconds = seconds * 1000;
+    return `${milliseconds >= 10 ? Math.round(milliseconds) : milliseconds.toFixed(2)}${t("millisecondsUnit")}`;
+  }
+  if (seconds >= 1) return `${seconds.toFixed(2)}${t("secondsUnit")}`;
+  if (seconds >= 0.01) return `${Math.round(seconds * 1000)}${t("millisecondsUnit")}`;
+  return t("under10ms");
 }
 
 function log10Value(value) {
@@ -362,7 +558,8 @@ function currentScoreLog10() {
 
 function scoreDisplay() {
   const scoreLog = currentScoreLog10();
-  if (scoreLog >= (state.detailedNumbers ? 3 : 18)) return formatLogNumber(scoreLog);
+  if (state.numberFormat === "scientific" && scoreLog > -Infinity) return formatScientificLog(scoreLog);
+  if (scoreLog >= (state.numberFormat === "detailed" ? 3 : 18)) return formatLogNumber(scoreLog);
   return formatNumber(state.score);
 }
 
@@ -431,10 +628,10 @@ function nextChallengeIndex() {
 }
 
 function challengeName(index) {
-  if (index === 1) return "IC1 角追加禁止";
-  if (index === 2) return "IC2 周回低速";
-  if (index === 3) return "IC3 増加低下";
-  return "未挑戦";
+  if (index === 1) return t("challenge1");
+  if (index === 2) return t("challenge2");
+  if (index === 3) return t("challenge3");
+  return t("challengeNone");
 }
 
 function infiniteAngleEfficiency() {
@@ -644,10 +841,10 @@ function pointPosition(points) {
 }
 
 function drawBackground() {
-  ctx.fillStyle = "#fbfaf5";
+  ctx.fillStyle = "#0b1630";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  ctx.strokeStyle = "rgba(24, 33, 31, 0.08)";
+  ctx.strokeStyle = "rgba(150, 174, 231, 0.10)";
   ctx.lineWidth = 1;
   const gap = 36;
   for (let x = -canvas.height; x < canvas.width; x += gap) {
@@ -673,16 +870,16 @@ function draw() {
     else ctx.lineTo(p.x, p.y);
   });
   ctx.closePath();
-  ctx.fillStyle = "rgba(46, 111, 143, 0.07)";
+  ctx.fillStyle = "rgba(84, 130, 206, 0.16)";
   ctx.fill();
-  ctx.strokeStyle = "#18211f";
+  ctx.strokeStyle = "#dbe7ff";
   ctx.lineWidth = 5;
   ctx.stroke();
 
   points.forEach((p, index) => {
     ctx.beginPath();
     ctx.arc(p.x, p.y, index === 0 ? 11 : 7, 0, TAU);
-    ctx.fillStyle = index === 0 ? "#d64f38" : "#2e6f8f";
+    ctx.fillStyle = index === 0 ? "#ff7659" : "#55d5ee";
     ctx.fill();
   });
 
@@ -690,35 +887,35 @@ function draw() {
   ctx.arc(point.x, point.y, 10, 0, TAU);
   ctx.fillStyle = "#f2b84b";
   ctx.fill();
-  ctx.strokeStyle = "#18211f";
+  ctx.strokeStyle = "#07101f";
   ctx.lineWidth = 3;
   ctx.stroke();
 
   ctx.textAlign = "center";
   if (canDrawJapanese) {
     ctx.font = "700 16px 'Noto Sans JP', sans-serif";
-    ctx.fillStyle = "#18211f";
-    ctx.fillText("核", points[0].x, points[0].y - 22);
+    ctx.fillStyle = "#eef4ff";
+    ctx.fillText(t("core"), points[0].x, points[0].y - 22);
   }
 
   ctx.font = "800 28px 'Noto Sans JP', sans-serif";
-  ctx.fillStyle = "#b73527";
+  ctx.fillStyle = "#f2b84b";
   ctx.fillText(formatUiNumber(finalScoreGain()), canvas.width / 2, canvas.height - 68);
 
   if (canDrawJapanese) {
     ctx.font = "700 15px 'Noto Sans JP', sans-serif";
-    ctx.fillStyle = "#66716d";
-    ctx.fillText("現在の獲得量", canvas.width / 2, canvas.height - 42);
+    ctx.fillStyle = "#b9c6e4";
+    ctx.fillText(t("currentGain"), canvas.width / 2, canvas.height - 42);
     if (hasMultiplicativeGainExpression()) {
       ctx.font = "700 13px 'Noto Sans JP', sans-serif";
-      ctx.fillText(`基礎乗算表記: ${formatGainExpressionSummary(state.currentGain)}`, canvas.width / 2, canvas.height - 20);
+      ctx.fillText(`${t("baseExpression")}: ${formatGainExpressionSummary(state.currentGain)}`, canvas.width / 2, canvas.height - 20);
     }
   }
 
   state.floatingTexts.forEach((item) => {
     ctx.globalAlpha = Math.max(item.life, 0);
     ctx.font = "900 24px 'Noto Sans JP', sans-serif";
-    ctx.fillStyle = "#d64f38";
+    ctx.fillStyle = "#ff7659";
     ctx.fillText(item.text, item.x, item.y);
     ctx.globalAlpha = 1;
   });
@@ -726,30 +923,57 @@ function draw() {
   ctx.restore();
 }
 
+function applyLanguage() {
+  document.documentElement.lang = state.language;
+  elements.i18nNodes.forEach((node) => {
+    const key = node.dataset.i18n;
+    if (key) node.textContent = t(key);
+  });
+  if (elements.languageSelect) elements.languageSelect.value = state.language;
+  if (elements.numberFormatSelect) {
+    elements.numberFormatSelect.value = state.numberFormat;
+    elements.numberFormatSelect.querySelector('[value="compact"]').textContent = t("numberCompact");
+    elements.numberFormatSelect.querySelector('[value="scientific"]').textContent = t("numberScientific");
+    elements.numberFormatSelect.querySelector('[value="detailed"]').textContent = t("numberDetailed");
+  }
+  if (elements.timeUnitSelect) {
+    elements.timeUnitSelect.value = state.timeUnit;
+    elements.timeUnitSelect.querySelector('[value="auto"]').textContent = t("timeAuto");
+    elements.timeUnitSelect.querySelector('[value="seconds"]').textContent = t("timeSeconds");
+    elements.timeUnitSelect.querySelector('[value="milliseconds"]').textContent = t("timeMilliseconds");
+  }
+}
+
+function canSpend(amount) {
+  return currentScoreLog10() >= log10Value(amount);
+}
+
 function updateUi() {
   const currentCosts = costs();
   document.documentElement.classList.toggle("light-effects", state.lightEffects);
+  applyLanguage();
   elements.scoreValue.textContent = scoreDisplay();
   elements.gainValue.textContent = formatUiNumber(finalScoreGain());
   elements.vertexGainValue.textContent = `+${formatSmallDecimal(vertexGainIncrease())}`;
   elements.lapValue.textContent = formatDuration(lapDuration());
-  elements.speedLevel.textContent = `レベル${state.speedLevel}`;
-  elements.vertexCount.textContent = `${state.vertices}頂点`;
-  elements.gainLevel.textContent = `レベル${state.gainLevel}`;
-  elements.speedCost.textContent = `必要 ${formatUiNumber(currentCosts.speed)}`;
-  elements.vertexCost.textContent = `必要 ${formatUiNumber(currentCosts.vertex)}`;
-  elements.gainCost.textContent = `必要 ${formatUiNumber(currentCosts.gain)}`;
-  elements.speedUpgrade.disabled = state.score < currentCosts.speed;
-  elements.vertexUpgrade.disabled = state.score < currentCosts.vertex || state.activeChallenge === 1;
-  elements.gainUpgrade.disabled = state.score < currentCosts.gain;
+  elements.speedLevel.textContent = `${t("level")} ${state.speedLevel}`;
+  elements.vertexCount.textContent = `${state.vertices} ${t("vertices")}`;
+  elements.gainLevel.textContent = `${t("level")} ${state.gainLevel}`;
+  elements.speedCost.textContent = `${t("cost")} ${formatUiNumber(currentCosts.speed)}`;
+  elements.vertexCost.textContent = `${t("cost")} ${formatUiNumber(currentCosts.vertex)}`;
+  elements.gainCost.textContent = `${t("cost")} ${formatUiNumber(currentCosts.gain)}`;
+  elements.speedUpgrade.disabled = !canSpend(currentCosts.speed);
+  elements.vertexUpgrade.disabled = !canSpend(currentCosts.vertex) || state.activeChallenge === 1;
+  elements.gainUpgrade.disabled = !canSpend(currentCosts.gain);
+  elements.buyAllUpgrade.disabled = !canSpend(Math.min(currentCosts.speed, currentCosts.gain, state.activeChallenge === 1 ? Infinity : currentCosts.vertex));
 
   const unlocked = state.totalScore >= GENERATION_UNLOCK_SCORE;
   const ready = state.generationScore >= GENERATION_UNLOCK_SCORE;
   elements.generationStatus.textContent = ready
-    ? "世代交代 可能"
+    ? t("generationReady")
     : unlocked
-      ? "世代 解放済み"
-      : "世代 未解放";
+      ? t("generationUnlocked")
+      : t("generationLocked");
   elements.generationButton.disabled = !ready;
   elements.generationCount.textContent = String(state.generationCount);
   elements.generationMultiplier.textContent = `×${state.generationScoreMultiplier.toFixed(2)}`;
@@ -782,18 +1006,20 @@ function updateUi() {
   elements.convertIpGain.textContent = `+${formatUiNumber(infiniteScoreGainPerIp())}`;
   const completed = completedChallengeCount();
   elements.challengeStatus.textContent = state.activeChallenge > 0
-    ? `${challengeName(state.activeChallenge)}中`
+    ? `${challengeName(state.activeChallenge)} ${t("challengeRunning")}`
     : state.infinityCount <= 0
-      ? "未解放"
-      : `${completed}/${INFINITY_CHALLENGE_COUNT}完了`;
-  elements.challengeButton.textContent = state.activeChallenge > 0 ? "IC中止" : challengeName(nextChallengeIndex());
+      ? t("locked")
+      : `${completed}/${INFINITY_CHALLENGE_COUNT} ${t("completed")}`;
+  elements.challengeButton.textContent = state.activeChallenge > 0 ? t("stopChallenge") : challengeName(nextChallengeIndex());
   elements.challengeButton.disabled = state.infinityCount <= 0;
   elements.breakCapButton.disabled = !canBreakInfiniteCap();
   elements.breakCapButton.textContent = state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 
   elements.floatingTextToggle.checked = state.showFloatingText;
   elements.lightEffectsToggle.checked = state.lightEffects;
-  elements.detailedNumbersToggle.checked = state.detailedNumbers;
+  elements.languageSelect.value = state.language;
+  elements.numberFormatSelect.value = state.numberFormat;
+  elements.timeUnitSelect.value = state.timeUnit;
 }
 
 function spend(amount) {
@@ -848,6 +1074,47 @@ function buyGain() {
   state.gainLevel += 1;
   updateUi();
   saveGame("manual");
+}
+
+function buyAllUpgrades() {
+  let purchases = 0;
+  let bought = true;
+  while (bought && purchases < BUY_ALL_LIMIT) {
+    bought = false;
+    const speedPrice = costs().speed;
+    if (spend(speedPrice)) {
+      state.speedLevel += 1;
+      purchases += 1;
+      bought = true;
+      if (purchases >= BUY_ALL_LIMIT) break;
+    }
+
+    if (state.activeChallenge !== 1) {
+      const vertexPrice = costs().vertex;
+      if (spend(vertexPrice)) {
+        state.vertices += 1;
+        state.pointProgress = 0;
+        state.totalVertexProgress = 0;
+        state.lastVertexIndex = 0;
+        purchases += 1;
+        bought = true;
+        if (purchases >= BUY_ALL_LIMIT) break;
+      }
+    }
+
+    const gainPrice = costs().gain;
+    if (spend(gainPrice)) {
+      state.gainLevel += 1;
+      purchases += 1;
+      bought = true;
+    }
+  }
+
+  if (purchases > 0) {
+    updateUi();
+    saveGame("manual");
+  }
+  return purchases;
 }
 
 function runGeneration() {
@@ -983,20 +1250,24 @@ function toggleInfinityChallenge() {
   saveGame("manual");
 }
 
-function switchSideTab(tab) {
-  activeSideTab = tab;
-  elements.sideTabs.forEach((button) => {
-    const active = button.dataset.tab === activeSideTab;
+function switchMainTab(tab) {
+  activeMainTab = tab;
+  elements.mainTabs.forEach((button) => {
+    const active = button.dataset.tab === activeMainTab;
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
-  elements.sidePanels.forEach((panel) => {
-    panel.classList.toggle("is-active", panel.dataset.panel === activeSideTab);
+  elements.mainPanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.panel === activeMainTab);
   });
+  resizeCanvas();
 }
 
 function applySetting(key, value) {
   state[key] = value;
+  if (key === "language") state.language = normalizeChoice(value, ["ja", "en"], "ja");
+  if (key === "numberFormat") state.numberFormat = normalizeChoice(value, ["compact", "scientific", "detailed"], "compact");
+  if (key === "timeUnit") state.timeUnit = normalizeChoice(value, ["auto", "seconds", "milliseconds"], "auto");
   if (key === "showFloatingText" && !value) state.floatingTexts = [];
   if (key === "lightEffects" && value) state.floatingTexts = [];
   updateUi();
@@ -1083,8 +1354,10 @@ function renderGameToText() {
     settings: {
       showFloatingText: state.showFloatingText,
       lightEffects: state.lightEffects,
-      detailedNumbers: state.detailedNumbers,
-      activeSideTab,
+      language: state.language,
+      numberFormat: state.numberFormat,
+      timeUnit: state.timeUnit,
+      activeMainTab,
     },
   });
 }
@@ -1105,10 +1378,11 @@ window.__angleDebug = {
   buyIpGainUpgrade,
   buyInfiniteAngleUpgrade,
   buySoftcapUpgrade,
+  buyAllUpgrades,
   convertIpToInfiniteScore,
   toggleInfinityChallenge,
   breakInfiniteCap,
-  switchSideTab,
+  switchMainTab,
   applySetting,
   saveGame,
   loadGame,
@@ -1118,6 +1392,7 @@ window.__angleDebug = {
 elements.speedUpgrade.addEventListener("click", buySpeed);
 elements.vertexUpgrade.addEventListener("click", buyVertex);
 elements.gainUpgrade.addEventListener("click", buyGain);
+elements.buyAllUpgrade.addEventListener("click", buyAllUpgrades);
 elements.generationButton.addEventListener("click", runGeneration);
 elements.coreBoostButton.addEventListener("click", runCoreBoost);
 elements.infinityButton.addEventListener("click", () => runInfinity(false));
@@ -1128,12 +1403,14 @@ elements.convertIpButton.addEventListener("click", convertIpToInfiniteScore);
 elements.challengeButton.addEventListener("click", toggleInfinityChallenge);
 elements.breakCapButton.addEventListener("click", breakInfiniteCap);
 elements.resetSaveButton.addEventListener("click", resetSave);
-elements.sideTabs.forEach((button) => {
-  button.addEventListener("click", () => switchSideTab(button.dataset.tab));
+elements.mainTabs.forEach((button) => {
+  button.addEventListener("click", () => switchMainTab(button.dataset.tab));
 });
 elements.floatingTextToggle.addEventListener("change", () => applySetting("showFloatingText", elements.floatingTextToggle.checked));
 elements.lightEffectsToggle.addEventListener("change", () => applySetting("lightEffects", elements.lightEffectsToggle.checked));
-elements.detailedNumbersToggle.addEventListener("change", () => applySetting("detailedNumbers", elements.detailedNumbersToggle.checked));
+elements.languageSelect.addEventListener("change", () => applySetting("language", elements.languageSelect.value));
+elements.numberFormatSelect.addEventListener("change", () => applySetting("numberFormat", elements.numberFormatSelect.value));
+elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", elements.timeUnitSelect.value));
 window.addEventListener("beforeunload", () => saveGame("manual"));
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("keydown", (event) => {
@@ -1144,7 +1421,7 @@ window.addEventListener("keydown", (event) => {
 });
 
 loadGame();
-switchSideTab(activeSideTab);
+switchMainTab(activeMainTab);
 resizeCanvas();
 updateUi();
 if (document.fonts) {
