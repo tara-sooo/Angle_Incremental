@@ -60,6 +60,7 @@ const elements = {
 
 const BASE_LAP_SECONDS = 6;
 const GENERATION_UNLOCK_SCORE = 1_000_000;
+const GENERATION_MIN_NEW_COST_FACTOR = 0.6;
 const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
 const INFINITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
@@ -712,6 +713,14 @@ function costs() {
   };
 }
 
+function generationRewardFor(generationScore) {
+  const depth = Math.max(0, log10Value(generationScore / GENERATION_UNLOCK_SCORE));
+  return {
+    scoreMultiplierGain: 1 + Math.min(1.25, 0.12 + Math.log10(1 + depth) * 0.22),
+    costReduction: Math.min(0.08, 0.01 + Math.log10(1 + depth) * 0.012),
+  };
+}
+
 function addScore(amount, amountLog10 = log10Value(amount)) {
   const previousScoreLog = currentScoreLog10();
   const rawScoreLog = combineLog10(previousScoreLog, amountLog10);
@@ -1120,10 +1129,13 @@ function buyAllUpgrades() {
 function runGeneration() {
   if (state.generationScore < GENERATION_UNLOCK_SCORE) return;
 
-  const earnedPower = Math.sqrt(state.generationScore / GENERATION_UNLOCK_SCORE);
+  const reward = generationRewardFor(state.generationScore);
+  const nextCostFactor = state.generationCostFactor * (1 - reward.costReduction);
   state.generationCount += 1;
-  state.generationScoreMultiplier += earnedPower * 0.5;
-  state.generationCostFactor = Math.max(0.25, state.generationCostFactor * (1 - Math.min(0.35, earnedPower * 0.08)));
+  state.generationScoreMultiplier *= reward.scoreMultiplierGain;
+  state.generationCostFactor = state.generationCostFactor < GENERATION_MIN_NEW_COST_FACTOR
+    ? state.generationCostFactor
+    : Math.max(GENERATION_MIN_NEW_COST_FACTOR, nextCostFactor);
 
   state.score = 0;
   state.scoreLog10 = -Infinity;
@@ -1379,6 +1391,7 @@ window.__angleDebug = {
   buyInfiniteAngleUpgrade,
   buySoftcapUpgrade,
   buyAllUpgrades,
+  generationRewardFor,
   convertIpToInfiniteScore,
   toggleInfinityChallenge,
   breakInfiniteCap,

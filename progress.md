@@ -31,10 +31,11 @@ Original prompt: では、中核ループを完成させてください
 - Added unit/display settings for language, number format, and time unit, with saved preferences and canvas text localization.
 - Added a normal-upgrade Buy All button with speed -> vertex -> gain priority, a 1000-purchase cap, and IC1 vertex-purchase skipping.
 - Verified the tabbed UI with Firefox/Playwright on desktop and mobile, including settings persistence, Buy All behavior, IC1 skipping, canvas pixel color, and screenshot/overflow checks.
+- Rebalanced Generation rewards toward a longer pre-Infinity path without changing Generation/Core Boost/Infinity thresholds: Generation now uses log-based multiplicative score growth and a gentler cost reduction floor for new progression.
 
 ## TODO
 
-- Future balance pass: tune late-game growth toward the 1,000,000 Generation target through real playtesting.
-- Future balance pass: tune Core Boost gain multiplier/exponent formulas and the path to 1.00e20.
+- Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
+- Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle conversion rates.
 - Future polish: add explicit import/export save text if players need to move saves between browsers.
