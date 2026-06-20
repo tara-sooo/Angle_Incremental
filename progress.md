@@ -42,6 +42,7 @@ Original prompt: では、中核ループを完成させてください
 - Verified Achievements through Firefox/Playwright on desktop and mobile: initial locked list, all-achievement unlock path, reward multipliers, generation multiplier doubling, and no console errors.
 - Expanded Infinity Challenges from 3 to 8. IC1-IC5 now follow the supplied draft constraints/rewards, while IC6-IC8 are provisional Revolution Idle-style constraints for lap speed, vertex scaling, and final gain compression.
 - Verified the 8-IC list, IC5 Infinity Upgrade scaling, core/generation/IP reward calculations, desktop/mobile Infinity tab rendering, and no console errors through Firefox/Playwright.
+- Reworked the Infinity page into a Revolution Idle-style subtab layout with persistent Infinity resources and separate Upgrades, Challenges, and Infinite Angle subpanels.
 
 ## TODO
 

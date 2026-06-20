@@ -159,34 +159,49 @@
             <div class="unlock-note" id="infinityUnlockNote">1.80e308で解放</div>
           </header>
 
-          <div class="infinity-grid">
-            <section class="infinity-summary">
-              <div class="metric primary">
-                <span>Infinity</span>
-                <strong id="infinityCount">0</strong>
-              </div>
-              <div>
-                <span>Infinity Point</span>
-                <strong id="infinityPoints">0</strong>
-              </div>
-              <div>
-                <span>Infinite Score</span>
-                <strong id="infiniteScore">0</strong>
-              </div>
-              <div>
-                <span data-i18n="infiniteAngleBoost">Infinite Angle倍率</span>
-                <strong id="infiniteAngleBoost">×1.00</strong>
-              </div>
-              <div>
-                <span data-i18n="infinityGain">Infinity獲得</span>
-                <strong id="infinityPointGain">+0 IP</strong>
-              </div>
-              <button id="infinityButton" class="infinity-button" type="button" disabled>
-                Infinity
-              </button>
-            </section>
+          <section class="infinity-summary">
+            <div class="metric primary">
+              <span>Infinity</span>
+              <strong id="infinityCount">0</strong>
+            </div>
+            <div>
+              <span>Infinity Point</span>
+              <strong id="infinityPoints">0</strong>
+            </div>
+            <div>
+              <span>Infinite Score</span>
+              <strong id="infiniteScore">0</strong>
+            </div>
+            <div>
+              <span data-i18n="infiniteAngleBoost">Infinite Angle倍率</span>
+              <strong id="infiniteAngleBoost">×1.00</strong>
+            </div>
+            <div>
+              <span data-i18n="infinityGain">Infinity獲得</span>
+              <strong id="infinityPointGain">+0 IP</strong>
+            </div>
+            <button id="infinityButton" class="infinity-button" type="button" disabled>
+              Infinity
+            </button>
+          </section>
 
-            <section class="infinity-panel">
+          <nav class="infinity-subtabs" aria-label="Infinity sub tabs">
+            <button class="infinity-subtab is-active" type="button" data-infinity-tab="upgrades" aria-selected="true">
+              <span>UPG</span>
+              <strong>Upgrades</strong>
+            </button>
+            <button class="infinity-subtab" type="button" data-infinity-tab="challenges" aria-selected="false">
+              <span>IC</span>
+              <strong>Challenges</strong>
+            </button>
+            <button class="infinity-subtab" type="button" data-infinity-tab="angle" aria-selected="false">
+              <span>IA</span>
+              <strong>Infinite Angle</strong>
+            </button>
+          </nav>
+
+          <div class="infinity-subpanels">
+            <section class="infinity-panel infinity-subpanel is-active" data-infinity-panel="upgrades">
               <div class="panel-heading">
                 <span>Infinity Upgrade</span>
                 <strong>IP</strong>
@@ -203,13 +218,9 @@
                 <button id="softcapUpgrade" class="mini-button" type="button" disabled data-i18n="softcapUpgrade">軟上限緩和</button>
                 <strong id="softcapUpgradeCost">4 IP</strong>
               </div>
-              <div class="upgrade-row">
-                <button id="convertIpButton" class="mini-button" type="button" disabled data-i18n="convertIp">IPをIAへ</button>
-                <strong id="convertIpGain">+0</strong>
-              </div>
             </section>
 
-            <section class="infinity-panel">
+            <section class="infinity-panel infinity-subpanel" data-infinity-panel="challenges">
               <div class="panel-heading">
                 <span>Infinity Challenge</span>
                 <strong id="challengeStatus">未解放</strong>
@@ -218,6 +229,27 @@
               <button id="breakCapButton" class="break-button" type="button" disabled>
                 Break Infinite Cap
               </button>
+            </section>
+
+            <section class="infinity-panel infinity-subpanel" data-infinity-panel="angle">
+              <div class="panel-heading">
+                <span>Infinite Angle</span>
+                <strong>IP</strong>
+              </div>
+              <div class="infinite-angle-panel">
+                <div>
+                  <span>Infinite Score</span>
+                  <strong id="infiniteScorePanel">0</strong>
+                </div>
+                <div>
+                  <span data-i18n="infiniteAngleBoost">Infinite Angle倍率</span>
+                  <strong id="infiniteAngleBoostPanel">×1.00</strong>
+                </div>
+                <div class="upgrade-row">
+                  <button id="convertIpButton" class="mini-button" type="button" disabled data-i18n="convertIp">IPをIAへ</button>
+                  <strong id="convertIpGain">+0</strong>
+                </div>
+              </div>
             </section>
           </div>
         </section>

@@ -4,6 +4,8 @@ const ctx = canvas.getContext("2d");
 const elements = {
   mainTabs: Array.from(document.querySelectorAll(".main-tab")),
   mainPanels: Array.from(document.querySelectorAll(".main-panel")),
+  infinitySubtabs: Array.from(document.querySelectorAll(".infinity-subtab")),
+  infinitySubpanels: Array.from(document.querySelectorAll(".infinity-subpanel")),
   scoreValue: document.getElementById("scoreValue"),
   gainValue: document.getElementById("gainValue"),
   vertexGainValue: document.getElementById("vertexGainValue"),
@@ -21,7 +23,9 @@ const elements = {
   infinityCount: document.getElementById("infinityCount"),
   infinityPoints: document.getElementById("infinityPoints"),
   infiniteScore: document.getElementById("infiniteScore"),
+  infiniteScorePanel: document.getElementById("infiniteScorePanel"),
   infiniteAngleBoost: document.getElementById("infiniteAngleBoost"),
+  infiniteAngleBoostPanel: document.getElementById("infiniteAngleBoostPanel"),
   infinityPointGain: document.getElementById("infinityPointGain"),
   infinityButton: document.getElementById("infinityButton"),
   ipGainUpgrade: document.getElementById("ipGainUpgrade"),
@@ -424,6 +428,7 @@ const SAVE_FIELDS = [
 let autoSaveElapsed = 0;
 let japaneseFontReady = false;
 let activeMainTab = "angle";
+let activeInfinitySubtab = "upgrades";
 let appliedLanguage = "";
 
 function t(key) {
@@ -1345,7 +1350,9 @@ function updateUi() {
   elements.infinityUnlockNote.hidden = infinityUnlocked;
   elements.infinityPoints.textContent = formatUiNumber(state.infinityPoints);
   elements.infiniteScore.textContent = formatUiNumber(state.infiniteScore);
+  elements.infiniteScorePanel.textContent = formatUiNumber(state.infiniteScore);
   elements.infiniteAngleBoost.textContent = `×${infiniteAngleBoost().toFixed(2)}`;
+  elements.infiniteAngleBoostPanel.textContent = `×${infiniteAngleBoost().toFixed(2)}`;
   elements.infinityPointGain.textContent = `+${formatUiNumber(infinityPointGain())} IP`;
   elements.infinityButton.disabled = state.infinityCount === 0 || !canInfinity();
   elements.ipGainUpgradeCost.textContent = `${formatUiNumber(ipGainUpgradeCost())} IP`;
@@ -1623,6 +1630,18 @@ function switchMainTab(tab) {
   resizeCanvas();
 }
 
+function switchInfinitySubtab(tab) {
+  activeInfinitySubtab = tab;
+  elements.infinitySubtabs.forEach((button) => {
+    const active = button.dataset.infinityTab === activeInfinitySubtab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  elements.infinitySubpanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.infinityPanel === activeInfinitySubtab);
+  });
+}
+
 function applySetting(key, value) {
   state[key] = value;
   if (key === "language") {
@@ -1734,6 +1753,7 @@ function renderGameToText() {
       numberFormat: state.numberFormat,
       timeUnit: state.timeUnit,
       activeMainTab,
+      activeInfinitySubtab,
     },
   });
 }
@@ -1761,6 +1781,7 @@ window.__angleDebug = {
   breakInfiniteCap,
   checkAchievements,
   switchMainTab,
+  switchInfinitySubtab,
   applySetting,
   saveGame,
   loadGame,
@@ -1783,6 +1804,9 @@ elements.resetSaveButton.addEventListener("click", resetSave);
 elements.mainTabs.forEach((button) => {
   button.addEventListener("click", () => switchMainTab(button.dataset.tab));
 });
+elements.infinitySubtabs.forEach((button) => {
+  button.addEventListener("click", () => switchInfinitySubtab(button.dataset.infinityTab));
+});
 elements.floatingTextToggle.addEventListener("change", () => applySetting("showFloatingText", elements.floatingTextToggle.checked));
 elements.lightEffectsToggle.addEventListener("change", () => applySetting("lightEffects", elements.lightEffectsToggle.checked));
 elements.languageSelect.addEventListener("change", () => applySetting("language", elements.languageSelect.value));
@@ -1801,6 +1825,7 @@ loadGame();
 createChallengeRows();
 createAchievementRows();
 switchMainTab(activeMainTab);
+switchInfinitySubtab(activeInfinitySubtab);
 resizeCanvas();
 updateUi();
 if (document.fonts) {
