@@ -50,6 +50,8 @@ Original prompt: では、中核ループを完成させてください
 - Made the reset dock sticky so Generation/Core Boost stay visible on constrained screens, and added a versioned update modal shown when the app version changes.
 - Fixed compact number suffixes so 1,000,000 displays as M rather than B.
 - Reworked Generation to match the revised spec: GR score multiplier now applies at ^2, cost reduction applies only to upgrade cost growth, repeat Generations require beating the previous generation score, GR slightly relaxes the lap speed softcap, and core-hit scoring now uses the `(x/y)^y` formula.
+- Fixed the `(x/y)^y` scoring order so it applies only to The Angle's base gain; GR, CB, achievement, and Infinity modifiers are applied afterward instead of being re-exponentiated by vertex count.
+- Changed achievement 3's GR reward to double only the multiplier above x1, so reset states no longer display an unexplained x2 Generation multiplier.
 - Changed compact reset controls so Generation and Core Boost multiplier/exponent rows remain accessible on short screens through scrolling instead of being hidden.
 
 ## TODO

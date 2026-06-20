@@ -83,7 +83,7 @@ const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 8;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
-const APP_VERSION = "2026.06.20-gr-rework";
+const APP_VERSION = "2026.06.20-gain-expression-order";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
 const MAX_EXACT_CORE_HITS = 50000;
@@ -183,7 +183,7 @@ const TEXT = {
     updateSummary: "Generation仕様とリセット欄表示を更新しました。",
     updateResetDock: "GenerationとCore Boostの全ステータスをスクロールで確認できるようにしました。",
     updateCanvas: "GR倍率、コスト増加軽減、前回GR超過条件を新仕様へ調整しました。",
-    updateModalNote: "核到達スコアに新しい(x/y)^y式を反映しました。",
+    updateModalNote: "(x/y)^y式はThe Angle由来の基礎獲得量に適用されます。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -282,7 +282,7 @@ const TEXT = {
     updateSummary: "Generation rules and reset-layer layout were updated.",
     updateResetDock: "All Generation and Core Boost stats can be reached by scrolling.",
     updateCanvas: "GR scaling, cost-growth reduction, and repeat Generation rules were adjusted.",
-    updateModalNote: "Core-hit score now uses the new (x/y)^y formula.",
+    updateModalNote: "The (x/y)^y formula now applies to The Angle's base gain.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -843,11 +843,17 @@ function generationAchievementMultiplier() {
   return generationScoreMultiplierBaseEffect();
 }
 
+function applyGenerationAchievementReward(baseMultiplier) {
+  if (!isAchievementUnlocked(3)) return baseMultiplier;
+  return 1 + (baseMultiplier - 1) * 2;
+}
+
 function generationScoreMultiplierEffect(includeAchievementReward = true) {
   if (state.activeChallenge === 1) return 1;
   if (state.activeChallenge === 3) return 1 / Math.pow(Math.max(state.generationScoreMultiplier, 1), 0.7);
 
-  return generationScoreMultiplierBaseEffect() * (includeAchievementReward && isAchievementUnlocked(3) ? 2 : 1);
+  const baseMultiplier = generationScoreMultiplierBaseEffect();
+  return includeAchievementReward ? applyGenerationAchievementReward(baseMultiplier) : baseMultiplier;
 }
 
 function generationCostFactorEffect() {
@@ -874,16 +880,21 @@ function finalScoreGain(baseGain = state.currentGain) {
   return gainLog <= 308 ? 10 ** gainLog : Infinity;
 }
 
+function angleExpressionLog10(baseGain = state.currentGain) {
+  const baseLog = log10Value(Math.max(baseGain, 0));
+  const parts = gainExpressionParts();
+  if (parts <= 1) return baseLog;
+  return (baseLog - log10Value(parts)) * parts;
+}
+
 function preExpressionScoreGainLog10(baseGain = state.currentGain) {
-  const baseLog = log10Value(Math.max(baseGain, 0)) * coreBoostGainExponent() + log10Value(generationScoreMultiplierEffect());
-  return baseLog * finalScoreGainPower() - log10Value(finalScoreGainDivisor());
+  return angleExpressionLog10(baseGain);
 }
 
 function finalScoreGainLog10(baseGain = state.currentGain) {
-  const preExpressionLog = preExpressionScoreGainLog10(baseGain);
-  const parts = gainExpressionParts();
-  if (parts <= 1) return preExpressionLog;
-  return (preExpressionLog - log10Value(parts)) * parts;
+  const angleLog = angleExpressionLog10(baseGain) * coreBoostGainExponent();
+  const boostedLog = angleLog + log10Value(generationScoreMultiplierEffect());
+  return boostedLog * finalScoreGainPower() - log10Value(finalScoreGainDivisor());
 }
 
 function isAchievementUnlocked(id) {
@@ -1093,7 +1104,7 @@ function nextGenerationValues() {
     : Math.max(GENERATION_MIN_NEW_COST_FACTOR, state.generationCostFactor * (1 - reward.costReduction));
 
   return {
-    scoreMultiplier: generationScoreMultiplierBaseEffect(nextRawScoreMultiplier) * (isAchievementUnlocked(3) ? 2 : 1),
+    scoreMultiplier: applyGenerationAchievementReward(generationScoreMultiplierBaseEffect(nextRawScoreMultiplier)),
     costFactor: Math.pow(nextRawCostFactor, generationCostPower()),
   };
 }
