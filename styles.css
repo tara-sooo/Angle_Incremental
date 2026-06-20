@@ -41,7 +41,7 @@ select {
   min-height: 100svh;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 86px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 86px;
   gap: 10px;
   align-items: stretch;
   padding: 9px 0;
@@ -61,6 +61,7 @@ select {
 }
 
 .main-tabs {
+  order: 2;
   min-height: calc(100svh - 18px);
   padding: 10px 8px;
   display: grid;
@@ -93,7 +94,7 @@ select {
 
 .main-tab.is-active {
   background: linear-gradient(180deg, #4f6fb8, #253f82);
-  box-shadow: inset 4px 0 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+  box-shadow: inset -4px 0 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
 }
 
 .tab-icon {
@@ -131,6 +132,7 @@ select {
 }
 
 .main-panels {
+  order: 1;
   min-width: 0;
   min-height: calc(100svh - 18px);
   display: grid;
@@ -699,6 +701,7 @@ canvas {
   }
 
   .main-tabs {
+    order: 1;
     min-height: auto;
     grid-template-columns: repeat(4, 1fr);
     grid-auto-rows: 56px;
@@ -710,6 +713,14 @@ canvas {
     grid-template-columns: auto auto;
     grid-template-rows: auto auto;
     gap: 2px 6px;
+  }
+
+  .main-tab.is-active {
+    box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+  }
+
+  .main-panels {
+    order: 2;
   }
 
   .main-tab small {
