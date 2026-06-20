@@ -54,6 +54,7 @@ select {
 .stage-panel,
 .infinity-summary,
 .infinity-panel,
+.achievement-overview,
 .settings-card,
 .save-panel {
   background: linear-gradient(180deg, rgba(23, 36, 59, 0.96), rgba(12, 20, 35, 0.96));
@@ -462,9 +463,14 @@ canvas {
 }
 
 .infinity-page,
+.achievements-panel,
 .help-panel,
 .settings-panel {
   padding: 0 14px 14px;
+}
+
+.infinity-page {
+  overflow: auto;
 }
 
 .infinity-grid {
@@ -476,6 +482,7 @@ canvas {
 
 .infinity-summary,
 .infinity-panel,
+.achievement-overview,
 .settings-card,
 .save-panel {
   padding: 12px;
@@ -555,7 +562,7 @@ canvas {
   grid-template-columns: minmax(0, 1fr) minmax(82px, auto);
   gap: 8px;
   align-items: stretch;
-  min-height: 54px;
+  min-height: 96px;
 }
 
 .challenge-info {
@@ -580,6 +587,19 @@ canvas {
   font-weight: 900;
 }
 
+.challenge-restriction,
+.challenge-reward {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.challenge-reward {
+  color: #c7d4f2;
+}
+
 .challenge-row.is-completed .challenge-info {
   border-color: rgba(59, 163, 110, 0.7);
   background: rgba(31, 76, 58, 0.34);
@@ -596,6 +616,97 @@ canvas {
 
 .break-button {
   background: linear-gradient(180deg, #272f43, #101726);
+}
+
+.achievement-overview {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.55fr) minmax(320px, 1fr);
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+
+.achievement-overview > div:not(.metric) {
+  display: grid;
+  align-content: center;
+  gap: 6px;
+}
+
+.achievement-overview span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.achievement-overview strong {
+  color: var(--gold);
+  font-size: 1rem;
+}
+
+.achievement-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.achievement-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  min-height: 118px;
+  padding: 12px;
+  border: 2px solid var(--line);
+  background: linear-gradient(180deg, rgba(17, 27, 47, 0.96), rgba(8, 14, 26, 0.96));
+}
+
+.achievement-row.is-unlocked {
+  border-color: rgba(242, 184, 75, 0.78);
+  background: linear-gradient(180deg, rgba(59, 72, 111, 0.94), rgba(24, 31, 54, 0.96));
+}
+
+.achievement-number {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--gold);
+  border: 2px solid var(--line-strong);
+  background: rgba(242, 184, 75, 0.08);
+}
+
+.achievement-title {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.achievement-condition,
+.achievement-reward {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.achievement-reward {
+  color: #c7d4f2;
+}
+
+.achievement-status {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+  background: rgba(7, 13, 25, 0.58);
+}
+
+.achievement-row.is-unlocked .achievement-status {
+  color: #101726;
+  background: var(--gold);
+  border-color: var(--gold);
 }
 
 .help-list {
@@ -717,7 +828,7 @@ canvas {
     z-index: 10;
     min-height: auto;
     height: auto;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     grid-auto-rows: 56px;
     padding: 8px;
   }
@@ -753,6 +864,8 @@ canvas {
 
   .angle-layout,
   .infinity-grid,
+  .achievement-overview,
+  .achievement-list,
   .settings-grid,
   .help-list {
     grid-template-columns: 1fr;
@@ -775,6 +888,7 @@ canvas {
   .stage-panel,
   .infinity-summary,
   .infinity-panel,
+  .achievement-overview,
   .settings-card,
   .save-panel {
     min-height: auto;

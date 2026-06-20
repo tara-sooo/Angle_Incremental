@@ -38,10 +38,15 @@ Original prompt: では、中核ループを完成させてください
 - Compressed the mobile Angle tab into one viewport by using a fixed-height two-row Angle layout, 2x2 upgrade controls, compact Stage header, and two-column Generation/Core Boost dock.
 - Fixed settings select controls repeatedly reopening on some browsers by avoiding per-frame option/value rewrites while a select has focus.
 - Added `CONTRIBUTING.md` documenting the lightweight stable-main branch strategy, short-lived branch naming, verification checklist, direct-main exceptions, and milestone tag guidance.
+- Added Achievements as a persistent reset-proof layer with 8 initial achievements, a shared gain-per-vertex multiplier, the GR multiplier doubling reward for achievement 3, save support, an Achievements tab, and spec documentation.
+- Verified Achievements through Firefox/Playwright on desktop and mobile: initial locked list, all-achievement unlock path, reward multipliers, generation multiplier doubling, and no console errors.
+- Expanded Infinity Challenges from 3 to 8. IC1-IC5 now follow the supplied draft constraints/rewards, while IC6-IC8 are provisional Revolution Idle-style constraints for lap speed, vertex scaling, and final gain compression.
+- Verified the 8-IC list, IC5 Infinity Upgrade scaling, core/generation/IP reward calculations, desktop/mobile Infinity tab rendering, and no console errors through Firefox/Playwright.
 
 ## TODO
 
 - Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle conversion rates.
+- Future design pass: replace provisional IC6-IC8 if the game owner provides official designs.
 - Future polish: add explicit import/export save text if players need to move saves between browsers.

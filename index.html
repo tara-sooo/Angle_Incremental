@@ -23,6 +23,11 @@
           <small id="infinityTabState">LOCKED</small>
           <i id="infinityTabBadge" aria-hidden="true"></i>
         </button>
+        <button class="main-tab" type="button" data-tab="achievements" aria-selected="false">
+          <span class="tab-icon">★</span>
+          <span class="tab-code">ACH</span>
+          <small id="achievementTabState">0/8</small>
+        </button>
         <button class="main-tab" type="button" data-tab="help" aria-selected="false">
           <span class="tab-icon">?</span>
           <span class="tab-code">HELP</span>
@@ -215,6 +220,29 @@
               </button>
             </section>
           </div>
+        </section>
+
+        <section class="main-panel achievements-panel" data-panel="achievements" aria-label="Achievements">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">Achievements</p>
+              <h1>Achievements</h1>
+            </div>
+            <div class="unlock-note" id="achievementSummary">0/8 実績</div>
+          </header>
+
+          <section class="achievement-overview">
+            <div class="metric primary">
+              <span data-i18n="achievementBoost">実績増加倍率</span>
+              <strong id="achievementBoost">×1.00</strong>
+            </div>
+            <div>
+              <span data-i18n="achievementReward">共通報酬</span>
+              <strong data-i18n="achievementRewardText">達成ごとに頂点通過ごとの増加 ×1.01</strong>
+            </div>
+          </section>
+
+          <div id="achievementList" class="achievement-list" aria-label="Achievement list"></div>
         </section>
 
         <section class="main-panel help-panel" data-panel="help" aria-label="Help">

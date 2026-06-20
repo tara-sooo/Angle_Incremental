@@ -35,6 +35,10 @@ const elements = {
   challengeList: document.getElementById("challengeList"),
   challengeStatus: document.getElementById("challengeStatus"),
   breakCapButton: document.getElementById("breakCapButton"),
+  achievementList: document.getElementById("achievementList"),
+  achievementSummary: document.getElementById("achievementSummary"),
+  achievementBoost: document.getElementById("achievementBoost"),
+  achievementTabState: document.getElementById("achievementTabState"),
   buyAllUpgrade: document.getElementById("buyAllUpgrade"),
   speedUpgrade: document.getElementById("speedUpgrade"),
   vertexUpgrade: document.getElementById("vertexUpgrade"),
@@ -65,7 +69,8 @@ const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
 const INFINITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
 const BREAK_CAP_REQUIREMENT_LOG10 = 333;
-const INFINITY_CHALLENGE_COUNT = 3;
+const INFINITY_CHALLENGE_COUNT = 8;
+const ACHIEVEMENT_COUNT = 8;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
@@ -77,6 +82,7 @@ const BUY_ALL_LIMIT = 1000;
 const TEXT = {
   ja: {
     tabAngle: "図形",
+    tabAchievements: "実績",
     tabHelp: "説明",
     tabSettings: "設定",
     score: "スコア",
@@ -103,6 +109,11 @@ const TEXT = {
     infiniteAngleUpgrade: "IA効率",
     softcapUpgrade: "軟上限緩和",
     convertIp: "IPをIAへ",
+    achievementBoost: "実績増加倍率",
+    achievementReward: "共通報酬",
+    achievementRewardText: "達成ごとに頂点通過ごとの増加 ×1.01",
+    achievementUnlocked: "達成済み",
+    achievementLocked: "未達成",
     language: "言語",
     numberFormat: "数値表記",
     timeUnit: "時間単位",
@@ -132,9 +143,8 @@ const TEXT = {
     challengeIncomplete: "未クリア",
     challengeLocked: "Infinity後に解放",
     challengeNone: "未挑戦",
-    challenge1: "IC1 角追加禁止",
-    challenge2: "IC2 周回低速",
-    challenge3: "IC3 増加低下",
+    challengeRestrictionLabel: "制約",
+    challengeRewardLabel: "報酬",
     core: "核",
     currentGain: "現在の獲得量",
     baseExpression: "基礎乗算表記",
@@ -160,6 +170,7 @@ const TEXT = {
   },
   en: {
     tabAngle: "Angle",
+    tabAchievements: "Achievements",
     tabHelp: "Info",
     tabSettings: "System",
     score: "Score",
@@ -186,6 +197,11 @@ const TEXT = {
     infiniteAngleUpgrade: "IA Efficiency",
     softcapUpgrade: "Soften Cap",
     convertIp: "Convert IP to IA",
+    achievementBoost: "Achievement boost",
+    achievementReward: "Shared reward",
+    achievementRewardText: "Each achievement multiplies gain per vertex by 1.01",
+    achievementUnlocked: "Unlocked",
+    achievementLocked: "Locked",
     language: "Language",
     numberFormat: "Number format",
     timeUnit: "Time unit",
@@ -215,9 +231,8 @@ const TEXT = {
     challengeIncomplete: "Incomplete",
     challengeLocked: "Unlocked after Infinity",
     challengeNone: "No challenge",
-    challenge1: "IC1 No Added Vertices",
-    challenge2: "IC2 Slow Lap",
-    challenge3: "IC3 Lower Growth",
+    challengeRestrictionLabel: "Restriction",
+    challengeRewardLabel: "Reward",
     core: "Core",
     currentGain: "Current gain",
     baseExpression: "Base product",
@@ -242,6 +257,100 @@ const TEXT = {
     timeMilliseconds: "Milliseconds",
   },
 };
+
+const ACHIEVEMENTS = [
+  {
+    title: { ja: "頂点すなわち角度", en: "A Vertex Is an Angle" },
+    condition: { ja: "角の数を増やす", en: "Increase the number of vertices." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.vertices > 3,
+  },
+  {
+    title: { ja: "世代を超えて", en: "Beyond Generations" },
+    condition: { ja: "Generationを実行する", en: "Run Generation." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.generationCount > 0,
+  },
+  {
+    title: { ja: "e(この実績の番号)分のブースト", en: "An e3 Boost" },
+    condition: { ja: "GR由来の単純なスコア獲得量の乗算値が1000を超える", en: "Make the raw GR score multiplier exceed 1000." },
+    reward: { ja: "GRの単純なスコア獲得量の乗算の効果が2倍", en: "Doubles the effect of the GR score multiplier." },
+    isUnlocked: () => state.generationScoreMultiplier > 1000,
+  },
+  {
+    title: { ja: "角と核はダブルミーニングでもあり", en: "Angle and Core, Doubled" },
+    condition: { ja: "Core Boost1に到達", en: "Reach Core Boost 1." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.coreBoostCount >= 1,
+  },
+  {
+    title: { ja: "目視できない", en: "Too Fast to See" },
+    condition: { ja: "ラップスピードが10を超える", en: "Raise lap speed above 10." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => lapSpeedMultiplier() > 10,
+  },
+  {
+    title: { ja: "contagon", en: "contagon" },
+    condition: { ja: "頂点の数が30を超える", en: "Raise vertices above 30." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.vertices > 30,
+  },
+  {
+    title: { ja: "再びe(この実績の番号)分のブースト", en: "Another e7 Boost" },
+    condition: { ja: "GR由来の単純なスコア獲得量の乗算値が10000000を超える", en: "Make the raw GR score multiplier exceed 10,000,000." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.generationScoreMultiplier > 10_000_000,
+  },
+  {
+    title: { ja: "スケーリングは始まっている", en: "Scaling Has Begun" },
+    condition: { ja: "所持スコアがe30を超える", en: "Hold more than 1e30 score." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => currentScoreLog10() > 30,
+  },
+];
+
+const INFINITY_CHALLENGES = [
+  {
+    name: { ja: "IC1 Generation停止", en: "IC1 No Generation" },
+    restriction: { ja: "Generationは機能しない", en: "Generation does not function." },
+    reward: { ja: "IPの獲得量が2倍", en: "Doubles IP gain." },
+  },
+  {
+    name: { ja: "IC2 核増幅圧縮", en: "IC2 Compressed Core" },
+    restriction: { ja: "CBボーナス獲得量が^0.6される", en: "Core Boost bonuses are raised to ^0.6." },
+    reward: { ja: "CBボーナス獲得量が^1.1される", en: "Core Boost bonuses are raised to ^1.1." },
+  },
+  {
+    name: { ja: "IC3 逆世代", en: "IC3 Reversed Generation" },
+    restriction: { ja: "Generationの効果が逆転し、Generationボーナスが^0.7される", en: "Generation effects invert and Generation bonuses are raised to ^0.7." },
+    reward: { ja: "Generationが少し強い", en: "Generation is slightly stronger." },
+  },
+  {
+    name: { ja: "IC4 二重核", en: "IC4 Double Core" },
+    restriction: { ja: "核の数は2で固定され、スコアはラップスピード+10で割られる", en: "The core count is fixed at 2, and score gain is divided by lap speed + 10." },
+    reward: { ja: "スコア獲得量は^2される", en: "Score gain is raised to ^2." },
+  },
+  {
+    name: { ja: "IC5 Infinity Upgrade圧縮", en: "IC5 Compressed Infinity Upgrades" },
+    restriction: { ja: "Infinity Upgradeの効果が^0.1される", en: "Infinity Upgrade effects are raised to ^0.1." },
+    reward: { ja: "Infinity Upgrade効果が^3される", en: "Infinity Upgrade effects are raised to ^3." },
+  },
+  {
+    name: { ja: "IC6 粘性軌道", en: "IC6 Viscous Orbit" },
+    restriction: { ja: "ラップスピードボーナスが平方根化される", en: "Lap speed bonuses are square-rooted." },
+    reward: { ja: "ラップスピードボーナスが少し強い", en: "Lap speed bonuses are slightly stronger." },
+  },
+  {
+    name: { ja: "IC7 多角崩壊", en: "IC7 Vertex Collapse" },
+    restriction: { ja: "頂点が多いほどスコア獲得量が割られる", en: "More vertices divide score gain." },
+    reward: { ja: "頂点数に応じて頂点通過ごとの増加が伸びる", en: "Vertices improve gain per vertex." },
+  },
+  {
+    name: { ja: "IC8 無限圧縮", en: "IC8 Infinite Compression" },
+    restriction: { ja: "最終スコア獲得量が^0.45される", en: "Final score gain is raised to ^0.45." },
+    reward: { ja: "クリア済みICに応じてIP獲得量が増える", en: "Completed ICs increase IP gain." },
+  },
+];
 
 const state = {
   score: 0,
@@ -268,6 +377,7 @@ const state = {
   activeChallenge: 0,
   completedChallenges: 0,
   infiniteCapBroken: false,
+  achievementMask: 0,
   showFloatingText: true,
   lightEffects: false,
   language: "ja",
@@ -302,6 +412,7 @@ const SAVE_FIELDS = [
   "activeChallenge",
   "completedChallenges",
   "infiniteCapBroken",
+  "achievementMask",
   "showFloatingText",
   "lightEffects",
   "language",
@@ -356,6 +467,7 @@ function applySaveData(data) {
   state.activeChallenge = Math.min(INFINITY_CHALLENGE_COUNT, Math.floor(sanitizeNumber(data.activeChallenge, 0)));
   state.completedChallenges = Math.floor(sanitizeNumber(data.completedChallenges, 0));
   state.infiniteCapBroken = Boolean(data.infiniteCapBroken);
+  state.achievementMask = Math.floor(sanitizeNumber(data.achievementMask, 0));
   if (state.infinityCount <= 0) state.activeChallenge = 0;
   state.showFloatingText = data.showFloatingText !== false;
   state.lightEffects = Boolean(data.lightEffects);
@@ -442,6 +554,7 @@ function resetSave() {
     activeChallenge: 0,
     completedChallenges: 0,
     infiniteCapBroken: false,
+    achievementMask: 0,
     showFloatingText: true,
     lightEffects: false,
     language: "ja",
@@ -527,14 +640,21 @@ function formatGainExpressionSummary(value) {
   return `${formatUiNumber(Math.pow(Math.max(value, 1), 1 / gainExpressionParts()))} × ... × ${gainExpressionParts()}${term}`;
 }
 
+function challengeText(index, key) {
+  const challenge = INFINITY_CHALLENGES[index - 1];
+  const language = TEXT[state.language] ? state.language : "ja";
+  return challenge ? challenge[key][language] : t("challengeNone");
+}
+
 function lapSpeedMultiplier() {
-  const challengeReward = isChallengeCompleted(2) ? 1.2 : 1;
-  return Math.pow(1.22, state.speedLevel) * challengeReward;
+  let multiplier = Math.pow(1.22, state.speedLevel);
+  if (state.activeChallenge === 6) multiplier = Math.pow(multiplier, 0.5);
+  if (isChallengeCompleted(6)) multiplier = Math.pow(multiplier, 1.08);
+  return multiplier;
 }
 
 function lapDuration() {
-  const challengePenalty = state.activeChallenge === 2 ? 3 : 1;
-  return (BASE_LAP_SECONDS / lapSpeedMultiplier()) * challengePenalty;
+  return BASE_LAP_SECONDS / lapSpeedMultiplier();
 }
 
 function formatDuration(seconds) {
@@ -575,7 +695,7 @@ function scoreDisplay() {
 
 function infinitySoftcapPower() {
   if (state.infiniteCapBroken) return 1;
-  return Math.min(0.32, 0.08 + state.softcapUpgradeLevel * 0.035 + completedChallengeCount() * 0.02);
+  return Math.min(0.32, 0.08 + infinityUpgradeEffect(state.softcapUpgradeLevel) * 0.035 + completedChallengeCount() * 0.02);
 }
 
 function applyInfinitySoftcap(rawLog10) {
@@ -584,8 +704,8 @@ function applyInfinitySoftcap(rawLog10) {
 }
 
 function vertexGainIncrease() {
-  const challengeFactor = state.activeChallenge === 3 ? 0.35 : 1;
-  return (0.01 + state.gainLevel * 0.01) * coreBoostGainIncreaseMultiplier() * infiniteAngleBoost() * challengeFactor;
+  const vertexReward = isChallengeCompleted(7) ? 1 + Math.max(0, state.vertices - 3) * 0.01 : 1;
+  return (0.01 + state.gainLevel * 0.01) * coreBoostGainIncreaseMultiplier() * infiniteAngleBoost() * achievementGainMultiplier() * vertexReward;
 }
 
 function coreBoostRequirementLog10() {
@@ -601,21 +721,82 @@ function canCoreBoost() {
   return currentScoreLog10() >= coreBoostRequirementLog10();
 }
 
+function coreBoostBonusPower() {
+  if (state.activeChallenge === 2) return 0.6;
+  return isChallengeCompleted(2) ? 1.1 : 1;
+}
+
 function coreBoostGainIncreaseMultiplier() {
-  return 1 + state.coreBoostCount * 0.5;
+  return Math.pow(1 + state.coreBoostCount * 0.5, coreBoostBonusPower());
 }
 
 function coreBoostGainExponent() {
-  const challengeReward = isChallengeCompleted(1) ? 0.02 : 0;
-  return 1 + state.coreBoostCount * 0.05 + challengeReward;
+  return Math.pow(1 + state.coreBoostCount * 0.05, coreBoostBonusPower());
+}
+
+function generationScoreMultiplierEffect() {
+  if (state.activeChallenge === 1) return 1;
+  if (state.activeChallenge === 3) return 1 / Math.pow(Math.max(state.generationScoreMultiplier, 1), 0.7);
+
+  const generationPower = isChallengeCompleted(3) ? 1.08 : 1;
+  return Math.pow(state.generationScoreMultiplier, generationPower) * (isAchievementUnlocked(3) ? 2 : 1);
+}
+
+function generationCostFactorEffect() {
+  if (state.activeChallenge === 1) return 1;
+  if (state.activeChallenge === 3) return 1 / Math.pow(Math.max(state.generationCostFactor, 0.01), 0.7);
+  return Math.pow(state.generationCostFactor, isChallengeCompleted(3) ? 1.08 : 1);
+}
+
+function finalScoreGainPower() {
+  let power = isChallengeCompleted(4) ? 2 : 1;
+  if (state.activeChallenge === 8) power *= 0.45;
+  return power;
+}
+
+function finalScoreGainDivisor() {
+  let divisor = 1;
+  if (state.activeChallenge === 4) divisor *= lapSpeedMultiplier() + 10;
+  if (state.activeChallenge === 7) divisor *= Math.max(1, state.vertices);
+  return divisor;
 }
 
 function finalScoreGain(baseGain = state.currentGain) {
-  return Math.pow(baseGain, coreBoostGainExponent()) * state.generationScoreMultiplier;
+  const gainLog = finalScoreGainLog10(baseGain);
+  return gainLog <= 308 ? 10 ** gainLog : Infinity;
 }
 
 function finalScoreGainLog10(baseGain = state.currentGain) {
-  return log10Value(Math.max(baseGain, 0)) * coreBoostGainExponent() + log10Value(state.generationScoreMultiplier);
+  const baseLog = log10Value(Math.max(baseGain, 0)) * coreBoostGainExponent() + log10Value(generationScoreMultiplierEffect());
+  return baseLog * finalScoreGainPower() - log10Value(finalScoreGainDivisor());
+}
+
+function isAchievementUnlocked(id) {
+  return (state.achievementMask & (1 << (id - 1))) !== 0;
+}
+
+function achievementCount() {
+  let count = 0;
+  for (let id = 1; id <= ACHIEVEMENT_COUNT; id += 1) {
+    if (isAchievementUnlocked(id)) count += 1;
+  }
+  return count;
+}
+
+function achievementGainMultiplier() {
+  return Math.pow(1.01, achievementCount());
+}
+
+function checkAchievements() {
+  let changed = false;
+  ACHIEVEMENTS.forEach((achievement, index) => {
+    const id = index + 1;
+    if (!isAchievementUnlocked(id) && achievement.isUnlocked()) {
+      state.achievementMask |= 1 << index;
+      changed = true;
+    }
+  });
+  return changed;
 }
 
 function isChallengeCompleted(index) {
@@ -644,19 +825,39 @@ function challengeStateText(index) {
 }
 
 function challengeName(index) {
-  if (index === 1) return t("challenge1");
-  if (index === 2) return t("challenge2");
-  if (index === 3) return t("challenge3");
-  return t("challengeNone");
+  return challengeText(index, "name");
+}
+
+function challengeRestriction(index) {
+  return challengeText(index, "restriction");
+}
+
+function challengeReward(index) {
+  return challengeText(index, "reward");
+}
+
+function coreVertexIndices() {
+  if (state.activeChallenge !== 4) return [0];
+  const secondCore = Math.floor(state.vertices / 2) % state.vertices;
+  return secondCore === 0 ? [0] : [0, secondCore];
+}
+
+function isCoreVertex(index) {
+  return coreVertexIndices().includes(index);
 }
 
 function infiniteAngleEfficiency() {
-  const challengeReward = isChallengeCompleted(3) ? 1.5 : 1;
-  return (1 + state.infiniteAngleUpgradeLevel) * challengeReward;
+  return 1 + infinityUpgradeEffect(state.infiniteAngleUpgradeLevel);
 }
 
 function infiniteAngleBoost() {
   return 1 + Math.log10(1 + state.infiniteScore) * 0.25;
+}
+
+function infinityUpgradeEffect(level) {
+  if (level <= 0) return 0;
+  const power = state.activeChallenge === 5 ? 0.1 : isChallengeCompleted(5) ? 3 : 1;
+  return Math.pow(level, power);
 }
 
 function ipGainUpgradeCost() {
@@ -680,8 +881,10 @@ function infinityPointGain() {
   const scoreLog = currentScoreLog10();
   const depth = Math.max(0, scoreLog - INFINITY_REQUIREMENT_LOG10);
   const base = 1 + Math.floor(depth / 25);
-  const upgradeMultiplier = 1 + state.ipGainUpgradeLevel;
-  return Math.max(1, base * upgradeMultiplier);
+  const upgradeMultiplier = 1 + infinityUpgradeEffect(state.ipGainUpgradeLevel);
+  const challenge1Reward = isChallengeCompleted(1) ? 2 : 1;
+  const challenge8Reward = isChallengeCompleted(8) ? 1 + completedChallengeCount() * 0.25 : 1;
+  return Math.max(1, Math.floor(base * upgradeMultiplier * challenge1Reward * challenge8Reward));
 }
 
 function infiniteScoreGainPerIp() {
@@ -693,8 +896,6 @@ function canBreakInfiniteCap() {
 }
 
 function sumCoreHitGains(firstCoreStep, coreHits, increase) {
-  const exponent = coreBoostGainExponent();
-  const multiplier = state.generationScoreMultiplier;
   const stride = state.vertices;
   const baseGain = state.currentGain;
 
@@ -704,20 +905,20 @@ function sumCoreHitGains(firstCoreStep, coreHits, increase) {
     for (let segment = 0; segment < CORE_HIT_APPROX_SEGMENTS; segment += 1) {
       const midHit = (segment + 0.5) * segmentSize;
       const stepAtMid = firstCoreStep + midHit * stride;
-      earned += Math.pow(baseGain + increase * stepAtMid, exponent) * multiplier * segmentSize;
+      earned += finalScoreGain(baseGain + increase * stepAtMid) * segmentSize;
     }
     return earned;
   }
 
   let earned = 0;
   for (let hit = 0; hit < coreHits; hit += 1) {
-    earned += Math.pow(baseGain + increase * (firstCoreStep + hit * stride), exponent) * multiplier;
+    earned += finalScoreGain(baseGain + increase * (firstCoreStep + hit * stride));
   }
   return earned;
 }
 
 function cost(base, level, growth) {
-  return Math.ceil(base * Math.pow(growth, level) * state.generationCostFactor);
+  return Math.ceil(base * Math.pow(growth, level) * generationCostFactorEffect());
 }
 
 function costs() {
@@ -752,6 +953,7 @@ function addScore(amount, amountLog10 = log10Value(amount)) {
   }
   state.lastEarned = amount;
 
+  if (checkAchievements()) saveGame("manual");
   if (state.infinityCount === 0 && canInfinity()) {
     runInfinity(true);
     return true;
@@ -762,7 +964,7 @@ function addScore(amount, amountLog10 = log10Value(amount)) {
 
 function passVertex(index) {
   state.currentGain += vertexGainIncrease();
-  if (index === 0) {
+  if (isCoreVertex(index)) {
     const earned = finalScoreGain();
     const resetByInfinity = addScore(earned, finalScoreGainLog10());
     if (resetByInfinity) return true;
@@ -783,13 +985,25 @@ function processManyVertices(start, end) {
   if (count <= 0) return;
 
   const increase = vertexGainIncrease();
-  const coreOffset = ((state.vertices - (start % state.vertices)) % state.vertices);
-  const coreHits = coreOffset >= count ? 0 : Math.floor((count - 1 - coreOffset) / state.vertices) + 1;
+  const coreBatches = coreVertexIndices()
+    .map((coreIndex) => {
+      const coreOffset = ((coreIndex - (start % state.vertices)) + state.vertices) % state.vertices;
+      const coreHits = coreOffset >= count ? 0 : Math.floor((count - 1 - coreOffset) / state.vertices) + 1;
+      return {
+        coreHits,
+        firstCoreStep: coreOffset + 1,
+      };
+    })
+    .filter((batch) => batch.coreHits > 0);
+  const coreHits = coreBatches.reduce((total, batch) => total + batch.coreHits, 0);
 
   if (coreHits > 0) {
-    const firstCoreStep = coreOffset + 1;
-    const earned = sumCoreHitGains(firstCoreStep, coreHits, increase);
-    const lastCoreStep = firstCoreStep + (coreHits - 1) * state.vertices;
+    let earned = 0;
+    let lastCoreStep = 0;
+    coreBatches.forEach((batch) => {
+      earned += sumCoreHitGains(batch.firstCoreStep, batch.coreHits, increase);
+      lastCoreStep = Math.max(lastCoreStep, batch.firstCoreStep + (batch.coreHits - 1) * state.vertices);
+    });
     const batchLog = log10Value(Math.max(coreHits, 1)) + finalScoreGainLog10(state.currentGain + increase * lastCoreStep);
     const resetByInfinity = addScore(earned, Number.isFinite(earned) ? log10Value(earned) : batchLog);
     if (resetByInfinity) return true;
@@ -900,10 +1114,12 @@ function draw() {
   ctx.lineWidth = 5;
   ctx.stroke();
 
+  const coreIndices = coreVertexIndices();
   points.forEach((p, index) => {
     ctx.beginPath();
-    ctx.arc(p.x, p.y, index === 0 ? 11 : 7, 0, TAU);
-    ctx.fillStyle = index === 0 ? "#ff7659" : "#55d5ee";
+    const core = coreIndices.includes(index);
+    ctx.arc(p.x, p.y, core ? 11 : 7, 0, TAU);
+    ctx.fillStyle = core ? "#ff7659" : "#55d5ee";
     ctx.fill();
   });
 
@@ -992,12 +1208,18 @@ function createChallengeRows() {
     const status = document.createElement("small");
     status.className = "challenge-state";
 
+    const restriction = document.createElement("p");
+    restriction.className = "challenge-restriction";
+
+    const reward = document.createElement("p");
+    reward.className = "challenge-reward";
+
     const button = document.createElement("button");
     button.className = "challenge-start-button";
     button.type = "button";
     button.addEventListener("click", () => toggleInfinityChallenge(index));
 
-    info.append(name, status);
+    info.append(name, status, restriction, reward);
     row.append(info, button);
     elements.challengeList.append(row);
   }
@@ -1015,8 +1237,60 @@ function updateChallengeRows() {
     row.classList.toggle("is-completed", completed);
     row.querySelector(".challenge-name").textContent = challengeName(index);
     row.querySelector(".challenge-state").textContent = challengeStateText(index);
+    row.querySelector(".challenge-restriction").textContent = `${t("challengeRestrictionLabel")}: ${challengeRestriction(index)}`;
+    row.querySelector(".challenge-reward").textContent = `${t("challengeRewardLabel")}: ${challengeReward(index)}`;
     button.textContent = active ? t("stopChallenge") : t("startChallenge");
     button.disabled = locked || (state.activeChallenge > 0 && !active);
+  });
+}
+
+function createAchievementRows() {
+  elements.achievementList.replaceChildren();
+  ACHIEVEMENTS.forEach((achievement, index) => {
+    const row = document.createElement("article");
+    row.className = "achievement-row";
+    row.dataset.achievement = String(index + 1);
+
+    const number = document.createElement("strong");
+    number.className = "achievement-number";
+
+    const body = document.createElement("div");
+    body.className = "achievement-body";
+
+    const title = document.createElement("h2");
+    title.className = "achievement-title";
+
+    const condition = document.createElement("p");
+    condition.className = "achievement-condition";
+
+    const reward = document.createElement("p");
+    reward.className = "achievement-reward";
+
+    const status = document.createElement("span");
+    status.className = "achievement-status";
+
+    body.append(title, condition, reward);
+    row.append(number, body, status);
+    elements.achievementList.append(row);
+  });
+}
+
+function updateAchievementRows() {
+  const language = TEXT[state.language] ? state.language : "ja";
+  elements.achievementList.querySelectorAll(".achievement-row").forEach((row) => {
+    const id = Number(row.dataset.achievement);
+    const achievement = ACHIEVEMENTS[id - 1];
+    const unlocked = isAchievementUnlocked(id);
+    const extraReward = achievement.reward[language];
+
+    row.classList.toggle("is-unlocked", unlocked);
+    row.querySelector(".achievement-number").textContent = String(id);
+    row.querySelector(".achievement-title").textContent = achievement.title[language];
+    row.querySelector(".achievement-condition").textContent = achievement.condition[language];
+    row.querySelector(".achievement-reward").textContent = extraReward
+      ? `${t("achievementReward")}: ${extraReward}`
+      : t("achievementRewardText");
+    row.querySelector(".achievement-status").textContent = unlocked ? t("achievementUnlocked") : t("achievementLocked");
   });
 }
 
@@ -1026,6 +1300,8 @@ function canSpend(amount) {
 
 function updateUi() {
   const currentCosts = costs();
+  const achievementsChanged = checkAchievements();
+  if (achievementsChanged) saveGame("manual");
   document.documentElement.classList.toggle("light-effects", state.lightEffects);
   applyLanguage();
   elements.scoreValue.textContent = scoreDisplay();
@@ -1039,9 +1315,9 @@ function updateUi() {
   elements.vertexCost.textContent = `${t("cost")} ${formatUiNumber(currentCosts.vertex)}`;
   elements.gainCost.textContent = `${t("cost")} ${formatUiNumber(currentCosts.gain)}`;
   elements.speedUpgrade.disabled = !canSpend(currentCosts.speed);
-  elements.vertexUpgrade.disabled = !canSpend(currentCosts.vertex) || state.activeChallenge === 1;
+  elements.vertexUpgrade.disabled = !canSpend(currentCosts.vertex);
   elements.gainUpgrade.disabled = !canSpend(currentCosts.gain);
-  elements.buyAllUpgrade.disabled = !canSpend(Math.min(currentCosts.speed, currentCosts.gain, state.activeChallenge === 1 ? Infinity : currentCosts.vertex));
+  elements.buyAllUpgrade.disabled = !canSpend(Math.min(currentCosts.speed, currentCosts.gain, currentCosts.vertex));
 
   const unlocked = state.totalScore >= GENERATION_UNLOCK_SCORE;
   const ready = state.generationScore >= GENERATION_UNLOCK_SCORE;
@@ -1050,10 +1326,10 @@ function updateUi() {
     : unlocked
       ? t("generationUnlocked")
       : t("generationLocked");
-  elements.generationButton.disabled = !ready;
+  elements.generationButton.disabled = !ready || state.activeChallenge === 1;
   elements.generationCount.textContent = String(state.generationCount);
-  elements.generationMultiplier.textContent = `×${state.generationScoreMultiplier.toFixed(2)}`;
-  elements.generationCostFactor.textContent = `×${state.generationCostFactor.toFixed(2)}`;
+  elements.generationMultiplier.textContent = `×${generationScoreMultiplierEffect().toFixed(2)}`;
+  elements.generationCostFactor.textContent = `×${generationCostFactorEffect().toFixed(2)}`;
 
   elements.coreBoostCount.textContent = String(state.coreBoostCount);
   elements.coreBoostRequirement.textContent = formatPowerOfTen(coreBoostRequirementLog10());
@@ -1089,6 +1365,12 @@ function updateUi() {
   updateChallengeRows();
   elements.breakCapButton.disabled = !canBreakInfiniteCap();
   elements.breakCapButton.textContent = state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
+
+  const unlockedAchievements = achievementCount();
+  elements.achievementTabState.textContent = `${unlockedAchievements}/${ACHIEVEMENT_COUNT}`;
+  elements.achievementSummary.textContent = `${unlockedAchievements}/${ACHIEVEMENT_COUNT} ${t("tabAchievements")}`;
+  elements.achievementBoost.textContent = `×${achievementGainMultiplier().toFixed(3)}`;
+  updateAchievementRows();
 
   syncFormControl(elements.floatingTextToggle, state.showFloatingText);
   syncFormControl(elements.lightEffectsToggle, state.lightEffects);
@@ -1132,7 +1414,6 @@ function buySpeed() {
 }
 
 function buyVertex() {
-  if (state.activeChallenge === 1) return;
   const price = costs().vertex;
   if (!spend(price)) return;
   state.vertices += 1;
@@ -1164,17 +1445,15 @@ function buyAllUpgrades() {
       if (purchases >= BUY_ALL_LIMIT) break;
     }
 
-    if (state.activeChallenge !== 1) {
-      const vertexPrice = costs().vertex;
-      if (spend(vertexPrice)) {
-        state.vertices += 1;
-        state.pointProgress = 0;
-        state.totalVertexProgress = 0;
-        state.lastVertexIndex = 0;
-        purchases += 1;
-        bought = true;
-        if (purchases >= BUY_ALL_LIMIT) break;
-      }
+    const vertexPrice = costs().vertex;
+    if (spend(vertexPrice)) {
+      state.vertices += 1;
+      state.pointProgress = 0;
+      state.totalVertexProgress = 0;
+      state.lastVertexIndex = 0;
+      purchases += 1;
+      bought = true;
+      if (purchases >= BUY_ALL_LIMIT) break;
     }
 
     const gainPrice = costs().gain;
@@ -1193,6 +1472,7 @@ function buyAllUpgrades() {
 }
 
 function runGeneration() {
+  if (state.activeChallenge === 1) return;
   if (state.generationScore < GENERATION_UNLOCK_SCORE) return;
 
   const reward = generationRewardFor(state.generationScore);
@@ -1400,6 +1680,7 @@ function renderGameToText() {
     lapSeconds: Number(lapDuration().toPrecision(6)),
     point: { x: Number(point.x.toFixed(1)), y: Number(point.y.toFixed(1)), progress: Number(state.pointProgress.toFixed(3)) },
     core: { x: Number(points[0].x.toFixed(1)), y: Number(points[0].y.toFixed(1)) },
+    coreCount: coreVertexIndices().length,
     upgrades: {
       speedLevel: state.speedLevel,
       gainLevel: state.gainLevel,
@@ -1409,8 +1690,9 @@ function renderGameToText() {
       unlocked: state.totalScore >= GENERATION_UNLOCK_SCORE,
       canGenerate: state.generationScore >= GENERATION_UNLOCK_SCORE,
       count: state.generationCount,
-      scoreMultiplier: Number(state.generationScoreMultiplier.toFixed(2)),
-      costFactor: Number(state.generationCostFactor.toFixed(2)),
+      rawScoreMultiplier: Number(state.generationScoreMultiplier.toFixed(2)),
+      scoreMultiplier: Number(generationScoreMultiplierEffect().toFixed(2)),
+      costFactor: Number(generationCostFactorEffect().toFixed(2)),
     },
     coreBoost: {
       canBoost: canCoreBoost(),
@@ -1430,9 +1712,20 @@ function renderGameToText() {
       infiniteAngleBoost: Number(infiniteAngleBoost().toFixed(2)),
       activeChallenge: state.activeChallenge,
       completedChallenges: completedChallengeCount(),
+      challengeCount: INFINITY_CHALLENGE_COUNT,
+      activeChallengeName: state.activeChallenge > 0 ? challengeName(state.activeChallenge) : challengeName(0),
       softcapPower: Number(infinitySoftcapPower().toFixed(3)),
       capBroken: state.infiniteCapBroken,
       canBreakCap: canBreakInfiniteCap(),
+      ipUpgradeEffect: Number(infinityUpgradeEffect(state.ipGainUpgradeLevel).toPrecision(6)),
+    },
+    achievements: {
+      unlocked: achievementCount(),
+      total: ACHIEVEMENT_COUNT,
+      gainMultiplier: Number(achievementGainMultiplier().toFixed(4)),
+      vertexGainIncrease: Number(vertexGainIncrease().toPrecision(6)),
+      mask: state.achievementMask,
+      generationMultiplierReward: isAchievementUnlocked(3),
     },
     settings: {
       showFloatingText: state.showFloatingText,
@@ -1466,6 +1759,7 @@ window.__angleDebug = {
   convertIpToInfiniteScore,
   toggleInfinityChallenge,
   breakInfiniteCap,
+  checkAchievements,
   switchMainTab,
   applySetting,
   saveGame,
@@ -1505,6 +1799,7 @@ window.addEventListener("keydown", (event) => {
 
 loadGame();
 createChallengeRows();
+createAchievementRows();
 switchMainTab(activeMainTab);
 resizeCanvas();
 updateUi();
