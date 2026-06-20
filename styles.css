@@ -439,12 +439,16 @@ canvas {
 }
 
 .reset-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 8;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   padding: 10px;
   border-top: 2px solid var(--line);
-  background: rgba(7, 13, 25, 0.62);
+  background: rgba(7, 13, 25, 0.94);
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.28);
 }
 
 .generation,
@@ -956,6 +960,55 @@ canvas {
   line-height: 1.35;
 }
 
+.update-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(3, 8, 17, 0.72);
+}
+
+.update-modal[hidden] {
+  display: none;
+}
+
+.update-modal-card {
+  width: min(460px, 100%);
+  padding: 18px;
+  border: 2px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(23, 36, 59, 0.98), rgba(8, 14, 26, 0.98));
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46), inset 0 -4px 0 var(--gold);
+}
+
+.update-modal-card h2 {
+  margin: 0 0 10px;
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+.update-modal-card p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.update-modal-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 16px;
+  padding-left: 20px;
+  color: #c7d4f2;
+  line-height: 1.45;
+}
+
+.update-modal-close {
+  width: 100%;
+  min-height: 44px;
+  background: linear-gradient(180deg, #3d9a61, #226d42);
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -1089,19 +1142,19 @@ canvas {
   }
 
   .upgrade-rail {
-    padding: 8px;
-    gap: 6px;
+    padding: 6px;
+    gap: 4px;
     overflow: visible;
   }
 
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px 10px;
-    padding-bottom: 4px;
+    gap: 3px 8px;
+    padding-bottom: 3px;
   }
 
   .metric {
-    min-height: 24px;
+    min-height: 20px;
     padding: 2px 0;
   }
 
@@ -1110,13 +1163,13 @@ canvas {
     grid-column: span 2;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: baseline;
-    min-height: 34px;
-    padding: 0 0 4px;
+    min-height: 28px;
+    padding: 0 0 3px;
   }
 
   .metric.primary strong {
     margin-top: 0;
-    font-size: 2rem;
+    font-size: 1.72rem;
   }
 
   .metric span {
@@ -1129,12 +1182,12 @@ canvas {
 
   .upgrades {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
+    gap: 4px;
   }
 
   .buy-all-button {
-    min-height: 50px;
-    padding: 7px 10px;
+    min-height: 42px;
+    padding: 6px 8px;
   }
 
   .buy-all-button small {
@@ -1142,8 +1195,8 @@ canvas {
   }
 
   .upgrade-button {
-    min-height: 50px;
-    padding: 7px 9px;
+    min-height: 42px;
+    padding: 6px 8px;
     gap: 3px;
   }
 
@@ -1171,8 +1224,8 @@ canvas {
   .stage-panel .topbar {
     align-items: end;
     flex-direction: row;
-    min-height: 62px;
-    padding: 8px 12px 7px;
+    min-height: 54px;
+    padding: 7px 10px 6px;
     gap: 4px;
   }
 
@@ -1181,7 +1234,7 @@ canvas {
   }
 
   .stage-panel h1 {
-    font-size: 2rem;
+    font-size: 1.72rem;
   }
 
   .stage-panel .eyebrow {
@@ -1195,11 +1248,11 @@ canvas {
 
   .playfield-wrap {
     padding: 6px;
-    min-height: 150px;
+    min-height: 128px;
   }
 
   .stage-panel {
-    grid-template-rows: auto minmax(150px, auto) auto;
+    grid-template-rows: auto minmax(128px, auto) auto;
     overflow: visible;
   }
 
@@ -1209,14 +1262,21 @@ canvas {
 
   .reset-dock {
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    padding: 6px;
+    gap: 4px;
+    padding: 5px;
+    max-height: 100px;
+    overflow: auto;
+  }
+
+  .generation > div:nth-of-type(n + 2),
+  .core-boost > div:nth-of-type(n + 3) {
+    display: none;
   }
 
   .generation,
   .core-boost {
-    padding: 6px;
-    gap: 4px;
+    padding: 5px;
+    gap: 3px;
   }
 
   .generation > div,
@@ -1239,8 +1299,8 @@ canvas {
 
   .generation-button,
   .core-boost-button {
-    min-height: 34px;
-    padding: 6px 8px;
-    font-size: 0.86rem;
+    min-height: 28px;
+    padding: 4px 7px;
+    font-size: 0.8rem;
   }
 }

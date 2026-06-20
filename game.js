@@ -64,6 +64,8 @@ const elements = {
   languageSelect: document.getElementById("languageSelect"),
   numberFormatSelect: document.getElementById("numberFormatSelect"),
   timeUnitSelect: document.getElementById("timeUnitSelect"),
+  updateModal: document.getElementById("updateModal"),
+  updateModalClose: document.getElementById("updateModalClose"),
   i18nNodes: Array.from(document.querySelectorAll("[data-i18n]")),
   infinityTabState: document.getElementById("infinityTabState"),
   infinityTabBadge: document.getElementById("infinityTabBadge"),
@@ -81,6 +83,8 @@ const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 8;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
+const APP_VERSION = "2026.06.20-reset-dock-modal";
+const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
 const MAX_EXACT_CORE_HITS = 50000;
 const CORE_HIT_APPROX_SEGMENTS = 2048;
@@ -174,6 +178,12 @@ const TEXT = {
     loadFailed: "読み込み失敗",
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
+    updateTitle: "アップデート",
+    updateSummary: "表示崩れ修正と更新通知を追加しました。",
+    updateResetDock: "短い画面でも世代交代と核増幅にアクセスしやすくしました。",
+    updateCanvas: "図形の潰れを抑えるcanvasサイズ調整を維持しました。",
+    updateModalNote: "今後の更新時にこの通知が表示されます。",
+    updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
     millisecondsUnit: "ミリ秒",
@@ -266,6 +276,12 @@ const TEXT = {
     loadFailed: "Load failed",
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
+    updateTitle: "Update",
+    updateSummary: "Layout fixes and update notices were added.",
+    updateResetDock: "Generation and Core Boost are easier to reach on short screens.",
+    updateCanvas: "Canvas sizing still prevents the Angle from being squeezed.",
+    updateModalNote: "This notice will appear for future updates.",
+    updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
     millisecondsUnit: "ms",
@@ -460,6 +476,30 @@ function t(key) {
 
 function setSaveStatus(text) {
   elements.saveStatus.textContent = text;
+}
+
+function shouldShowUpdateModal() {
+  try {
+    return localStorage.getItem(UPDATE_SEEN_KEY) !== APP_VERSION;
+  } catch (error) {
+    return false;
+  }
+}
+
+function closeUpdateModal() {
+  if (!elements.updateModal) return;
+  elements.updateModal.hidden = true;
+  try {
+    localStorage.setItem(UPDATE_SEEN_KEY, APP_VERSION);
+  } catch (error) {
+    // Non-critical: private browsing or blocked storage should not affect gameplay.
+  }
+}
+
+function showUpdateModalIfNeeded() {
+  if (!elements.updateModal || !shouldShowUpdateModal()) return;
+  elements.updateModal.hidden = false;
+  if (elements.updateModalClose) elements.updateModalClose.focus();
 }
 
 function normalizeChoice(value, allowed, fallback) {
@@ -1948,6 +1988,7 @@ elements.fpsToggle.addEventListener("change", () => applySetting("showFps", elem
 elements.languageSelect.addEventListener("change", () => applySetting("language", elements.languageSelect.value));
 elements.numberFormatSelect.addEventListener("change", () => applySetting("numberFormat", elements.numberFormatSelect.value));
 elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", elements.timeUnitSelect.value));
+if (elements.updateModalClose) elements.updateModalClose.addEventListener("click", closeUpdateModal);
 window.addEventListener("beforeunload", () => saveGame("manual"));
 window.addEventListener("resize", resizeCanvas);
 const canvasResizeObserver = window.ResizeObserver && canvas.parentElement
@@ -1955,6 +1996,12 @@ const canvasResizeObserver = window.ResizeObserver && canvas.parentElement
   : null;
 if (canvasResizeObserver) canvasResizeObserver.observe(canvas.parentElement);
 window.addEventListener("keydown", (event) => {
+  const updateModalVisible = elements.updateModal && !elements.updateModal.hidden;
+  if (updateModalVisible && event.key === "Escape") {
+    closeUpdateModal();
+    return;
+  }
+  if (updateModalVisible) return;
   if (event.key.toLowerCase() === "f") {
     if (document.fullscreenElement) document.exitFullscreen();
     else document.documentElement.requestFullscreen();
@@ -1968,6 +2015,7 @@ switchMainTab(activeMainTab);
 switchInfinitySubtab(activeInfinitySubtab);
 resizeCanvas();
 updateUi();
+showUpdateModalIfNeeded();
 if (document.fonts) {
   document.fonts.ready.then(() => {
     japaneseFontReady = true;

@@ -368,6 +368,19 @@
 
     <div id="achievementToasts" class="achievement-toasts" aria-live="polite"></div>
     <div id="fpsCounter" class="fps-counter" hidden>FPS 0</div>
+    <div id="updateModal" class="update-modal" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle" hidden>
+      <div class="update-modal-card">
+        <p class="eyebrow">Update</p>
+        <h2 id="updateModalTitle" data-i18n="updateTitle">アップデート</h2>
+        <p data-i18n="updateSummary">表示崩れ修正と更新通知を追加しました。</p>
+        <ul>
+          <li data-i18n="updateResetDock">短い画面でも世代交代と核増幅にアクセスしやすくしました。</li>
+          <li data-i18n="updateCanvas">図形の潰れを抑えるcanvasサイズ調整を維持しました。</li>
+          <li data-i18n="updateModalNote">今後の更新時にこの通知が表示されます。</li>
+        </ul>
+        <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
+      </div>
+    </div>
 
     <script src="game.js"></script>
   </body>
