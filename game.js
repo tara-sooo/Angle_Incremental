@@ -84,7 +84,7 @@ const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 8;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 2;
-const APP_VERSION = "2026.06.20-log-resource-safety";
+const APP_VERSION = "2026.06.20-log-cost-pregr-balance";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const VERSION_MANIFEST_URL = "version.json";
 const UPDATE_CHECK_INTERVAL_SECONDS = 60;
@@ -93,6 +93,13 @@ const MAX_EXACT_CORE_HITS = 50000;
 const CORE_HIT_APPROX_SEGMENTS = 2048;
 const LAP_SPEED_SOFTCAP_START = 200;
 const LAP_SPEED_SOFTCAP_POWER = 0.5;
+const PRE_GENERATION_LAP_SPEED_SOFTCAP_START = 35;
+const PRE_GENERATION_LAP_SPEED_SOFTCAP_POWER = 0.22;
+const PRE_GENERATION_COST_SCALING = {
+  speed: { startsAfter: 20, logScale: 0.3 },
+  vertex: { startsAfter: 15, logScale: 1.2 },
+  gain: { startsAfter: 12, logScale: 0.55 },
+};
 const GENERATION_SCORE_POWER = 2;
 const GENERATION_SCORE_POWER_IC3_REWARD = 2.1;
 const GENERATION_COST_POWER_IC3_REWARD = 1.08;
@@ -183,10 +190,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "巨大数値がInfinity表示やNaN保存になりにくいよう修正しました。",
-    updateResetDock: "累計スコア、世代スコア、IP、Infinite Scoreをlog値で保持します。",
-    updateCanvas: "核到達時の獲得量表示の丸めとラベルを修正しました。",
-    updateModalNote: "巨大値は∞ではなく指数表記で表示されます。",
+    updateSummary: "高レベル強化コストと序盤リセット層の進行バランスを調整しました。",
+    updateResetDock: "通常強化コストをlog値で扱い、旧上限以降も購入できるようにしました。",
+    updateCanvas: "周回速度軟上限と通常強化コストの追加スケーリングを段階解除式にしました。",
+    updateModalNote: "Core BoostやInfinityへ早く進みすぎないようにしつつ、リセット後は速度投資が戻る形にしました。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -282,10 +289,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Large numbers are now less likely to become Infinity displays or NaN saves.",
-    updateResetDock: "Total score, generation score, IP, and Infinite Score are stored with log values.",
-    updateCanvas: "Gain-on-core display rounding and labels were corrected.",
-    updateModalNote: "Huge values are displayed with exponent notation instead of ∞.",
+    updateSummary: "High-level upgrade costs and early reset-layer balance were adjusted.",
+    updateResetDock: "Normal upgrade costs now use log values, so purchases can continue past the old numeric cap.",
+    updateCanvas: "Lap-speed softcaps and normal-upgrade cost scaling now relax in stages.",
+    updateModalNote: "Core Boost and Infinity are paced more deliberately while speed investment recovers after resets.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -830,7 +837,7 @@ function lapSpeedMultiplier() {
   const rawMultiplier = rawLapSpeedMultiplier();
   const softcapStart = lapSpeedSoftcapStart();
   if (rawMultiplier <= softcapStart) return rawMultiplier;
-  return softcapStart * Math.pow(rawMultiplier / softcapStart, LAP_SPEED_SOFTCAP_POWER);
+  return softcapStart * Math.pow(rawMultiplier / softcapStart, lapSpeedSoftcapPower());
 }
 
 function isLapSpeedSoftcapped() {
@@ -839,8 +846,21 @@ function isLapSpeedSoftcapped() {
 
 function lapSpeedSoftcapStart() {
   if (state.activeChallenge === 1) return LAP_SPEED_SOFTCAP_START;
-  const relief = Math.min(1.5, Math.max(0, log10Value(state.generationScoreMultiplier)) * 0.15);
-  return LAP_SPEED_SOFTCAP_START * (1 + relief);
+  if (state.generationCount <= 0) return PRE_GENERATION_LAP_SPEED_SOFTCAP_START;
+  const stagedStart = Math.min(
+    LAP_SPEED_SOFTCAP_START,
+    60 + (state.generationCount - 1) * 40 + state.coreBoostCount * 65,
+  );
+  const relief = Math.min(1.5, Math.max(0, log10Value(state.generationScoreMultiplier)) * 0.08);
+  return stagedStart * (1 + relief);
+}
+
+function lapSpeedSoftcapPower() {
+  if (state.generationCount <= 0) return PRE_GENERATION_LAP_SPEED_SOFTCAP_POWER;
+  return Math.min(
+    LAP_SPEED_SOFTCAP_POWER,
+    0.24 + (state.generationCount - 1) * 0.06 + state.coreBoostCount * 0.1,
+  );
 }
 
 function lapDuration() {
@@ -1222,16 +1242,64 @@ function sumCoreHitGains(firstCoreStep, coreHits, increase) {
   return earned;
 }
 
-function cost(base, level, growth) {
-  const rawCost = base * Math.pow(growth, level);
-  return Math.ceil(base + (rawCost - base) * generationCostFactorEffect());
+function earlyLayerCostScalingFactor() {
+  let generationFactor;
+  if (state.generationCount <= 0) generationFactor = 1;
+  else if (state.generationCount === 1) generationFactor = 0.9;
+  else if (state.generationCount === 2) generationFactor = 0.45;
+  else if (state.generationCount === 3) generationFactor = 0.2;
+  else generationFactor = 0;
+
+  let coreRelief;
+  if (state.coreBoostCount <= 0) coreRelief = 1;
+  else if (state.coreBoostCount === 1) coreRelief = 0.35;
+  else if (state.coreBoostCount === 2) coreRelief = 0.1;
+  else coreRelief = 0;
+
+  return generationFactor * coreRelief;
+}
+
+function preGenerationCostScalingLog10(kind, level) {
+  const scalingFactor = earlyLayerCostScalingFactor();
+  if (scalingFactor <= 0) return 0;
+  const scaling = PRE_GENERATION_COST_SCALING[kind];
+  if (!scaling) return 0;
+  const excess = Math.max(0, level - scaling.startsAfter);
+  return excess * excess * scaling.logScale * scalingFactor;
+}
+
+function costLog10(kind, base, level, growth) {
+  const rawLog = log10Value(base) + level * log10Value(growth);
+  const costFactor = generationCostFactorEffect();
+  let adjustedLog;
+
+  if (rawLog <= 300) {
+    const rawCost = 10 ** rawLog;
+    adjustedLog = log10Value(Math.ceil(base + (rawCost - base) * costFactor));
+  } else {
+    adjustedLog = rawLog + log10Value(costFactor);
+  }
+
+  return adjustedLog + preGenerationCostScalingLog10(kind, level);
+}
+
+function cost(kind, base, level, growth) {
+  return valueFromLog10(costLog10(kind, base, level, growth));
+}
+
+function costLogs() {
+  return {
+    speed: costLog10("speed", 5, state.speedLevel, 1.55),
+    vertex: costLog10("vertex", 12, state.vertices - 3, 1.72),
+    gain: costLog10("gain", 18, state.gainLevel, 1.68),
+  };
 }
 
 function costs() {
   return {
-    speed: cost(5, state.speedLevel, 1.55),
-    vertex: cost(12, state.vertices - 3, 1.72),
-    gain: cost(18, state.gainLevel, 1.68),
+    speed: cost("speed", 5, state.speedLevel, 1.55),
+    vertex: cost("vertex", 12, state.vertices - 3, 1.72),
+    gain: cost("gain", 18, state.gainLevel, 1.68),
   };
 }
 
@@ -1675,12 +1743,16 @@ function updateAchievementRows() {
   });
 }
 
+function canSpendLog(amountLog) {
+  return currentScoreLog10() >= amountLog;
+}
+
 function canSpend(amount) {
-  return currentScoreLog10() >= log10Value(amount);
+  return canSpendLog(log10Value(amount));
 }
 
 function updateUi() {
-  const currentCosts = costs();
+  const currentCostLogs = costLogs();
   const unlockedAchievementsNow = checkAchievements(true);
   if (unlockedAchievementsNow.length > 0) saveGame("manual");
   document.documentElement.classList.toggle("light-effects", state.lightEffects);
@@ -1695,13 +1767,13 @@ function updateUi() {
   elements.speedLevel.textContent = `${t("level")} ${state.speedLevel}`;
   elements.vertexCount.textContent = `${state.vertices} ${t("vertices")}`;
   elements.gainLevel.textContent = `${t("level")} ${state.gainLevel}`;
-  elements.speedCost.textContent = `${t("cost")} ${formatUiNumber(currentCosts.speed)}`;
-  elements.vertexCost.textContent = `${t("cost")} ${formatUiNumber(currentCosts.vertex)}`;
-  elements.gainCost.textContent = `${t("cost")} ${formatUiNumber(currentCosts.gain)}`;
-  elements.speedUpgrade.disabled = !canSpend(currentCosts.speed);
-  elements.vertexUpgrade.disabled = !canSpend(currentCosts.vertex);
-  elements.gainUpgrade.disabled = !canSpend(currentCosts.gain);
-  elements.buyAllUpgrade.disabled = !canSpend(Math.min(currentCosts.speed, currentCosts.gain, currentCosts.vertex));
+  elements.speedCost.textContent = `${t("cost")} ${formatUiLogNumber(currentCostLogs.speed)}`;
+  elements.vertexCost.textContent = `${t("cost")} ${formatUiLogNumber(currentCostLogs.vertex)}`;
+  elements.gainCost.textContent = `${t("cost")} ${formatUiLogNumber(currentCostLogs.gain)}`;
+  elements.speedUpgrade.disabled = !canSpendLog(currentCostLogs.speed);
+  elements.vertexUpgrade.disabled = !canSpendLog(currentCostLogs.vertex);
+  elements.gainUpgrade.disabled = !canSpendLog(currentCostLogs.gain);
+  elements.buyAllUpgrade.disabled = !canSpendLog(Math.min(currentCostLogs.speed, currentCostLogs.gain, currentCostLogs.vertex));
 
   const unlocked = currentTotalScoreLog10() >= log10Value(GENERATION_UNLOCK_SCORE);
   const ready = canRunGeneration();
@@ -1777,43 +1849,40 @@ function updateUi() {
   if (state.showFps) elements.fpsCounter.textContent = `FPS ${Math.round(smoothedFps)}`;
 }
 
-function spend(amount) {
+function spendLog(amountLog) {
   const scoreLog = currentScoreLog10();
-  const amountLog = log10Value(amount);
+  if (!canSpendLog(amountLog)) return false;
 
-  if (scoreLog > 308) {
-    if (amountLog > scoreLog) return false;
-    if (scoreLog - amountLog > 15) return true;
-
-    const remainingFactor = 1 - 10 ** (amountLog - scoreLog);
-    if (remainingFactor <= 0) {
-      state.score = 0;
-      state.scoreLog10 = -Infinity;
-    } else {
-      state.scoreLog10 = scoreLog + Math.log10(remainingFactor);
-      state.score = state.scoreLog10 <= 308 ? 10 ** state.scoreLog10 : Number.MAX_VALUE;
-    }
+  if (scoreLog > 18 && scoreLog - amountLog > 12) {
     return true;
   }
 
-  if (state.score < amount) return false;
-  if (scoreLog > 18 && amount < state.score * 1e-12) return true;
-  state.score -= amount;
-  state.scoreLog10 = log10Value(state.score);
+  const remainingLog = subtractLog10(scoreLog, amountLog);
+  state.scoreLog10 = remainingLog;
+  state.score = valueFromLog10(remainingLog);
   return true;
 }
 
+function spend(amount) {
+  return spendLog(log10Value(amount));
+}
+
+function upgradeCostLog(kind) {
+  const currentCostLogs = costLogs();
+  return currentCostLogs[kind];
+}
+
 function buySpeed() {
-  const price = costs().speed;
-  if (!spend(price)) return;
+  const priceLog = upgradeCostLog("speed");
+  if (!spendLog(priceLog)) return;
   state.speedLevel += 1;
   updateUi();
   saveGame("manual");
 }
 
 function buyVertex() {
-  const price = costs().vertex;
-  if (!spend(price)) return;
+  const priceLog = upgradeCostLog("vertex");
+  if (!spendLog(priceLog)) return;
   state.vertices += 1;
   state.pointProgress = 0;
   state.totalVertexProgress = 0;
@@ -1823,8 +1892,8 @@ function buyVertex() {
 }
 
 function buyGain() {
-  const price = costs().gain;
-  if (!spend(price)) return;
+  const priceLog = upgradeCostLog("gain");
+  if (!spendLog(priceLog)) return;
   state.gainLevel += 1;
   updateUi();
   saveGame("manual");
@@ -1835,16 +1904,16 @@ function buyAllUpgrades() {
   let bought = true;
   while (bought && purchases < BUY_ALL_LIMIT) {
     bought = false;
-    const speedPrice = costs().speed;
-    if (spend(speedPrice)) {
+    const speedPriceLog = upgradeCostLog("speed");
+    if (spendLog(speedPriceLog)) {
       state.speedLevel += 1;
       purchases += 1;
       bought = true;
       if (purchases >= BUY_ALL_LIMIT) break;
     }
 
-    const vertexPrice = costs().vertex;
-    if (spend(vertexPrice)) {
+    const vertexPriceLog = upgradeCostLog("vertex");
+    if (spendLog(vertexPriceLog)) {
       state.vertices += 1;
       state.pointProgress = 0;
       state.totalVertexProgress = 0;
@@ -1854,8 +1923,8 @@ function buyAllUpgrades() {
       if (purchases >= BUY_ALL_LIMIT) break;
     }
 
-    const gainPrice = costs().gain;
-    if (spend(gainPrice)) {
+    const gainPriceLog = upgradeCostLog("gain");
+    if (spendLog(gainPriceLog)) {
       state.gainLevel += 1;
       purchases += 1;
       bought = true;
@@ -2107,7 +2176,7 @@ function renderGameToText() {
   const infinityPointsLog = currentInfinityPointsLog10();
   const infiniteScoreLog = currentInfiniteScoreLog10();
   const currentGainLog = log10Value(state.currentGain);
-  const currentCosts = costs();
+  const currentCostLogs = costLogs();
   return JSON.stringify({
     coordinateSystem: "canvas pixels, origin top-left, x right, y down",
     score: scoreDisplay(),
@@ -2125,6 +2194,7 @@ function renderGameToText() {
     lapSpeedMultiplier: Number(lapSpeedMultiplier().toPrecision(6)),
     rawLapSpeedMultiplier: Number(rawLapSpeedMultiplier().toPrecision(6)),
     lapSpeedSoftcapStart: Number(lapSpeedSoftcapStart().toPrecision(6)),
+    lapSpeedSoftcapPower: Number(lapSpeedSoftcapPower().toPrecision(6)),
     lapSpeedSoftcapped: isLapSpeedSoftcapped(),
     point: { x: Number(point.x.toFixed(1)), y: Number(point.y.toFixed(1)), progress: Number(state.pointProgress.toFixed(3)) },
     core: { x: Number(points[0].x.toFixed(1)), y: Number(points[0].y.toFixed(1)) },
@@ -2133,9 +2203,12 @@ function renderGameToText() {
       speedLevel: state.speedLevel,
       gainLevel: state.gainLevel,
       costs: {
-        speed: formatUiNumber(currentCosts.speed),
-        vertex: formatUiNumber(currentCosts.vertex),
-        gain: formatUiNumber(currentCosts.gain),
+        speed: formatUiLogNumber(currentCostLogs.speed),
+        speedLog10: Number(currentCostLogs.speed.toPrecision(6)),
+        vertex: formatUiLogNumber(currentCostLogs.vertex),
+        vertexLog10: Number(currentCostLogs.vertex.toPrecision(6)),
+        gain: formatUiLogNumber(currentCostLogs.gain),
+        gainLog10: Number(currentCostLogs.gain.toPrecision(6)),
       },
     },
     generation: {
