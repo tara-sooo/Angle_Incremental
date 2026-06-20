@@ -896,6 +896,34 @@ canvas {
   transform: none;
 }
 
+.fps-counter {
+  position: fixed;
+  top: 18px;
+  right: 112px;
+  z-index: 100;
+  min-width: 72px;
+  padding: 5px 8px;
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: center;
+  pointer-events: none;
+  border: 1px solid var(--line-strong);
+  background: rgba(7, 16, 31, 0.82);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+}
+
+.fps-counter[hidden] {
+  display: none;
+}
+
+@media (max-width: 820px) {
+  .fps-counter {
+    top: 12px;
+    right: 12px;
+  }
+}
+
 @media (max-width: 1180px) {
   .angle-layout {
     grid-template-columns: 290px minmax(0, 1fr);

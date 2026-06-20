@@ -342,6 +342,10 @@
                 <label for="lightEffectsToggle" data-i18n="lightEffects">軽量演出</label>
                 <input id="lightEffectsToggle" type="checkbox" />
               </div>
+              <div class="setting-row">
+                <label for="fpsToggle" data-i18n="showFps">FPS表示</label>
+                <input id="fpsToggle" type="checkbox" />
+              </div>
             </section>
 
             <section class="save-panel" aria-label="Save data">
@@ -357,6 +361,8 @@
         </section>
       </div>
     </main>
+
+    <div id="fpsCounter" class="fps-counter" hidden>FPS 0</div>
 
     <script src="game.js"></script>
   </body>

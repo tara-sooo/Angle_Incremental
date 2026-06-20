@@ -57,6 +57,8 @@ const elements = {
   gainCost: document.getElementById("gainCost"),
   floatingTextToggle: document.getElementById("floatingTextToggle"),
   lightEffectsToggle: document.getElementById("lightEffectsToggle"),
+  fpsToggle: document.getElementById("fpsToggle"),
+  fpsCounter: document.getElementById("fpsCounter"),
   languageSelect: document.getElementById("languageSelect"),
   numberFormatSelect: document.getElementById("numberFormatSelect"),
   timeUnitSelect: document.getElementById("timeUnitSelect"),
@@ -123,6 +125,7 @@ const TEXT = {
     timeUnit: "時間単位",
     floatingText: "浮遊テキスト",
     lightEffects: "軽量演出",
+    showFps: "FPS表示",
     save: "セーブ",
     resetSave: "セーブをリセット",
     helpAngle: "左の強化で周回速度、角、頂点獲得量を伸ばします。",
@@ -211,6 +214,7 @@ const TEXT = {
     timeUnit: "Time unit",
     floatingText: "Floating text",
     lightEffects: "Reduced effects",
+    showFps: "Show FPS",
     save: "Save",
     resetSave: "Reset save",
     helpAngle: "Use normal upgrades to improve lap speed, vertices, and vertex gain.",
@@ -384,6 +388,7 @@ const state = {
   achievementMask: 0,
   showFloatingText: true,
   lightEffects: false,
+  showFps: false,
   language: "ja",
   numberFormat: "compact",
   timeUnit: "auto",
@@ -419,6 +424,7 @@ const SAVE_FIELDS = [
   "achievementMask",
   "showFloatingText",
   "lightEffects",
+  "showFps",
   "language",
   "numberFormat",
   "timeUnit",
@@ -430,6 +436,7 @@ let japaneseFontReady = false;
 let activeMainTab = "angle";
 let activeInfinitySubtab = "upgrades";
 let appliedLanguage = "";
+let smoothedFps = 0;
 
 function t(key) {
   return (TEXT[state.language] && TEXT[state.language][key]) || TEXT.ja[key] || key;
@@ -476,6 +483,7 @@ function applySaveData(data) {
   if (state.infinityCount <= 0) state.activeChallenge = 0;
   state.showFloatingText = data.showFloatingText !== false;
   state.lightEffects = Boolean(data.lightEffects);
+  state.showFps = Boolean(data.showFps);
   state.language = normalizeChoice(data.language, ["ja", "en"], "ja");
   state.numberFormat = normalizeChoice(data.numberFormat, ["compact", "scientific", "detailed"], data.detailedNumbers ? "detailed" : "compact");
   state.timeUnit = normalizeChoice(data.timeUnit, ["auto", "seconds", "milliseconds"], "auto");
@@ -562,6 +570,7 @@ function resetSave() {
     achievementMask: 0,
     showFloatingText: true,
     lightEffects: false,
+    showFps: false,
     language: "ja",
     numberFormat: "compact",
     timeUnit: "auto",
@@ -1381,9 +1390,12 @@ function updateUi() {
 
   syncFormControl(elements.floatingTextToggle, state.showFloatingText);
   syncFormControl(elements.lightEffectsToggle, state.lightEffects);
+  syncFormControl(elements.fpsToggle, state.showFps);
   syncFormControl(elements.languageSelect, state.language);
   syncFormControl(elements.numberFormatSelect, state.numberFormat);
   syncFormControl(elements.timeUnitSelect, state.timeUnit);
+  elements.fpsCounter.hidden = !state.showFps;
+  if (state.showFps) elements.fpsCounter.textContent = `FPS ${Math.round(smoothedFps)}`;
 }
 
 function spend(amount) {
@@ -1652,6 +1664,7 @@ function applySetting(key, value) {
   if (key === "timeUnit") state.timeUnit = normalizeChoice(value, ["auto", "seconds", "milliseconds"], "auto");
   if (key === "showFloatingText" && !value) state.floatingTexts = [];
   if (key === "lightEffects" && value) state.floatingTexts = [];
+  if (key === "showFps") state.showFps = Boolean(value);
   updateUi();
   draw();
   saveGame("manual");
@@ -1676,6 +1689,10 @@ function resizeCanvas() {
 let lastTime = performance.now();
 function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.08);
+  if (dt > 0) {
+    const instantFps = 1 / dt;
+    smoothedFps = smoothedFps === 0 ? instantFps : smoothedFps * 0.9 + instantFps * 0.1;
+  }
   lastTime = now;
   update(dt);
   updateUi();
@@ -1749,6 +1766,8 @@ function renderGameToText() {
     settings: {
       showFloatingText: state.showFloatingText,
       lightEffects: state.lightEffects,
+      showFps: state.showFps,
+      fps: Number(smoothedFps.toFixed(1)),
       language: state.language,
       numberFormat: state.numberFormat,
       timeUnit: state.timeUnit,
@@ -1809,6 +1828,7 @@ elements.infinitySubtabs.forEach((button) => {
 });
 elements.floatingTextToggle.addEventListener("change", () => applySetting("showFloatingText", elements.floatingTextToggle.checked));
 elements.lightEffectsToggle.addEventListener("change", () => applySetting("lightEffects", elements.lightEffectsToggle.checked));
+elements.fpsToggle.addEventListener("change", () => applySetting("showFps", elements.fpsToggle.checked));
 elements.languageSelect.addEventListener("change", () => applySetting("language", elements.languageSelect.value));
 elements.numberFormatSelect.addEventListener("change", () => applySetting("numberFormat", elements.numberFormatSelect.value));
 elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", elements.timeUnitSelect.value));
