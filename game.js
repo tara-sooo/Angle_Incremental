@@ -84,6 +84,8 @@ const SAVE_VERSION = 1;
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
 const MAX_EXACT_CORE_HITS = 50000;
 const CORE_HIT_APPROX_SEGMENTS = 2048;
+const LAP_SPEED_SOFTCAP_START = 200;
+const LAP_SPEED_SOFTCAP_POWER = 0.5;
 const VERTEX_EPSILON = 1e-9;
 const TAU = Math.PI * 2;
 const BUY_ALL_LIMIT = 1000;
@@ -98,6 +100,7 @@ const TEXT = {
     vertexGain: "頂点通過ごとの増加",
     lapTime: "1周の時間",
     lapSpeed: "ラップ速度",
+    lapSpeedSoftcapped: "軟上限中",
     buyAll: "全購入",
     buyAllHint: "通常強化を順番に購入",
     speedUpgrade: "周回速度",
@@ -189,6 +192,7 @@ const TEXT = {
     vertexGain: "Gain per vertex",
     lapTime: "Lap time",
     lapSpeed: "Lap speed",
+    lapSpeedSoftcapped: "softcapped",
     buyAll: "Buy All",
     buyAllHint: "Buys normal upgrades in order",
     speedUpgrade: "Lap Speed",
@@ -669,11 +673,21 @@ function challengeText(index, key) {
   return challenge ? challenge[key][language] : t("challengeNone");
 }
 
-function lapSpeedMultiplier() {
+function rawLapSpeedMultiplier() {
   let multiplier = Math.pow(1.22, state.speedLevel);
   if (state.activeChallenge === 6) multiplier = Math.pow(multiplier, 0.5);
   if (isChallengeCompleted(6)) multiplier = Math.pow(multiplier, 1.08);
   return multiplier;
+}
+
+function lapSpeedMultiplier() {
+  const rawMultiplier = rawLapSpeedMultiplier();
+  if (rawMultiplier <= LAP_SPEED_SOFTCAP_START) return rawMultiplier;
+  return LAP_SPEED_SOFTCAP_START * Math.pow(rawMultiplier / LAP_SPEED_SOFTCAP_START, LAP_SPEED_SOFTCAP_POWER);
+}
+
+function isLapSpeedSoftcapped() {
+  return rawLapSpeedMultiplier() > LAP_SPEED_SOFTCAP_START;
 }
 
 function lapDuration() {
@@ -1394,7 +1408,9 @@ function updateUi() {
   elements.gainValue.textContent = formatUiNumber(finalScoreGain());
   elements.vertexGainValue.textContent = `+${formatSmallDecimal(vertexGainIncrease())}`;
   elements.lapValue.textContent = formatDuration(lapDuration());
-  elements.lapSpeedValue.textContent = `×${lapSpeedMultiplier().toFixed(2)}`;
+  elements.lapSpeedValue.textContent = isLapSpeedSoftcapped()
+    ? `×${lapSpeedMultiplier().toFixed(2)} ${t("lapSpeedSoftcapped")}`
+    : `×${lapSpeedMultiplier().toFixed(2)}`;
   elements.speedLevel.textContent = `${t("level")} ${state.speedLevel}`;
   elements.vertexCount.textContent = `${state.vertices} ${t("vertices")}`;
   elements.gainLevel.textContent = `${t("level")} ${state.gainLevel}`;
@@ -1794,6 +1810,8 @@ function renderGameToText() {
     vertices: state.vertices,
     lapSeconds: Number(lapDuration().toPrecision(6)),
     lapSpeedMultiplier: Number(lapSpeedMultiplier().toPrecision(6)),
+    rawLapSpeedMultiplier: Number(rawLapSpeedMultiplier().toPrecision(6)),
+    lapSpeedSoftcapped: isLapSpeedSoftcapped(),
     point: { x: Number(point.x.toFixed(1)), y: Number(point.y.toFixed(1)), progress: Number(state.pointProgress.toFixed(3)) },
     core: { x: Number(points[0].x.toFixed(1)), y: Number(points[0].y.toFixed(1)) },
     coreCount: coreVertexIndices().length,
