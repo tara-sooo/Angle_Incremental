@@ -35,6 +35,7 @@ Original prompt: では、中核ループを完成させてください
 - Changed Infinity Challenge UI from a single next-challenge button to a full IC1-IC3 list. Completed challenges can be restarted, active challenges show a stop action, and locked/pre-Infinity rows are disabled.
 - Moved the main tab rail from the left side to the right side on desktop, while keeping the compact mobile layout as a top horizontal tab bar.
 - Constrained the desktop Angle tab to a single viewport-height screen and moved the mobile tab bar to the bottom with sticky positioning.
+- Compressed the mobile Angle tab into one viewport by using a fixed-height two-row Angle layout, 2x2 upgrade controls, compact Stage header, and two-column Generation/Core Boost dock.
 
 ## TODO
 

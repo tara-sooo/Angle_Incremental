@@ -702,17 +702,18 @@ canvas {
 @media (max-width: 820px) {
   .shell {
     width: min(100vw - 14px, 620px);
-    height: auto;
-    min-height: 100svh;
+    height: 100svh;
+    min-height: 0;
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
+    gap: 6px;
+    overflow: hidden;
     padding: 7px 0;
   }
 
   .main-tabs {
     order: 2;
-    position: sticky;
-    bottom: 7px;
+    position: relative;
     z-index: 10;
     min-height: auto;
     height: auto;
@@ -735,6 +736,8 @@ canvas {
   .main-panels {
     order: 1;
     height: auto;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .main-tab small {
@@ -744,16 +747,28 @@ canvas {
   .main-panels,
   .main-panel,
   .angle-layout {
-    height: auto;
-    min-height: auto;
+    height: 100%;
+    min-height: 0;
   }
 
   .angle-layout,
   .infinity-grid,
   .settings-grid,
-  .reset-dock,
   .help-list {
     grid-template-columns: 1fr;
+  }
+
+  .main-panel {
+    overflow: auto;
+  }
+
+  .angle-panel {
+    overflow: hidden;
+  }
+
+  .angle-layout {
+    grid-template-rows: 292px minmax(0, 1fr);
+    gap: 6px;
   }
 
   .upgrade-rail,
@@ -765,6 +780,78 @@ canvas {
     min-height: auto;
   }
 
+  .upgrade-rail {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 10px;
+    padding-bottom: 4px;
+  }
+
+  .metric {
+    min-height: 24px;
+    padding: 2px 0;
+  }
+
+  .metric.primary {
+    display: grid;
+    grid-column: span 2;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    min-height: 34px;
+    padding: 0 0 4px;
+  }
+
+  .metric.primary strong {
+    margin-top: 0;
+    font-size: 2rem;
+  }
+
+  .metric span {
+    font-size: 0.72rem;
+  }
+
+  .metric strong {
+    font-size: 0.86rem;
+  }
+
+  .upgrades {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .buy-all-button {
+    min-height: 50px;
+    padding: 7px 10px;
+  }
+
+  .buy-all-button small {
+    display: none;
+  }
+
+  .upgrade-button {
+    min-height: 50px;
+    padding: 7px 9px;
+    gap: 3px;
+  }
+
+  .upgrade-button span {
+    display: grid;
+    gap: 2px;
+  }
+
+  .upgrade-button b {
+    font-size: 0.9rem;
+  }
+
+  .upgrade-button small,
+  .upgrade-button em {
+    font-size: 0.72rem;
+  }
+
   .topbar,
   .page-heading {
     align-items: start;
@@ -772,15 +859,73 @@ canvas {
     min-height: auto;
   }
 
+  .stage-panel .topbar {
+    align-items: end;
+    flex-direction: row;
+    min-height: 62px;
+    padding: 8px 12px 7px;
+    gap: 4px;
+  }
+
   h1 {
     font-size: clamp(2.1rem, 12vw, 4rem);
   }
 
-  canvas {
-    min-height: 360px;
+  .stage-panel h1 {
+    font-size: 2rem;
   }
 
-  .metric.primary {
-    min-height: auto;
+  .stage-panel .eyebrow {
+    font-size: 0.68rem;
+  }
+
+  .generation-status {
+    padding-bottom: 0;
+    font-size: 0.86rem;
+  }
+
+  .playfield-wrap {
+    padding: 6px;
+  }
+
+  canvas {
+    min-height: 0;
+  }
+
+  .reset-dock {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .generation,
+  .core-boost {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .generation > div,
+  .core-boost > div {
+    min-height: 22px;
+    padding: 2px 0;
+    gap: 6px;
+  }
+
+  .generation span,
+  .core-boost span {
+    font-size: 0.68rem;
+  }
+
+  .generation strong,
+  .core-boost strong {
+    font-size: 0.8rem;
+    max-width: 9ch;
+  }
+
+  .generation-button,
+  .core-boost-button {
+    min-height: 34px;
+    padding: 6px 8px;
+    font-size: 0.86rem;
   }
 }
