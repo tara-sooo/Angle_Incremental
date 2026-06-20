@@ -183,7 +183,7 @@ select {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(180px, 1fr) auto;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .topbar,
@@ -1073,7 +1073,7 @@ canvas {
   }
 
   .angle-layout {
-    grid-template-rows: auto minmax(320px, 1fr);
+    grid-template-rows: auto auto;
     gap: 6px;
   }
 
@@ -1196,6 +1196,11 @@ canvas {
   .playfield-wrap {
     padding: 6px;
     min-height: 150px;
+  }
+
+  .stage-panel {
+    grid-template-rows: auto minmax(150px, auto) auto;
+    overflow: visible;
   }
 
   canvas {
