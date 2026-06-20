@@ -83,8 +83,10 @@ const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 8;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 1;
-const APP_VERSION = "2026.06.20-gain-expression-order";
+const APP_VERSION = "2026.06.20-auto-update";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
+const VERSION_MANIFEST_URL = "version.json";
+const UPDATE_CHECK_INTERVAL_SECONDS = 60;
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
 const MAX_EXACT_CORE_HITS = 50000;
 const CORE_HIT_APPROX_SEGMENTS = 2048;
@@ -465,6 +467,8 @@ const SAVE_FIELDS = [
 ];
 
 let autoSaveElapsed = 0;
+let updateCheckElapsed = 0;
+let updateCheckInFlight = false;
 let japaneseFontReady = false;
 let activeMainTab = "angle";
 let activeInfinitySubtab = "upgrades";
@@ -504,6 +508,25 @@ function showUpdateModalIfNeeded() {
   if (!elements.updateModal || !shouldShowUpdateModal()) return;
   elements.updateModal.hidden = false;
   if (elements.updateModalClose) elements.updateModalClose.focus();
+}
+
+async function checkForRemoteUpdate() {
+  if (updateCheckInFlight || !window.fetch) return;
+  updateCheckInFlight = true;
+  try {
+    const response = await fetch(`${VERSION_MANIFEST_URL}?t=${Date.now()}`, { cache: "no-store" });
+    if (!response.ok) return;
+    const manifest = await response.json();
+    if (!manifest || typeof manifest.appVersion !== "string") return;
+    if (manifest.appVersion && manifest.appVersion !== APP_VERSION) {
+      saveGame("manual");
+      window.location.reload();
+    }
+  } catch (error) {
+    // Update checks should never interrupt gameplay.
+  } finally {
+    updateCheckInFlight = false;
+  }
 }
 
 function normalizeChoice(value, allowed, fallback) {
@@ -1242,6 +1265,12 @@ function update(dt) {
 
   autoSaveElapsed += dt;
   if (autoSaveElapsed >= 5) saveGame("auto");
+
+  updateCheckElapsed += dt;
+  if (updateCheckElapsed >= UPDATE_CHECK_INTERVAL_SECONDS) {
+    updateCheckElapsed = 0;
+    checkForRemoteUpdate();
+  }
 }
 
 function polygonPoints() {
@@ -2081,6 +2110,7 @@ switchInfinitySubtab(activeInfinitySubtab);
 resizeCanvas();
 updateUi();
 showUpdateModalIfNeeded();
+checkForRemoteUpdate();
 if (document.fonts) {
   document.fonts.ready.then(() => {
     japaneseFontReady = true;

@@ -52,6 +52,7 @@ Original prompt: では、中核ループを完成させてください
 - Reworked Generation to match the revised spec: GR score multiplier now applies at ^2, cost reduction applies only to upgrade cost growth, repeat Generations require beating the previous generation score, GR slightly relaxes the lap speed softcap, and core-hit scoring now uses the `(x/y)^y` formula.
 - Fixed the `(x/y)^y` scoring order so it applies only to The Angle's base gain; GR, CB, achievement, and Infinity modifiers are applied afterward instead of being re-exponentiated by vertex count.
 - Changed achievement 3's GR reward to double only the multiplier above x1, so reset states no longer display an unexplained x2 Generation multiplier.
+- Added a version manifest and automatic update check. Loaded clients save and reload themselves when `version.json` advertises a newer `appVersion`.
 - Changed compact reset controls so Generation and Core Boost multiplier/exponent rows remain accessible on short screens through scrolling instead of being hidden.
 
 ## TODO
