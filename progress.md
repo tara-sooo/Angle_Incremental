@@ -32,6 +32,7 @@ Original prompt: では、中核ループを完成させてください
 - Added a normal-upgrade Buy All button with speed -> vertex -> gain priority, a 1000-purchase cap, and IC1 vertex-purchase skipping.
 - Verified the tabbed UI with Firefox/Playwright on desktop and mobile, including settings persistence, Buy All behavior, IC1 skipping, canvas pixel color, and screenshot/overflow checks.
 - Rebalanced Generation rewards toward a longer pre-Infinity path without changing Generation/Core Boost/Infinity thresholds: Generation now uses log-based multiplicative score growth and a gentler cost reduction floor for new progression.
+- Changed Infinity Challenge UI from a single next-challenge button to a full IC1-IC3 list. Completed challenges can be restarted, active challenges show a stop action, and locked/pre-Infinity rows are disabled.
 
 ## TODO
 

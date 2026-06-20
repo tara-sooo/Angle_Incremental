@@ -32,7 +32,7 @@ const elements = {
   softcapUpgradeCost: document.getElementById("softcapUpgradeCost"),
   convertIpButton: document.getElementById("convertIpButton"),
   convertIpGain: document.getElementById("convertIpGain"),
-  challengeButton: document.getElementById("challengeButton"),
+  challengeList: document.getElementById("challengeList"),
   challengeStatus: document.getElementById("challengeStatus"),
   breakCapButton: document.getElementById("breakCapButton"),
   buyAllUpgrade: document.getElementById("buyAllUpgrade"),
@@ -127,6 +127,10 @@ const TEXT = {
     completed: "完了",
     challengeRunning: "中",
     stopChallenge: "IC中止",
+    startChallenge: "開始",
+    challengeCompleted: "クリア済み",
+    challengeIncomplete: "未クリア",
+    challengeLocked: "Infinity後に解放",
     challengeNone: "未挑戦",
     challenge1: "IC1 角追加禁止",
     challenge2: "IC2 周回低速",
@@ -206,6 +210,10 @@ const TEXT = {
     completed: "complete",
     challengeRunning: "running",
     stopChallenge: "Stop IC",
+    startChallenge: "Start",
+    challengeCompleted: "Complete",
+    challengeIncomplete: "Incomplete",
+    challengeLocked: "Unlocked after Infinity",
     challengeNone: "No challenge",
     challenge1: "IC1 No Added Vertices",
     challenge2: "IC2 Slow Lap",
@@ -628,6 +636,12 @@ function nextChallengeIndex() {
   return 1;
 }
 
+function challengeStateText(index) {
+  if (state.infinityCount <= 0) return t("challengeLocked");
+  if (state.activeChallenge === index) return t("challengeRunning");
+  return isChallengeCompleted(index) ? t("challengeCompleted") : t("challengeIncomplete");
+}
+
 function challengeName(index) {
   if (index === 1) return t("challenge1");
   if (index === 2) return t("challenge2");
@@ -953,6 +967,50 @@ function applyLanguage() {
   }
 }
 
+function createChallengeRows() {
+  elements.challengeList.replaceChildren();
+  for (let index = 1; index <= INFINITY_CHALLENGE_COUNT; index += 1) {
+    const row = document.createElement("div");
+    row.className = "challenge-row";
+    row.dataset.challenge = String(index);
+
+    const info = document.createElement("div");
+    info.className = "challenge-info";
+
+    const name = document.createElement("strong");
+    name.className = "challenge-name";
+
+    const status = document.createElement("small");
+    status.className = "challenge-state";
+
+    const button = document.createElement("button");
+    button.className = "challenge-start-button";
+    button.type = "button";
+    button.addEventListener("click", () => toggleInfinityChallenge(index));
+
+    info.append(name, status);
+    row.append(info, button);
+    elements.challengeList.append(row);
+  }
+}
+
+function updateChallengeRows() {
+  elements.challengeList.querySelectorAll(".challenge-row").forEach((row) => {
+    const index = Number(row.dataset.challenge);
+    const active = state.activeChallenge === index;
+    const completed = isChallengeCompleted(index);
+    const locked = state.infinityCount <= 0;
+    const button = row.querySelector("button");
+
+    row.classList.toggle("is-active", active);
+    row.classList.toggle("is-completed", completed);
+    row.querySelector(".challenge-name").textContent = challengeName(index);
+    row.querySelector(".challenge-state").textContent = challengeStateText(index);
+    button.textContent = active ? t("stopChallenge") : t("startChallenge");
+    button.disabled = locked || (state.activeChallenge > 0 && !active);
+  });
+}
+
 function canSpend(amount) {
   return currentScoreLog10() >= log10Value(amount);
 }
@@ -1019,8 +1077,7 @@ function updateUi() {
     : state.infinityCount <= 0
       ? t("locked")
       : `${completed}/${INFINITY_CHALLENGE_COUNT} ${t("completed")}`;
-  elements.challengeButton.textContent = state.activeChallenge > 0 ? t("stopChallenge") : challengeName(nextChallengeIndex());
-  elements.challengeButton.disabled = state.infinityCount <= 0;
+  updateChallengeRows();
   elements.breakCapButton.disabled = !canBreakInfiniteCap();
   elements.breakCapButton.textContent = state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 
@@ -1250,12 +1307,14 @@ function convertIpToInfiniteScore() {
   saveGame("manual");
 }
 
-function toggleInfinityChallenge() {
+function toggleInfinityChallenge(index = nextChallengeIndex()) {
   if (state.infinityCount <= 0) return;
-  if (state.activeChallenge > 0) {
+  if (state.activeChallenge === index) {
     state.activeChallenge = 0;
+  } else if (state.activeChallenge > 0) {
+    return;
   } else {
-    state.activeChallenge = nextChallengeIndex();
+    state.activeChallenge = Math.min(INFINITY_CHALLENGE_COUNT, Math.max(1, Math.floor(index)));
     resetBelowInfinity();
   }
   updateUi();
@@ -1413,7 +1472,6 @@ elements.ipGainUpgrade.addEventListener("click", buyIpGainUpgrade);
 elements.infiniteAngleUpgrade.addEventListener("click", buyInfiniteAngleUpgrade);
 elements.softcapUpgrade.addEventListener("click", buySoftcapUpgrade);
 elements.convertIpButton.addEventListener("click", convertIpToInfiniteScore);
-elements.challengeButton.addEventListener("click", toggleInfinityChallenge);
 elements.breakCapButton.addEventListener("click", breakInfiniteCap);
 elements.resetSaveButton.addEventListener("click", resetSave);
 elements.mainTabs.forEach((button) => {
@@ -1434,6 +1492,7 @@ window.addEventListener("keydown", (event) => {
 });
 
 loadGame();
+createChallengeRows();
 switchMainTab(activeMainTab);
 resizeCanvas();
 updateUi();
