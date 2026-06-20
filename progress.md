@@ -53,6 +53,7 @@ Original prompt: では、中核ループを完成させてください
 - Fixed the `(x/y)^y` scoring order so it applies only to The Angle's base gain; GR, CB, achievement, and Infinity modifiers are applied afterward instead of being re-exponentiated by vertex count.
 - Changed achievement 3's GR reward to double only the multiplier above x1, so reset states no longer display an unexplained x2 Generation multiplier.
 - Added a version manifest and automatic update check. Loaded clients save and reload themselves when `version.json` advertises a newer `appVersion`.
+- Added log-backed resource tracking for total score, generation score, IP, and Infinite Score, and fixed gain-on-core rounding/labeling so large values do not collapse into Infinity/NaN displays or saves.
 - Changed compact reset controls so Generation and Core Boost multiplier/exponent rows remain accessible on short screens through scrolling instead of being hidden.
 
 ## TODO

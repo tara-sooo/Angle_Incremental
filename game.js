@@ -79,11 +79,12 @@ const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
 const INFINITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
 const BREAK_CAP_REQUIREMENT_LOG10 = 333;
+const MAX_TRACKED_LOG10 = 1000000000;
 const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 8;
 const SAVE_KEY = "angle-incremental-save";
-const SAVE_VERSION = 1;
-const APP_VERSION = "2026.06.20-auto-update";
+const SAVE_VERSION = 2;
+const APP_VERSION = "2026.06.20-log-resource-safety";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const VERSION_MANIFEST_URL = "version.json";
 const UPDATE_CHECK_INTERVAL_SECONDS = 60;
@@ -170,8 +171,8 @@ const TEXT = {
     challengeRestrictionLabel: "制約",
     challengeRewardLabel: "報酬",
     core: "核",
-    currentGain: "現在の獲得量",
-    baseExpression: "基礎乗算表記",
+    currentGain: "核到達時の獲得量",
+    baseExpression: "基礎獲得式",
     savedAuto: "自動保存済み",
     savedManual: "保存済み",
     saveFailed: "保存失敗",
@@ -182,10 +183,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "スコア獲得式の爆発を抑える修正を行いました。",
-    updateResetDock: "(x/y)^y式はThe Angle由来の基礎獲得量にだけ適用されます。",
-    updateCanvas: "Generationや実績などの倍率は、その後に乗算されるようになりました。",
-    updateModalNote: "実績3の報酬はx1を超えた増分だけを2倍し、リセット直後の謎のx2表示を防ぎます。",
+    updateSummary: "巨大数値がInfinity表示やNaN保存になりにくいよう修正しました。",
+    updateResetDock: "累計スコア、世代スコア、IP、Infinite Scoreをlog値で保持します。",
+    updateCanvas: "核到達時の獲得量表示の丸めとラベルを修正しました。",
+    updateModalNote: "巨大値は∞ではなく指数表記で表示されます。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -269,8 +270,8 @@ const TEXT = {
     challengeRestrictionLabel: "Restriction",
     challengeRewardLabel: "Reward",
     core: "Core",
-    currentGain: "Current gain",
-    baseExpression: "Base product",
+    currentGain: "Gain on core hit",
+    baseExpression: "Base gain formula",
     savedAuto: "Autosaved",
     savedManual: "Saved",
     saveFailed: "Save failed",
@@ -281,10 +282,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Score gain scaling was adjusted to prevent runaway growth.",
-    updateResetDock: "The (x/y)^y formula now applies only to The Angle's base gain.",
-    updateCanvas: "Generation, achievement, and other multipliers are applied afterward.",
-    updateModalNote: "Achievement 3 now doubles only the amount above x1, preventing unexplained x2 after resets.",
+    updateSummary: "Large numbers are now less likely to become Infinity displays or NaN saves.",
+    updateResetDock: "Total score, generation score, IP, and Infinite Score are stored with log values.",
+    updateCanvas: "Gain-on-core display rounding and labels were corrected.",
+    updateModalNote: "Huge values are displayed with exponent notation instead of ∞.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -397,7 +398,9 @@ const state = {
   score: 0,
   scoreLog10: -Infinity,
   totalScore: 0,
+  totalScoreLog10: -Infinity,
   generationScore: 0,
+  generationScoreLog10: -Infinity,
   vertices: 3,
   speedLevel: 0,
   gainLevel: 0,
@@ -407,12 +410,15 @@ const state = {
   lastVertexIndex: 0,
   generationCount: 0,
   previousGenerationScore: 0,
+  previousGenerationScoreLog10: -Infinity,
   generationScoreMultiplier: 1,
   generationCostFactor: 1,
   coreBoostCount: 0,
   infinityCount: 0,
   infinityPoints: 0,
+  infinityPointsLog10: -Infinity,
   infiniteScore: 0,
+  infiniteScoreLog10: -Infinity,
   ipGainUpgradeLevel: 0,
   infiniteAngleUpgradeLevel: 0,
   softcapUpgradeLevel: 0,
@@ -428,13 +434,16 @@ const state = {
   timeUnit: "auto",
   floatingTexts: [],
   lastEarned: 0,
+  lastEarnedLog10: -Infinity,
 };
 
 const SAVE_FIELDS = [
   "score",
   "scoreLog10",
   "totalScore",
+  "totalScoreLog10",
   "generationScore",
+  "generationScoreLog10",
   "vertices",
   "speedLevel",
   "gainLevel",
@@ -444,12 +453,15 @@ const SAVE_FIELDS = [
   "lastVertexIndex",
   "generationCount",
   "previousGenerationScore",
+  "previousGenerationScoreLog10",
   "generationScoreMultiplier",
   "generationCostFactor",
   "coreBoostCount",
   "infinityCount",
   "infinityPoints",
+  "infinityPointsLog10",
   "infiniteScore",
+  "infiniteScoreLog10",
   "ipGainUpgradeLevel",
   "infiniteAngleUpgradeLevel",
   "softcapUpgradeLevel",
@@ -464,6 +476,7 @@ const SAVE_FIELDS = [
   "numberFormat",
   "timeUnit",
   "lastEarned",
+  "lastEarnedLog10",
 ];
 
 let autoSaveElapsed = 0;
@@ -537,11 +550,50 @@ function sanitizeNumber(value, fallback, min = 0) {
   return Number.isFinite(value) && value >= min ? value : fallback;
 }
 
+function sanitizeLog10(value, fallback = -Infinity) {
+  if (value === -Infinity) return -Infinity;
+  if (value === Infinity) return MAX_TRACKED_LOG10;
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function clampLog10(value) {
+  if (value === -Infinity) return -Infinity;
+  if (!Number.isFinite(value)) return value === Infinity ? MAX_TRACKED_LOG10 : -Infinity;
+  return Math.min(value, MAX_TRACKED_LOG10);
+}
+
+function logFromSavedValue(value, fallback = -Infinity) {
+  if (value === Infinity || value === Number.MAX_VALUE) return Math.log10(Number.MAX_VALUE);
+  return log10Value(value) > -Infinity ? log10Value(value) : fallback;
+}
+
+function hydrateLog10(savedLog, savedValue, fallback = -Infinity) {
+  const log = sanitizeLog10(savedLog, null);
+  return log === null ? logFromSavedValue(savedValue, fallback) : log;
+}
+
+function valueFromLog10(log) {
+  log = clampLog10(log);
+  if (log === -Infinity) return 0;
+  return Number.isFinite(log) && log <= 308 ? 10 ** log : Number.MAX_VALUE;
+}
+
+function subtractLog10(currentLog, amountLog) {
+  if (currentLog === -Infinity || amountLog === -Infinity) return currentLog;
+  if (currentLog === Infinity) return MAX_TRACKED_LOG10;
+  if (amountLog > currentLog) return currentLog;
+  if (currentLog - amountLog > 15) return currentLog;
+  const remainingFactor = 1 - 10 ** (amountLog - currentLog);
+  return remainingFactor <= 0 ? -Infinity : currentLog + Math.log10(remainingFactor);
+}
+
 function applySaveData(data) {
   state.score = sanitizeNumber(data.score, 0);
   state.scoreLog10 = sanitizeNumber(data.scoreLog10, log10Value(state.score), -Infinity);
   state.totalScore = sanitizeNumber(data.totalScore, state.score);
+  state.totalScoreLog10 = hydrateLog10(data.totalScoreLog10, state.totalScore, log10Value(state.totalScore));
   state.generationScore = sanitizeNumber(data.generationScore, state.score);
+  state.generationScoreLog10 = hydrateLog10(data.generationScoreLog10, state.generationScore, log10Value(state.generationScore));
   state.vertices = Math.max(3, Math.floor(sanitizeNumber(data.vertices, 3, 3)));
   state.speedLevel = Math.floor(sanitizeNumber(data.speedLevel, 0));
   state.gainLevel = Math.floor(sanitizeNumber(data.gainLevel, 0));
@@ -554,12 +606,19 @@ function applySaveData(data) {
     data.previousGenerationScore,
     state.generationCount > 0 ? GENERATION_UNLOCK_SCORE : 0,
   );
+  state.previousGenerationScoreLog10 = hydrateLog10(
+    data.previousGenerationScoreLog10,
+    state.previousGenerationScore,
+    state.generationCount > 0 ? log10Value(GENERATION_UNLOCK_SCORE) : -Infinity,
+  );
   state.generationScoreMultiplier = sanitizeNumber(data.generationScoreMultiplier, 1, 1);
   state.generationCostFactor = Math.min(1, sanitizeNumber(data.generationCostFactor, 1, 0.25));
   state.coreBoostCount = Math.floor(sanitizeNumber(data.coreBoostCount, 0));
   state.infinityCount = Math.floor(sanitizeNumber(data.infinityCount, 0));
   state.infinityPoints = Math.floor(sanitizeNumber(data.infinityPoints, 0));
+  state.infinityPointsLog10 = hydrateLog10(data.infinityPointsLog10, state.infinityPoints, log10Value(state.infinityPoints));
   state.infiniteScore = sanitizeNumber(data.infiniteScore, 0);
+  state.infiniteScoreLog10 = hydrateLog10(data.infiniteScoreLog10, state.infiniteScore, log10Value(state.infiniteScore));
   state.ipGainUpgradeLevel = Math.floor(sanitizeNumber(data.ipGainUpgradeLevel, 0));
   state.infiniteAngleUpgradeLevel = Math.floor(sanitizeNumber(data.infiniteAngleUpgradeLevel, 0));
   state.softcapUpgradeLevel = Math.floor(sanitizeNumber(data.softcapUpgradeLevel, 0));
@@ -575,6 +634,7 @@ function applySaveData(data) {
   state.numberFormat = normalizeChoice(data.numberFormat, ["compact", "scientific", "detailed"], data.detailedNumbers ? "detailed" : "compact");
   state.timeUnit = normalizeChoice(data.timeUnit, ["auto", "seconds", "milliseconds"], "auto");
   state.lastEarned = sanitizeNumber(data.lastEarned, 0);
+  state.lastEarnedLog10 = hydrateLog10(data.lastEarnedLog10, state.lastEarned, log10Value(state.lastEarned));
   state.floatingTexts = [];
 }
 
@@ -612,7 +672,7 @@ function loadGame() {
     }
 
     const parsed = JSON.parse(raw);
-    if (parsed.version !== SAVE_VERSION || !parsed.state || typeof parsed.state !== "object") {
+    if (!parsed.version || parsed.version > SAVE_VERSION || !parsed.state || typeof parsed.state !== "object") {
       setSaveStatus(t("oldSave"));
       return;
     }
@@ -633,7 +693,9 @@ function resetSave() {
     score: 0,
     scoreLog10: -Infinity,
     totalScore: 0,
+    totalScoreLog10: -Infinity,
     generationScore: 0,
+    generationScoreLog10: -Infinity,
     vertices: 3,
     speedLevel: 0,
     gainLevel: 0,
@@ -643,12 +705,15 @@ function resetSave() {
     lastVertexIndex: 0,
     generationCount: 0,
     previousGenerationScore: 0,
+    previousGenerationScoreLog10: -Infinity,
     generationScoreMultiplier: 1,
     generationCostFactor: 1,
     coreBoostCount: 0,
     infinityCount: 0,
     infinityPoints: 0,
+    infinityPointsLog10: -Infinity,
     infiniteScore: 0,
+    infiniteScoreLog10: -Infinity,
     ipGainUpgradeLevel: 0,
     infiniteAngleUpgradeLevel: 0,
     softcapUpgradeLevel: 0,
@@ -664,6 +729,7 @@ function resetSave() {
     timeUnit: "auto",
     floatingTexts: [],
     lastEarned: 0,
+    lastEarnedLog10: -Infinity,
   });
   autoSaveElapsed = 0;
   setSaveStatus(t("resetDone"));
@@ -672,10 +738,10 @@ function resetSave() {
 }
 
 function formatNumber(value) {
-  if (value === Infinity) return "∞";
+  if (value === Infinity) return formatLogNumber(Infinity);
   if (!Number.isFinite(value)) return "0";
   if (value < 1000) return value.toFixed(value < 10 ? 2 : 0).replace(/\.00$/, "");
-  if (value < 1000000) return Math.floor(value).toLocaleString("en-US");
+  if (value < 1000000) return Math.round(value).toLocaleString("en-US");
   if (value >= 1e18) return value.toExponential(2).replace("e+", "e");
   const units = ["M", "B", "T", "Qa", "Qi", "Sx"];
   let scaled = value / 1000000;
@@ -695,8 +761,16 @@ function formatUiNumber(value) {
   return formatLogNumber(valueLog);
 }
 
+function formatUiLogNumber(log10Value) {
+  if (log10Value === -Infinity) return "0";
+  if (!Number.isFinite(log10Value)) return formatLogNumber(log10Value);
+  if (log10Value < 18) return formatUiNumber(10 ** log10Value);
+  return formatLogNumber(log10Value);
+}
+
 function formatLogNumber(log10Value, capSuffix = false) {
-  if (!Number.isFinite(log10Value)) return log10Value === -Infinity ? "0" : "∞";
+  log10Value = clampLog10(log10Value);
+  if (log10Value === -Infinity) return "0";
   if (log10Value < 18) return formatNumber(10 ** log10Value);
   const exponent = Math.floor(log10Value);
   const mantissa = 10 ** (log10Value - exponent);
@@ -736,7 +810,7 @@ function hasMultiplicativeGainExpression() {
 }
 
 function formatGainExpressionSummary() {
-  return formatGainExpression(preExpressionScoreGainLog10());
+  return formatGainExpression(log10Value(state.currentGain));
 }
 
 function challengeText(index, key) {
@@ -792,14 +866,41 @@ function log10Value(value) {
 function combineLog10(a, b) {
   if (a === -Infinity) return b;
   if (b === -Infinity) return a;
+  if (a === Infinity || b === Infinity) return MAX_TRACKED_LOG10;
   const high = Math.max(a, b);
   const low = Math.min(a, b);
   if (high - low > 15) return high;
-  return high + Math.log10(1 + 10 ** (low - high));
+  return clampLog10(high + Math.log10(1 + 10 ** (low - high)));
 }
 
 function currentScoreLog10() {
-  return Math.max(log10Value(state.score), Number.isFinite(state.scoreLog10) ? state.scoreLog10 : -Infinity);
+  return currentLog10ForValue(state.score, state.scoreLog10);
+}
+
+function currentLog10ForValue(value, savedLog) {
+  const log = sanitizeLog10(savedLog);
+  if (value === Number.MAX_VALUE && log > -Infinity) return log;
+  return Math.max(log10Value(value), log);
+}
+
+function currentTotalScoreLog10() {
+  return currentLog10ForValue(state.totalScore, state.totalScoreLog10);
+}
+
+function currentGenerationScoreLog10() {
+  return currentLog10ForValue(state.generationScore, state.generationScoreLog10);
+}
+
+function currentPreviousGenerationScoreLog10() {
+  return currentLog10ForValue(state.previousGenerationScore, state.previousGenerationScoreLog10);
+}
+
+function currentInfinityPointsLog10() {
+  return currentLog10ForValue(state.infinityPoints, state.infinityPointsLog10);
+}
+
+function currentInfiniteScoreLog10() {
+  return currentLog10ForValue(state.infiniteScore, state.infiniteScoreLog10);
 }
 
 function scoreDisplay() {
@@ -1014,7 +1115,10 @@ function infiniteAngleEfficiency() {
 }
 
 function infiniteAngleBoost() {
-  return 1 + Math.log10(1 + state.infiniteScore) * 0.25;
+  const scoreLog = currentInfiniteScoreLog10();
+  if (scoreLog === -Infinity) return 1;
+  const logOnePlusScore = scoreLog < 12 ? Math.log10(1 + state.infiniteScore) : scoreLog;
+  return 1 + logOnePlusScore * 0.25;
 }
 
 function infinityUpgradeEffect(level) {
@@ -1024,15 +1128,27 @@ function infinityUpgradeEffect(level) {
 }
 
 function ipGainUpgradeCost() {
-  return Math.floor(1 * 2 ** state.ipGainUpgradeLevel);
+  return valueFromLog10(ipGainUpgradeCostLog10());
 }
 
 function infiniteAngleUpgradeCost() {
-  return Math.floor(2 * 2 ** state.infiniteAngleUpgradeLevel);
+  return valueFromLog10(infiniteAngleUpgradeCostLog10());
 }
 
 function softcapUpgradeCost() {
-  return Math.floor(4 * 3 ** state.softcapUpgradeLevel);
+  return valueFromLog10(softcapUpgradeCostLog10());
+}
+
+function ipGainUpgradeCostLog10() {
+  return state.ipGainUpgradeLevel * log10Value(2);
+}
+
+function infiniteAngleUpgradeCostLog10() {
+  return log10Value(2) + state.infiniteAngleUpgradeLevel * log10Value(2);
+}
+
+function softcapUpgradeCostLog10() {
+  return log10Value(4) + state.softcapUpgradeLevel * log10Value(3);
 }
 
 function canInfinity() {
@@ -1052,6 +1168,32 @@ function infinityPointGain() {
 
 function infiniteScoreGainPerIp() {
   return 10 * infiniteAngleEfficiency();
+}
+
+function infiniteScoreGainPerIpLog10() {
+  return log10Value(infiniteScoreGainPerIp());
+}
+
+function canSpendInfinityPoints(costLog) {
+  return currentInfinityPointsLog10() >= costLog;
+}
+
+function addInfinityPoints(amount) {
+  const amountLog = log10Value(amount);
+  state.infinityPointsLog10 = combineLog10(currentInfinityPointsLog10(), amountLog);
+  state.infinityPoints = valueFromLog10(state.infinityPointsLog10);
+}
+
+function spendInfinityPoints(costLog) {
+  if (!canSpendInfinityPoints(costLog)) return false;
+  state.infinityPointsLog10 = subtractLog10(currentInfinityPointsLog10(), costLog);
+  state.infinityPoints = valueFromLog10(state.infinityPointsLog10);
+  return true;
+}
+
+function addInfiniteScoreLog(amountLog) {
+  state.infiniteScoreLog10 = combineLog10(currentInfiniteScoreLog10(), amountLog);
+  state.infiniteScore = valueFromLog10(state.infiniteScoreLog10);
 }
 
 function canBreakInfiniteCap() {
@@ -1093,23 +1235,32 @@ function costs() {
   };
 }
 
-function generationRewardFor(generationScore) {
-  const depth = Math.max(0, log10Value(generationScore / GENERATION_UNLOCK_SCORE));
+function generationRewardForLog(generationScoreLog) {
+  const depth = Math.max(0, generationScoreLog - log10Value(GENERATION_UNLOCK_SCORE));
   return {
     scoreMultiplierGain: 1 + Math.min(1.25, 0.12 + Math.log10(1 + depth) * 0.22),
     costReduction: Math.min(0.08, 0.01 + Math.log10(1 + depth) * 0.012),
   };
 }
 
+function generationRewardFor(generationScore) {
+  return generationRewardForLog(log10Value(generationScore));
+}
+
+function generationRequirementLog10() {
+  if (state.generationCount <= 0) return log10Value(GENERATION_UNLOCK_SCORE);
+  return Math.max(log10Value(GENERATION_UNLOCK_SCORE), currentPreviousGenerationScoreLog10());
+}
+
 function generationRequirement() {
-  if (state.generationCount <= 0) return GENERATION_UNLOCK_SCORE;
-  return Math.max(GENERATION_UNLOCK_SCORE, state.previousGenerationScore);
+  return valueFromLog10(generationRequirementLog10());
 }
 
 function canRunGeneration() {
   if (state.activeChallenge === 1) return false;
-  if (state.generationCount <= 0) return state.generationScore >= GENERATION_UNLOCK_SCORE;
-  return state.generationScore > generationRequirement();
+  const generationScoreLog = currentGenerationScoreLog10();
+  if (state.generationCount <= 0) return generationScoreLog >= log10Value(GENERATION_UNLOCK_SCORE);
+  return generationScoreLog > generationRequirementLog10();
 }
 
 function nextGenerationValues() {
@@ -1120,7 +1271,7 @@ function nextGenerationValues() {
     };
   }
 
-  const reward = generationRewardFor(state.generationScore);
+  const reward = generationRewardForLog(currentGenerationScoreLog10());
   const nextRawScoreMultiplier = state.generationScoreMultiplier * reward.scoreMultiplierGain;
   const nextRawCostFactor = state.generationCostFactor < GENERATION_MIN_NEW_COST_FACTOR
     ? state.generationCostFactor
@@ -1157,18 +1308,16 @@ function formatExponentPreview(current, next) {
 function addScore(amount, amountLog10 = log10Value(amount)) {
   const previousScoreLog = currentScoreLog10();
   const rawScoreLog = combineLog10(previousScoreLog, amountLog10);
-  const cappedScoreLog = applyInfinitySoftcap(rawScoreLog);
+  const cappedScoreLog = clampLog10(applyInfinitySoftcap(rawScoreLog));
 
   state.scoreLog10 = cappedScoreLog;
   state.score = cappedScoreLog <= 308 ? 10 ** cappedScoreLog : Number.MAX_VALUE;
-  if (Number.isFinite(amount)) {
-    state.totalScore += amount;
-    state.generationScore += amount;
-  } else {
-    state.totalScore = Number.MAX_VALUE;
-    state.generationScore = Number.MAX_VALUE;
-  }
-  state.lastEarned = amount;
+  state.totalScoreLog10 = combineLog10(currentTotalScoreLog10(), amountLog10);
+  state.generationScoreLog10 = combineLog10(currentGenerationScoreLog10(), amountLog10);
+  state.totalScore = valueFromLog10(state.totalScoreLog10);
+  state.generationScore = valueFromLog10(state.generationScoreLog10);
+  state.lastEarnedLog10 = amountLog10;
+  state.lastEarned = valueFromLog10(amountLog10);
 
   if (checkAchievements(true).length > 0) saveGame("manual");
   if (state.infinityCount === 0 && canInfinity()) {
@@ -1187,7 +1336,7 @@ function passVertex(index) {
     if (resetByInfinity) return true;
     if (state.showFloatingText && !state.lightEffects) {
       state.floatingTexts.push({
-        text: `+${formatUiNumber(earned)}`,
+        text: `+${formatUiLogNumber(finalScoreGainLog10())}`,
         life: 1,
         x: canvas.width / 2,
         y: canvas.height * 0.16,
@@ -1226,7 +1375,7 @@ function processManyVertices(start, end) {
     if (resetByInfinity) return true;
     if (state.showFloatingText && !state.lightEffects) {
       state.floatingTexts.push({
-        text: `+${formatUiNumber(earned)}`,
+        text: `+${formatUiLogNumber(Number.isFinite(earned) ? log10Value(earned) : batchLog)}`,
         life: 1,
         x: canvas.width / 2,
         y: canvas.height * 0.16,
@@ -1365,7 +1514,7 @@ function draw() {
   if (!compactCanvas) {
     ctx.font = "800 28px 'Noto Sans JP', sans-serif";
     ctx.fillStyle = "#f2b84b";
-    ctx.fillText(formatUiNumber(finalScoreGain()), canvas.width / 2, canvas.height - 68);
+    ctx.fillText(formatUiLogNumber(finalScoreGainLog10()), canvas.width / 2, canvas.height - 68);
 
     if (canDrawJapanese) {
       ctx.font = "700 15px 'Noto Sans JP', sans-serif";
@@ -1537,7 +1686,7 @@ function updateUi() {
   document.documentElement.classList.toggle("light-effects", state.lightEffects);
   applyLanguage();
   elements.scoreValue.textContent = scoreDisplay();
-  elements.gainValue.textContent = formatUiNumber(finalScoreGain());
+  elements.gainValue.textContent = formatUiLogNumber(finalScoreGainLog10());
   elements.vertexGainValue.textContent = `+${formatSmallDecimal(vertexGainIncrease())}`;
   elements.lapValue.textContent = formatDuration(lapDuration());
   elements.lapSpeedValue.textContent = isLapSpeedSoftcapped()
@@ -1554,11 +1703,11 @@ function updateUi() {
   elements.gainUpgrade.disabled = !canSpend(currentCosts.gain);
   elements.buyAllUpgrade.disabled = !canSpend(Math.min(currentCosts.speed, currentCosts.gain, currentCosts.vertex));
 
-  const unlocked = state.totalScore >= GENERATION_UNLOCK_SCORE;
+  const unlocked = currentTotalScoreLog10() >= log10Value(GENERATION_UNLOCK_SCORE);
   const ready = canRunGeneration();
   const waitingPrevious = unlocked
     && state.generationCount > 0
-    && state.generationScore >= GENERATION_UNLOCK_SCORE
+    && currentGenerationScoreLog10() >= log10Value(GENERATION_UNLOCK_SCORE)
     && !ready
     && state.activeChallenge !== 1;
   elements.generationStatus.textContent = ready
@@ -1587,21 +1736,21 @@ function updateUi() {
   elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";
   elements.infinityTabBadge.classList.toggle("is-visible", infinityReady);
   elements.infinityUnlockNote.hidden = infinityUnlocked;
-  elements.infinityPoints.textContent = formatUiNumber(state.infinityPoints);
-  elements.infiniteScore.textContent = formatUiNumber(state.infiniteScore);
-  elements.infiniteScorePanel.textContent = formatUiNumber(state.infiniteScore);
+  elements.infinityPoints.textContent = formatUiLogNumber(currentInfinityPointsLog10());
+  elements.infiniteScore.textContent = formatUiLogNumber(currentInfiniteScoreLog10());
+  elements.infiniteScorePanel.textContent = formatUiLogNumber(currentInfiniteScoreLog10());
   elements.infiniteAngleBoost.textContent = `×${infiniteAngleBoost().toFixed(2)}`;
   elements.infiniteAngleBoostPanel.textContent = `×${infiniteAngleBoost().toFixed(2)}`;
   elements.infinityPointGain.textContent = `+${formatUiNumber(infinityPointGain())} IP`;
   elements.infinityButton.disabled = state.infinityCount === 0 || !canInfinity();
-  elements.ipGainUpgradeCost.textContent = `${formatUiNumber(ipGainUpgradeCost())} IP`;
-  elements.infiniteAngleUpgradeCost.textContent = `${formatUiNumber(infiniteAngleUpgradeCost())} IP`;
-  elements.softcapUpgradeCost.textContent = `${formatUiNumber(softcapUpgradeCost())} IP`;
-  elements.ipGainUpgrade.disabled = state.infinityPoints < ipGainUpgradeCost();
-  elements.infiniteAngleUpgrade.disabled = state.infinityPoints < infiniteAngleUpgradeCost();
-  elements.softcapUpgrade.disabled = state.infinityPoints < softcapUpgradeCost();
-  elements.convertIpButton.disabled = state.infinityPoints < 1;
-  elements.convertIpGain.textContent = `+${formatUiNumber(infiniteScoreGainPerIp())}`;
+  elements.ipGainUpgradeCost.textContent = `${formatUiLogNumber(ipGainUpgradeCostLog10())} IP`;
+  elements.infiniteAngleUpgradeCost.textContent = `${formatUiLogNumber(infiniteAngleUpgradeCostLog10())} IP`;
+  elements.softcapUpgradeCost.textContent = `${formatUiLogNumber(softcapUpgradeCostLog10())} IP`;
+  elements.ipGainUpgrade.disabled = !canSpendInfinityPoints(ipGainUpgradeCostLog10());
+  elements.infiniteAngleUpgrade.disabled = !canSpendInfinityPoints(infiniteAngleUpgradeCostLog10());
+  elements.softcapUpgrade.disabled = !canSpendInfinityPoints(softcapUpgradeCostLog10());
+  elements.convertIpButton.disabled = !canSpendInfinityPoints(0);
+  elements.convertIpGain.textContent = `+${formatUiLogNumber(infiniteScoreGainPerIpLog10())}`;
   const completed = completedChallengeCount();
   elements.challengeStatus.textContent = state.activeChallenge > 0
     ? `${challengeName(state.activeChallenge)} ${t("challengeRunning")}`
@@ -1723,11 +1872,12 @@ function buyAllUpgrades() {
 function runGeneration() {
   if (!canRunGeneration()) return;
 
-  const generationScoreBeforeReset = state.generationScore;
-  const reward = generationRewardFor(state.generationScore);
+  const generationScoreBeforeResetLog = currentGenerationScoreLog10();
+  const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = state.generationCostFactor * (1 - reward.costReduction);
   state.generationCount += 1;
-  state.previousGenerationScore = generationScoreBeforeReset;
+  state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
+  state.previousGenerationScore = valueFromLog10(generationScoreBeforeResetLog);
   state.generationScoreMultiplier *= reward.scoreMultiplierGain;
   state.generationCostFactor = state.generationCostFactor < GENERATION_MIN_NEW_COST_FACTOR
     ? state.generationCostFactor
@@ -1736,6 +1886,7 @@ function runGeneration() {
   state.score = 0;
   state.scoreLog10 = -Infinity;
   state.generationScore = 0;
+  state.generationScoreLog10 = -Infinity;
   state.vertices = 3;
   state.speedLevel = 0;
   state.gainLevel = 0;
@@ -1752,7 +1903,9 @@ function resetBelowCoreBoost() {
   state.score = 0;
   state.scoreLog10 = -Infinity;
   state.totalScore = 0;
+  state.totalScoreLog10 = -Infinity;
   state.generationScore = 0;
+  state.generationScoreLog10 = -Infinity;
   state.vertices = 3;
   state.speedLevel = 0;
   state.gainLevel = 0;
@@ -1762,6 +1915,7 @@ function resetBelowCoreBoost() {
   state.lastVertexIndex = 0;
   state.generationCount = 0;
   state.previousGenerationScore = 0;
+  state.previousGenerationScoreLog10 = -Infinity;
   state.generationScoreMultiplier = 1;
   state.generationCostFactor = 1;
   state.floatingTexts = [];
@@ -1779,7 +1933,9 @@ function resetBelowInfinity() {
   state.score = 0;
   state.scoreLog10 = -Infinity;
   state.totalScore = 0;
+  state.totalScoreLog10 = -Infinity;
   state.generationScore = 0;
+  state.generationScoreLog10 = -Infinity;
   state.vertices = 3;
   state.speedLevel = 0;
   state.gainLevel = 0;
@@ -1789,10 +1945,12 @@ function resetBelowInfinity() {
   state.lastVertexIndex = 0;
   state.generationCount = 0;
   state.previousGenerationScore = 0;
+  state.previousGenerationScoreLog10 = -Infinity;
   state.generationScoreMultiplier = 1;
   state.generationCostFactor = 1;
   state.coreBoostCount = 0;
   state.infiniteScore = 0;
+  state.infiniteScoreLog10 = -Infinity;
   state.floatingTexts = [];
 }
 
@@ -1807,43 +1965,39 @@ function runInfinity(forced = false) {
   }
 
   state.infinityCount += 1;
-  state.infinityPoints += gained;
+  addInfinityPoints(gained);
   resetBelowInfinity();
   updateUi();
   saveGame("manual");
 }
 
 function buyIpGainUpgrade() {
-  const price = ipGainUpgradeCost();
-  if (state.infinityPoints < price) return;
-  state.infinityPoints -= price;
+  const priceLog = ipGainUpgradeCostLog10();
+  if (!spendInfinityPoints(priceLog)) return;
   state.ipGainUpgradeLevel += 1;
   updateUi();
   saveGame("manual");
 }
 
 function buyInfiniteAngleUpgrade() {
-  const price = infiniteAngleUpgradeCost();
-  if (state.infinityPoints < price) return;
-  state.infinityPoints -= price;
+  const priceLog = infiniteAngleUpgradeCostLog10();
+  if (!spendInfinityPoints(priceLog)) return;
   state.infiniteAngleUpgradeLevel += 1;
   updateUi();
   saveGame("manual");
 }
 
 function buySoftcapUpgrade() {
-  const price = softcapUpgradeCost();
-  if (state.infinityPoints < price) return;
-  state.infinityPoints -= price;
+  const priceLog = softcapUpgradeCostLog10();
+  if (!spendInfinityPoints(priceLog)) return;
   state.softcapUpgradeLevel += 1;
   updateUi();
   saveGame("manual");
 }
 
 function convertIpToInfiniteScore() {
-  if (state.infinityPoints < 1) return;
-  state.infinityPoints -= 1;
-  state.infiniteScore += infiniteScoreGainPerIp();
+  if (!spendInfinityPoints(0)) return;
+  addInfiniteScoreLog(infiniteScoreGainPerIpLog10());
   updateUi();
   saveGame("manual");
 }
@@ -1947,14 +2101,25 @@ function renderGameToText() {
   const points = polygonPoints();
   const point = pointPosition(points);
   const scoreLog = currentScoreLog10();
+  const finalGainLog = finalScoreGainLog10();
+  const totalScoreLog = currentTotalScoreLog10();
+  const generationScoreLog = currentGenerationScoreLog10();
+  const infinityPointsLog = currentInfinityPointsLog10();
+  const infiniteScoreLog = currentInfiniteScoreLog10();
+  const currentGainLog = log10Value(state.currentGain);
+  const currentCosts = costs();
   return JSON.stringify({
     coordinateSystem: "canvas pixels, origin top-left, x right, y down",
     score: scoreDisplay(),
     scoreLog10: Number.isFinite(scoreLog) ? Number(scoreLog.toPrecision(6)) : null,
-    totalScore: Number(state.totalScore.toFixed(2)),
-    generationScore: Number(state.generationScore.toFixed(2)),
-    currentGain: Number(state.currentGain.toFixed(2)),
-    finalGainOnCore: Number(finalScoreGain().toPrecision(6)),
+    totalScore: formatUiLogNumber(totalScoreLog),
+    totalScoreLog10: Number.isFinite(totalScoreLog) ? Number(totalScoreLog.toPrecision(6)) : null,
+    generationScore: formatUiLogNumber(generationScoreLog),
+    generationScoreLog10: Number.isFinite(generationScoreLog) ? Number(generationScoreLog.toPrecision(6)) : null,
+    currentGain: formatUiLogNumber(currentGainLog),
+    currentGainLog10: Number.isFinite(currentGainLog) ? Number(currentGainLog.toPrecision(6)) : null,
+    finalGainOnCore: formatUiLogNumber(finalGainLog),
+    finalGainOnCoreLog10: Number.isFinite(finalGainLog) ? Number(finalGainLog.toPrecision(6)) : null,
     vertices: state.vertices,
     lapSeconds: Number(lapDuration().toPrecision(6)),
     lapSpeedMultiplier: Number(lapSpeedMultiplier().toPrecision(6)),
@@ -1967,14 +2132,20 @@ function renderGameToText() {
     upgrades: {
       speedLevel: state.speedLevel,
       gainLevel: state.gainLevel,
-      costs: costs(),
+      costs: {
+        speed: formatUiNumber(currentCosts.speed),
+        vertex: formatUiNumber(currentCosts.vertex),
+        gain: formatUiNumber(currentCosts.gain),
+      },
     },
     generation: {
-      unlocked: state.totalScore >= GENERATION_UNLOCK_SCORE,
+      unlocked: currentTotalScoreLog10() >= log10Value(GENERATION_UNLOCK_SCORE),
       canGenerate: canRunGeneration(),
-      requirement: Number(generationRequirement().toPrecision(6)),
+      requirement: formatUiLogNumber(generationRequirementLog10()),
+      requirementLog10: Number(generationRequirementLog10().toPrecision(6)),
       count: state.generationCount,
-      previousGenerationScore: Number(state.previousGenerationScore.toPrecision(6)),
+      previousGenerationScore: formatUiLogNumber(currentPreviousGenerationScoreLog10()),
+      previousGenerationScoreLog10: Number.isFinite(currentPreviousGenerationScoreLog10()) ? Number(currentPreviousGenerationScoreLog10().toPrecision(6)) : null,
       rawScoreMultiplier: Number(state.generationScoreMultiplier.toFixed(2)),
       achievementScoreMultiplier: Number(generationAchievementMultiplier().toFixed(2)),
       scoreMultiplier: Number(generationScoreMultiplierEffect().toFixed(2)),
@@ -1983,7 +2154,7 @@ function renderGameToText() {
     coreBoost: {
       canBoost: canCoreBoost(),
       count: state.coreBoostCount,
-      requirement: coreBoostRequirement(),
+      requirement: formatPowerOfTen(coreBoostRequirementLog10()),
       requirementLog10: coreBoostRequirementLog10(),
       requirementText: formatPowerOfTen(coreBoostRequirementLog10()),
       gainIncreaseMultiplier: Number(coreBoostGainIncreaseMultiplier().toFixed(2)),
@@ -1992,9 +2163,11 @@ function renderGameToText() {
     infinity: {
       canInfinity: canInfinity(),
       count: state.infinityCount,
-      points: state.infinityPoints,
+      points: formatUiLogNumber(infinityPointsLog),
+      pointsLog10: Number.isFinite(infinityPointsLog) ? Number(infinityPointsLog.toPrecision(6)) : null,
       pointGain: infinityPointGain(),
-      infiniteScore: Number(state.infiniteScore.toPrecision(6)),
+      infiniteScore: formatUiLogNumber(infiniteScoreLog),
+      infiniteScoreLog10: Number.isFinite(infiniteScoreLog) ? Number(infiniteScoreLog.toPrecision(6)) : null,
       infiniteAngleBoost: Number(infiniteAngleBoost().toFixed(2)),
       activeChallenge: state.activeChallenge,
       completedChallenges: completedChallengeCount(),
