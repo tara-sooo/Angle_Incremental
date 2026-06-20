@@ -71,7 +71,7 @@ const elements = {
 };
 
 const BASE_LAP_SECONDS = 6;
-const GENERATION_UNLOCK_SCORE = 1_000_000;
+const GENERATION_UNLOCK_SCORE = 1000000;
 const GENERATION_MIN_NEW_COST_FACTOR = 0.6;
 const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
@@ -313,7 +313,7 @@ const ACHIEVEMENTS = [
     title: { ja: "再びe(この実績の番号)分のブースト", en: "Another e7 Boost" },
     condition: { ja: "GR由来の単純なスコア獲得量の乗算値が10000000を超える", en: "Make the raw GR score multiplier exceed 10,000,000." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => state.generationScoreMultiplier > 10_000_000,
+    isUnlocked: () => state.generationScoreMultiplier > 10000000,
   },
   {
     title: { ja: "スケーリングは始まっている", en: "Scaling Has Begun" },
@@ -443,6 +443,9 @@ let activeMainTab = "angle";
 let activeInfinitySubtab = "upgrades";
 let appliedLanguage = "";
 let smoothedFps = 0;
+const requestNextFrame = window.requestAnimationFrame
+  ? window.requestAnimationFrame.bind(window)
+  : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
 
 function t(key) {
   return (TEXT[state.language] && TEXT[state.language][key]) || TEXT.ja[key] || key;
@@ -593,7 +596,7 @@ function formatNumber(value) {
   if (value === Infinity) return "∞";
   if (!Number.isFinite(value)) return "0";
   if (value < 1000) return value.toFixed(value < 10 ? 2 : 0).replace(/\.00$/, "");
-  if (value < 1_000_000) return Math.floor(value).toLocaleString("en-US");
+  if (value < 1000000) return Math.floor(value).toLocaleString("en-US");
   if (value >= 1e18) return value.toExponential(2).replace("e+", "e");
   const units = ["M", "B", "T", "Qa", "Qi", "Sx"];
   let scaled = value;
@@ -816,7 +819,7 @@ function showAchievementNotification(id) {
   toast.innerHTML = `<span>${t("achievementNotice")}</span><strong>${achievement.title[language]}</strong>`;
   elements.achievementToasts.append(toast);
   window.setTimeout(() => {
-    toast.remove();
+    if (toast.parentNode) toast.parentNode.removeChild(toast);
   }, 4200);
 }
 
@@ -1269,8 +1272,14 @@ function syncFormControl(control, value) {
   }
 }
 
+function clearElement(element) {
+  while (element.firstChild) {
+    element.removeChild(element.firstChild);
+  }
+}
+
 function createChallengeRows() {
-  elements.challengeList.replaceChildren();
+  clearElement(elements.challengeList);
   for (let index = 1; index <= INFINITY_CHALLENGE_COUNT; index += 1) {
     const row = document.createElement("div");
     row.className = "challenge-row";
@@ -1322,7 +1331,7 @@ function updateChallengeRows() {
 }
 
 function createAchievementRows() {
-  elements.achievementList.replaceChildren();
+  clearElement(elements.achievementList);
   ACHIEVEMENTS.forEach((achievement, index) => {
     const row = document.createElement("article");
     row.className = "achievement-row";
@@ -1752,7 +1761,11 @@ function resizeCanvas() {
   draw();
 }
 
-let lastTime = performance.now();
+function currentFrameTime() {
+  return window.performance && performance.now ? performance.now() : Date.now();
+}
+
+let lastTime = currentFrameTime();
 function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.08);
   if (dt > 0) {
@@ -1763,7 +1776,7 @@ function frame(now) {
   update(dt);
   updateUi();
   draw();
-  requestAnimationFrame(frame);
+  requestNextFrame(frame);
 }
 
 function renderGameToText() {
@@ -1924,4 +1937,4 @@ if (document.fonts) {
 } else {
   japaneseFontReady = true;
 }
-requestAnimationFrame(frame);
+requestNextFrame(frame);
