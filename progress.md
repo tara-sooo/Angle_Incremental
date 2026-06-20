@@ -49,6 +49,8 @@ Original prompt: では、中核ループを完成させてください
 - Restored access to the Generation/Core Boost dock on short screens by allowing the stage or mobile Angle panel to scroll instead of clipping the lower reset controls.
 - Made the reset dock sticky so Generation/Core Boost stay visible on constrained screens, and added a versioned update modal shown when the app version changes.
 - Fixed compact number suffixes so 1,000,000 displays as M rather than B.
+- Reworked Generation to match the revised spec: GR score multiplier now applies at ^2, cost reduction applies only to upgrade cost growth, repeat Generations require beating the previous generation score, GR slightly relaxes the lap speed softcap, and core-hit scoring now uses the `(x/y)^y` formula.
+- Changed compact reset controls so Generation and Core Boost multiplier/exponent rows remain accessible on short screens through scrolling instead of being hidden.
 
 ## TODO
 
