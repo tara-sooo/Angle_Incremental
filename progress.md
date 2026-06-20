@@ -44,6 +44,7 @@ Original prompt: では、中核ループを完成させてください
 - Verified the 8-IC list, IC5 Infinity Upgrade scaling, core/generation/IP reward calculations, desktop/mobile Infinity tab rendering, and no console errors through Firefox/Playwright.
 - Reworked the Infinity page into a Revolution Idle-style subtab layout with persistent Infinity resources and separate Upgrades, Challenges, and Infinite Angle subpanels.
 - Added a pre-Core Boost balance softcap to lap speed: speed behaves normally through ×200, then effective speed scales with the square root of additional raw speed.
+- Strengthened Generation score multiplier scaling: raw GR score multiplier now contributes at ^1.15, rising to ^1.25 after IC3, while keeping the existing achievement 3 x2 reward.
 
 ## TODO
 

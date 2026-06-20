@@ -279,6 +279,16 @@ Generationコスト倍率が0.6未満の場合:
   Generationコスト倍率を維持
 ```
 
+スコア計算に使う実効 Generation スコア倍率は、蓄積された Generation スコア倍率に指数補正をかける。
+
+```text
+実効Generationスコア倍率 = Generationスコア倍率 ^ 1.15
+IC3クリア後:
+  実効Generationスコア倍率 = Generationスコア倍率 ^ 1.25
+実績3達成後:
+  実効Generationスコア倍率 = 実効Generationスコア倍率 x 2
+```
+
 既存セーブで Generationコスト倍率 が 0.6 未満の場合は、その値を維持する。
 
 ## 12. Core Boost

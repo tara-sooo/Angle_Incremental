@@ -86,6 +86,9 @@ const MAX_EXACT_CORE_HITS = 50000;
 const CORE_HIT_APPROX_SEGMENTS = 2048;
 const LAP_SPEED_SOFTCAP_START = 200;
 const LAP_SPEED_SOFTCAP_POWER = 0.5;
+const GENERATION_SCORE_POWER = 1.15;
+const GENERATION_SCORE_POWER_IC3_REWARD = 1.25;
+const GENERATION_COST_POWER_IC3_REWARD = 1.08;
 const VERTEX_EPSILON = 1e-9;
 const TAU = Math.PI * 2;
 const BUY_ALL_LIMIT = 1000;
@@ -771,18 +774,25 @@ function coreBoostGainExponent() {
   return Math.pow(1 + state.coreBoostCount * 0.05, coreBoostBonusPower());
 }
 
+function generationScorePower() {
+  return isChallengeCompleted(3) ? GENERATION_SCORE_POWER_IC3_REWARD : GENERATION_SCORE_POWER;
+}
+
+function generationCostPower() {
+  return isChallengeCompleted(3) ? GENERATION_COST_POWER_IC3_REWARD : 1;
+}
+
 function generationScoreMultiplierEffect() {
   if (state.activeChallenge === 1) return 1;
   if (state.activeChallenge === 3) return 1 / Math.pow(Math.max(state.generationScoreMultiplier, 1), 0.7);
 
-  const generationPower = isChallengeCompleted(3) ? 1.08 : 1;
-  return Math.pow(state.generationScoreMultiplier, generationPower) * (isAchievementUnlocked(3) ? 2 : 1);
+  return Math.pow(state.generationScoreMultiplier, generationScorePower()) * (isAchievementUnlocked(3) ? 2 : 1);
 }
 
 function generationCostFactorEffect() {
   if (state.activeChallenge === 1) return 1;
   if (state.activeChallenge === 3) return 1 / Math.pow(Math.max(state.generationCostFactor, 0.01), 0.7);
-  return Math.pow(state.generationCostFactor, isChallengeCompleted(3) ? 1.08 : 1);
+  return Math.pow(state.generationCostFactor, generationCostPower());
 }
 
 function finalScoreGainPower() {
@@ -1001,11 +1011,10 @@ function nextGenerationValues() {
   const nextRawCostFactor = state.generationCostFactor < GENERATION_MIN_NEW_COST_FACTOR
     ? state.generationCostFactor
     : Math.max(GENERATION_MIN_NEW_COST_FACTOR, state.generationCostFactor * (1 - reward.costReduction));
-  const generationPower = isChallengeCompleted(3) ? 1.08 : 1;
 
   return {
-    scoreMultiplier: Math.pow(nextRawScoreMultiplier, generationPower) * (isAchievementUnlocked(3) ? 2 : 1),
-    costFactor: Math.pow(nextRawCostFactor, generationPower),
+    scoreMultiplier: Math.pow(nextRawScoreMultiplier, generationScorePower()) * (isAchievementUnlocked(3) ? 2 : 1),
+    costFactor: Math.pow(nextRawCostFactor, generationCostPower()),
   };
 }
 
