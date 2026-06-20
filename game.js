@@ -971,6 +971,49 @@ function generationRewardFor(generationScore) {
   };
 }
 
+function nextGenerationValues() {
+  if (state.activeChallenge === 1 || state.generationScore < GENERATION_UNLOCK_SCORE) {
+    return {
+      scoreMultiplier: generationScoreMultiplierEffect(),
+      costFactor: generationCostFactorEffect(),
+    };
+  }
+
+  const reward = generationRewardFor(state.generationScore);
+  const nextRawScoreMultiplier = state.generationScoreMultiplier * reward.scoreMultiplierGain;
+  const nextRawCostFactor = state.generationCostFactor < GENERATION_MIN_NEW_COST_FACTOR
+    ? state.generationCostFactor
+    : Math.max(GENERATION_MIN_NEW_COST_FACTOR, state.generationCostFactor * (1 - reward.costReduction));
+  const generationPower = isChallengeCompleted(3) ? 1.08 : 1;
+
+  return {
+    scoreMultiplier: Math.pow(nextRawScoreMultiplier, generationPower) * (isAchievementUnlocked(3) ? 2 : 1),
+    costFactor: Math.pow(nextRawCostFactor, generationPower),
+  };
+}
+
+function nextCoreBoostValues() {
+  const currentCoreBoostCount = state.coreBoostCount;
+  const nextCoreBoostCount = canCoreBoost() ? currentCoreBoostCount + 1 : currentCoreBoostCount;
+  const power = coreBoostBonusPower();
+  return {
+    gainMultiplier: Math.pow(1 + nextCoreBoostCount * 0.5, power),
+    gainExponent: Math.pow(1 + nextCoreBoostCount * 0.05, power),
+  };
+}
+
+function formatMultiplierPreview(current, next) {
+  const currentText = `×${current.toFixed(2)}`;
+  const nextText = `×${next.toFixed(2)}`;
+  return currentText === nextText ? currentText : `${currentText} → ${nextText}`;
+}
+
+function formatExponentPreview(current, next) {
+  const currentText = `^${current.toFixed(2)}`;
+  const nextText = `^${next.toFixed(2)}`;
+  return currentText === nextText ? currentText : `${currentText} → ${nextText}`;
+}
+
 function addScore(amount, amountLog10 = log10Value(amount)) {
   const previousScoreLog = currentScoreLog10();
   const rawScoreLog = combineLog10(previousScoreLog, amountLog10);
@@ -1363,13 +1406,15 @@ function updateUi() {
       : t("generationLocked");
   elements.generationButton.disabled = !ready || state.activeChallenge === 1;
   elements.generationCount.textContent = String(state.generationCount);
-  elements.generationMultiplier.textContent = `×${generationScoreMultiplierEffect().toFixed(2)}`;
-  elements.generationCostFactor.textContent = `×${generationCostFactorEffect().toFixed(2)}`;
+  const nextGeneration = nextGenerationValues();
+  elements.generationMultiplier.textContent = formatMultiplierPreview(generationScoreMultiplierEffect(), nextGeneration.scoreMultiplier);
+  elements.generationCostFactor.textContent = formatMultiplierPreview(generationCostFactorEffect(), nextGeneration.costFactor);
 
   elements.coreBoostCount.textContent = String(state.coreBoostCount);
   elements.coreBoostRequirement.textContent = formatPowerOfTen(coreBoostRequirementLog10());
-  elements.coreBoostGainBoost.textContent = `×${coreBoostGainIncreaseMultiplier().toFixed(2)}`;
-  elements.coreBoostExponent.textContent = `^${coreBoostGainExponent().toFixed(2)}`;
+  const nextCoreBoost = nextCoreBoostValues();
+  elements.coreBoostGainBoost.textContent = formatMultiplierPreview(coreBoostGainIncreaseMultiplier(), nextCoreBoost.gainMultiplier);
+  elements.coreBoostExponent.textContent = formatExponentPreview(coreBoostGainExponent(), nextCoreBoost.gainExponent);
   elements.coreBoostButton.disabled = !canCoreBoost();
 
   elements.infinityCount.textContent = String(state.infinityCount);
