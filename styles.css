@@ -182,7 +182,7 @@ select {
 .stage-panel {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(180px, 1fr) auto;
   overflow: hidden;
 }
 
@@ -228,11 +228,16 @@ h1 {
 }
 
 .playfield-wrap {
-  min-height: 0;
+  min-height: 180px;
   padding: 10px;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: hidden;
 }
 
 canvas {
+  flex: 1 1 auto;
   display: block;
   width: 100%;
   height: 100%;
@@ -1064,11 +1069,11 @@ canvas {
   }
 
   .angle-panel {
-    overflow: hidden;
+    overflow: auto;
   }
 
   .angle-layout {
-    grid-template-rows: 292px minmax(0, 1fr);
+    grid-template-rows: auto minmax(320px, 1fr);
     gap: 6px;
   }
 
@@ -1086,6 +1091,7 @@ canvas {
   .upgrade-rail {
     padding: 8px;
     gap: 6px;
+    overflow: visible;
   }
 
   .stats {
@@ -1189,6 +1195,7 @@ canvas {
 
   .playfield-wrap {
     padding: 6px;
+    min-height: 150px;
   }
 
   canvas {

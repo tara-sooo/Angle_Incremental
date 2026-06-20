@@ -1201,6 +1201,7 @@ function draw() {
   const points = polygonPoints();
   const point = pointPosition(points);
   const canDrawJapanese = japaneseFontReady || !document.fonts;
+  const compactCanvas = canvas.getBoundingClientRect().height < 260;
 
   ctx.save();
   ctx.lineJoin = "round";
@@ -1241,17 +1242,19 @@ function draw() {
     ctx.fillText(t("core"), points[0].x, points[0].y - 22);
   }
 
-  ctx.font = "800 28px 'Noto Sans JP', sans-serif";
-  ctx.fillStyle = "#f2b84b";
-  ctx.fillText(formatUiNumber(finalScoreGain()), canvas.width / 2, canvas.height - 68);
+  if (!compactCanvas) {
+    ctx.font = "800 28px 'Noto Sans JP', sans-serif";
+    ctx.fillStyle = "#f2b84b";
+    ctx.fillText(formatUiNumber(finalScoreGain()), canvas.width / 2, canvas.height - 68);
 
-  if (canDrawJapanese) {
-    ctx.font = "700 15px 'Noto Sans JP', sans-serif";
-    ctx.fillStyle = "#b9c6e4";
-    ctx.fillText(t("currentGain"), canvas.width / 2, canvas.height - 42);
-    if (hasMultiplicativeGainExpression()) {
-      ctx.font = "700 13px 'Noto Sans JP', sans-serif";
-      ctx.fillText(`${t("baseExpression")}: ${formatGainExpressionSummary(state.currentGain)}`, canvas.width / 2, canvas.height - 20);
+    if (canDrawJapanese) {
+      ctx.font = "700 15px 'Noto Sans JP', sans-serif";
+      ctx.fillStyle = "#b9c6e4";
+      ctx.fillText(t("currentGain"), canvas.width / 2, canvas.height - 42);
+      if (hasMultiplicativeGainExpression()) {
+        ctx.font = "700 13px 'Noto Sans JP', sans-serif";
+        ctx.fillText(`${t("baseExpression")}: ${formatGainExpressionSummary(state.currentGain)}`, canvas.width / 2, canvas.height - 20);
+      }
     }
   }
 
@@ -1780,8 +1783,14 @@ function breakInfiniteCap() {
 function resizeCanvas() {
   const rect = canvas.getBoundingClientRect();
   const scale = window.devicePixelRatio || 1;
-  canvas.width = Math.max(640, Math.floor(rect.width * scale));
-  canvas.height = Math.max(420, Math.floor(rect.height * scale));
+  const width = Math.max(1, Math.floor(rect.width * scale));
+  const height = Math.max(1, Math.floor(rect.height * scale));
+  if (canvas.width === width && canvas.height === height) {
+    draw();
+    return;
+  }
+  canvas.width = width;
+  canvas.height = height;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   draw();
 }
@@ -1941,6 +1950,10 @@ elements.numberFormatSelect.addEventListener("change", () => applySetting("numbe
 elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", elements.timeUnitSelect.value));
 window.addEventListener("beforeunload", () => saveGame("manual"));
 window.addEventListener("resize", resizeCanvas);
+const canvasResizeObserver = window.ResizeObserver && canvas.parentElement
+  ? new ResizeObserver(resizeCanvas)
+  : null;
+if (canvasResizeObserver) canvasResizeObserver.observe(canvas.parentElement);
 window.addEventListener("keydown", (event) => {
   if (event.key.toLowerCase() === "f") {
     if (document.fullscreenElement) document.exitFullscreen();

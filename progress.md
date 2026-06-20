@@ -45,6 +45,7 @@ Original prompt: では、中核ループを完成させてください
 - Reworked the Infinity page into a Revolution Idle-style subtab layout with persistent Infinity resources and separate Upgrades, Challenges, and Infinite Angle subpanels.
 - Added a pre-Core Boost balance softcap to lap speed: speed behaves normally through ×200, then effective speed scales with the square root of additional raw speed.
 - Strengthened Generation score multiplier scaling: raw GR score multiplier now contributes at ^1.15, rising to ^1.25 after IC3, while keeping the existing achievement 3 x2 reward.
+- Fixed Angle canvas collapse on narrow or short screens by preserving a minimum playfield area, matching canvas backing size to the rendered size, and allowing mobile Angle overflow when the viewport is too short.
 
 ## TODO
 
