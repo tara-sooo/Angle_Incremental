@@ -37,6 +37,7 @@ Original prompt: では、中核ループを完成させてください
 - Constrained the desktop Angle tab to a single viewport-height screen and moved the mobile tab bar to the bottom with sticky positioning.
 - Compressed the mobile Angle tab into one viewport by using a fixed-height two-row Angle layout, 2x2 upgrade controls, compact Stage header, and two-column Generation/Core Boost dock.
 - Fixed settings select controls repeatedly reopening on some browsers by avoiding per-frame option/value rewrites while a select has focus.
+- Added `CONTRIBUTING.md` documenting the lightweight stable-main branch strategy, short-lived branch naming, verification checklist, direct-main exceptions, and milestone tag guidance.
 
 ## TODO
 
