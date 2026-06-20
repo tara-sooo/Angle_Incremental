@@ -10,6 +10,7 @@ const elements = {
   gainValue: document.getElementById("gainValue"),
   vertexGainValue: document.getElementById("vertexGainValue"),
   lapValue: document.getElementById("lapValue"),
+  lapSpeedValue: document.getElementById("lapSpeedValue"),
   generationStatus: document.getElementById("generationStatus"),
   generationCount: document.getElementById("generationCount"),
   generationMultiplier: document.getElementById("generationMultiplier"),
@@ -43,6 +44,7 @@ const elements = {
   achievementSummary: document.getElementById("achievementSummary"),
   achievementBoost: document.getElementById("achievementBoost"),
   achievementTabState: document.getElementById("achievementTabState"),
+  achievementToasts: document.getElementById("achievementToasts"),
   buyAllUpgrade: document.getElementById("buyAllUpgrade"),
   speedUpgrade: document.getElementById("speedUpgrade"),
   vertexUpgrade: document.getElementById("vertexUpgrade"),
@@ -95,6 +97,7 @@ const TEXT = {
     coreGain: "核到達時の獲得量",
     vertexGain: "頂点通過ごとの増加",
     lapTime: "1周の時間",
+    lapSpeed: "ラップ速度",
     buyAll: "全購入",
     buyAllHint: "通常強化を順番に購入",
     speedUpgrade: "周回速度",
@@ -120,6 +123,7 @@ const TEXT = {
     achievementRewardText: "達成ごとに頂点通過ごとの増加 ×1.01",
     achievementUnlocked: "達成済み",
     achievementLocked: "未達成",
+    achievementNotice: "実績達成",
     language: "言語",
     numberFormat: "数値表記",
     timeUnit: "時間単位",
@@ -184,6 +188,7 @@ const TEXT = {
     coreGain: "Gain on core hit",
     vertexGain: "Gain per vertex",
     lapTime: "Lap time",
+    lapSpeed: "Lap speed",
     buyAll: "Buy All",
     buyAllHint: "Buys normal upgrades in order",
     speedUpgrade: "Lap Speed",
@@ -209,6 +214,7 @@ const TEXT = {
     achievementRewardText: "Each achievement multiplies gain per vertex by 1.01",
     achievementUnlocked: "Unlocked",
     achievementLocked: "Locked",
+    achievementNotice: "Achievement unlocked",
     language: "Language",
     numberFormat: "Number format",
     timeUnit: "Time unit",
@@ -801,16 +807,30 @@ function achievementGainMultiplier() {
   return Math.pow(1.01, achievementCount());
 }
 
-function checkAchievements() {
-  let changed = false;
+function showAchievementNotification(id) {
+  if (!elements.achievementToasts) return;
+  const language = TEXT[state.language] ? state.language : "ja";
+  const achievement = ACHIEVEMENTS[id - 1];
+  const toast = document.createElement("div");
+  toast.className = "achievement-toast";
+  toast.innerHTML = `<span>${t("achievementNotice")}</span><strong>${achievement.title[language]}</strong>`;
+  elements.achievementToasts.append(toast);
+  window.setTimeout(() => {
+    toast.remove();
+  }, 4200);
+}
+
+function checkAchievements(notify = false) {
+  const unlockedIds = [];
   ACHIEVEMENTS.forEach((achievement, index) => {
     const id = index + 1;
     if (!isAchievementUnlocked(id) && achievement.isUnlocked()) {
       state.achievementMask |= 1 << index;
-      changed = true;
+      unlockedIds.push(id);
+      if (notify) showAchievementNotification(id);
     }
   });
-  return changed;
+  return unlockedIds;
 }
 
 function isChallengeCompleted(index) {
@@ -967,7 +987,7 @@ function addScore(amount, amountLog10 = log10Value(amount)) {
   }
   state.lastEarned = amount;
 
-  if (checkAchievements()) saveGame("manual");
+  if (checkAchievements(true).length > 0) saveGame("manual");
   if (state.infinityCount === 0 && canInfinity()) {
     runInfinity(true);
     return true;
@@ -1314,14 +1334,15 @@ function canSpend(amount) {
 
 function updateUi() {
   const currentCosts = costs();
-  const achievementsChanged = checkAchievements();
-  if (achievementsChanged) saveGame("manual");
+  const unlockedAchievementsNow = checkAchievements(true);
+  if (unlockedAchievementsNow.length > 0) saveGame("manual");
   document.documentElement.classList.toggle("light-effects", state.lightEffects);
   applyLanguage();
   elements.scoreValue.textContent = scoreDisplay();
   elements.gainValue.textContent = formatUiNumber(finalScoreGain());
   elements.vertexGainValue.textContent = `+${formatSmallDecimal(vertexGainIncrease())}`;
   elements.lapValue.textContent = formatDuration(lapDuration());
+  elements.lapSpeedValue.textContent = `×${lapSpeedMultiplier().toFixed(2)}`;
   elements.speedLevel.textContent = `${t("level")} ${state.speedLevel}`;
   elements.vertexCount.textContent = `${state.vertices} ${t("vertices")}`;
   elements.gainLevel.textContent = `${t("level")} ${state.gainLevel}`;
@@ -1714,6 +1735,7 @@ function renderGameToText() {
     finalGainOnCore: Number(finalScoreGain().toPrecision(6)),
     vertices: state.vertices,
     lapSeconds: Number(lapDuration().toPrecision(6)),
+    lapSpeedMultiplier: Number(lapSpeedMultiplier().toPrecision(6)),
     point: { x: Number(point.x.toFixed(1)), y: Number(point.y.toFixed(1)), progress: Number(state.pointProgress.toFixed(3)) },
     core: { x: Number(points[0].x.toFixed(1)), y: Number(points[0].y.toFixed(1)) },
     coreCount: coreVertexIndices().length,

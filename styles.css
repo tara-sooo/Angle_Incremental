@@ -917,10 +917,69 @@ canvas {
   display: none;
 }
 
+.achievement-toasts {
+  position: fixed;
+  top: 58px;
+  right: 112px;
+  z-index: 110;
+  display: grid;
+  gap: 8px;
+  width: min(320px, calc(100vw - 140px));
+  pointer-events: none;
+}
+
+.achievement-toast {
+  padding: 10px 12px;
+  border: 2px solid rgba(242, 184, 75, 0.82);
+  background: linear-gradient(180deg, rgba(33, 48, 82, 0.96), rgba(10, 16, 29, 0.96));
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.36), inset 0 -3px 0 var(--gold);
+  animation: toast-in 180ms ease-out, toast-out 380ms ease-in 3.7s forwards;
+}
+
+.achievement-toast span {
+  display: block;
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.achievement-toast strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
 @media (max-width: 820px) {
   .fps-counter {
     top: 12px;
     right: 12px;
+  }
+
+  .achievement-toasts {
+    top: auto;
+    bottom: 84px;
+    right: 12px;
+    width: min(300px, calc(100vw - 24px));
   }
 }
 
