@@ -1264,13 +1264,8 @@ canvas {
     grid-template-columns: 1fr 1fr;
     gap: 4px;
     padding: 5px;
-    max-height: 100px;
+    max-height: min(240px, 42svh);
     overflow: auto;
-  }
-
-  .generation > div:nth-of-type(n + 2),
-  .core-boost > div:nth-of-type(n + 3) {
-    display: none;
   }
 
   .generation,
@@ -1291,11 +1286,11 @@ canvas {
     font-size: 0.68rem;
   }
 
-.generation strong,
-.core-boost strong {
-  font-size: 0.8rem;
-  max-width: 18ch;
-}
+  .generation strong,
+  .core-boost strong {
+    font-size: 0.8rem;
+    max-width: 18ch;
+  }
 
   .generation-button,
   .core-boost-button {
