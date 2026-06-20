@@ -48,6 +48,7 @@ Original prompt: では、中核ループを完成させてください
 - Fixed Angle canvas collapse on narrow or short screens by preserving a minimum playfield area, matching canvas backing size to the rendered size, and allowing mobile Angle overflow when the viewport is too short.
 - Restored access to the Generation/Core Boost dock on short screens by allowing the stage or mobile Angle panel to scroll instead of clipping the lower reset controls.
 - Made the reset dock sticky so Generation/Core Boost stay visible on constrained screens, and added a versioned update modal shown when the app version changes.
+- Fixed compact number suffixes so 1,000,000 displays as M rather than B.
 
 ## TODO
 

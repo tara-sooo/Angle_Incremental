@@ -646,8 +646,8 @@ function formatNumber(value) {
   if (value < 1000000) return Math.floor(value).toLocaleString("en-US");
   if (value >= 1e18) return value.toExponential(2).replace("e+", "e");
   const units = ["M", "B", "T", "Qa", "Qi", "Sx"];
-  let scaled = value;
-  let unitIndex = -1;
+  let scaled = value / 1000000;
+  let unitIndex = 0;
   while (scaled >= 1000 && unitIndex < units.length - 1) {
     scaled /= 1000;
     unitIndex += 1;
