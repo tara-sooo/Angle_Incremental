@@ -313,6 +313,7 @@ const SAVE_FIELDS = [
 let autoSaveElapsed = 0;
 let japaneseFontReady = false;
 let activeMainTab = "angle";
+let appliedLanguage = "";
 
 function t(key) {
   return (TEXT[state.language] && TEXT[state.language][key]) || TEXT.ja[key] || key;
@@ -947,23 +948,31 @@ function draw() {
 }
 
 function applyLanguage() {
+  if (appliedLanguage === state.language) return;
+  appliedLanguage = state.language;
   document.documentElement.lang = state.language;
   elements.i18nNodes.forEach((node) => {
     const key = node.dataset.i18n;
     if (key) node.textContent = t(key);
   });
-  if (elements.languageSelect) elements.languageSelect.value = state.language;
   if (elements.numberFormatSelect) {
-    elements.numberFormatSelect.value = state.numberFormat;
     elements.numberFormatSelect.querySelector('[value="compact"]').textContent = t("numberCompact");
     elements.numberFormatSelect.querySelector('[value="scientific"]').textContent = t("numberScientific");
     elements.numberFormatSelect.querySelector('[value="detailed"]').textContent = t("numberDetailed");
   }
   if (elements.timeUnitSelect) {
-    elements.timeUnitSelect.value = state.timeUnit;
     elements.timeUnitSelect.querySelector('[value="auto"]').textContent = t("timeAuto");
     elements.timeUnitSelect.querySelector('[value="seconds"]').textContent = t("timeSeconds");
     elements.timeUnitSelect.querySelector('[value="milliseconds"]').textContent = t("timeMilliseconds");
+  }
+}
+
+function syncFormControl(control, value) {
+  if (!control || document.activeElement === control) return;
+  if (control.type === "checkbox") {
+    control.checked = Boolean(value);
+  } else {
+    control.value = value;
   }
 }
 
@@ -1081,11 +1090,11 @@ function updateUi() {
   elements.breakCapButton.disabled = !canBreakInfiniteCap();
   elements.breakCapButton.textContent = state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 
-  elements.floatingTextToggle.checked = state.showFloatingText;
-  elements.lightEffectsToggle.checked = state.lightEffects;
-  elements.languageSelect.value = state.language;
-  elements.numberFormatSelect.value = state.numberFormat;
-  elements.timeUnitSelect.value = state.timeUnit;
+  syncFormControl(elements.floatingTextToggle, state.showFloatingText);
+  syncFormControl(elements.lightEffectsToggle, state.lightEffects);
+  syncFormControl(elements.languageSelect, state.language);
+  syncFormControl(elements.numberFormatSelect, state.numberFormat);
+  syncFormControl(elements.timeUnitSelect, state.timeUnit);
 }
 
 function spend(amount) {
@@ -1336,7 +1345,10 @@ function switchMainTab(tab) {
 
 function applySetting(key, value) {
   state[key] = value;
-  if (key === "language") state.language = normalizeChoice(value, ["ja", "en"], "ja");
+  if (key === "language") {
+    state.language = normalizeChoice(value, ["ja", "en"], "ja");
+    appliedLanguage = "";
+  }
   if (key === "numberFormat") state.numberFormat = normalizeChoice(value, ["compact", "scientific", "detailed"], "compact");
   if (key === "timeUnit") state.timeUnit = normalizeChoice(value, ["auto", "seconds", "milliseconds"], "auto");
   if (key === "showFloatingText" && !value) state.floatingTexts = [];

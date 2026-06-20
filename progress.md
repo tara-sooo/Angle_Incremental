@@ -36,6 +36,7 @@ Original prompt: では、中核ループを完成させてください
 - Moved the main tab rail from the left side to the right side on desktop, while keeping the compact mobile layout as a top horizontal tab bar.
 - Constrained the desktop Angle tab to a single viewport-height screen and moved the mobile tab bar to the bottom with sticky positioning.
 - Compressed the mobile Angle tab into one viewport by using a fixed-height two-row Angle layout, 2x2 upgrade controls, compact Stage header, and two-column Generation/Core Boost dock.
+- Fixed settings select controls repeatedly reopening on some browsers by avoiding per-frame option/value rewrites while a select has focus.
 
 ## TODO
 
