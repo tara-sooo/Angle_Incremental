@@ -34,6 +34,7 @@ Original prompt: では、中核ループを完成させてください
 - Rebalanced Generation rewards toward a longer pre-Infinity path without changing Generation/Core Boost/Infinity thresholds: Generation now uses log-based multiplicative score growth and a gentler cost reduction floor for new progression.
 - Changed Infinity Challenge UI from a single next-challenge button to a full IC1-IC3 list. Completed challenges can be restarted, active challenges show a stop action, and locked/pre-Infinity rows are disabled.
 - Moved the main tab rail from the left side to the right side on desktop, while keeping the compact mobile layout as a top horizontal tab bar.
+- Constrained the desktop Angle tab to a single viewport-height screen and moved the mobile tab bar to the bottom with sticky positioning.
 
 ## TODO
 
