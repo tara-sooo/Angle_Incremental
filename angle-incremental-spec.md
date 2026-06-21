@@ -516,7 +516,7 @@ IC 中に Infinity 条件を満たして Infinity を実行すると、その IC
 | IC5 環境配慮 | Core Boost は使えない。 | Core Boost の獲得指数 +0.01。 |
 | IC6 最初だけ強い | 頂点通過ごとの増加は0.1で固定される。 | Infinity 獲得量 x2。 |
 | IC7 倹約家もどき | 購入対象の通常upgradeの必要スコアが1e100以上だと購入できない。 | 通常upgrade購入時にスコアを消費しない。 |
-| IC8 リアル・タイム・アタック | 角の数は100で始まり、3秒ごとに角の数が1減り、角追加upgradeは購入できない。 | 角の数はGenerationとCore Boostでリセットされない。 |
+| IC8 リアル・タイム・アタック | 角の数は100で始まり、3秒ごとに角の数が1減り、角追加upgradeは購入できず、角の数はGenerationとCore Boostでリセットされない。 | 角の数はGenerationとCore Boostでリセットされない。 |
 
 ## 16. Break Infinite Cap
 

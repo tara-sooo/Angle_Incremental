@@ -103,7 +103,7 @@ const ACHIEVEMENT_COUNT = 14;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_QUARANTINE_KEY = "angle-incremental-save-quarantine";
 const SAVE_VERSION = 7;
-const APP_VERSION = "2026.06.21-ic-savecode-breakcap";
+const APP_VERSION = "2026.06.21-ic8-active-preserve";
 const SAVE_CODE_PREFIX = "ANGLE_SAVE_V2:";
 const SAVE_CODE_SALT = "angle-incremental-save-code-v2";
 const SAVE_CODE_SECRET = "Angle Incremental local save code obfuscation";
@@ -528,7 +528,7 @@ const INFINITY_CHALLENGES = [
   },
   {
     name: { ja: "IC8 リアル・タイム・アタック", en: "IC8 Real Time Attack" },
-    restriction: { ja: "角の数は100で始まり点が3秒経過するごとに角の数が1減り、角増加upgradeは購入できない", en: "Starts at 100 vertices, loses 1 vertex every 3 seconds, and vertex upgrades cannot be bought." },
+    restriction: { ja: "角の数は100で始まり点が3秒経過するごとに角の数が1減り、角増加upgradeは購入できず、角はGRとCBでリセットされない", en: "Starts at 100 vertices, loses 1 vertex every 3 seconds, vertex upgrades cannot be bought, and vertices are not reset by Generation or Core Boost." },
     reward: { ja: "角の数はGRとCBでリセットされなくなる", en: "Vertices are no longer reset by Generation or Core Boost." },
   },
 ];
@@ -2777,13 +2777,17 @@ function buyAllUpgrades(options = {}) {
   return purchases;
 }
 
+function shouldPreserveVerticesThroughEarlyReset() {
+  return state.activeChallenge === 8 || isChallengeCompleted(8);
+}
+
 function runGeneration() {
   if (!canRunGeneration()) return;
 
   const generationScoreBeforeResetLog = currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = state.generationCostFactor * (1 - reward.costReduction);
-  const preservedVertices = isChallengeCompleted(8) ? state.vertices : 3;
+  const preservedVertices = shouldPreserveVerticesThroughEarlyReset() ? state.vertices : 3;
   state.generationCount += 1;
   state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   state.previousGenerationScore = valueFromLog10(generationScoreBeforeResetLog);
@@ -2808,7 +2812,7 @@ function runGeneration() {
 }
 
 function resetBelowCoreBoost() {
-  const preservedVertices = isChallengeCompleted(8) ? state.vertices : 3;
+  const preservedVertices = shouldPreserveVerticesThroughEarlyReset() ? state.vertices : 3;
   state.score = 0;
   state.scoreLog10 = -Infinity;
   state.totalScore = 0;

@@ -73,6 +73,7 @@ Original prompt: では、中核ループを完成させてください
 - Changed lap speed growth so raw speed keeps increasing in log space while effective speed is restrained by an extra-heavy second softcap instead of a fixed visible cap.
 - Fixed IC1 formula precedence/display, changed IC7 to lock by upgrade cost, changed IC8 to preserve vertices through Generation/Core Boost, raised Break Infinite Cap to e350, and strengthened the second lap-speed softcap.
 - Added encrypted save-code export/import, IC auto-complete automation, and long statistics time formatting with leading zero units omitted.
+- Updated IC8 so its active challenge state also preserves vertices through Generation/Core Boost, matching the displayed restriction text.
 
 ## TODO
 

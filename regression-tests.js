@@ -270,6 +270,7 @@ function testIc7LocksByUpgradeCostNotScore() {
 function testIc8DecayKeepsProgressAndRewardPreservesVertices() {
   const context = loadGame();
   const { state, runGeneration, runCoreBoost } = context.window.__angleDebug;
+  assert.ok(context.challengeRestriction(8).includes("GRとCBでリセットされない"));
   state.activeChallenge = 8;
   state.vertices = 100;
   state.totalVertexProgress = 50;
@@ -277,6 +278,19 @@ function testIc8DecayKeepsProgressAndRewardPreservesVertices() {
   context.updateChallengeTimers(3);
   assert.strictEqual(state.vertices, 99);
   assert.ok(state.pointProgress > 0.49);
+
+  state.vertices = 80;
+  state.totalScoreLog10 = 10;
+  state.generationScoreLog10 = 10;
+  runGeneration();
+  assert.strictEqual(state.vertices, 80);
+  assert.strictEqual(state.activeChallenge, 8);
+
+  state.vertices = 70;
+  state.scoreLog10 = 25;
+  runCoreBoost();
+  assert.strictEqual(state.vertices, 70);
+  assert.strictEqual(state.activeChallenge, 8);
 
   state.activeChallenge = 0;
   state.completedChallenges = 1 << 7;
