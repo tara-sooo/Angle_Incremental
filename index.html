@@ -210,18 +210,7 @@
                 <span>Infinity Upgrade</span>
                 <strong>IP</strong>
               </div>
-              <div class="upgrade-row">
-                <button id="ipGainUpgrade" class="mini-button" type="button" disabled data-i18n="ipGainUpgrade">IP倍率</button>
-                <strong id="ipGainUpgradeCost">1 IP</strong>
-              </div>
-              <div class="upgrade-row">
-                <button id="infiniteAngleUpgrade" class="mini-button" type="button" disabled data-i18n="infiniteAngleUpgrade">IA効率</button>
-                <strong id="infiniteAngleUpgradeCost">2 IP</strong>
-              </div>
-              <div class="upgrade-row">
-                <button id="softcapUpgrade" class="mini-button" type="button" disabled data-i18n="softcapUpgrade">軟上限緩和</button>
-                <strong id="softcapUpgradeCost">4 IP</strong>
-              </div>
+              <div id="infinityUpgradeTree" class="infinity-upgrade-tree" aria-label="Infinity Upgrade tree"></div>
             </section>
 
             <section class="infinity-panel infinity-subpanel" data-infinity-panel="challenges">
@@ -372,11 +361,11 @@
       <div class="update-modal-card">
         <p class="eyebrow">Update</p>
         <h2 id="updateModalTitle" data-i18n="updateTitle">アップデート</h2>
-        <p data-i18n="updateSummary">高レベル強化コストと序盤リセット層の進行バランスを調整しました。</p>
+        <p data-i18n="updateSummary">Infinity Upgradeを順番購入ツリーへ変更し、旧IU購入分はIPへ返金しました。</p>
         <ul>
-          <li data-i18n="updateResetDock">通常強化コストをlog値で扱い、旧上限以降も購入できるようにしました。</li>
-          <li data-i18n="updateCanvas">周回速度軟上限と通常強化コストの追加スケーリングを段階解除式にしました。</li>
-          <li data-i18n="updateModalNote">Core BoostやInfinityへ早く進みすぎないようにしつつ、リセット後は速度投資が戻る形にしました。</li>
+          <li data-i18n="updateResetDock">通常強化コストに高log帯の段階スケーリングを追加し、GRコスト軽減の下限を×0.90にしました。</li>
+          <li data-i18n="updateCanvas">Core Boostの獲得指数を控えめにし、Infinite Angle変換は1.00e20 IP消費に変更しました。</li>
+          <li data-i18n="updateModalNote">Infinity ChallengeはIU 4-1購入後に解放されます。旧セーブではIUは未購入から再構築してください。</li>
         </ul>
         <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
       </div>

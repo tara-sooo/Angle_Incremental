@@ -29,12 +29,7 @@ const elements = {
   infiniteAngleBoostPanel: document.getElementById("infiniteAngleBoostPanel"),
   infinityPointGain: document.getElementById("infinityPointGain"),
   infinityButton: document.getElementById("infinityButton"),
-  ipGainUpgrade: document.getElementById("ipGainUpgrade"),
-  ipGainUpgradeCost: document.getElementById("ipGainUpgradeCost"),
-  infiniteAngleUpgrade: document.getElementById("infiniteAngleUpgrade"),
-  infiniteAngleUpgradeCost: document.getElementById("infiniteAngleUpgradeCost"),
-  softcapUpgrade: document.getElementById("softcapUpgrade"),
-  softcapUpgradeCost: document.getElementById("softcapUpgradeCost"),
+  infinityUpgradeTree: document.getElementById("infinityUpgradeTree"),
   convertIpButton: document.getElementById("convertIpButton"),
   convertIpGain: document.getElementById("convertIpGain"),
   challengeList: document.getElementById("challengeList"),
@@ -74,7 +69,7 @@ const elements = {
 
 const BASE_LAP_SECONDS = 6;
 const GENERATION_UNLOCK_SCORE = 1000000;
-const GENERATION_MIN_NEW_COST_FACTOR = 0.6;
+const GENERATION_MIN_NEW_COST_FACTOR = 0.9;
 const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
 const INFINITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
@@ -83,8 +78,8 @@ const MAX_TRACKED_LOG10 = 1000000000;
 const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 8;
 const SAVE_KEY = "angle-incremental-save";
-const SAVE_VERSION = 2;
-const APP_VERSION = "2026.06.20-log-cost-pregr-balance";
+const SAVE_VERSION = 3;
+const APP_VERSION = "2026.06.21-iu-tree-balance";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const VERSION_MANIFEST_URL = "version.json";
 const UPDATE_CHECK_INTERVAL_SECONDS = 60;
@@ -100,6 +95,11 @@ const PRE_GENERATION_COST_SCALING = {
   vertex: { startsAfter: 15, logScale: 1.2 },
   gain: { startsAfter: 12, logScale: 0.55 },
 };
+const STAGED_UPGRADE_COST_SCALING = [
+  { startsAfterLog10: 30, logScale: 0.02 },
+  { startsAfterLog10: 100, logScale: 0.006 },
+];
+const INFINITE_ANGLE_CONVERSION_COST_LOG10 = 20;
 const GENERATION_SCORE_POWER = 2;
 const GENERATION_SCORE_POWER_IC3_REWARD = 2.1;
 const GENERATION_COST_POWER_IC3_REWARD = 1.08;
@@ -134,9 +134,12 @@ const TEXT = {
     coreBoostButton: "核増幅",
     infiniteAngleBoost: "Infinite Angle倍率",
     infinityGain: "Infinity獲得",
-    ipGainUpgrade: "IP倍率",
-    infiniteAngleUpgrade: "IA効率",
-    softcapUpgrade: "軟上限緩和",
+    infinityUpgradePurchased: "購入済み",
+    infinityUpgradeAvailable: "購入可能",
+    infinityUpgradeLocked: "未解放",
+    infinityUpgradeNeedIp: "IP不足",
+    infinityUpgradeCost: "必要",
+    infinityUpgradeRequires: "前提",
     convertIp: "IPをIAへ",
     achievementBoost: "実績増加倍率",
     achievementReward: "共通報酬",
@@ -156,7 +159,7 @@ const TEXT = {
     helpGeneration: "世代スコアが 1,000,000 に届いたら、下部の世代交代で倍率を得ます。",
     helpCoreBoost: "1.00e20 スコアから実行でき、世代以下をリセットして指数と増加倍率を得ます。",
     helpInfinity: "1.80e308 到達で初回は自動発動し、以降は任意発動で IP を得ます。",
-    helpChallenge: "Infinity 後に挑戦できます。縛り状態で Infinity に到達すると報酬を得ます。",
+    helpChallenge: "Infinity Upgrade 4-1 後に挑戦できます。縛り状態で Infinity に到達すると報酬を得ます。",
     helpBreakCap: "1.00e333 到達で、Infinity 以降の強いソフトキャップを破壊します。",
     helpInfiniteAngle: "IP を Infinite Score に変換し、頂点通過ごとの増加を伸ばします。",
     level: "レベル",
@@ -173,7 +176,7 @@ const TEXT = {
     startChallenge: "開始",
     challengeCompleted: "クリア済み",
     challengeIncomplete: "未クリア",
-    challengeLocked: "Infinity後に解放",
+    challengeLocked: "IU 4-1後に解放",
     challengeNone: "未挑戦",
     challengeRestrictionLabel: "制約",
     challengeRewardLabel: "報酬",
@@ -190,10 +193,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "高レベル強化コストと序盤リセット層の進行バランスを調整しました。",
-    updateResetDock: "通常強化コストをlog値で扱い、旧上限以降も購入できるようにしました。",
-    updateCanvas: "周回速度軟上限と通常強化コストの追加スケーリングを段階解除式にしました。",
-    updateModalNote: "Core BoostやInfinityへ早く進みすぎないようにしつつ、リセット後は速度投資が戻る形にしました。",
+    updateSummary: "Infinity Upgradeを順番購入ツリーへ変更し、旧IU購入分はIPへ返金しました。",
+    updateResetDock: "通常強化コストに高log帯の段階スケーリングを追加し、GRコスト軽減の下限を×0.90にしました。",
+    updateCanvas: "Core Boostの獲得指数を控えめにし、Infinite Angle変換は1.00e20 IP消費に変更しました。",
+    updateModalNote: "Infinity ChallengeはIU 4-1購入後に解放されます。旧セーブではIUは未購入から再構築してください。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -233,9 +236,12 @@ const TEXT = {
     coreBoostButton: "Core Boost",
     infiniteAngleBoost: "Infinite Angle boost",
     infinityGain: "Infinity gain",
-    ipGainUpgrade: "IP Multiplier",
-    infiniteAngleUpgrade: "IA Efficiency",
-    softcapUpgrade: "Soften Cap",
+    infinityUpgradePurchased: "Purchased",
+    infinityUpgradeAvailable: "Available",
+    infinityUpgradeLocked: "Locked",
+    infinityUpgradeNeedIp: "Need IP",
+    infinityUpgradeCost: "Cost",
+    infinityUpgradeRequires: "Requires",
     convertIp: "Convert IP to IA",
     achievementBoost: "Achievement boost",
     achievementReward: "Shared reward",
@@ -255,7 +261,7 @@ const TEXT = {
     helpGeneration: "Reach 1,000,000 generation score, then generate for permanent lower-layer boosts.",
     helpCoreBoost: "Starts at 1.00e20 score and resets Generation progress for gain growth and exponent boosts.",
     helpInfinity: "First triggers automatically at 1.80e308, then can be run manually for IP.",
-    helpChallenge: "Available after Infinity. Reach Infinity under a restriction to claim a reward.",
+    helpChallenge: "Available after Infinity Upgrade 4-1. Reach Infinity under a restriction to claim a reward.",
     helpBreakCap: "Reach 1.00e333 to break the heavy post-Infinity softcap.",
     helpInfiniteAngle: "Convert IP into Infinite Score to improve gain per vertex.",
     level: "Level",
@@ -272,7 +278,7 @@ const TEXT = {
     startChallenge: "Start",
     challengeCompleted: "Complete",
     challengeIncomplete: "Incomplete",
-    challengeLocked: "Unlocked after Infinity",
+    challengeLocked: "Unlocked after IU 4-1",
     challengeNone: "No challenge",
     challengeRestrictionLabel: "Restriction",
     challengeRewardLabel: "Reward",
@@ -289,10 +295,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "High-level upgrade costs and early reset-layer balance were adjusted.",
-    updateResetDock: "Normal upgrade costs now use log values, so purchases can continue past the old numeric cap.",
-    updateCanvas: "Lap-speed softcaps and normal-upgrade cost scaling now relax in stages.",
-    updateModalNote: "Core Boost and Infinity are paced more deliberately while speed investment recovers after resets.",
+    updateSummary: "Infinity Upgrades now use an ordered tree, and old IU purchases were refunded into IP.",
+    updateResetDock: "Normal upgrades gained staged high-log cost scaling, and GR cost reduction now floors at ×0.90.",
+    updateCanvas: "Core Boost exponent growth was reduced, and Infinite Angle conversion now costs 1.00e20 IP.",
+    updateModalNote: "Infinity Challenges unlock after IU 4-1. Older saves rebuild the new tree from refunded IP.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -401,6 +407,60 @@ const INFINITY_CHALLENGES = [
   },
 ];
 
+const INFINITY_UPGRADES = [
+  {
+    id: "1-1",
+    bit: 0,
+    cost: 1,
+    requires: [],
+    name: { ja: "1-1 リセットは負ではない", en: "1-1 Resets Are Not Negative" },
+    effect: {
+      ja: "頂点通過ごとの増加がInfinity回数に応じて強化される",
+      en: "Gain per vertex scales with Infinity count.",
+    },
+  },
+  {
+    id: "1-2",
+    bit: 1,
+    cost: 1,
+    requires: ["1-1"],
+    name: { ja: "1-2 はじめてのQoL", en: "1-2 First QoL" },
+    effect: { ja: "通常強化の自動購入を解放", en: "Unlocks normal-upgrade autobuy." },
+  },
+  {
+    id: "2-1",
+    bit: 2,
+    cost: 1,
+    requires: ["1-1", "1-2"],
+    name: { ja: "2-1 最速タイム", en: "2-1 Fastest Time" },
+    effect: { ja: "ラップスピードが×1.5される", en: "Multiplies lap speed by 1.5." },
+  },
+  {
+    id: "3-1",
+    bit: 3,
+    cost: 3,
+    requires: ["2-1"],
+    name: { ja: "3-1 実績3と7を獲得するにはこれがほぼ必須です", en: "3-1 Almost Required For Achievements 3 And 7" },
+    effect: { ja: "GRスコア倍率が^1.5される", en: "Raises GR score multiplier to ^1.5." },
+  },
+  {
+    id: "3-2",
+    bit: 4,
+    cost: 3,
+    requires: ["2-1"],
+    name: { ja: "3-2 (必須じゃない方だけど強い)", en: "3-2 Optional, But Strong" },
+    effect: { ja: "GRコスト倍率が×0.95される", en: "Multiplies GR cost factor by 0.95." },
+  },
+  {
+    id: "4-1",
+    bit: 5,
+    cost: 5,
+    requires: ["3-1", "3-2"],
+    name: { ja: "4-1 縛り縛られ", en: "4-1 Bound By Restrictions" },
+    effect: { ja: "Infinity Challengeを解放", en: "Unlocks Infinity Challenges." },
+  },
+];
+
 const state = {
   score: 0,
   scoreLog10: -Infinity,
@@ -426,6 +486,7 @@ const state = {
   infinityPointsLog10: -Infinity,
   infiniteScore: 0,
   infiniteScoreLog10: -Infinity,
+  infinityUpgradeMask: 0,
   ipGainUpgradeLevel: 0,
   infiniteAngleUpgradeLevel: 0,
   softcapUpgradeLevel: 0,
@@ -469,6 +530,7 @@ const SAVE_FIELDS = [
   "infinityPointsLog10",
   "infiniteScore",
   "infiniteScoreLog10",
+  "infinityUpgradeMask",
   "ipGainUpgradeLevel",
   "infiniteAngleUpgradeLevel",
   "softcapUpgradeLevel",
@@ -490,6 +552,7 @@ let autoSaveElapsed = 0;
 let updateCheckElapsed = 0;
 let updateCheckInFlight = false;
 let japaneseFontReady = false;
+let normalAutobuyElapsed = 0;
 let activeMainTab = "angle";
 let activeInfinitySubtab = "upgrades";
 let appliedLanguage = "";
@@ -594,7 +657,29 @@ function subtractLog10(currentLog, amountLog) {
   return remainingFactor <= 0 ? -Infinity : currentLog + Math.log10(remainingFactor);
 }
 
-function applySaveData(data) {
+function legacyInfinityUpgradeRefundLog10(data) {
+  const ipLevels = Math.floor(sanitizeNumber(data.ipGainUpgradeLevel, 0));
+  const angleLevels = Math.floor(sanitizeNumber(data.infiniteAngleUpgradeLevel, 0));
+  const softcapLevels = Math.floor(sanitizeNumber(data.softcapUpgradeLevel, 0));
+  let refundLog = -Infinity;
+
+  const addGeometricCosts = (levels, firstCostLog, growthLog) => {
+    for (let level = 0; level < Math.min(levels, 80); level += 1) {
+      refundLog = combineLog10(refundLog, firstCostLog + growthLog * level);
+    }
+    if (levels > 80) {
+      const lastLog = firstCostLog + growthLog * (levels - 1);
+      refundLog = combineLog10(refundLog, lastLog + Math.log10(1 / (1 - 10 ** -growthLog)));
+    }
+  };
+
+  addGeometricCosts(ipLevels, 0, log10Value(2));
+  addGeometricCosts(angleLevels, log10Value(2), log10Value(2));
+  addGeometricCosts(softcapLevels, log10Value(4), log10Value(3));
+  return refundLog;
+}
+
+function applySaveData(data, saveVersion = SAVE_VERSION) {
   state.score = sanitizeNumber(data.score, 0);
   state.scoreLog10 = sanitizeNumber(data.scoreLog10, log10Value(state.score), -Infinity);
   state.totalScore = sanitizeNumber(data.totalScore, state.score);
@@ -619,21 +704,33 @@ function applySaveData(data) {
     state.generationCount > 0 ? log10Value(GENERATION_UNLOCK_SCORE) : -Infinity,
   );
   state.generationScoreMultiplier = sanitizeNumber(data.generationScoreMultiplier, 1, 1);
-  state.generationCostFactor = Math.min(1, sanitizeNumber(data.generationCostFactor, 1, 0.25));
+  state.generationCostFactor = Math.max(
+    GENERATION_MIN_NEW_COST_FACTOR,
+    Math.min(1, sanitizeNumber(data.generationCostFactor, 1, GENERATION_MIN_NEW_COST_FACTOR)),
+  );
   state.coreBoostCount = Math.floor(sanitizeNumber(data.coreBoostCount, 0));
   state.infinityCount = Math.floor(sanitizeNumber(data.infinityCount, 0));
   state.infinityPoints = Math.floor(sanitizeNumber(data.infinityPoints, 0));
   state.infinityPointsLog10 = hydrateLog10(data.infinityPointsLog10, state.infinityPoints, log10Value(state.infinityPoints));
   state.infiniteScore = sanitizeNumber(data.infiniteScore, 0);
   state.infiniteScoreLog10 = hydrateLog10(data.infiniteScoreLog10, state.infiniteScore, log10Value(state.infiniteScore));
-  state.ipGainUpgradeLevel = Math.floor(sanitizeNumber(data.ipGainUpgradeLevel, 0));
-  state.infiniteAngleUpgradeLevel = Math.floor(sanitizeNumber(data.infiniteAngleUpgradeLevel, 0));
-  state.softcapUpgradeLevel = Math.floor(sanitizeNumber(data.softcapUpgradeLevel, 0));
+  state.infinityUpgradeMask = Math.floor(sanitizeNumber(data.infinityUpgradeMask, 0));
+  if (saveVersion < 3) {
+    const refundLog = legacyInfinityUpgradeRefundLog10(data);
+    if (refundLog > -Infinity) {
+      state.infinityPointsLog10 = combineLog10(currentInfinityPointsLog10(), refundLog);
+      state.infinityPoints = valueFromLog10(state.infinityPointsLog10);
+    }
+    state.infinityUpgradeMask = 0;
+  }
+  state.ipGainUpgradeLevel = 0;
+  state.infiniteAngleUpgradeLevel = 0;
+  state.softcapUpgradeLevel = 0;
   state.activeChallenge = Math.min(INFINITY_CHALLENGE_COUNT, Math.floor(sanitizeNumber(data.activeChallenge, 0)));
   state.completedChallenges = Math.floor(sanitizeNumber(data.completedChallenges, 0));
   state.infiniteCapBroken = Boolean(data.infiniteCapBroken);
   state.achievementMask = Math.floor(sanitizeNumber(data.achievementMask, 0));
-  if (state.infinityCount <= 0) state.activeChallenge = 0;
+  if (!infinityChallengesUnlocked()) state.activeChallenge = 0;
   state.showFloatingText = data.showFloatingText !== false;
   state.lightEffects = Boolean(data.lightEffects);
   state.showFps = Boolean(data.showFps);
@@ -684,7 +781,7 @@ function loadGame() {
       return;
     }
 
-    applySaveData(parsed.state);
+    applySaveData(parsed.state, parsed.version);
     autoSaveElapsed = 0;
     setSaveStatus(t("loaded"));
   } catch (error) {
@@ -721,6 +818,7 @@ function resetSave() {
     infinityPointsLog10: -Infinity,
     infiniteScore: 0,
     infiniteScoreLog10: -Infinity,
+    infinityUpgradeMask: 0,
     ipGainUpgradeLevel: 0,
     infiniteAngleUpgradeLevel: 0,
     softcapUpgradeLevel: 0,
@@ -826,8 +924,54 @@ function challengeText(index, key) {
   return challenge ? challenge[key][language] : t("challengeNone");
 }
 
+function infinityUpgradeById(id) {
+  return INFINITY_UPGRADES.find((upgrade) => upgrade.id === id);
+}
+
+function hasInfinityUpgrade(id) {
+  const upgrade = infinityUpgradeById(id);
+  return upgrade ? (state.infinityUpgradeMask & (1 << upgrade.bit)) !== 0 : false;
+}
+
+function infinityUpgradeName(id) {
+  const upgrade = infinityUpgradeById(id);
+  const language = TEXT[state.language] ? state.language : "ja";
+  return upgrade ? upgrade.name[language] : id;
+}
+
+function infinityUpgradeEffectText(id) {
+  const upgrade = infinityUpgradeById(id);
+  const language = TEXT[state.language] ? state.language : "ja";
+  return upgrade ? upgrade.effect[language] : "";
+}
+
+function infinityUpgradeEffectPower() {
+  if (state.activeChallenge === 5) return 0.1;
+  return isChallengeCompleted(5) ? 3 : 1;
+}
+
+function applyInfinityUpgradePower(value) {
+  if (value === 1) return 1;
+  return Math.pow(value, infinityUpgradeEffectPower());
+}
+
+function infinityUpgradePrerequisitesMet(upgrade) {
+  return upgrade.requires.every((requiredId) => hasInfinityUpgrade(requiredId));
+}
+
+function canBuyInfinityUpgrade(id) {
+  const upgrade = infinityUpgradeById(id);
+  if (!upgrade || hasInfinityUpgrade(id) || !infinityUpgradePrerequisitesMet(upgrade)) return false;
+  return canSpendInfinityPoints(log10Value(upgrade.cost));
+}
+
+function infinityChallengesUnlocked() {
+  return state.infinityCount > 0 && hasInfinityUpgrade("4-1");
+}
+
 function rawLapSpeedMultiplier() {
   let multiplier = Math.pow(1.22, state.speedLevel);
+  if (hasInfinityUpgrade("2-1")) multiplier *= applyInfinityUpgradePower(1.5);
   if (state.activeChallenge === 6) multiplier = Math.pow(multiplier, 0.5);
   if (isChallengeCompleted(6)) multiplier = Math.pow(multiplier, 1.08);
   return multiplier;
@@ -932,7 +1076,7 @@ function scoreDisplay() {
 
 function infinitySoftcapPower() {
   if (state.infiniteCapBroken) return 1;
-  return Math.min(0.32, 0.08 + infinityUpgradeEffect(state.softcapUpgradeLevel) * 0.035 + completedChallengeCount() * 0.02);
+  return Math.min(0.32, 0.08 + completedChallengeCount() * 0.02);
 }
 
 function applyInfinitySoftcap(rawLog10) {
@@ -942,7 +1086,13 @@ function applyInfinitySoftcap(rawLog10) {
 
 function vertexGainIncrease() {
   const vertexReward = isChallengeCompleted(7) ? 1 + Math.max(0, state.vertices - 3) * 0.01 : 1;
-  return (0.01 + state.gainLevel * 0.01) * coreBoostGainIncreaseMultiplier() * infiniteAngleBoost() * achievementGainMultiplier() * vertexReward;
+  const infinityResetBoost = hasInfinityUpgrade("1-1") ? applyInfinityUpgradePower(Math.max(1, state.infinityCount)) : 1;
+  return (0.01 + state.gainLevel * 0.01)
+    * coreBoostGainIncreaseMultiplier()
+    * infiniteAngleBoost()
+    * achievementGainMultiplier()
+    * vertexReward
+    * infinityResetBoost;
 }
 
 function coreBoostRequirementLog10() {
@@ -968,11 +1118,13 @@ function coreBoostGainIncreaseMultiplier() {
 }
 
 function coreBoostGainExponent() {
-  return Math.pow(1 + state.coreBoostCount * 0.05, coreBoostBonusPower());
+  return Math.pow(1 + state.coreBoostCount * 0.02, coreBoostBonusPower());
 }
 
 function generationScorePower() {
-  return isChallengeCompleted(3) ? GENERATION_SCORE_POWER_IC3_REWARD : GENERATION_SCORE_POWER;
+  let power = isChallengeCompleted(3) ? GENERATION_SCORE_POWER_IC3_REWARD : GENERATION_SCORE_POWER;
+  if (hasInfinityUpgrade("3-1")) power *= applyInfinityUpgradePower(1.5);
+  return power;
 }
 
 function generationCostPower() {
@@ -1003,7 +1155,8 @@ function generationScoreMultiplierEffect(includeAchievementReward = true) {
 function generationCostFactorEffect() {
   if (state.activeChallenge === 1) return 1;
   if (state.activeChallenge === 3) return 1 / Math.pow(Math.max(state.generationCostFactor, 0.01), 0.7);
-  return Math.pow(state.generationCostFactor, generationCostPower());
+  const upgradeFactor = hasInfinityUpgrade("3-2") ? applyInfinityUpgradePower(0.95) : 1;
+  return Math.pow(state.generationCostFactor, generationCostPower()) * upgradeFactor;
 }
 
 function finalScoreGainPower() {
@@ -1103,7 +1256,7 @@ function nextChallengeIndex() {
 }
 
 function challengeStateText(index) {
-  if (state.infinityCount <= 0) return t("challengeLocked");
+  if (!infinityChallengesUnlocked()) return t("challengeLocked");
   if (state.activeChallenge === index) return t("challengeRunning");
   return isChallengeCompleted(index) ? t("challengeCompleted") : t("challengeIncomplete");
 }
@@ -1131,7 +1284,7 @@ function isCoreVertex(index) {
 }
 
 function infiniteAngleEfficiency() {
-  return 1 + infinityUpgradeEffect(state.infiniteAngleUpgradeLevel);
+  return 1;
 }
 
 function infiniteAngleBoost() {
@@ -1141,34 +1294,8 @@ function infiniteAngleBoost() {
   return 1 + logOnePlusScore * 0.25;
 }
 
-function infinityUpgradeEffect(level) {
-  if (level <= 0) return 0;
-  const power = state.activeChallenge === 5 ? 0.1 : isChallengeCompleted(5) ? 3 : 1;
-  return Math.pow(level, power);
-}
-
-function ipGainUpgradeCost() {
-  return valueFromLog10(ipGainUpgradeCostLog10());
-}
-
-function infiniteAngleUpgradeCost() {
-  return valueFromLog10(infiniteAngleUpgradeCostLog10());
-}
-
-function softcapUpgradeCost() {
-  return valueFromLog10(softcapUpgradeCostLog10());
-}
-
-function ipGainUpgradeCostLog10() {
-  return state.ipGainUpgradeLevel * log10Value(2);
-}
-
-function infiniteAngleUpgradeCostLog10() {
-  return log10Value(2) + state.infiniteAngleUpgradeLevel * log10Value(2);
-}
-
-function softcapUpgradeCostLog10() {
-  return log10Value(4) + state.softcapUpgradeLevel * log10Value(3);
+function infiniteAngleConversionCostLog10() {
+  return INFINITE_ANGLE_CONVERSION_COST_LOG10;
 }
 
 function canInfinity() {
@@ -1180,10 +1307,9 @@ function infinityPointGain() {
   const scoreLog = currentScoreLog10();
   const depth = Math.max(0, scoreLog - INFINITY_REQUIREMENT_LOG10);
   const base = 1 + Math.floor(depth / 25);
-  const upgradeMultiplier = 1 + infinityUpgradeEffect(state.ipGainUpgradeLevel);
   const challenge1Reward = isChallengeCompleted(1) ? 2 : 1;
   const challenge8Reward = isChallengeCompleted(8) ? 1 + completedChallengeCount() * 0.25 : 1;
-  return Math.max(1, Math.floor(base * upgradeMultiplier * challenge1Reward * challenge8Reward));
+  return Math.max(1, Math.floor(base * challenge1Reward * challenge8Reward));
 }
 
 function infiniteScoreGainPerIp() {
@@ -1248,7 +1374,7 @@ function earlyLayerCostScalingFactor() {
   else if (state.generationCount === 1) generationFactor = 0.9;
   else if (state.generationCount === 2) generationFactor = 0.45;
   else if (state.generationCount === 3) generationFactor = 0.2;
-  else generationFactor = 0;
+  else generationFactor = 0.08;
 
   let coreRelief;
   if (state.coreBoostCount <= 0) coreRelief = 1;
@@ -1268,6 +1394,13 @@ function preGenerationCostScalingLog10(kind, level) {
   return excess * excess * scaling.logScale * scalingFactor;
 }
 
+function stagedUpgradeCostScalingLog10(costLog) {
+  return STAGED_UPGRADE_COST_SCALING.reduce((total, stage) => {
+    const excess = Math.max(0, costLog - stage.startsAfterLog10);
+    return total + excess * excess * stage.logScale;
+  }, 0);
+}
+
 function costLog10(kind, base, level, growth) {
   const rawLog = log10Value(base) + level * log10Value(growth);
   const costFactor = generationCostFactorEffect();
@@ -1280,7 +1413,8 @@ function costLog10(kind, base, level, growth) {
     adjustedLog = rawLog + log10Value(costFactor);
   }
 
-  return adjustedLog + preGenerationCostScalingLog10(kind, level);
+  const earlyAdjustedLog = adjustedLog + preGenerationCostScalingLog10(kind, level);
+  return earlyAdjustedLog + stagedUpgradeCostScalingLog10(earlyAdjustedLog);
 }
 
 function cost(kind, base, level, growth) {
@@ -1341,13 +1475,11 @@ function nextGenerationValues() {
 
   const reward = generationRewardForLog(currentGenerationScoreLog10());
   const nextRawScoreMultiplier = state.generationScoreMultiplier * reward.scoreMultiplierGain;
-  const nextRawCostFactor = state.generationCostFactor < GENERATION_MIN_NEW_COST_FACTOR
-    ? state.generationCostFactor
-    : Math.max(GENERATION_MIN_NEW_COST_FACTOR, state.generationCostFactor * (1 - reward.costReduction));
+  const nextRawCostFactor = Math.max(GENERATION_MIN_NEW_COST_FACTOR, state.generationCostFactor * (1 - reward.costReduction));
 
   return {
     scoreMultiplier: applyGenerationAchievementReward(generationScoreMultiplierBaseEffect(nextRawScoreMultiplier)),
-    costFactor: Math.pow(nextRawCostFactor, generationCostPower()),
+    costFactor: Math.pow(nextRawCostFactor, generationCostPower()) * (hasInfinityUpgrade("3-2") ? applyInfinityUpgradePower(0.95) : 1),
   };
 }
 
@@ -1357,7 +1489,7 @@ function nextCoreBoostValues() {
   const power = coreBoostBonusPower();
   return {
     gainMultiplier: Math.pow(1 + nextCoreBoostCount * 0.5, power),
-    gainExponent: Math.pow(1 + nextCoreBoostCount * 0.05, power),
+    gainExponent: Math.pow(1 + nextCoreBoostCount * 0.02, power),
   };
 }
 
@@ -1456,6 +1588,16 @@ function processManyVertices(start, end) {
 }
 
 function update(dt) {
+  if (hasInfinityUpgrade("1-2")) {
+    normalAutobuyElapsed += dt;
+    if (normalAutobuyElapsed >= 0.5) {
+      normalAutobuyElapsed %= 0.5;
+      buyAllUpgrades({ refresh: false, save: false });
+    }
+  } else {
+    normalAutobuyElapsed = 0;
+  }
+
   const previousAbsolute = state.totalVertexProgress;
   state.totalVertexProgress += (dt / lapDuration()) * state.vertices;
   const nearestVertex = Math.round(state.totalVertexProgress);
@@ -1679,7 +1821,7 @@ function updateChallengeRows() {
     const index = Number(row.dataset.challenge);
     const active = state.activeChallenge === index;
     const completed = isChallengeCompleted(index);
-    const locked = state.infinityCount <= 0;
+    const locked = !infinityChallengesUnlocked();
     const button = row.querySelector("button");
 
     row.classList.toggle("is-active", active);
@@ -1690,6 +1832,66 @@ function updateChallengeRows() {
     row.querySelector(".challenge-reward").textContent = `${t("challengeRewardLabel")}: ${challengeReward(index)}`;
     button.textContent = active ? t("stopChallenge") : t("startChallenge");
     button.disabled = locked || (state.activeChallenge > 0 && !active);
+  });
+}
+
+function createInfinityUpgradeRows() {
+  clearElement(elements.infinityUpgradeTree);
+  INFINITY_UPGRADES.forEach((upgrade) => {
+    const row = document.createElement("article");
+    row.className = "infinity-upgrade-row";
+    row.dataset.upgrade = upgrade.id;
+
+    const info = document.createElement("div");
+    info.className = "infinity-upgrade-info";
+
+    const name = document.createElement("strong");
+    name.className = "infinity-upgrade-name";
+
+    const status = document.createElement("small");
+    status.className = "infinity-upgrade-state";
+
+    const effect = document.createElement("p");
+    effect.className = "infinity-upgrade-effect";
+
+    const requirement = document.createElement("p");
+    requirement.className = "infinity-upgrade-requires";
+
+    const button = document.createElement("button");
+    button.className = "mini-button infinity-upgrade-buy";
+    button.type = "button";
+    button.addEventListener("click", () => buyInfinityUpgrade(upgrade.id));
+
+    info.append(name, status, effect, requirement);
+    row.append(info, button);
+    elements.infinityUpgradeTree.append(row);
+  });
+}
+
+function updateInfinityUpgradeRows() {
+  elements.infinityUpgradeTree.querySelectorAll(".infinity-upgrade-row").forEach((row) => {
+    const upgrade = infinityUpgradeById(row.dataset.upgrade);
+    if (!upgrade) return;
+    const purchased = hasInfinityUpgrade(upgrade.id);
+    const prerequisitesMet = infinityUpgradePrerequisitesMet(upgrade);
+    const affordable = canSpendInfinityPoints(log10Value(upgrade.cost));
+    const button = row.querySelector("button");
+    const requirementText = upgrade.requires.length > 0
+      ? `${t("infinityUpgradeRequires")}: ${upgrade.requires.join(", ")}`
+      : "";
+    let stateText = t("infinityUpgradeAvailable");
+    if (purchased) stateText = t("infinityUpgradePurchased");
+    else if (!prerequisitesMet) stateText = t("infinityUpgradeLocked");
+    else if (!affordable) stateText = t("infinityUpgradeNeedIp");
+
+    row.classList.toggle("is-purchased", purchased);
+    row.classList.toggle("is-locked", !purchased && !prerequisitesMet);
+    row.querySelector(".infinity-upgrade-name").textContent = infinityUpgradeName(upgrade.id);
+    row.querySelector(".infinity-upgrade-state").textContent = `${stateText} · ${t("infinityUpgradeCost")} ${formatUiLogNumber(log10Value(upgrade.cost))} IP`;
+    row.querySelector(".infinity-upgrade-effect").textContent = infinityUpgradeEffectText(upgrade.id);
+    row.querySelector(".infinity-upgrade-requires").textContent = requirementText;
+    button.textContent = purchased ? t("infinityUpgradePurchased") : t("startChallenge");
+    button.disabled = purchased || !prerequisitesMet || !affordable;
   });
 }
 
@@ -1815,18 +2017,13 @@ function updateUi() {
   elements.infiniteAngleBoostPanel.textContent = `×${infiniteAngleBoost().toFixed(2)}`;
   elements.infinityPointGain.textContent = `+${formatUiNumber(infinityPointGain())} IP`;
   elements.infinityButton.disabled = state.infinityCount === 0 || !canInfinity();
-  elements.ipGainUpgradeCost.textContent = `${formatUiLogNumber(ipGainUpgradeCostLog10())} IP`;
-  elements.infiniteAngleUpgradeCost.textContent = `${formatUiLogNumber(infiniteAngleUpgradeCostLog10())} IP`;
-  elements.softcapUpgradeCost.textContent = `${formatUiLogNumber(softcapUpgradeCostLog10())} IP`;
-  elements.ipGainUpgrade.disabled = !canSpendInfinityPoints(ipGainUpgradeCostLog10());
-  elements.infiniteAngleUpgrade.disabled = !canSpendInfinityPoints(infiniteAngleUpgradeCostLog10());
-  elements.softcapUpgrade.disabled = !canSpendInfinityPoints(softcapUpgradeCostLog10());
-  elements.convertIpButton.disabled = !canSpendInfinityPoints(0);
-  elements.convertIpGain.textContent = `+${formatUiLogNumber(infiniteScoreGainPerIpLog10())}`;
+  updateInfinityUpgradeRows();
+  elements.convertIpButton.disabled = !canSpendInfinityPoints(infiniteAngleConversionCostLog10());
+  elements.convertIpGain.textContent = `${formatUiLogNumber(infiniteAngleConversionCostLog10())} IP -> +${formatUiLogNumber(infiniteScoreGainPerIpLog10())}`;
   const completed = completedChallengeCount();
   elements.challengeStatus.textContent = state.activeChallenge > 0
     ? `${challengeName(state.activeChallenge)} ${t("challengeRunning")}`
-    : state.infinityCount <= 0
+    : !infinityChallengesUnlocked()
       ? t("locked")
       : `${completed}/${INFINITY_CHALLENGE_COUNT} ${t("completed")}`;
   updateChallengeRows();
@@ -1899,7 +2096,10 @@ function buyGain() {
   saveGame("manual");
 }
 
-function buyAllUpgrades() {
+function buyAllUpgrades(options = {}) {
+  if (options instanceof Event) options = {};
+  const refresh = options.refresh !== false;
+  const persist = options.save !== false;
   let purchases = 0;
   let bought = true;
   while (bought && purchases < BUY_ALL_LIMIT) {
@@ -1932,8 +2132,8 @@ function buyAllUpgrades() {
   }
 
   if (purchases > 0) {
-    updateUi();
-    saveGame("manual");
+    if (refresh) updateUi();
+    if (persist) saveGame("manual");
   }
   return purchases;
 }
@@ -1948,9 +2148,7 @@ function runGeneration() {
   state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   state.previousGenerationScore = valueFromLog10(generationScoreBeforeResetLog);
   state.generationScoreMultiplier *= reward.scoreMultiplierGain;
-  state.generationCostFactor = state.generationCostFactor < GENERATION_MIN_NEW_COST_FACTOR
-    ? state.generationCostFactor
-    : Math.max(GENERATION_MIN_NEW_COST_FACTOR, nextCostFactor);
+  state.generationCostFactor = Math.max(GENERATION_MIN_NEW_COST_FACTOR, nextCostFactor);
 
   state.score = 0;
   state.scoreLog10 = -Infinity;
@@ -2040,39 +2238,24 @@ function runInfinity(forced = false) {
   saveGame("manual");
 }
 
-function buyIpGainUpgrade() {
-  const priceLog = ipGainUpgradeCostLog10();
-  if (!spendInfinityPoints(priceLog)) return;
-  state.ipGainUpgradeLevel += 1;
-  updateUi();
-  saveGame("manual");
-}
-
-function buyInfiniteAngleUpgrade() {
-  const priceLog = infiniteAngleUpgradeCostLog10();
-  if (!spendInfinityPoints(priceLog)) return;
-  state.infiniteAngleUpgradeLevel += 1;
-  updateUi();
-  saveGame("manual");
-}
-
-function buySoftcapUpgrade() {
-  const priceLog = softcapUpgradeCostLog10();
-  if (!spendInfinityPoints(priceLog)) return;
-  state.softcapUpgradeLevel += 1;
+function buyInfinityUpgrade(id) {
+  const upgrade = infinityUpgradeById(id);
+  if (!upgrade || !canBuyInfinityUpgrade(id)) return;
+  if (!spendInfinityPoints(log10Value(upgrade.cost))) return;
+  state.infinityUpgradeMask |= 1 << upgrade.bit;
   updateUi();
   saveGame("manual");
 }
 
 function convertIpToInfiniteScore() {
-  if (!spendInfinityPoints(0)) return;
+  if (!spendInfinityPoints(infiniteAngleConversionCostLog10())) return;
   addInfiniteScoreLog(infiniteScoreGainPerIpLog10());
   updateUi();
   saveGame("manual");
 }
 
 function toggleInfinityChallenge(index = nextChallengeIndex()) {
-  if (state.infinityCount <= 0) return;
+  if (!infinityChallengesUnlocked()) return;
   if (state.activeChallenge === index) {
     state.activeChallenge = 0;
   } else if (state.activeChallenge > 0) {
@@ -2245,11 +2428,19 @@ function renderGameToText() {
       activeChallenge: state.activeChallenge,
       completedChallenges: completedChallengeCount(),
       challengeCount: INFINITY_CHALLENGE_COUNT,
+      challengesUnlocked: infinityChallengesUnlocked(),
       activeChallengeName: state.activeChallenge > 0 ? challengeName(state.activeChallenge) : challengeName(0),
       softcapPower: Number(infinitySoftcapPower().toFixed(3)),
       capBroken: state.infiniteCapBroken,
       canBreakCap: canBreakInfiniteCap(),
-      ipUpgradeEffect: Number(infinityUpgradeEffect(state.ipGainUpgradeLevel).toPrecision(6)),
+      infiniteAngleConversionCost: formatUiLogNumber(infiniteAngleConversionCostLog10()),
+      infiniteAngleConversionCostLog10: INFINITE_ANGLE_CONVERSION_COST_LOG10,
+      normalAutobuy: hasInfinityUpgrade("1-2"),
+      upgrades: INFINITY_UPGRADES.map((upgrade) => ({
+        id: upgrade.id,
+        purchased: hasInfinityUpgrade(upgrade.id),
+        canBuy: canBuyInfinityUpgrade(upgrade.id),
+      })),
     },
     achievements: {
       unlocked: achievementCount(),
@@ -2286,9 +2477,7 @@ window.__angleDebug = {
   runGeneration,
   runCoreBoost,
   runInfinity,
-  buyIpGainUpgrade,
-  buyInfiniteAngleUpgrade,
-  buySoftcapUpgrade,
+  buyInfinityUpgrade,
   buyAllUpgrades,
   generationRewardFor,
   convertIpToInfiniteScore,
@@ -2306,13 +2495,10 @@ window.__angleDebug = {
 elements.speedUpgrade.addEventListener("click", buySpeed);
 elements.vertexUpgrade.addEventListener("click", buyVertex);
 elements.gainUpgrade.addEventListener("click", buyGain);
-elements.buyAllUpgrade.addEventListener("click", buyAllUpgrades);
+elements.buyAllUpgrade.addEventListener("click", () => buyAllUpgrades());
 elements.generationButton.addEventListener("click", runGeneration);
 elements.coreBoostButton.addEventListener("click", runCoreBoost);
 elements.infinityButton.addEventListener("click", () => runInfinity(false));
-elements.ipGainUpgrade.addEventListener("click", buyIpGainUpgrade);
-elements.infiniteAngleUpgrade.addEventListener("click", buyInfiniteAngleUpgrade);
-elements.softcapUpgrade.addEventListener("click", buySoftcapUpgrade);
 elements.convertIpButton.addEventListener("click", convertIpToInfiniteScore);
 elements.breakCapButton.addEventListener("click", breakInfiniteCap);
 elements.resetSaveButton.addEventListener("click", resetSave);
@@ -2348,9 +2534,10 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
-loadGame();
 createChallengeRows();
+createInfinityUpgradeRows();
 createAchievementRows();
+loadGame();
 switchMainTab(activeMainTab);
 switchInfinitySubtab(activeInfinitySubtab);
 resizeCanvas();

@@ -266,7 +266,7 @@ canvas {
 .metric,
 .generation > div,
 .core-boost > div,
-.infinity-panel > div:not(.upgrade-row):not(.panel-heading):not(.challenge-list),
+.infinity-panel > div:not(.upgrade-row):not(.panel-heading):not(.challenge-list):not(.infinity-upgrade-tree),
 .infinity-summary > div:not(.metric),
 .infinite-angle-panel > div:not(.upgrade-row),
 .save-panel > div {
@@ -332,6 +332,7 @@ canvas {
 .core-boost-button,
 .infinity-button,
 .mini-button,
+.infinity-upgrade-row button,
 .challenge-row button,
 .challenge-button,
 .break-button,
@@ -383,6 +384,7 @@ canvas {
 .core-boost-button:hover:not(:disabled),
 .infinity-button:hover:not(:disabled),
 .mini-button:hover:not(:disabled),
+.infinity-upgrade-row button:hover:not(:disabled),
 .challenge-row button:hover:not(:disabled),
 .challenge-button:hover:not(:disabled),
 .break-button:hover:not(:disabled),
@@ -398,6 +400,7 @@ canvas {
 .core-boost-button:active:not(:disabled),
 .infinity-button:active:not(:disabled),
 .mini-button:active:not(:disabled),
+.infinity-upgrade-row button:active:not(:disabled),
 .challenge-row button:active:not(:disabled),
 .challenge-button:active:not(:disabled),
 .break-button:active:not(:disabled),
@@ -411,6 +414,7 @@ canvas {
 .core-boost-button:disabled,
 .infinity-button:disabled,
 .mini-button:disabled,
+.infinity-upgrade-row button:disabled,
 .challenge-row button:disabled,
 .challenge-button:disabled,
 .break-button:disabled {
@@ -651,11 +655,70 @@ canvas {
 
 .mini-button,
 .challenge-button,
+.infinity-upgrade-row button,
 .challenge-row button {
   min-height: 42px;
   padding: 8px 10px;
   text-align: left;
   background: linear-gradient(180deg, #375da7, #243f78);
+}
+
+.infinity-upgrade-tree {
+  display: grid;
+  gap: 8px;
+}
+
+.infinity-upgrade-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
+  gap: 8px;
+  align-items: stretch;
+  min-height: 92px;
+}
+
+.infinity-upgrade-info {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: rgba(12, 20, 35, 0.82);
+}
+
+.infinity-upgrade-info strong {
+  text-align: left;
+  color: var(--ink);
+  font-size: 0.88rem;
+  max-width: none;
+  overflow-wrap: anywhere;
+}
+
+.infinity-upgrade-info small,
+.infinity-upgrade-effect,
+.infinity-upgrade-requires {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.infinity-upgrade-effect {
+  color: #c7d4f2;
+}
+
+.infinity-upgrade-requires:empty {
+  display: none;
+}
+
+.infinity-upgrade-row.is-purchased .infinity-upgrade-info {
+  border-color: rgba(59, 163, 110, 0.7);
+  background: rgba(31, 76, 58, 0.34);
+}
+
+.infinity-upgrade-row.is-locked .infinity-upgrade-info {
+  opacity: 0.68;
 }
 
 .challenge-list {
