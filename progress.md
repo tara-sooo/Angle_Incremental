@@ -69,6 +69,7 @@ Original prompt: では、中核ループを完成させてください
 - Implemented the stability/IC/automation pass: UI updates are throttled, high-vertex drawing is sampled, Core Boost requirements grow in log space, IP gain now uses `log10(score)-307`, and ACH12 now only marks first CB without Generation.
 - Replaced the provisional IC list with the new IC1-IC8 constraints and rewards, including IC8's timed vertex drain and Core Boost vertex preservation reward.
 - Added Automation and Statistics main tabs with saved per-upgrade autobuy toggles, Infinity run timing, fastest Infinity time, and last-10 Infinity run records.
+- Added versioned CSS/JS asset URLs and bumped the app version so clients stuck on cached old Infinity Challenge code fetch the refreshed assets.
 
 ## TODO
 
