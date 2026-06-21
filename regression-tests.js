@@ -1,6 +1,7 @@
 const assert = require("assert");
 const fs = require("fs");
 const path = require("path");
+const { webcrypto } = require("crypto");
 const vm = require("vm");
 
 class FakeClassList {
@@ -168,12 +169,18 @@ function createContext() {
     Math,
     Number,
     Infinity,
+    TextDecoder,
+    TextEncoder,
+    atob: (value) => Buffer.from(value, "base64").toString("binary"),
+    btoa: (value) => Buffer.from(value, "binary").toString("base64"),
   };
   context.window.document = document;
   context.window.localStorage = context.localStorage;
   context.window.requestAnimationFrame = () => {};
   context.window.setTimeout = () => {};
   context.window.fetch = null;
+  context.window.crypto = webcrypto;
+  context.crypto = webcrypto;
   context.window.URL = URL;
   context.window.Math = Math;
   return context;
@@ -218,13 +225,142 @@ function testRawLapSpeedCanGrowPastEffectiveSafetyCap() {
   const { state } = context.window.__angleDebug;
   state.speedLevel = 10000;
   assert.ok(context.rawLapSpeedLog10() > 42);
-  assert.ok(context.effectiveLapSpeedLog10() > 42);
+  assert.ok(context.effectiveLapSpeedLog10() > 36);
   assert.ok(context.effectiveLapSpeedLog10() < context.rawLapSpeedLog10());
   assert.ok(Number.isFinite(context.lapSpeedMultiplier()));
 }
 
-testCoreBoostRequirementGrowsPastE308();
-testIpGainUsesLogMinus307();
-testAchievement12OnlyFirstCoreBoostWithoutGeneration();
-testRawLapSpeedCanGrowPastEffectiveSafetyCap();
-console.log("regression tests passed");
+function testGainExpressionReflectsChallengeRulesAndNumberFormat() {
+  const context = loadGame();
+  const { state } = context.window.__angleDebug;
+  state.vertices = 16;
+  state.currentGainLog10 = 24;
+  state.currentGain = 1e24;
+
+  state.numberFormat = "scientific";
+  assert.strictEqual(context.formatGainExpressionSummary(), "(1.00e24 / 4)^4");
+
+  state.activeChallenge = 1;
+  assert.strictEqual(context.formatGainExpressionSummary(), "(1.00e24 / 8)^4");
+  const activeChallengeLog = context.angleExpressionFromBaseLog10(24);
+
+  state.completedChallenges = 1;
+  assert.strictEqual(context.formatGainExpressionSummary(), "(1.00e24 / 8)^4");
+  assert.strictEqual(context.angleExpressionFromBaseLog10(24), activeChallengeLog);
+
+  state.activeChallenge = 0;
+  assert.strictEqual(context.formatGainExpressionSummary(), "(1.00e24)^4");
+  assert.ok(context.angleExpressionFromBaseLog10(24) > activeChallengeLog);
+}
+
+function testIc7LocksByUpgradeCostNotScore() {
+  const context = loadGame();
+  const { state } = context.window.__angleDebug;
+  state.activeChallenge = 7;
+  state.scoreLog10 = 150;
+  state.speedLevel = 0;
+  assert.strictEqual(context.canBuyNormalUpgrade("speed"), true);
+
+  state.scoreLog10 = 200;
+  state.speedLevel = 1000;
+  assert.ok(context.upgradeCostLog("speed") >= 100);
+  assert.strictEqual(context.canBuyNormalUpgrade("speed"), false);
+}
+
+function testIc8DecayKeepsProgressAndRewardPreservesVertices() {
+  const context = loadGame();
+  const { state, runGeneration, runCoreBoost } = context.window.__angleDebug;
+  state.activeChallenge = 8;
+  state.vertices = 100;
+  state.totalVertexProgress = 50;
+  state.pointProgress = 0.5;
+  context.updateChallengeTimers(3);
+  assert.strictEqual(state.vertices, 99);
+  assert.ok(state.pointProgress > 0.49);
+
+  state.activeChallenge = 0;
+  state.completedChallenges = 1 << 7;
+  state.vertices = 42;
+  state.totalScoreLog10 = 10;
+  state.generationScoreLog10 = 10;
+  runGeneration();
+  assert.strictEqual(state.vertices, 42);
+
+  state.scoreLog10 = 25;
+  runCoreBoost();
+  assert.strictEqual(state.vertices, 42);
+}
+
+function testBreakCapRequirementIsE350() {
+  const context = loadGame();
+  const { state } = context.window.__angleDebug;
+  state.scoreLog10 = 349.99;
+  assert.strictEqual(context.canBreakInfiniteCap(), false);
+  state.scoreLog10 = 350;
+  assert.strictEqual(context.canBreakInfiniteCap(), true);
+}
+
+async function testEncryptedSaveCodeRoundTripsAndRejectsTampering() {
+  const context = loadGame();
+  const { state } = context.window.__angleDebug;
+  state.scoreLog10 = 123;
+  state.vertices = 77;
+  const code = await context.exportSaveCode();
+  assert.match(code, /^ANGLE_SAVE_V2:/);
+  assert.ok(!code.includes("\"scoreLog10\""));
+
+  state.scoreLog10 = 0;
+  state.vertices = 3;
+  assert.strictEqual(await context.importSaveCode(code), true);
+  assert.strictEqual(state.scoreLog10, 123);
+  assert.strictEqual(state.vertices, 77);
+
+  const tampered = `${code.slice(0, -1)}${code.endsWith("A") ? "B" : "A"}`;
+  state.scoreLog10 = 55;
+  assert.strictEqual(await context.importSaveCode(tampered), false);
+  assert.strictEqual(state.scoreLog10, 55);
+}
+
+function testLongDurationOmitsOnlyLeadingZeroUnits() {
+  const context = loadGame();
+  assert.strictEqual(context.formatLongDuration(45), "45秒");
+  assert.strictEqual(context.formatLongDuration(3 * 3600 + 12 * 60 + 4), "3時間12分4秒");
+  assert.strictEqual(context.formatLongDuration(2 * 86400 + 3 * 3600 + 5), "2日3時間0分5秒");
+}
+
+function testChallengeAutoCompleteRunsInfinityOnlyWhenEnabled() {
+  const context = loadGame();
+  const { state } = context.window.__angleDebug;
+  state.infinityCount = 1;
+  state.infinityUpgradeMask = 1 << 5;
+  state.activeChallenge = 1;
+  state.scoreLog10 = 309;
+  state.autoCompleteChallenges = false;
+  context.completeChallengeIfReady();
+  assert.strictEqual(state.activeChallenge, 1);
+
+  state.autoCompleteChallenges = true;
+  context.completeChallengeIfReady();
+  assert.strictEqual(state.activeChallenge, 0);
+  assert.ok((state.completedChallenges & 1) !== 0);
+}
+
+async function run() {
+  testCoreBoostRequirementGrowsPastE308();
+  testIpGainUsesLogMinus307();
+  testAchievement12OnlyFirstCoreBoostWithoutGeneration();
+  testRawLapSpeedCanGrowPastEffectiveSafetyCap();
+  testGainExpressionReflectsChallengeRulesAndNumberFormat();
+  testIc7LocksByUpgradeCostNotScore();
+  testIc8DecayKeepsProgressAndRewardPreservesVertices();
+  testBreakCapRequirementIsE350();
+  await testEncryptedSaveCodeRoundTripsAndRejectsTampering();
+  testLongDurationOmitsOnlyLeadingZeroUnits();
+  testChallengeAutoCompleteRunsInfinityOnlyWhenEnabled();
+  console.log("regression tests passed");
+}
+
+run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

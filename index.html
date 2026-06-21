@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=2026.06.21-lap-speed-log-growth" />
+    <link rel="stylesheet" href="styles.css?v=2026.06.21-ic-savecode-breakcap" />
   </head>
   <body>
     <main class="shell">
@@ -293,6 +293,10 @@
                 <label for="autoBuyGainToggle" data-i18n="autoBuyGain">頂点獲得量 自動購入</label>
                 <input id="autoBuyGainToggle" type="checkbox" checked />
               </div>
+              <div class="setting-row">
+                <label for="autoCompleteChallengesToggle" data-i18n="autoCompleteChallenges">IC自動完了</label>
+                <input id="autoCompleteChallengesToggle" type="checkbox" />
+              </div>
             </section>
           </div>
         </section>
@@ -366,7 +370,7 @@
             <dt>Infinity Challenge</dt>
             <dd data-i18n="helpChallenge">Infinity 後に挑戦できます。縛り状態で Infinity に到達すると報酬を得ます。</dd>
             <dt>Break Infinite Cap</dt>
-            <dd data-i18n="helpBreakCap">1.00e333 到達で、Infinity 以降の強いソフトキャップを破壊します。</dd>
+            <dd data-i18n="helpBreakCap">1.00e350 到達で、Infinity 以降の強いソフトキャップを破壊します。</dd>
             <dt>Infinite Angle</dt>
             <dd data-i18n="helpInfiniteAngle">IP を Infinite Score に変換し、頂点通過ごとの増加を伸ばします。</dd>
           </dl>
@@ -423,6 +427,13 @@
                 <span data-i18n="save">セーブ</span>
                 <strong id="saveStatus">未保存</strong>
               </div>
+              <label class="save-code-label" for="saveCodeArea" data-i18n="saveCode">セーブコード</label>
+              <textarea id="saveCodeArea" class="save-code-area" spellcheck="false"></textarea>
+              <div class="save-code-actions">
+                <button id="exportSaveCodeButton" class="reset-button" type="button" data-i18n="exportSaveCode">書き出し</button>
+                <button id="importSaveCodeButton" class="reset-button" type="button" data-i18n="importSaveCode">読み込み</button>
+                <button id="copySaveCodeButton" class="reset-button" type="button" data-i18n="copySaveCode">コピー</button>
+              </div>
               <button id="resetSaveButton" class="reset-button" type="button" data-i18n="resetSave">
                 セーブをリセット
               </button>
@@ -438,16 +449,16 @@
       <div class="update-modal-card">
         <p class="eyebrow">Update</p>
         <h2 id="updateModalTitle" data-i18n="updateTitle">アップデート</h2>
-        <p data-i18n="updateSummary">ラップスピードの成長表示と内部処理を更新しました。</p>
+        <p data-i18n="updateSummary">Infinity Challengeとセーブコードを更新しました。</p>
         <ul>
-          <li data-i18n="updateResetDock">生ラップスピードはlogで伸び続け、実効速度は超強力な追加ソフトキャップで抑えるようになりました。</li>
-          <li data-i18n="updateCanvas">ソフトキャップ中は実効速度と生速度を分けて表示します。</li>
-          <li data-i18n="updateModalNote">高レベル速度強化で成長が止まって見える問題を軽減しました。</li>
+          <li data-i18n="updateResetDock">IC1/IC7/IC8の制約と報酬、Break Infinite Capの必要値を調整しました。</li>
+          <li data-i18n="updateCanvas">基礎獲得式の表示が数値表記設定とIC状態を反映するようになりました。</li>
+          <li data-i18n="updateModalNote">暗号化セーブコード、IC自動完了、統計の長時間表示を追加しました。</li>
         </ul>
         <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
       </div>
     </div>
 
-    <script src="game.js?v=2026.06.21-lap-speed-log-growth"></script>
+    <script src="game.js?v=2026.06.21-ic-savecode-breakcap"></script>
   </body>
 </html>

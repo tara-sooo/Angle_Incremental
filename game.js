@@ -75,11 +75,16 @@ const elements = {
   autoBuySpeedToggle: document.getElementById("autoBuySpeedToggle"),
   autoBuyVertexToggle: document.getElementById("autoBuyVertexToggle"),
   autoBuyGainToggle: document.getElementById("autoBuyGainToggle"),
+  autoCompleteChallengesToggle: document.getElementById("autoCompleteChallengesToggle"),
   automationLockNote: document.getElementById("automationLockNote"),
   currentInfinityRunTime: document.getElementById("currentInfinityRunTime"),
   totalPlayTime: document.getElementById("totalPlayTime"),
   fastestInfinityTime: document.getElementById("fastestInfinityTime"),
   lastInfinityRuns: document.getElementById("lastInfinityRuns"),
+  saveCodeArea: document.getElementById("saveCodeArea"),
+  exportSaveCodeButton: document.getElementById("exportSaveCodeButton"),
+  importSaveCodeButton: document.getElementById("importSaveCodeButton"),
+  copySaveCodeButton: document.getElementById("copySaveCodeButton"),
 };
 
 const BASE_LAP_SECONDS = 6;
@@ -87,18 +92,21 @@ const GENERATION_UNLOCK_SCORE = 1000000;
 const GENERATION_MIN_NEW_COST_FACTOR = 0.78;
 const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const INFINITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
-const BREAK_CAP_REQUIREMENT_LOG10 = 333;
+const BREAK_CAP_REQUIREMENT_LOG10 = 350;
 const MAX_TRACKED_LOG10 = 1000000000;
 const MAX_RENDERED_VERTICES = 10000;
 const MAX_DRAW_VERTICES = 720;
-const LAP_SPEED_SUPER_SOFTCAP_START_LOG10 = 42;
-const LAP_SPEED_SUPER_SOFTCAP_LOG_STRENGTH = 1;
+const LAP_SPEED_SUPER_SOFTCAP_START_LOG10 = 36;
+const LAP_SPEED_SUPER_SOFTCAP_LOG_STRENGTH = 0.75;
 const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 14;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_QUARANTINE_KEY = "angle-incremental-save-quarantine";
 const SAVE_VERSION = 7;
-const APP_VERSION = "2026.06.21-lap-speed-log-growth";
+const APP_VERSION = "2026.06.21-ic-savecode-breakcap";
+const SAVE_CODE_PREFIX = "ANGLE_SAVE_V2:";
+const SAVE_CODE_SALT = "angle-incremental-save-code-v2";
+const SAVE_CODE_SECRET = "Angle Incremental local save code obfuscation";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const UPDATE_RELOAD_TARGET_KEY = "angle-incremental-update-reload-target";
 const UPDATE_RELOAD_TIME_KEY = "angle-incremental-update-reload-time";
@@ -154,6 +162,7 @@ const TEXT = {
     autoBuySpeed: "周回速度 自動購入",
     autoBuyVertex: "角追加 自動購入",
     autoBuyGain: "頂点獲得量 自動購入",
+    autoCompleteChallenges: "IC自動完了",
     statistics: "統計",
     currentInfinityRun: "現在のInfinity周回",
     totalPlayTimeLabel: "総プレイ時間",
@@ -197,13 +206,17 @@ const TEXT = {
     lightEffects: "軽量演出",
     showFps: "FPS表示",
     save: "セーブ",
+    saveCode: "セーブコード",
+    exportSaveCode: "書き出し",
+    importSaveCode: "読み込み",
+    copySaveCode: "コピー",
     resetSave: "セーブをリセット",
     helpAngle: "左の強化で周回速度、角、頂点獲得量を伸ばします。",
     helpGeneration: "世代スコアが 1,000,000 に届いたら、下部の世代交代で倍率を得ます。",
     helpCoreBoost: "1.00e20 スコアから実行でき、世代以下をリセットして指数と増加倍率を得ます。",
     helpInfinity: "1.80e308 到達で初回は自動発動し、以降は任意発動で IP を得ます。",
     helpChallenge: "Infinity Upgrade 4-1 後に挑戦できます。縛り状態で Infinity に到達すると報酬を得ます。",
-    helpBreakCap: "1.00e333 到達で、Infinity 以降の強いソフトキャップを破壊します。",
+    helpBreakCap: "1.00e350 到達で、Infinity 以降の強いソフトキャップを破壊します。",
     helpInfiniteAngle: "IP を Infinite Score に変換し、頂点通過ごとの増加を伸ばします。",
     level: "レベル",
     vertices: "頂点",
@@ -228,6 +241,11 @@ const TEXT = {
     baseExpression: "基礎獲得式",
     savedAuto: "自動保存済み",
     savedManual: "保存済み",
+    saveCodeExported: "セーブコードを書き出しました",
+    saveCodeImported: "セーブコードを読み込みました",
+    saveCodeCopied: "セーブコードをコピーしました",
+    saveCodeInvalid: "セーブコードが無効です",
+    saveCodeCryptoUnavailable: "暗号化機能を利用できません",
     saveFailed: "保存失敗",
     noSave: "未保存",
     loaded: "ロード済み",
@@ -237,10 +255,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "ラップスピードの成長表示と内部処理を更新しました。",
-    updateResetDock: "生ラップスピードはlogで伸び続け、実効速度は超強力な追加ソフトキャップで抑えるようになりました。",
-    updateCanvas: "ソフトキャップ中は実効速度と生速度を分けて表示します。",
-    updateModalNote: "高レベル速度強化で成長が止まって見える問題を軽減しました。",
+    updateSummary: "Infinity Challengeとセーブコードを更新しました。",
+    updateResetDock: "IC1/IC7/IC8の制約と報酬、Break Infinite Capの必要値を調整しました。",
+    updateCanvas: "基礎獲得式の表示が数値表記設定とIC状態を反映するようになりました。",
+    updateModalNote: "暗号化セーブコード、IC自動完了、統計の長時間表示を追加しました。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -274,6 +292,7 @@ const TEXT = {
     autoBuySpeed: "Autobuy lap speed",
     autoBuyVertex: "Autobuy vertices",
     autoBuyGain: "Autobuy vertex gain",
+    autoCompleteChallenges: "Auto-complete IC",
     statistics: "Statistics",
     currentInfinityRun: "Current Infinity run",
     totalPlayTimeLabel: "Total play time",
@@ -317,13 +336,17 @@ const TEXT = {
     lightEffects: "Reduced effects",
     showFps: "Show FPS",
     save: "Save",
+    saveCode: "Save code",
+    exportSaveCode: "Export",
+    importSaveCode: "Import",
+    copySaveCode: "Copy",
     resetSave: "Reset save",
     helpAngle: "Use normal upgrades to improve lap speed, vertices, and vertex gain.",
     helpGeneration: "Reach 1,000,000 generation score, then generate for permanent lower-layer boosts.",
     helpCoreBoost: "Starts at 1.00e20 score and resets Generation progress for gain growth and exponent boosts.",
     helpInfinity: "First triggers automatically at 1.80e308, then can be run manually for IP.",
     helpChallenge: "Available after Infinity Upgrade 4-1. Reach Infinity under a restriction to claim a reward.",
-    helpBreakCap: "Reach 1.00e333 to break the heavy post-Infinity softcap.",
+    helpBreakCap: "Reach 1.00e350 to break the heavy post-Infinity softcap.",
     helpInfiniteAngle: "Convert IP into Infinite Score to improve gain per vertex.",
     level: "Level",
     vertices: "vertices",
@@ -348,6 +371,11 @@ const TEXT = {
     baseExpression: "Base gain formula",
     savedAuto: "Autosaved",
     savedManual: "Saved",
+    saveCodeExported: "Save code exported",
+    saveCodeImported: "Save code imported",
+    saveCodeCopied: "Save code copied",
+    saveCodeInvalid: "Invalid save code",
+    saveCodeCryptoUnavailable: "Crypto is unavailable",
     saveFailed: "Save failed",
     noSave: "No save",
     loaded: "Loaded",
@@ -357,10 +385,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Updated lap-speed growth display and internal handling.",
-    updateResetDock: "Raw lap speed now keeps growing in log space while effective speed is restrained by an extra-heavy softcap.",
-    updateCanvas: "Softcapped speed now shows effective speed and raw speed separately.",
-    updateModalNote: "High-level speed upgrades should no longer look like they completely stop growing.",
+    updateSummary: "Infinity Challenges and save codes were updated.",
+    updateResetDock: "IC1/IC7/IC8 rules and the Break Infinite Cap requirement were adjusted.",
+    updateCanvas: "The base gain formula display now reflects number format settings and IC state.",
+    updateModalNote: "Encrypted save codes, IC auto-complete, and long statistics time display were added.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -495,13 +523,13 @@ const INFINITY_CHALLENGES = [
   },
   {
     name: { ja: "IC7 倹約家もどき", en: "IC7 Pretend Saver" },
-    restriction: { ja: "スコアが1e100を超えると、アップグレードを購入できなくなる", en: "Normal upgrades cannot be bought above 1e100 score." },
+    restriction: { ja: "購入対象の通常アップグレードの必要スコアが1e100以上だと購入できない", en: "Normal upgrades cannot be bought when that upgrade costs at least 1e100." },
     reward: { ja: "アップグレードを購入する際にスコアを消費しなくなる", en: "Normal upgrades no longer spend score." },
   },
   {
     name: { ja: "IC8 リアル・タイム・アタック", en: "IC8 Real Time Attack" },
     restriction: { ja: "角の数は100で始まり点が3秒経過するごとに角の数が1減り、角増加upgradeは購入できない", en: "Starts at 100 vertices, loses 1 vertex every 3 seconds, and vertex upgrades cannot be bought." },
-    reward: { ja: "角の数はCBでリセットされなくなる", en: "Vertices are no longer reset by Core Boost." },
+    reward: { ja: "角の数はGRとCBでリセットされなくなる", en: "Vertices are no longer reset by Generation or Core Boost." },
   },
 ];
 
@@ -601,6 +629,7 @@ const state = {
   autoBuySpeed: true,
   autoBuyVertex: true,
   autoBuyGain: true,
+  autoCompleteChallenges: false,
   ic8VertexDecayElapsed: 0,
   noGenerationCoreBoostReached: false,
   showFloatingText: true,
@@ -656,6 +685,7 @@ const SAVE_FIELDS = [
   "autoBuySpeed",
   "autoBuyVertex",
   "autoBuyGain",
+  "autoCompleteChallenges",
   "ic8VertexDecayElapsed",
   "noGenerationCoreBoostReached",
   "showFloatingText",
@@ -968,6 +998,7 @@ function applySaveData(data, saveVersion = SAVE_VERSION) {
   state.autoBuySpeed = sanitizeBoolean(data.autoBuySpeed, true);
   state.autoBuyVertex = sanitizeBoolean(data.autoBuyVertex, true);
   state.autoBuyGain = sanitizeBoolean(data.autoBuyGain, true);
+  state.autoCompleteChallenges = sanitizeBoolean(data.autoCompleteChallenges, false);
   state.ic8VertexDecayElapsed = sanitizeNumber(data.ic8VertexDecayElapsed, 0);
   state.noGenerationCoreBoostReached = Boolean(data.noGenerationCoreBoostReached);
   if (state.activeChallenge > 0 && !infinityChallengesUnlocked()) {
@@ -1004,6 +1035,120 @@ function serializeSaveData() {
     savedAt: Date.now(),
     state: data,
   };
+}
+
+function bytesToBase64Url(bytes) {
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlToBytes(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function cryptoApi() {
+  return globalThis.crypto && globalThis.crypto.subtle ? globalThis.crypto : null;
+}
+
+async function saveCodeKey() {
+  const api = cryptoApi();
+  if (!api) throw new Error("crypto unavailable");
+  const encoder = new TextEncoder();
+  const material = await api.subtle.importKey(
+    "raw",
+    encoder.encode(SAVE_CODE_SECRET),
+    "PBKDF2",
+    false,
+    ["deriveKey"],
+  );
+  return api.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: encoder.encode(SAVE_CODE_SALT),
+      iterations: 120000,
+      hash: "SHA-256",
+    },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+async function exportSaveCode() {
+  const api = cryptoApi();
+  if (!api) {
+    setSaveStatus(t("saveCodeCryptoUnavailable"));
+    return "";
+  }
+  const iv = api.getRandomValues(new Uint8Array(12));
+  const encoder = new TextEncoder();
+  const plaintext = encoder.encode(JSON.stringify(serializeSaveData()));
+  const encrypted = new Uint8Array(await api.subtle.encrypt({ name: "AES-GCM", iv }, await saveCodeKey(), plaintext));
+  const envelope = {
+    v: 2,
+    i: bytesToBase64Url(iv),
+    d: bytesToBase64Url(encrypted),
+  };
+  const code = `${SAVE_CODE_PREFIX}${bytesToBase64Url(encoder.encode(JSON.stringify(envelope)))}`;
+  if (elements.saveCodeArea) elements.saveCodeArea.value = code;
+  setSaveStatus(t("saveCodeExported"));
+  return code;
+}
+
+async function importSaveCode(code) {
+  try {
+    const trimmed = String(code || "").trim();
+    if (!trimmed.startsWith(SAVE_CODE_PREFIX)) throw new Error("bad prefix");
+    const api = cryptoApi();
+    if (!api) throw new Error("crypto unavailable");
+    const decoder = new TextDecoder();
+    const envelope = JSON.parse(decoder.decode(base64UrlToBytes(trimmed.slice(SAVE_CODE_PREFIX.length))));
+    if (!envelope || envelope.v !== 2 || !envelope.i || !envelope.d) throw new Error("bad envelope");
+    const decrypted = await api.subtle.decrypt(
+      { name: "AES-GCM", iv: base64UrlToBytes(envelope.i) },
+      await saveCodeKey(),
+      base64UrlToBytes(envelope.d),
+    );
+    const parsed = JSON.parse(decoder.decode(new Uint8Array(decrypted)));
+    if (!parsed || !parsed.version || parsed.version > SAVE_VERSION || !parsed.state) throw new Error("bad save");
+    applySaveData(parsed.state, parsed.version);
+    saveGame("manual");
+    updateUi();
+    draw();
+    setSaveStatus(t("saveCodeImported"));
+    return true;
+  } catch (error) {
+    setSaveStatus(cryptoApi() ? t("saveCodeInvalid") : t("saveCodeCryptoUnavailable"));
+    return false;
+  }
+}
+
+async function importSaveCodeFromUi() {
+  const ok = await importSaveCode(elements.saveCodeArea ? elements.saveCodeArea.value : "");
+  if (!ok) updateUi();
+}
+
+async function copySaveCodeFromUi() {
+  const code = elements.saveCodeArea ? elements.saveCodeArea.value.trim() : "";
+  if (!code) return;
+  try {
+    const clipboard = globalThis.navigator && globalThis.navigator.clipboard;
+    if (clipboard && clipboard.writeText) await clipboard.writeText(code);
+    else if (elements.saveCodeArea) {
+      elements.saveCodeArea.focus();
+      elements.saveCodeArea.select();
+      document.execCommand("copy");
+    }
+    setSaveStatus(t("saveCodeCopied"));
+  } catch (error) {
+    setSaveStatus(t("saveCodeInvalid"));
+  }
 }
 
 function saveGame(reason = "auto") {
@@ -1105,6 +1250,7 @@ function resetSave() {
     autoBuySpeed: true,
     autoBuyVertex: true,
     autoBuyGain: true,
+    autoCompleteChallenges: false,
     ic8VertexDecayElapsed: 0,
     noGenerationCoreBoostReached: false,
     showFloatingText: true,
@@ -1180,11 +1326,20 @@ function formatSmallDecimal(value) {
   return value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-function formatGainExpression(valueLog10) {
+function gainExpressionConfig() {
   const parts = gainExpressionParts();
-  if (parts <= 1) return formatLogNumber(valueLog10);
-  const base = formatLogNumber(valueLog10);
-  return `(${base} / ${parts})^${parts}`;
+  if (parts <= 1) return { parts, divisor: 1, rewardRemovesDivisor: false };
+  if (state.activeChallenge === 1) return { parts, divisor: parts * 2, rewardRemovesDivisor: false };
+  if (isChallengeCompleted(1)) return { parts, divisor: 1, rewardRemovesDivisor: true };
+  return { parts, divisor: parts, rewardRemovesDivisor: false };
+}
+
+function formatGainExpression(valueLog10) {
+  const config = gainExpressionConfig();
+  if (config.parts <= 1) return formatUiLogNumber(valueLog10);
+  const base = formatUiLogNumber(valueLog10);
+  if (config.divisor <= 1) return `(${base})^${config.parts}`;
+  return `(${base} / ${config.divisor})^${config.parts}`;
 }
 
 function gainExpressionParts() {
@@ -1196,7 +1351,7 @@ function hasMultiplicativeGainExpression() {
 }
 
 function formatGainExpressionSummary() {
-  return formatGainExpression(log10Value(state.currentGain));
+  return formatGainExpression(currentGainLog10());
 }
 
 function challengeText(index, key) {
@@ -1312,6 +1467,25 @@ function formatDuration(seconds) {
   if (seconds >= 1) return `${seconds.toFixed(2)}${t("secondsUnit")}`;
   if (seconds >= 0.01) return `${Math.round(seconds * 1000)}${t("millisecondsUnit")}`;
   return t("under10ms");
+}
+
+function formatLongDuration(seconds) {
+  const totalSeconds = Math.max(0, Math.floor(sanitizeNumber(seconds, 0)));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  const units = [
+    { value: days, label: state.language === "en" ? "d" : "日" },
+    { value: hours, label: state.language === "en" ? "h" : "時間" },
+    { value: minutes, label: state.language === "en" ? "m" : "分" },
+    { value: secs, label: state.language === "en" ? "s" : "秒" },
+  ];
+  const firstNonZero = units.findIndex((unit) => unit.value > 0);
+  return units
+    .slice(firstNonZero === -1 ? units.length - 1 : firstNonZero)
+    .map((unit) => `${unit.value}${unit.label}`)
+    .join("");
 }
 
 function log10Value(value) {
@@ -1483,11 +1657,9 @@ function finalScoreGain(baseGain = state.currentGain) {
 }
 
 function angleExpressionFromBaseLog10(baseLog) {
-  const parts = gainExpressionParts();
-  if (parts <= 1) return baseLog;
-  if (isChallengeCompleted(1)) return baseLog * parts;
-  const divisor = state.activeChallenge === 1 ? parts * 2 : parts;
-  return (baseLog - log10Value(divisor)) * parts;
+  const config = gainExpressionConfig();
+  if (config.parts <= 1) return baseLog;
+  return (baseLog - log10Value(config.divisor)) * config.parts;
 }
 
 function angleExpressionLog10(baseGain = state.currentGain) {
@@ -1928,6 +2100,12 @@ function runAutobuyers() {
   });
 }
 
+function completeChallengeIfReady() {
+  if (!state.autoCompleteChallenges || state.activeChallenge <= 0 || !canInfinity()) return false;
+  runInfinity(false);
+  return true;
+}
+
 function updateChallengeTimers(dt) {
   if (state.activeChallenge !== 8) {
     state.ic8VertexDecayElapsed = 0;
@@ -1939,8 +2117,11 @@ function updateChallengeTimers(dt) {
   state.ic8VertexDecayElapsed -= losses * 3;
   const nextVertices = Math.max(3, state.vertices - losses);
   if (nextVertices !== state.vertices) {
+    const lapFraction = ((state.totalVertexProgress / state.vertices) % 1 + 1) % 1;
     state.vertices = nextVertices;
-    resetVertexProgress();
+    state.totalVertexProgress = lapFraction * state.vertices;
+    state.pointProgress = lapFraction;
+    state.lastVertexIndex = Math.floor(state.pointProgress * state.vertices) % state.vertices;
   }
 }
 
@@ -1977,6 +2158,7 @@ function update(dt) {
       if (passVertex(vertex % state.vertices)) return;
     }
   }
+  if (completeChallengeIfReady()) return;
 
   normalizeVertexProgress();
   state.lastVertexIndex = Math.floor(state.pointProgress * state.vertices) % state.vertices;
@@ -2362,22 +2544,24 @@ function updateAutomationUi() {
   elements.autoBuySpeedToggle.disabled = !unlocked;
   elements.autoBuyVertexToggle.disabled = !unlocked;
   elements.autoBuyGainToggle.disabled = !unlocked;
+  if (elements.autoCompleteChallengesToggle) elements.autoCompleteChallengesToggle.disabled = !infinityChallengesUnlocked();
   syncFormControl(elements.automationMasterToggle, unlocked && state.automationEnabled);
   syncFormControl(elements.autoBuySpeedToggle, state.autoBuySpeed);
   syncFormControl(elements.autoBuyVertexToggle, state.autoBuyVertex);
   syncFormControl(elements.autoBuyGainToggle, state.autoBuyGain);
+  if (elements.autoCompleteChallengesToggle) syncFormControl(elements.autoCompleteChallengesToggle, state.autoCompleteChallenges);
 }
 
 function infinityRunRecordText(record, index) {
   const challenge = record.challenge > 0 ? ` IC${record.challenge}` : "";
-  return `#${index + 1}${challenge} ${formatDuration(record.time)} / ${formatPowerOfTen(record.scoreLog10)} / +${formatUiNumber(record.ipGain)} IP`;
+  return `#${index + 1}${challenge} ${formatLongDuration(record.time)} / ${formatPowerOfTen(record.scoreLog10)} / +${formatUiNumber(record.ipGain)} IP`;
 }
 
 function updateStatisticsUi() {
   if (!elements.totalPlayTime) return;
-  elements.totalPlayTime.textContent = formatDuration(state.totalPlayTime);
-  elements.currentInfinityRunTime.textContent = formatDuration(state.currentInfinityRunTime);
-  elements.fastestInfinityTime.textContent = state.fastestInfinityTime > 0 ? formatDuration(state.fastestInfinityTime) : t("noInfinityRuns");
+  elements.totalPlayTime.textContent = formatLongDuration(state.totalPlayTime);
+  elements.currentInfinityRunTime.textContent = formatLongDuration(state.currentInfinityRunTime);
+  elements.fastestInfinityTime.textContent = state.fastestInfinityTime > 0 ? formatLongDuration(state.fastestInfinityTime) : t("noInfinityRuns");
   elements.lastInfinityRuns.innerHTML = "";
   if (state.lastInfinityRuns.length === 0) {
     const row = document.createElement("li");
@@ -2511,7 +2695,7 @@ function upgradeCostLog(kind) {
 }
 
 function canBuyNormalUpgrade(kind) {
-  if (state.activeChallenge === 7 && currentScoreLog10() > 100) return false;
+  if (state.activeChallenge === 7 && upgradeCostLog(kind) >= 100) return false;
   if (kind === "vertex") {
     if (state.activeChallenge === 8) return false;
     if (state.activeChallenge === 2 && state.vertices >= 500) return false;
@@ -2599,6 +2783,7 @@ function runGeneration() {
   const generationScoreBeforeResetLog = currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = state.generationCostFactor * (1 - reward.costReduction);
+  const preservedVertices = isChallengeCompleted(8) ? state.vertices : 3;
   state.generationCount += 1;
   state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   state.previousGenerationScore = valueFromLog10(generationScoreBeforeResetLog);
@@ -2609,7 +2794,7 @@ function runGeneration() {
   state.scoreLog10 = -Infinity;
   state.generationScore = 0;
   state.generationScoreLog10 = -Infinity;
-  state.vertices = 3;
+  state.vertices = preservedVertices;
   state.speedLevel = 0;
   state.gainLevel = 0;
   state.currentGain = 1;
@@ -2790,6 +2975,7 @@ function applySetting(key, value) {
   if (key === "showFloatingText" && !value) state.floatingTexts = [];
   if (key === "lightEffects" && value) state.floatingTexts = [];
   if (key === "showFps") state.showFps = Boolean(value);
+  if (key === "autoCompleteChallenges") state.autoCompleteChallenges = Boolean(value);
   updateUi();
   draw();
   saveGame("manual");
@@ -2856,6 +3042,7 @@ function renderGameToText() {
   const infiniteScoreLog = currentInfiniteScoreLog10();
   const currentGainLog = currentGainLog10();
   const currentCostLogs = costLogs();
+  const gainExpression = gainExpressionConfig();
   return JSON.stringify({
     coordinateSystem: "canvas pixels, origin top-left, x right, y down",
     score: scoreDisplay(),
@@ -2868,6 +3055,9 @@ function renderGameToText() {
     currentGainLog10: Number.isFinite(currentGainLog) ? Number(currentGainLog.toPrecision(6)) : null,
     finalGainOnCore: formatUiLogNumber(finalGainLog),
     finalGainOnCoreLog10: Number.isFinite(finalGainLog) ? Number(finalGainLog.toPrecision(6)) : null,
+    baseGainExpression: formatGainExpressionSummary(),
+    baseGainExpressionDivisor: gainExpression.divisor,
+    baseGainExpressionParts: gainExpression.parts,
     vertices: state.vertices,
     lapSeconds: Number(lapDuration().toPrecision(6)),
     lapSpeedMultiplier: Number(lapSpeedMultiplier().toPrecision(6)),
@@ -3005,6 +3195,9 @@ window.__angleDebug = {
   saveGame,
   loadGame,
   resetSave,
+  exportSaveCode,
+  importSaveCode,
+  completeChallengeIfReady,
 };
 
 elements.speedUpgrade.addEventListener("click", buySpeed);
@@ -3031,9 +3224,13 @@ elements.automationMasterToggle.addEventListener("change", () => applySetting("a
 elements.autoBuySpeedToggle.addEventListener("change", () => applySetting("autoBuySpeed", elements.autoBuySpeedToggle.checked));
 elements.autoBuyVertexToggle.addEventListener("change", () => applySetting("autoBuyVertex", elements.autoBuyVertexToggle.checked));
 elements.autoBuyGainToggle.addEventListener("change", () => applySetting("autoBuyGain", elements.autoBuyGainToggle.checked));
+if (elements.autoCompleteChallengesToggle) elements.autoCompleteChallengesToggle.addEventListener("change", () => applySetting("autoCompleteChallenges", elements.autoCompleteChallengesToggle.checked));
 elements.languageSelect.addEventListener("change", () => applySetting("language", elements.languageSelect.value));
 elements.numberFormatSelect.addEventListener("change", () => applySetting("numberFormat", elements.numberFormatSelect.value));
 elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", elements.timeUnitSelect.value));
+if (elements.exportSaveCodeButton) elements.exportSaveCodeButton.addEventListener("click", exportSaveCode);
+if (elements.importSaveCodeButton) elements.importSaveCodeButton.addEventListener("click", importSaveCodeFromUi);
+if (elements.copySaveCodeButton) elements.copySaveCodeButton.addEventListener("click", copySaveCodeFromUi);
 if (elements.updateModalClose) elements.updateModalClose.addEventListener("click", closeUpdateModal);
 window.addEventListener("beforeunload", () => saveGame("manual"));
 window.addEventListener("resize", resizeCanvas);

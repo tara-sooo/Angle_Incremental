@@ -1060,6 +1060,45 @@ canvas {
   font-size: 0.84rem;
 }
 
+.save-code-label {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
+.save-code-area {
+  width: 100%;
+  min-height: 116px;
+  resize: vertical;
+  color: var(--ink);
+  background: #07101f;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 10px;
+  font: 700 0.78rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.save-code-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.save-panel > div.save-code-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  min-height: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.save-code-actions .reset-button {
+  min-height: 38px;
+  font-size: 0.82rem;
+}
+
 .reset-button {
   min-height: 44px;
   color: var(--accent-strong);

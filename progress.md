@@ -71,12 +71,13 @@ Original prompt: では、中核ループを完成させてください
 - Added Automation and Statistics main tabs with saved per-upgrade autobuy toggles, Infinity run timing, fastest Infinity time, and last-10 Infinity run records.
 - Added versioned CSS/JS asset URLs and bumped the app version so clients stuck on cached old Infinity Challenge code fetch the refreshed assets.
 - Changed lap speed growth so raw speed keeps increasing in log space while effective speed is restrained by an extra-heavy second softcap instead of a fixed visible cap.
+- Fixed IC1 formula precedence/display, changed IC7 to lock by upgrade cost, changed IC8 to preserve vertices through Generation/Core Boost, raised Break Infinite Cap to e350, and strengthened the second lap-speed softcap.
+- Added encrypted save-code export/import, IC auto-complete automation, and long statistics time formatting with leading zero units omitted.
 
 ## TODO
 
-- Verify the new Automation/Statistics tabs in Firefox/Playwright on desktop and mobile before release.
+- Verify the new save-code controls, IC auto-complete toggle, and updated IC formula display in Firefox/Playwright on desktop and mobile before release.
 - Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle conversion rates.
 - Future design pass: replace provisional IC6-IC8 if the game owner provides official designs.
-- Future polish: add explicit import/export save text if players need to move saves between browsers.
