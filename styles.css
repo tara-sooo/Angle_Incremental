@@ -693,10 +693,8 @@ canvas {
   opacity: 0.7;
 }
 
-.infinity-upgrade-tier[data-tier="1"] .infinity-upgrade-node,
 .infinity-upgrade-tier[data-tier="2"] .infinity-upgrade-node,
-.infinity-upgrade-tier[data-tier="3"] .infinity-upgrade-node,
-.infinity-upgrade-tier[data-tier="5"] .infinity-upgrade-node {
+.infinity-upgrade-tier[data-tier="4"] .infinity-upgrade-node {
   grid-column: 1 / -1;
   justify-self: center;
   width: min(360px, 100%);
@@ -1252,10 +1250,8 @@ canvas {
     grid-template-columns: 1fr;
   }
 
-  .infinity-upgrade-tier[data-tier="1"] .infinity-upgrade-node,
   .infinity-upgrade-tier[data-tier="2"] .infinity-upgrade-node,
-  .infinity-upgrade-tier[data-tier="3"] .infinity-upgrade-node,
-  .infinity-upgrade-tier[data-tier="5"] .infinity-upgrade-node {
+  .infinity-upgrade-tier[data-tier="4"] .infinity-upgrade-node {
     width: 100%;
   }
 

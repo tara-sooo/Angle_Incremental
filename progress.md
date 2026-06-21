@@ -57,6 +57,9 @@ Original prompt: では、中核ループを完成させてください
 - Changed compact reset controls so Generation and Core Boost multiplier/exponent rows remain accessible on short screens through scrolling instead of being hidden.
 - Fixed legacy IC save migration so invalidating a locked active IC also resets Infinity-below progress instead of carrying restricted progress into a normal run.
 - Reworked the Infinity Upgrade UI into a selectable large-node tree with a lower detail panel and purchase button, while keeping IU costs, prerequisites, and effects unchanged.
+- Fixed extreme legacy saves that could fail to open by hydrating score logs safely, clamping loaded vertex count for rendering, and capping effective lap speed to a finite value.
+- Updated Infinity Upgrade 1-2 so it has no prerequisite while keeping 2-1 gated behind both 1-1 and 1-2.
+- Expanded Achievements to the new 14-item list, added total playtime and no-Generation Core Boost tracking, and migrated old achievement bits so old score-e30 progress maps to the new #7 instead of incorrectly unlocking CB3.
 
 ## TODO
 

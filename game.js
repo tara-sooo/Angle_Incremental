@@ -81,11 +81,13 @@ const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
 const INFINITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
 const BREAK_CAP_REQUIREMENT_LOG10 = 333;
 const MAX_TRACKED_LOG10 = 1000000000;
+const MAX_RENDERED_VERTICES = 10000;
+const MAX_EFFECTIVE_LAP_SPEED_LOG10 = 12;
 const INFINITY_CHALLENGE_COUNT = 8;
-const ACHIEVEMENT_COUNT = 8;
+const ACHIEVEMENT_COUNT = 14;
 const SAVE_KEY = "angle-incremental-save";
-const SAVE_VERSION = 3;
-const APP_VERSION = "2026.06.21-iu-select-tree-fix";
+const SAVE_VERSION = 4;
+const APP_VERSION = "2026.06.21-save-compat-achievements";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const VERSION_MANIFEST_URL = "version.json";
 const UPDATE_CHECK_INTERVAL_SECONDS = 60;
@@ -202,10 +204,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "Infinity Upgradeを選択式の大型ツリー表示へ変更しました。",
-    updateResetDock: "ノードを選択すると下部に詳細が表示され、購入ボタンから購入できます。",
-    updateCanvas: "旧セーブでIC中だった場合、IC制約だけが外れて進行を持ち越す問題を修正しました。",
-    updateModalNote: "旧IU購入分のIP返金と、IU 4-1購入後にIC解放される仕様は維持されます。",
+    updateSummary: "巨大な旧セーブで画面が開けなくなる可能性を修正しました。",
+    updateResetDock: "IU 1-2は前提条件なしで購入できるようになりました。",
+    updateCanvas: "実績を新仕様の14個に更新しました。",
+    updateModalNote: "極端な周回速度は安全な有限値に丸め、進行ループが壊れないようにしています。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -307,10 +309,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Infinity Upgrades now use a larger selectable tree view.",
-    updateResetDock: "Select a node to show its details below, then purchase from the detail panel.",
-    updateCanvas: "Old saves that were inside an IC now reset lower progress when that locked IC is invalidated.",
-    updateModalNote: "Legacy IU refunds and the IU 4-1 Infinity Challenge unlock rule are unchanged.",
+    updateSummary: "Fixed a possible load failure with extremely large old saves.",
+    updateResetDock: "IU 1-2 no longer has a prerequisite.",
+    updateCanvas: "Achievements were updated to the new 14-achievement list.",
+    updateModalNote: "Extreme lap speed is clamped to a safe finite value so the update loop stays valid.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -352,9 +354,9 @@ const ACHIEVEMENTS = [
   },
   {
     title: { ja: "目視できない", en: "Too Fast to See" },
-    condition: { ja: "ラップスピードが10を超える", en: "Raise lap speed above 10." },
+    condition: { ja: "ラップスピードが100を超える", en: "Raise lap speed above 100." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => lapSpeedMultiplier() > 10,
+    isUnlocked: () => lapSpeedMultiplier() > 100,
   },
   {
     title: { ja: "contagon", en: "contagon" },
@@ -363,16 +365,52 @@ const ACHIEVEMENTS = [
     isUnlocked: () => state.vertices > 30,
   },
   {
-    title: { ja: "再びe(この実績の番号)分のブースト", en: "Another e7 Boost" },
-    condition: { ja: "GR由来の単純なスコア獲得量の実効乗算値が10000000を超える", en: "Make the effective GR score multiplier exceed 10,000,000." },
-    reward: { ja: "", en: "" },
-    isUnlocked: () => generationAchievementMultiplier() > 10000000,
-  },
-  {
     title: { ja: "スケーリングは始まっている", en: "Scaling Has Begun" },
     condition: { ja: "所持スコアがe30を超える", en: "Hold more than 1e30 score." },
     reward: { ja: "", en: "" },
     isUnlocked: () => currentScoreLog10() > 30,
+  },
+  {
+    title: { ja: "増幅、増幅、増幅", en: "Boost, Boost, Boost" },
+    condition: { ja: "CB3に到達", en: "Reach Core Boost 3." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.coreBoostCount >= 3,
+  },
+  {
+    title: { ja: "宇宙は収縮する", en: "The Universe Contracts" },
+    condition: { ja: "Infinityに到達", en: "Reach Infinity." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.infinityCount > 0,
+  },
+  {
+    title: { ja: "根元から", en: "From the Root" },
+    condition: { ja: "Infinity Upgradesを購入", en: "Buy an Infinity Upgrade." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.infinityUpgradeMask !== 0,
+  },
+  {
+    title: { ja: "Tips:目を休める時間です", en: "Tip: Time to Rest Your Eyes" },
+    condition: { ja: "累計5時間プレイする", en: "Play for 5 total hours." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.totalPlayTime >= 5 * 60 * 60,
+  },
+  {
+    title: { ja: "一代で成り上がれ", en: "Rise in One Lifetime" },
+    condition: { ja: "GRなしでCB1に到達", en: "Reach Core Boost 1 without Generation." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => state.noGenerationCoreBoostReached,
+  },
+  {
+    title: { ja: "かつての記憶", en: "Former Memory" },
+    condition: { ja: "IU4-1を購入", en: "Buy IU 4-1." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => hasInfinityUpgrade("4-1"),
+  },
+  {
+    title: { ja: "乗り越える時", en: "Time to Overcome" },
+    condition: { ja: "Infinite Challengeを1つクリア", en: "Complete one Infinity Challenge." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => completedChallengeCount() > 0,
   },
 ];
 
@@ -435,7 +473,7 @@ const INFINITY_UPGRADES = [
     id: "1-2",
     bit: 1,
     cost: 1,
-    requires: ["1-1"],
+    requires: [],
     name: { ja: "1-2 はじめてのQoL", en: "1-2 First QoL" },
     effect: { ja: "通常強化の自動購入を解放", en: "Unlocks normal-upgrade autobuy." },
   },
@@ -506,6 +544,8 @@ const state = {
   completedChallenges: 0,
   infiniteCapBroken: false,
   achievementMask: 0,
+  totalPlayTime: 0,
+  noGenerationCoreBoostReached: false,
   showFloatingText: true,
   lightEffects: false,
   showFps: false,
@@ -550,6 +590,8 @@ const SAVE_FIELDS = [
   "completedChallenges",
   "infiniteCapBroken",
   "achievementMask",
+  "totalPlayTime",
+  "noGenerationCoreBoostReached",
   "showFloatingText",
   "lightEffects",
   "showFps",
@@ -694,12 +736,12 @@ function legacyInfinityUpgradeRefundLog10(data) {
 
 function applySaveData(data, saveVersion = SAVE_VERSION) {
   state.score = sanitizeNumber(data.score, 0);
-  state.scoreLog10 = sanitizeNumber(data.scoreLog10, log10Value(state.score), -Infinity);
+  state.scoreLog10 = hydrateLog10(data.scoreLog10, state.score, log10Value(state.score));
   state.totalScore = sanitizeNumber(data.totalScore, state.score);
   state.totalScoreLog10 = hydrateLog10(data.totalScoreLog10, state.totalScore, log10Value(state.totalScore));
   state.generationScore = sanitizeNumber(data.generationScore, state.score);
   state.generationScoreLog10 = hydrateLog10(data.generationScoreLog10, state.generationScore, log10Value(state.generationScore));
-  state.vertices = Math.max(3, Math.floor(sanitizeNumber(data.vertices, 3, 3)));
+  state.vertices = Math.min(MAX_RENDERED_VERTICES, Math.max(3, Math.floor(sanitizeNumber(data.vertices, 3, 3))));
   state.speedLevel = Math.floor(sanitizeNumber(data.speedLevel, 0));
   state.gainLevel = Math.floor(sanitizeNumber(data.gainLevel, 0));
   state.currentGain = sanitizeNumber(data.currentGain, 1);
@@ -742,7 +784,16 @@ function applySaveData(data, saveVersion = SAVE_VERSION) {
   state.activeChallenge = Math.min(INFINITY_CHALLENGE_COUNT, Math.floor(sanitizeNumber(data.activeChallenge, 0)));
   state.completedChallenges = Math.floor(sanitizeNumber(data.completedChallenges, 0));
   state.infiniteCapBroken = Boolean(data.infiniteCapBroken);
-  state.achievementMask = Math.floor(sanitizeNumber(data.achievementMask, 0));
+  const loadedAchievementMask = Math.floor(sanitizeNumber(data.achievementMask, 0));
+  if (saveVersion < 4) {
+    const preservedMask = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 5);
+    state.achievementMask = loadedAchievementMask & preservedMask;
+    if ((loadedAchievementMask & (1 << 7)) !== 0) state.achievementMask |= 1 << 6;
+  } else {
+    state.achievementMask = loadedAchievementMask;
+  }
+  state.totalPlayTime = sanitizeNumber(data.totalPlayTime, 0);
+  state.noGenerationCoreBoostReached = Boolean(data.noGenerationCoreBoostReached);
   if (state.activeChallenge > 0 && !infinityChallengesUnlocked()) {
     resetBelowInfinity();
     state.activeChallenge = 0;
@@ -842,6 +893,8 @@ function resetSave() {
     completedChallenges: 0,
     infiniteCapBroken: false,
     achievementMask: 0,
+    totalPlayTime: 0,
+    noGenerationCoreBoostReached: false,
     showFloatingText: true,
     lightEffects: false,
     showFps: false,
@@ -986,18 +1039,21 @@ function infinityChallengesUnlocked() {
 }
 
 function rawLapSpeedMultiplier() {
-  let multiplier = Math.pow(1.22, state.speedLevel);
+  let multiplierLog = Math.min(state.speedLevel * log10Value(1.22), MAX_EFFECTIVE_LAP_SPEED_LOG10);
+  let multiplier = valueFromLog10(multiplierLog);
   if (hasInfinityUpgrade("2-1")) multiplier *= applyInfinityUpgradePower(1.5);
   if (state.activeChallenge === 6) multiplier = Math.pow(multiplier, 0.5);
   if (isChallengeCompleted(6)) multiplier = Math.pow(multiplier, 1.08);
-  return multiplier;
+  return Math.min(multiplier, valueFromLog10(MAX_EFFECTIVE_LAP_SPEED_LOG10));
 }
 
 function lapSpeedMultiplier() {
   const rawMultiplier = rawLapSpeedMultiplier();
   const softcapStart = lapSpeedSoftcapStart();
-  if (rawMultiplier <= softcapStart) return rawMultiplier;
-  return softcapStart * Math.pow(rawMultiplier / softcapStart, lapSpeedSoftcapPower());
+  const multiplier = rawMultiplier <= softcapStart
+    ? rawMultiplier
+    : softcapStart * Math.pow(rawMultiplier / softcapStart, lapSpeedSoftcapPower());
+  return Math.min(multiplier, valueFromLog10(MAX_EFFECTIVE_LAP_SPEED_LOG10));
 }
 
 function isLapSpeedSoftcapped() {
@@ -1604,6 +1660,7 @@ function processManyVertices(start, end) {
 }
 
 function update(dt) {
+  state.totalPlayTime += dt;
   if (hasInfinityUpgrade("1-2")) {
     normalAutobuyElapsed += dt;
     if (normalAutobuyElapsed >= 0.5) {
@@ -1853,7 +1910,7 @@ function updateChallengeRows() {
 
 function createInfinityUpgradeRows() {
   clearElement(elements.infinityUpgradeTree);
-  const upgradeRows = [["1-1"], ["1-2"], ["2-1"], ["3-1", "3-2"], ["4-1"]];
+  const upgradeRows = [["1-1", "1-2"], ["2-1"], ["3-1", "3-2"], ["4-1"]];
 
   upgradeRows.forEach((rowIds, rowIndex) => {
     const tier = document.createElement("div");
@@ -2237,6 +2294,7 @@ function resetBelowCoreBoost() {
 
 function runCoreBoost() {
   if (!canCoreBoost()) return;
+  if (state.generationCount <= 0) state.noGenerationCoreBoostReached = true;
   state.coreBoostCount += 1;
   resetBelowCoreBoost();
   updateUi();
@@ -2498,6 +2556,8 @@ function renderGameToText() {
       vertexGainIncrease: Number(vertexGainIncrease().toPrecision(6)),
       mask: state.achievementMask,
       generationMultiplierReward: isAchievementUnlocked(3),
+      totalPlayTime: Number(state.totalPlayTime.toFixed(1)),
+      noGenerationCoreBoostReached: state.noGenerationCoreBoostReached,
     },
     settings: {
       showFloatingText: state.showFloatingText,
