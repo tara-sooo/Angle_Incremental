@@ -211,6 +211,16 @@
                 <strong>IP</strong>
               </div>
               <div id="infinityUpgradeTree" class="infinity-upgrade-tree" aria-label="Infinity Upgrade tree"></div>
+              <aside class="infinity-upgrade-detail" aria-live="polite">
+                <div class="infinity-upgrade-detail-head">
+                  <span id="infinityUpgradeDetailState">選択中</span>
+                  <strong id="infinityUpgradeDetailCost">1 IP</strong>
+                </div>
+                <h2 id="infinityUpgradeDetailName">1-1 リセットは負ではない</h2>
+                <p id="infinityUpgradeDetailEffect">頂点通過ごとの増加がInfinity回数に応じて強化される</p>
+                <p id="infinityUpgradeDetailRequires">前提なし</p>
+                <button id="infinityUpgradeDetailBuy" class="infinity-upgrade-detail-buy" type="button" disabled>購入</button>
+              </aside>
             </section>
 
             <section class="infinity-panel infinity-subpanel" data-infinity-panel="challenges">
@@ -361,11 +371,11 @@
       <div class="update-modal-card">
         <p class="eyebrow">Update</p>
         <h2 id="updateModalTitle" data-i18n="updateTitle">アップデート</h2>
-        <p data-i18n="updateSummary">Infinity Upgradeを順番購入ツリーへ変更し、旧IU購入分はIPへ返金しました。</p>
+        <p data-i18n="updateSummary">Infinity Upgradeを選択式の大型ツリー表示へ変更しました。</p>
         <ul>
-          <li data-i18n="updateResetDock">通常強化コストに高log帯の段階スケーリングを追加し、GRコスト軽減の下限を×0.90にしました。</li>
-          <li data-i18n="updateCanvas">Core Boostの獲得指数を控えめにし、Infinite Angle変換は1.00e20 IP消費に変更しました。</li>
-          <li data-i18n="updateModalNote">Infinity ChallengeはIU 4-1購入後に解放されます。旧セーブではIUは未購入から再構築してください。</li>
+          <li data-i18n="updateResetDock">ノードを選択すると下部に詳細が表示され、購入ボタンから購入できます。</li>
+          <li data-i18n="updateCanvas">旧セーブでIC中だった場合、IC制約だけが外れて進行を持ち越す問題を修正しました。</li>
+          <li data-i18n="updateModalNote">旧IU購入分のIP返金と、IU 4-1購入後にIC解放される仕様は維持されます。</li>
         </ul>
         <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
       </div>

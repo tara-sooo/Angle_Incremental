@@ -332,7 +332,8 @@ canvas {
 .core-boost-button,
 .infinity-button,
 .mini-button,
-.infinity-upgrade-row button,
+.infinity-upgrade-node,
+.infinity-upgrade-detail-buy,
 .challenge-row button,
 .challenge-button,
 .break-button,
@@ -384,7 +385,8 @@ canvas {
 .core-boost-button:hover:not(:disabled),
 .infinity-button:hover:not(:disabled),
 .mini-button:hover:not(:disabled),
-.infinity-upgrade-row button:hover:not(:disabled),
+.infinity-upgrade-node:hover:not(:disabled),
+.infinity-upgrade-detail-buy:hover:not(:disabled),
 .challenge-row button:hover:not(:disabled),
 .challenge-button:hover:not(:disabled),
 .break-button:hover:not(:disabled),
@@ -400,7 +402,8 @@ canvas {
 .core-boost-button:active:not(:disabled),
 .infinity-button:active:not(:disabled),
 .mini-button:active:not(:disabled),
-.infinity-upgrade-row button:active:not(:disabled),
+.infinity-upgrade-node:active:not(:disabled),
+.infinity-upgrade-detail-buy:active:not(:disabled),
 .challenge-row button:active:not(:disabled),
 .challenge-button:active:not(:disabled),
 .break-button:active:not(:disabled),
@@ -414,7 +417,8 @@ canvas {
 .core-boost-button:disabled,
 .infinity-button:disabled,
 .mini-button:disabled,
-.infinity-upgrade-row button:disabled,
+.infinity-upgrade-node:disabled,
+.infinity-upgrade-detail-buy:disabled,
 .challenge-row button:disabled,
 .challenge-button:disabled,
 .break-button:disabled {
@@ -655,7 +659,8 @@ canvas {
 
 .mini-button,
 .challenge-button,
-.infinity-upgrade-row button,
+.infinity-upgrade-node,
+.infinity-upgrade-detail-buy,
 .challenge-row button {
   min-height: 42px;
   padding: 8px 10px;
@@ -665,38 +670,60 @@ canvas {
 
 .infinity-upgrade-tree {
   display: grid;
-  gap: 8px;
+  gap: 14px;
+  padding: 4px 0 2px;
 }
 
-.infinity-upgrade-row {
+.infinity-upgrade-tier {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
-  gap: 8px;
-  align-items: stretch;
-  min-height: 92px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: center;
 }
 
-.infinity-upgrade-info {
+.infinity-upgrade-tier:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  width: 2px;
+  height: 14px;
+  background: var(--line-strong);
+  opacity: 0.7;
+}
+
+.infinity-upgrade-tier[data-tier="1"] .infinity-upgrade-node,
+.infinity-upgrade-tier[data-tier="2"] .infinity-upgrade-node,
+.infinity-upgrade-tier[data-tier="3"] .infinity-upgrade-node,
+.infinity-upgrade-tier[data-tier="5"] .infinity-upgrade-node {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(360px, 100%);
+}
+
+.infinity-upgrade-node {
+  position: relative;
   display: grid;
   align-content: center;
-  gap: 4px;
+  justify-items: center;
+  gap: 6px;
   min-width: 0;
-  padding: 8px 10px;
+  min-height: 82px;
+  padding: 12px;
   border: 1px solid var(--line);
-  background: rgba(12, 20, 35, 0.82);
+  text-align: center;
+  background: linear-gradient(180deg, #1f3158, #111d34);
 }
 
-.infinity-upgrade-info strong {
-  text-align: left;
+.infinity-upgrade-node strong {
   color: var(--ink);
-  font-size: 0.88rem;
+  font-size: 1rem;
   max-width: none;
   overflow-wrap: anywhere;
 }
 
-.infinity-upgrade-info small,
-.infinity-upgrade-effect,
-.infinity-upgrade-requires {
+.infinity-upgrade-node small {
   margin: 0;
   color: var(--muted);
   font-size: 0.72rem;
@@ -704,21 +731,62 @@ canvas {
   line-height: 1.35;
 }
 
-.infinity-upgrade-effect {
-  color: #c7d4f2;
+.infinity-upgrade-node.is-selected {
+  border-color: var(--gold);
+  box-shadow: inset 0 -4px 0 var(--gold), 0 0 22px rgba(242, 184, 75, 0.18);
 }
 
-.infinity-upgrade-requires:empty {
-  display: none;
+.infinity-upgrade-node.is-available {
+  border-color: rgba(76, 123, 217, 0.9);
+  background: linear-gradient(180deg, #315fb0, #203f7a);
 }
 
-.infinity-upgrade-row.is-purchased .infinity-upgrade-info {
+.infinity-upgrade-node.is-purchased {
   border-color: rgba(59, 163, 110, 0.7);
-  background: rgba(31, 76, 58, 0.34);
+  background: linear-gradient(180deg, rgba(47, 119, 83, 0.9), rgba(29, 74, 56, 0.9));
 }
 
-.infinity-upgrade-row.is-locked .infinity-upgrade-info {
+.infinity-upgrade-node.is-locked,
+.infinity-upgrade-node.is-unaffordable {
   opacity: 0.68;
+}
+
+.infinity-upgrade-detail {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 2px solid var(--line-strong);
+  background: rgba(12, 20, 35, 0.9);
+}
+
+.infinity-upgrade-detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.infinity-upgrade-detail h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.infinity-upgrade-detail p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.infinity-upgrade-detail-buy {
+  min-height: 48px;
+  text-align: center;
 }
 
 .challenge-list {
@@ -1178,6 +1246,21 @@ canvas {
   .infinity-summary,
   .infinity-subtabs {
     grid-template-columns: 1fr;
+  }
+
+  .infinity-upgrade-tier {
+    grid-template-columns: 1fr;
+  }
+
+  .infinity-upgrade-tier[data-tier="1"] .infinity-upgrade-node,
+  .infinity-upgrade-tier[data-tier="2"] .infinity-upgrade-node,
+  .infinity-upgrade-tier[data-tier="3"] .infinity-upgrade-node,
+  .infinity-upgrade-tier[data-tier="5"] .infinity-upgrade-node {
+    width: 100%;
+  }
+
+  .infinity-upgrade-node {
+    min-height: 68px;
   }
 
   .main-panel {

@@ -30,6 +30,12 @@ const elements = {
   infinityPointGain: document.getElementById("infinityPointGain"),
   infinityButton: document.getElementById("infinityButton"),
   infinityUpgradeTree: document.getElementById("infinityUpgradeTree"),
+  infinityUpgradeDetailName: document.getElementById("infinityUpgradeDetailName"),
+  infinityUpgradeDetailState: document.getElementById("infinityUpgradeDetailState"),
+  infinityUpgradeDetailEffect: document.getElementById("infinityUpgradeDetailEffect"),
+  infinityUpgradeDetailRequires: document.getElementById("infinityUpgradeDetailRequires"),
+  infinityUpgradeDetailCost: document.getElementById("infinityUpgradeDetailCost"),
+  infinityUpgradeDetailBuy: document.getElementById("infinityUpgradeDetailBuy"),
   convertIpButton: document.getElementById("convertIpButton"),
   convertIpGain: document.getElementById("convertIpGain"),
   challengeList: document.getElementById("challengeList"),
@@ -79,7 +85,7 @@ const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 8;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_VERSION = 3;
-const APP_VERSION = "2026.06.21-iu-tree-balance";
+const APP_VERSION = "2026.06.21-iu-select-tree-fix";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const VERSION_MANIFEST_URL = "version.json";
 const UPDATE_CHECK_INTERVAL_SECONDS = 60;
@@ -140,6 +146,9 @@ const TEXT = {
     infinityUpgradeNeedIp: "IP不足",
     infinityUpgradeCost: "必要",
     infinityUpgradeRequires: "前提",
+    infinityUpgradeNoRequires: "前提なし",
+    infinityUpgradeSelected: "選択中",
+    buyInfinityUpgrade: "購入",
     convertIp: "IPをIAへ",
     achievementBoost: "実績増加倍率",
     achievementReward: "共通報酬",
@@ -193,10 +202,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "Infinity Upgradeを順番購入ツリーへ変更し、旧IU購入分はIPへ返金しました。",
-    updateResetDock: "通常強化コストに高log帯の段階スケーリングを追加し、GRコスト軽減の下限を×0.90にしました。",
-    updateCanvas: "Core Boostの獲得指数を控えめにし、Infinite Angle変換は1.00e20 IP消費に変更しました。",
-    updateModalNote: "Infinity ChallengeはIU 4-1購入後に解放されます。旧セーブではIUは未購入から再構築してください。",
+    updateSummary: "Infinity Upgradeを選択式の大型ツリー表示へ変更しました。",
+    updateResetDock: "ノードを選択すると下部に詳細が表示され、購入ボタンから購入できます。",
+    updateCanvas: "旧セーブでIC中だった場合、IC制約だけが外れて進行を持ち越す問題を修正しました。",
+    updateModalNote: "旧IU購入分のIP返金と、IU 4-1購入後にIC解放される仕様は維持されます。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -242,6 +251,9 @@ const TEXT = {
     infinityUpgradeNeedIp: "Need IP",
     infinityUpgradeCost: "Cost",
     infinityUpgradeRequires: "Requires",
+    infinityUpgradeNoRequires: "No prerequisite",
+    infinityUpgradeSelected: "Selected",
+    buyInfinityUpgrade: "Buy",
     convertIp: "Convert IP to IA",
     achievementBoost: "Achievement boost",
     achievementReward: "Shared reward",
@@ -295,10 +307,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Infinity Upgrades now use an ordered tree, and old IU purchases were refunded into IP.",
-    updateResetDock: "Normal upgrades gained staged high-log cost scaling, and GR cost reduction now floors at ×0.90.",
-    updateCanvas: "Core Boost exponent growth was reduced, and Infinite Angle conversion now costs 1.00e20 IP.",
-    updateModalNote: "Infinity Challenges unlock after IU 4-1. Older saves rebuild the new tree from refunded IP.",
+    updateSummary: "Infinity Upgrades now use a larger selectable tree view.",
+    updateResetDock: "Select a node to show its details below, then purchase from the detail panel.",
+    updateCanvas: "Old saves that were inside an IC now reset lower progress when that locked IC is invalidated.",
+    updateModalNote: "Legacy IU refunds and the IU 4-1 Infinity Challenge unlock rule are unchanged.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -555,6 +567,7 @@ let japaneseFontReady = false;
 let normalAutobuyElapsed = 0;
 let activeMainTab = "angle";
 let activeInfinitySubtab = "upgrades";
+let selectedInfinityUpgradeId = "1-1";
 let appliedLanguage = "";
 let smoothedFps = 0;
 const requestNextFrame = window.requestAnimationFrame
@@ -730,7 +743,10 @@ function applySaveData(data, saveVersion = SAVE_VERSION) {
   state.completedChallenges = Math.floor(sanitizeNumber(data.completedChallenges, 0));
   state.infiniteCapBroken = Boolean(data.infiniteCapBroken);
   state.achievementMask = Math.floor(sanitizeNumber(data.achievementMask, 0));
-  if (!infinityChallengesUnlocked()) state.activeChallenge = 0;
+  if (state.activeChallenge > 0 && !infinityChallengesUnlocked()) {
+    resetBelowInfinity();
+    state.activeChallenge = 0;
+  }
   state.showFloatingText = data.showFloatingText !== false;
   state.lightEffects = Boolean(data.lightEffects);
   state.showFps = Boolean(data.showFps);
@@ -1837,62 +1853,93 @@ function updateChallengeRows() {
 
 function createInfinityUpgradeRows() {
   clearElement(elements.infinityUpgradeTree);
-  INFINITY_UPGRADES.forEach((upgrade) => {
-    const row = document.createElement("article");
-    row.className = "infinity-upgrade-row";
-    row.dataset.upgrade = upgrade.id;
+  const upgradeRows = [["1-1"], ["1-2"], ["2-1"], ["3-1", "3-2"], ["4-1"]];
 
-    const info = document.createElement("div");
-    info.className = "infinity-upgrade-info";
+  upgradeRows.forEach((rowIds, rowIndex) => {
+    const tier = document.createElement("div");
+    tier.className = "infinity-upgrade-tier";
+    tier.dataset.tier = String(rowIndex + 1);
 
-    const name = document.createElement("strong");
-    name.className = "infinity-upgrade-name";
+    rowIds.forEach((id) => {
+      const upgrade = infinityUpgradeById(id);
+      if (!upgrade) return;
+      const button = document.createElement("button");
+      button.className = "infinity-upgrade-node";
+      button.type = "button";
+      button.dataset.upgrade = upgrade.id;
+      button.addEventListener("click", () => selectInfinityUpgrade(upgrade.id));
 
-    const status = document.createElement("small");
-    status.className = "infinity-upgrade-state";
+      const name = document.createElement("strong");
+      name.className = "infinity-upgrade-name";
 
-    const effect = document.createElement("p");
-    effect.className = "infinity-upgrade-effect";
+      const status = document.createElement("small");
+      status.className = "infinity-upgrade-state";
 
-    const requirement = document.createElement("p");
-    requirement.className = "infinity-upgrade-requires";
+      button.append(name, status);
+      tier.append(button);
+    });
 
-    const button = document.createElement("button");
-    button.className = "mini-button infinity-upgrade-buy";
-    button.type = "button";
-    button.addEventListener("click", () => buyInfinityUpgrade(upgrade.id));
-
-    info.append(name, status, effect, requirement);
-    row.append(info, button);
-    elements.infinityUpgradeTree.append(row);
+    elements.infinityUpgradeTree.append(tier);
   });
 }
 
+function selectInfinityUpgrade(id) {
+  if (!infinityUpgradeById(id)) return;
+  selectedInfinityUpgradeId = id;
+  updateInfinityUpgradeRows();
+}
+
+function infinityUpgradeStateText(upgrade) {
+  if (hasInfinityUpgrade(upgrade.id)) return t("infinityUpgradePurchased");
+  if (!infinityUpgradePrerequisitesMet(upgrade)) return t("infinityUpgradeLocked");
+  if (!canSpendInfinityPoints(log10Value(upgrade.cost))) return t("infinityUpgradeNeedIp");
+  return t("infinityUpgradeAvailable");
+}
+
+function updateInfinityUpgradeDetail() {
+  const upgrade = infinityUpgradeById(selectedInfinityUpgradeId) || INFINITY_UPGRADES[0];
+  selectedInfinityUpgradeId = upgrade.id;
+  const purchased = hasInfinityUpgrade(upgrade.id);
+  const prerequisitesMet = infinityUpgradePrerequisitesMet(upgrade);
+  const affordable = canSpendInfinityPoints(log10Value(upgrade.cost));
+  const canBuy = !purchased && prerequisitesMet && affordable;
+  const requiresText = upgrade.requires.length > 0
+    ? `${t("infinityUpgradeRequires")}: ${upgrade.requires.join(", ")}`
+    : t("infinityUpgradeNoRequires");
+
+  elements.infinityUpgradeDetailName.textContent = infinityUpgradeName(upgrade.id);
+  elements.infinityUpgradeDetailState.textContent = `${t("infinityUpgradeSelected")} · ${infinityUpgradeStateText(upgrade)}`;
+  elements.infinityUpgradeDetailEffect.textContent = infinityUpgradeEffectText(upgrade.id);
+  elements.infinityUpgradeDetailRequires.textContent = requiresText;
+  elements.infinityUpgradeDetailCost.textContent = `${t("infinityUpgradeCost")} ${formatUiLogNumber(log10Value(upgrade.cost))} IP`;
+  elements.infinityUpgradeDetailBuy.textContent = purchased ? t("infinityUpgradePurchased") : t("buyInfinityUpgrade");
+  elements.infinityUpgradeDetailBuy.disabled = !canBuy;
+}
+
 function updateInfinityUpgradeRows() {
-  elements.infinityUpgradeTree.querySelectorAll(".infinity-upgrade-row").forEach((row) => {
-    const upgrade = infinityUpgradeById(row.dataset.upgrade);
+  elements.infinityUpgradeTree.querySelectorAll(".infinity-upgrade-node").forEach((node) => {
+    const upgrade = infinityUpgradeById(node.dataset.upgrade);
     if (!upgrade) return;
     const purchased = hasInfinityUpgrade(upgrade.id);
     const prerequisitesMet = infinityUpgradePrerequisitesMet(upgrade);
     const affordable = canSpendInfinityPoints(log10Value(upgrade.cost));
-    const button = row.querySelector("button");
-    const requirementText = upgrade.requires.length > 0
-      ? `${t("infinityUpgradeRequires")}: ${upgrade.requires.join(", ")}`
-      : "";
-    let stateText = t("infinityUpgradeAvailable");
-    if (purchased) stateText = t("infinityUpgradePurchased");
-    else if (!prerequisitesMet) stateText = t("infinityUpgradeLocked");
-    else if (!affordable) stateText = t("infinityUpgradeNeedIp");
+    const available = !purchased && prerequisitesMet && affordable;
+    const selected = selectedInfinityUpgradeId === upgrade.id;
 
-    row.classList.toggle("is-purchased", purchased);
-    row.classList.toggle("is-locked", !purchased && !prerequisitesMet);
-    row.querySelector(".infinity-upgrade-name").textContent = infinityUpgradeName(upgrade.id);
-    row.querySelector(".infinity-upgrade-state").textContent = `${stateText} · ${t("infinityUpgradeCost")} ${formatUiLogNumber(log10Value(upgrade.cost))} IP`;
-    row.querySelector(".infinity-upgrade-effect").textContent = infinityUpgradeEffectText(upgrade.id);
-    row.querySelector(".infinity-upgrade-requires").textContent = requirementText;
-    button.textContent = purchased ? t("infinityUpgradePurchased") : t("startChallenge");
-    button.disabled = purchased || !prerequisitesMet || !affordable;
+    node.classList.toggle("is-selected", selected);
+    node.classList.toggle("is-purchased", purchased);
+    node.classList.toggle("is-available", available);
+    node.classList.toggle("is-locked", !purchased && !prerequisitesMet);
+    node.classList.toggle("is-unaffordable", !purchased && prerequisitesMet && !affordable);
+    node.querySelector(".infinity-upgrade-name").textContent = upgrade.id;
+    node.querySelector(".infinity-upgrade-state").textContent = infinityUpgradeStateText(upgrade);
   });
+
+  updateInfinityUpgradeDetail();
+}
+
+function buySelectedInfinityUpgrade() {
+  buyInfinityUpgrade(selectedInfinityUpgradeId);
 }
 
 function createAchievementRows() {
@@ -2436,6 +2483,8 @@ function renderGameToText() {
       infiniteAngleConversionCost: formatUiLogNumber(infiniteAngleConversionCostLog10()),
       infiniteAngleConversionCostLog10: INFINITE_ANGLE_CONVERSION_COST_LOG10,
       normalAutobuy: hasInfinityUpgrade("1-2"),
+      selectedUpgrade: selectedInfinityUpgradeId,
+      selectedUpgradeCanBuy: canBuyInfinityUpgrade(selectedInfinityUpgradeId),
       upgrades: INFINITY_UPGRADES.map((upgrade) => ({
         id: upgrade.id,
         purchased: hasInfinityUpgrade(upgrade.id),
@@ -2499,6 +2548,7 @@ elements.buyAllUpgrade.addEventListener("click", () => buyAllUpgrades());
 elements.generationButton.addEventListener("click", runGeneration);
 elements.coreBoostButton.addEventListener("click", runCoreBoost);
 elements.infinityButton.addEventListener("click", () => runInfinity(false));
+elements.infinityUpgradeDetailBuy.addEventListener("click", buySelectedInfinityUpgrade);
 elements.convertIpButton.addEventListener("click", convertIpToInfiniteScore);
 elements.breakCapButton.addEventListener("click", breakInfiniteCap);
 elements.resetSaveButton.addEventListener("click", resetSave);

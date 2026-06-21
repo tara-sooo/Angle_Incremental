@@ -55,6 +55,8 @@ Original prompt: では、中核ループを完成させてください
 - Added a version manifest and automatic update check. Loaded clients save and reload themselves when `version.json` advertises a newer `appVersion`.
 - Added log-backed resource tracking for total score, generation score, IP, and Infinite Score, and fixed gain-on-core rounding/labeling so large values do not collapse into Infinity/NaN displays or saves.
 - Changed compact reset controls so Generation and Core Boost multiplier/exponent rows remain accessible on short screens through scrolling instead of being hidden.
+- Fixed legacy IC save migration so invalidating a locked active IC also resets Infinity-below progress instead of carrying restricted progress into a normal run.
+- Reworked the Infinity Upgrade UI into a selectable large-node tree with a lower detail panel and purchase button, while keeping IU costs, prerequisites, and effects unchanged.
 
 ## TODO
 
