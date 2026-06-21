@@ -75,20 +75,20 @@ const elements = {
 
 const BASE_LAP_SECONDS = 6;
 const GENERATION_UNLOCK_SCORE = 1000000;
-const GENERATION_MIN_NEW_COST_FACTOR = 0.9;
+const GENERATION_MIN_NEW_COST_FACTOR = 0.78;
 const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const MAX_CORE_BOOST_REQUIREMENT_LOG10 = 308;
 const INFINITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
 const BREAK_CAP_REQUIREMENT_LOG10 = 333;
 const MAX_TRACKED_LOG10 = 1000000000;
 const MAX_RENDERED_VERTICES = 10000;
-const MAX_EFFECTIVE_LAP_SPEED_LOG10 = 12;
+const MAX_EFFECTIVE_LAP_SPEED_LOG10 = 42;
 const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 14;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_QUARANTINE_KEY = "angle-incremental-save-quarantine";
-const SAVE_VERSION = 5;
-const APP_VERSION = "2026.06.21-update-reload-guard";
+const SAVE_VERSION = 6;
+const APP_VERSION = "2026.06.21-progression-recovery";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const UPDATE_RELOAD_TARGET_KEY = "angle-incremental-update-reload-target";
 const UPDATE_RELOAD_TIME_KEY = "angle-incremental-update-reload-time";
@@ -119,6 +119,7 @@ const GENERATION_COST_POWER_IC3_REWARD = 1.08;
 const VERTEX_EPSILON = 1e-9;
 const TAU = Math.PI * 2;
 const BUY_ALL_LIMIT = 1000;
+const MAX_VERTEX_PROGRESS_TRACKED = 1000000000000;
 const TEXT = {
   ja: {
     tabAngle: "図形",
@@ -210,10 +211,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "自動更新の連続リロードを防ぐようにしました。",
-    updateResetDock: "同じ更新先への自動リロードは1回だけ試行します。",
-    updateCanvas: "キャッシュが古い場合は手動リロード待ちとして表示します。",
-    updateModalNote: "更新適用時はURLにバージョンを付けてキャッシュを避けます。",
+    updateSummary: "CB3/GR5付近からInfinityへ届きやすいように調整しました。",
+    updateResetDock: "ラップ速度の安全上限を引き上げ、後半で速度が止まりにくくなりました。",
+    updateCanvas: "核到達時の獲得量をlog保存し、巨大値のセーブ破損を防ぎます。",
+    updateModalNote: "Generation報酬を強化し、実行直後の弱体感を軽減しました。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -316,10 +317,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Automatic update reloads no longer loop repeatedly.",
-    updateResetDock: "The same update target is auto-reloaded only once.",
-    updateCanvas: "If browser cache keeps an old build, the game now waits for a manual reload.",
-    updateModalNote: "Update reloads add the target version to the URL to avoid stale HTML cache.",
+    updateSummary: "Progression around CB3/GR5 now reaches Infinity more reliably.",
+    updateResetDock: "The safe lap-speed cap was raised so late speed investment keeps scaling.",
+    updateCanvas: "Gain on core hit is saved in log space to avoid huge-value save corruption.",
+    updateModalNote: "Generation rewards were strengthened to reduce post-reset weakness.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -529,6 +530,7 @@ const state = {
   speedLevel: 0,
   gainLevel: 0,
   currentGain: 1,
+  currentGainLog10: 0,
   pointProgress: 0,
   totalVertexProgress: 0,
   lastVertexIndex: 0,
@@ -575,6 +577,7 @@ const SAVE_FIELDS = [
   "speedLevel",
   "gainLevel",
   "currentGain",
+  "currentGainLog10",
   "pointProgress",
   "totalVertexProgress",
   "lastVertexIndex",
@@ -829,7 +832,9 @@ function applySaveData(data, saveVersion = SAVE_VERSION) {
   state.vertices = Math.min(MAX_RENDERED_VERTICES, Math.max(3, Math.floor(sanitizeNumber(data.vertices, 3, 3))));
   state.speedLevel = Math.floor(sanitizeNumber(data.speedLevel, 0));
   state.gainLevel = Math.floor(sanitizeNumber(data.gainLevel, 0));
-  state.currentGain = hydrateLogResource(data.currentGain, data.currentGainLog10, 0).value || 1;
+  const currentGain = hydrateLogResource(data.currentGain, data.currentGainLog10, 0);
+  state.currentGain = currentGain.value || 1;
+  state.currentGainLog10 = Math.max(0, currentGain.log);
   state.pointProgress = ((sanitizeNumber(data.pointProgress, 0) % 1) + 1) % 1;
   state.totalVertexProgress = sanitizeNumber(data.totalVertexProgress, state.pointProgress * state.vertices);
   state.lastVertexIndex = Math.floor(sanitizeNumber(data.lastVertexIndex, Math.floor(state.totalVertexProgress)));
@@ -975,6 +980,7 @@ function resetSave() {
     speedLevel: 0,
     gainLevel: 0,
     currentGain: 1,
+    currentGainLog10: 0,
     pointProgress: 0,
     totalVertexProgress: 0,
     lastVertexIndex: 0,
@@ -1231,6 +1237,25 @@ function currentGenerationScoreLog10() {
   return currentLog10ForValue(state.generationScore, state.generationScoreLog10);
 }
 
+function currentGainLog10() {
+  return currentLog10ForValue(state.currentGain, state.currentGainLog10);
+}
+
+function setCurrentGainLog10(log) {
+  state.currentGainLog10 = Math.max(0, clampLog10(log));
+  state.currentGain = valueFromLog10(state.currentGainLog10);
+}
+
+function addCurrentGain(amount) {
+  if (amount <= 0) return;
+  setCurrentGainLog10(combineLog10(currentGainLog10(), log10Value(amount)));
+}
+
+function gainAfterIncreaseLog10(increase, stepCount) {
+  if (stepCount <= 0 || increase <= 0) return currentGainLog10();
+  return combineLog10(currentGainLog10(), log10Value(increase) + log10Value(stepCount));
+}
+
 function currentPreviousGenerationScoreLog10() {
   return currentLog10ForValue(state.previousGenerationScore, state.previousGenerationScoreLog10);
 }
@@ -1353,21 +1378,29 @@ function finalScoreGain(baseGain = state.currentGain) {
   return gainLog <= 308 ? 10 ** gainLog : Infinity;
 }
 
-function angleExpressionLog10(baseGain = state.currentGain) {
-  const baseLog = log10Value(Math.max(baseGain, 0));
+function angleExpressionFromBaseLog10(baseLog) {
   const parts = gainExpressionParts();
   if (parts <= 1) return baseLog;
   return (baseLog - log10Value(parts)) * parts;
+}
+
+function angleExpressionLog10(baseGain = state.currentGain) {
+  return angleExpressionFromBaseLog10(log10Value(Math.max(baseGain, 0)));
 }
 
 function preExpressionScoreGainLog10(baseGain = state.currentGain) {
   return angleExpressionLog10(baseGain);
 }
 
-function finalScoreGainLog10(baseGain = state.currentGain) {
-  const angleLog = angleExpressionLog10(baseGain) * coreBoostGainExponent();
+function finalScoreGainFromBaseLog10(baseLog) {
+  const angleLog = angleExpressionFromBaseLog10(baseLog) * coreBoostGainExponent();
   const boostedLog = angleLog + log10Value(generationScoreMultiplierEffect());
   return boostedLog * finalScoreGainPower() - log10Value(finalScoreGainDivisor());
+}
+
+function finalScoreGainLog10(baseGain = state.currentGain) {
+  if (baseGain === state.currentGain) return finalScoreGainFromBaseLog10(currentGainLog10());
+  return finalScoreGainFromBaseLog10(log10Value(Math.max(baseGain, 0)));
 }
 
 function isAchievementUnlocked(id) {
@@ -1524,7 +1557,6 @@ function canBreakInfiniteCap() {
 
 function sumCoreHitGains(firstCoreStep, coreHits, increase) {
   const stride = state.vertices;
-  const baseGain = state.currentGain;
 
   if (coreHits > MAX_EXACT_CORE_HITS) {
     let earned = 0;
@@ -1532,14 +1564,17 @@ function sumCoreHitGains(firstCoreStep, coreHits, increase) {
     for (let segment = 0; segment < CORE_HIT_APPROX_SEGMENTS; segment += 1) {
       const midHit = (segment + 0.5) * segmentSize;
       const stepAtMid = firstCoreStep + midHit * stride;
-      earned += finalScoreGain(baseGain + increase * stepAtMid) * segmentSize;
+      const gainLog = gainAfterIncreaseLog10(increase, stepAtMid);
+      const scoreLog = finalScoreGainFromBaseLog10(gainLog);
+      earned += valueFromLog10(scoreLog) * segmentSize;
     }
     return earned;
   }
 
   let earned = 0;
   for (let hit = 0; hit < coreHits; hit += 1) {
-    earned += finalScoreGain(baseGain + increase * (firstCoreStep + hit * stride));
+    const gainLog = gainAfterIncreaseLog10(increase, firstCoreStep + hit * stride);
+    earned += valueFromLog10(finalScoreGainFromBaseLog10(gainLog));
   }
   return earned;
 }
@@ -1571,9 +1606,13 @@ function preGenerationCostScalingLog10(kind, level) {
 }
 
 function stagedUpgradeCostScalingLog10(costLog) {
+  const relief = Math.max(
+    0.28,
+    1 - Math.max(0, state.generationCount - 1) * 0.06 - state.coreBoostCount * 0.16,
+  );
   return STAGED_UPGRADE_COST_SCALING.reduce((total, stage) => {
     const excess = Math.max(0, costLog - stage.startsAfterLog10);
-    return total + excess * excess * stage.logScale;
+    return total + excess * excess * stage.logScale * relief;
   }, 0);
 }
 
@@ -1616,8 +1655,8 @@ function costs() {
 function generationRewardForLog(generationScoreLog) {
   const depth = Math.max(0, generationScoreLog - log10Value(GENERATION_UNLOCK_SCORE));
   return {
-    scoreMultiplierGain: 1 + Math.min(1.25, 0.12 + Math.log10(1 + depth) * 0.22),
-    costReduction: Math.min(0.08, 0.01 + Math.log10(1 + depth) * 0.012),
+    scoreMultiplierGain: 1 + Math.min(4.5, 0.65 + Math.log10(1 + depth) * 0.9),
+    costReduction: Math.min(0.18, 0.03 + Math.log10(1 + depth) * 0.032),
   };
 }
 
@@ -1705,7 +1744,7 @@ function addScore(amount, amountLog10 = log10Value(amount)) {
 }
 
 function passVertex(index) {
-  state.currentGain += vertexGainIncrease();
+  addCurrentGain(vertexGainIncrease());
   if (isCoreVertex(index)) {
     const earned = finalScoreGain();
     const resetByInfinity = addScore(earned, finalScoreGainLog10());
@@ -1746,7 +1785,7 @@ function processManyVertices(start, end) {
       earned += sumCoreHitGains(batch.firstCoreStep, batch.coreHits, increase);
       lastCoreStep = Math.max(lastCoreStep, batch.firstCoreStep + (batch.coreHits - 1) * state.vertices);
     });
-    const batchLog = log10Value(Math.max(coreHits, 1)) + finalScoreGainLog10(state.currentGain + increase * lastCoreStep);
+    const batchLog = log10Value(Math.max(coreHits, 1)) + finalScoreGainFromBaseLog10(gainAfterIncreaseLog10(increase, lastCoreStep));
     const resetByInfinity = addScore(earned, Number.isFinite(earned) ? log10Value(earned) : batchLog);
     if (resetByInfinity) return true;
     if (state.showFloatingText && !state.lightEffects) {
@@ -1759,8 +1798,16 @@ function processManyVertices(start, end) {
     }
   }
 
-  state.currentGain += increase * count;
+  addCurrentGain(increase * count);
   return false;
+}
+
+function normalizeVertexProgress() {
+  if (state.totalVertexProgress <= MAX_VERTEX_PROGRESS_TRACKED) return;
+  const wrapped = ((state.totalVertexProgress % state.vertices) + state.vertices) % state.vertices;
+  state.totalVertexProgress = wrapped;
+  state.pointProgress = wrapped / state.vertices;
+  state.lastVertexIndex = Math.floor(wrapped) % state.vertices;
 }
 
 function update(dt) {
@@ -1794,6 +1841,7 @@ function update(dt) {
     }
   }
 
+  normalizeVertexProgress();
   state.lastVertexIndex = Math.floor(state.pointProgress * state.vertices) % state.vertices;
   state.floatingTexts = state.floatingTexts
     .map((item) => ({ ...item, life: item.life - dt, y: item.y - dt * 26 }))
@@ -2366,6 +2414,7 @@ function runGeneration() {
   state.speedLevel = 0;
   state.gainLevel = 0;
   state.currentGain = 1;
+  state.currentGainLog10 = 0;
   state.pointProgress = 0;
   state.totalVertexProgress = 0;
   state.lastVertexIndex = 0;
@@ -2385,6 +2434,7 @@ function resetBelowCoreBoost() {
   state.speedLevel = 0;
   state.gainLevel = 0;
   state.currentGain = 1;
+  state.currentGainLog10 = 0;
   state.pointProgress = 0;
   state.totalVertexProgress = 0;
   state.lastVertexIndex = 0;
@@ -2416,6 +2466,7 @@ function resetBelowInfinity() {
   state.speedLevel = 0;
   state.gainLevel = 0;
   state.currentGain = 1;
+  state.currentGainLog10 = 0;
   state.pointProgress = 0;
   state.totalVertexProgress = 0;
   state.lastVertexIndex = 0;
@@ -2567,7 +2618,7 @@ function renderGameToText() {
   const generationScoreLog = currentGenerationScoreLog10();
   const infinityPointsLog = currentInfinityPointsLog10();
   const infiniteScoreLog = currentInfiniteScoreLog10();
-  const currentGainLog = log10Value(state.currentGain);
+  const currentGainLog = currentGainLog10();
   const currentCostLogs = costLogs();
   return JSON.stringify({
     coordinateSystem: "canvas pixels, origin top-left, x right, y down",
