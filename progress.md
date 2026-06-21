@@ -63,6 +63,7 @@ Original prompt: では、中核ループを完成させてください
 - Added landscape scrolling for The Angle upgrades, achievements, and the main tab rail so short horizontal screens do not clip controls or achievement rows.
 - Hardened save loading for stringified large numbers such as `1e1300`, and quarantine unrecoverable saves under a backup key before opening from a fresh state.
 - Renamed IU 3-1 to remove the stale achievement 7 reference after the achievement list changed.
+- Guarded remote update reloads so a stale cached build only auto-reloads once per target version, then shows a manual-reload status instead of looping.
 
 ## TODO
 

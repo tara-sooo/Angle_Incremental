@@ -371,11 +371,11 @@
       <div class="update-modal-card">
         <p class="eyebrow">Update</p>
         <h2 id="updateModalTitle" data-i18n="updateTitle">アップデート</h2>
-        <p data-i18n="updateSummary">横画面で強化欄と実績タブをスクロールできるようにしました。</p>
+        <p data-i18n="updateSummary">自動更新の連続リロードを防ぐようにしました。</p>
         <ul>
-          <li data-i18n="updateResetDock">巨大な旧セーブや文字列化された大数セーブの復元を強化しました。</li>
-          <li data-i18n="updateCanvas">復元不能なセーブは退避して、新規状態で起動できるようにしました。</li>
-          <li data-i18n="updateModalNote">IU 3-1の名前から古い実績7への言及を外しました。</li>
+          <li data-i18n="updateResetDock">同じ更新先への自動リロードは1回だけ試行します。</li>
+          <li data-i18n="updateCanvas">キャッシュが古い場合は手動リロード待ちとして表示します。</li>
+          <li data-i18n="updateModalNote">更新適用時はURLにバージョンを付けてキャッシュを避けます。</li>
         </ul>
         <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
       </div>

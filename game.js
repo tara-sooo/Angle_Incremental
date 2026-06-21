@@ -88,10 +88,14 @@ const ACHIEVEMENT_COUNT = 14;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_QUARANTINE_KEY = "angle-incremental-save-quarantine";
 const SAVE_VERSION = 5;
-const APP_VERSION = "2026.06.21-landscape-save-recovery";
+const APP_VERSION = "2026.06.21-update-reload-guard";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
+const UPDATE_RELOAD_TARGET_KEY = "angle-incremental-update-reload-target";
+const UPDATE_RELOAD_TIME_KEY = "angle-incremental-update-reload-time";
+const UPDATE_DEFERRED_TARGET_KEY = "angle-incremental-update-deferred-target";
 const VERSION_MANIFEST_URL = "version.json";
 const UPDATE_CHECK_INTERVAL_SECONDS = 60;
+const UPDATE_RETRY_COOLDOWN_MS = 10 * 60 * 1000;
 const MAX_VERTEX_STEPS_PER_FRAME = 5000;
 const MAX_EXACT_CORE_HITS = 50000;
 const CORE_HIT_APPROX_SEGMENTS = 2048;
@@ -202,13 +206,14 @@ const TEXT = {
     loaded: "ロード済み",
     oldSave: "セーブ形式が古い",
     loadFailed: "読み込み失敗",
+    updateReloadDeferred: "更新待機中：手動リロードしてください",
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "横画面で強化欄と実績タブをスクロールできるようにしました。",
-    updateResetDock: "巨大な旧セーブや文字列化された大数セーブの復元を強化しました。",
-    updateCanvas: "復元不能なセーブは退避して、新規状態で起動できるようにしました。",
-    updateModalNote: "IU 3-1の名前から古い実績7への言及を外しました。",
+    updateSummary: "自動更新の連続リロードを防ぐようにしました。",
+    updateResetDock: "同じ更新先への自動リロードは1回だけ試行します。",
+    updateCanvas: "キャッシュが古い場合は手動リロード待ちとして表示します。",
+    updateModalNote: "更新適用時はURLにバージョンを付けてキャッシュを避けます。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -307,13 +312,14 @@ const TEXT = {
     loaded: "Loaded",
     oldSave: "Old save format",
     loadFailed: "Load failed",
+    updateReloadDeferred: "Update waiting: reload manually",
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Upgrade and achievement panels now scroll in landscape layouts.",
-    updateResetDock: "Large old saves and stringified large-number saves are restored more robustly.",
-    updateCanvas: "Unrecoverable saves are quarantined so the game can still open from a fresh state.",
-    updateModalNote: "IU 3-1 no longer mentions the replaced achievement 7.",
+    updateSummary: "Automatic update reloads no longer loop repeatedly.",
+    updateResetDock: "The same update target is auto-reloaded only once.",
+    updateCanvas: "If browser cache keeps an old build, the game now waits for a manual reload.",
+    updateModalNote: "Update reloads add the target version to the URL to avoid stale HTML cache.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -649,6 +655,50 @@ function showUpdateModalIfNeeded() {
   if (elements.updateModalClose) elements.updateModalClose.focus();
 }
 
+function storedUpdateReloadTime() {
+  try {
+    return sanitizeNumber(localStorage.getItem(UPDATE_RELOAD_TIME_KEY), 0);
+  } catch (error) {
+    return 0;
+  }
+}
+
+function markUpdateDeferred(targetVersion) {
+  try {
+    localStorage.setItem(UPDATE_DEFERRED_TARGET_KEY, targetVersion);
+  } catch (error) {
+    // Non-critical: the visible save status still tells the player what to do.
+  }
+  setSaveStatus(t("updateReloadDeferred"));
+}
+
+function reloadForRemoteUpdate(targetVersion) {
+  const now = Date.now();
+  try {
+    const previousTarget = localStorage.getItem(UPDATE_RELOAD_TARGET_KEY);
+    const previousTime = storedUpdateReloadTime();
+    if (previousTarget === targetVersion) {
+      markUpdateDeferred(targetVersion);
+      return;
+    }
+    if (previousTime > 0 && now - previousTime < UPDATE_RETRY_COOLDOWN_MS) {
+      markUpdateDeferred(targetVersion);
+      return;
+    }
+    localStorage.setItem(UPDATE_RELOAD_TARGET_KEY, targetVersion);
+    localStorage.setItem(UPDATE_RELOAD_TIME_KEY, String(now));
+    localStorage.removeItem(UPDATE_DEFERRED_TARGET_KEY);
+  } catch (error) {
+    markUpdateDeferred(targetVersion);
+    return;
+  }
+
+  saveGame("manual");
+  const url = new URL(window.location.href);
+  url.searchParams.set("v", targetVersion);
+  window.location.replace(url.toString());
+}
+
 async function checkForRemoteUpdate() {
   if (updateCheckInFlight || !window.fetch) return;
   updateCheckInFlight = true;
@@ -658,8 +708,7 @@ async function checkForRemoteUpdate() {
     const manifest = await response.json();
     if (!manifest || typeof manifest.appVersion !== "string") return;
     if (manifest.appVersion && manifest.appVersion !== APP_VERSION) {
-      saveGame("manual");
-      window.location.reload();
+      reloadForRemoteUpdate(manifest.appVersion);
     }
   } catch (error) {
     // Update checks should never interrupt gameplay.
