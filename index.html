@@ -23,6 +23,16 @@
           <small id="infinityTabState">LOCKED</small>
           <i id="infinityTabBadge" aria-hidden="true"></i>
         </button>
+        <button class="main-tab" type="button" data-tab="automation" aria-selected="false">
+          <span class="tab-icon">⟳</span>
+          <span class="tab-code">AUTO</span>
+          <small data-i18n="tabAutomation">自動化</small>
+        </button>
+        <button class="main-tab" type="button" data-tab="statistics" aria-selected="false">
+          <span class="tab-icon">#</span>
+          <span class="tab-code">STAT</span>
+          <small data-i18n="tabStatistics">統計</small>
+        </button>
         <button class="main-tab" type="button" data-tab="achievements" aria-selected="false">
           <span class="tab-icon">★</span>
           <span class="tab-code">ACH</span>
@@ -255,6 +265,63 @@
               </div>
             </section>
           </div>
+        </section>
+
+        <section class="main-panel automation-panel" data-panel="automation" aria-label="Automation">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">Automation</p>
+              <h1 data-i18n="automation">自動化</h1>
+            </div>
+            <div class="unlock-note" id="automationLockNote">IU 1-2で解放</div>
+          </header>
+          <div class="settings-grid">
+            <section class="settings-card">
+              <div class="setting-row">
+                <label for="automationMasterToggle" data-i18n="automationMaster">自動購入</label>
+                <input id="automationMasterToggle" type="checkbox" />
+              </div>
+              <div class="setting-row">
+                <label for="autoBuySpeedToggle" data-i18n="autoBuySpeed">周回速度 自動購入</label>
+                <input id="autoBuySpeedToggle" type="checkbox" checked />
+              </div>
+              <div class="setting-row">
+                <label for="autoBuyVertexToggle" data-i18n="autoBuyVertex">角追加 自動購入</label>
+                <input id="autoBuyVertexToggle" type="checkbox" checked />
+              </div>
+              <div class="setting-row">
+                <label for="autoBuyGainToggle" data-i18n="autoBuyGain">頂点獲得量 自動購入</label>
+                <input id="autoBuyGainToggle" type="checkbox" checked />
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="main-panel statistics-panel" data-panel="statistics" aria-label="Statistics">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">Statistics</p>
+              <h1 data-i18n="statistics">統計</h1>
+            </div>
+          </header>
+          <section class="statistics-grid">
+            <div class="settings-card stat-card">
+              <span data-i18n="currentInfinityRun">現在のInfinity周回</span>
+              <strong id="currentInfinityRunTime">0秒</strong>
+            </div>
+            <div class="settings-card stat-card">
+              <span data-i18n="totalPlayTimeLabel">総プレイ時間</span>
+              <strong id="totalPlayTime">0秒</strong>
+            </div>
+            <div class="settings-card stat-card">
+              <span data-i18n="fastestInfinity">最速Infinity</span>
+              <strong id="fastestInfinityTime">記録なし</strong>
+            </div>
+            <section class="settings-card run-history">
+              <h2 data-i18n="lastInfinityRunsLabel">過去10回のInfinity</h2>
+              <ol id="lastInfinityRuns"></ol>
+            </section>
+          </section>
         </section>
 
         <section class="main-panel achievements-panel" data-panel="achievements" aria-label="Achievements">

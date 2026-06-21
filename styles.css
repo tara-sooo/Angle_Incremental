@@ -487,6 +487,8 @@ canvas {
 }
 
 .infinity-page,
+.automation-panel,
+.statistics-panel,
 .achievements-panel,
 .help-panel,
 .settings-panel {
@@ -494,6 +496,8 @@ canvas {
 }
 
 .infinity-page,
+.automation-panel,
+.statistics-panel,
 .achievements-panel {
   overflow: auto;
 }
@@ -979,6 +983,46 @@ canvas {
   align-items: start;
 }
 
+.statistics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.stat-card {
+  display: grid;
+  gap: 8px;
+}
+
+.stat-card span,
+.run-history h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.stat-card strong {
+  color: var(--gold);
+  font-size: 1.24rem;
+  overflow-wrap: anywhere;
+}
+
+.run-history {
+  grid-column: 1 / -1;
+}
+
+.run-history ol {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding-left: 22px;
+  color: #c7d4f2;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
 .setting-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(110px, auto);
@@ -1202,7 +1246,7 @@ canvas {
     z-index: 10;
     min-height: auto;
     height: auto;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(7, minmax(58px, 1fr));
     grid-auto-rows: 56px;
     padding: 8px;
   }
@@ -1223,6 +1267,7 @@ canvas {
     height: auto;
     min-height: 0;
     overflow: hidden;
+    overflow-x: auto;
   }
 
   .main-tab small {
@@ -1241,6 +1286,7 @@ canvas {
   .achievement-list,
   .infinite-angle-panel,
   .settings-grid,
+  .statistics-grid,
   .help-list {
     grid-template-columns: 1fr;
   }

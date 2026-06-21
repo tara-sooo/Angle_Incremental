@@ -65,9 +65,14 @@ Original prompt: では、中核ループを完成させてください
 - Renamed IU 3-1 to remove the stale achievement 7 reference after the achievement list changed.
 - Guarded remote update reloads so a stale cached build only auto-reloads once per target version, then shows a manual-reload status instead of looping.
 - Raised the late-game lap speed safety cap, log-backed currentGain saves, strengthened Generation rewards, and added GR/CB relief to staged upgrade scaling so CB3/GR5 can reach Infinity in short simulated play.
+- Added regression coverage for Core Boost requirements past e308, the new IP gain formula, and ACH12's CB1-only unlock condition.
+- Implemented the stability/IC/automation pass: UI updates are throttled, high-vertex drawing is sampled, Core Boost requirements grow in log space, IP gain now uses `log10(score)-307`, and ACH12 now only marks first CB without Generation.
+- Replaced the provisional IC list with the new IC1-IC8 constraints and rewards, including IC8's timed vertex drain and Core Boost vertex preservation reward.
+- Added Automation and Statistics main tabs with saved per-upgrade autobuy toggles, Infinity run timing, fastest Infinity time, and last-10 Infinity run records.
 
 ## TODO
 
+- Verify the new Automation/Statistics tabs in Firefox/Playwright on desktop and mobile before release.
 - Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle conversion rates.
