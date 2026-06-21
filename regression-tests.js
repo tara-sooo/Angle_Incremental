@@ -213,7 +213,18 @@ function testAchievement12OnlyFirstCoreBoostWithoutGeneration() {
   assert.strictEqual(state.noGenerationCoreBoostReached, false);
 }
 
+function testRawLapSpeedCanGrowPastEffectiveSafetyCap() {
+  const context = loadGame();
+  const { state } = context.window.__angleDebug;
+  state.speedLevel = 10000;
+  assert.ok(context.rawLapSpeedLog10() > 42);
+  assert.ok(context.effectiveLapSpeedLog10() > 42);
+  assert.ok(context.effectiveLapSpeedLog10() < context.rawLapSpeedLog10());
+  assert.ok(Number.isFinite(context.lapSpeedMultiplier()));
+}
+
 testCoreBoostRequirementGrowsPastE308();
 testIpGainUsesLogMinus307();
 testAchievement12OnlyFirstCoreBoostWithoutGeneration();
+testRawLapSpeedCanGrowPastEffectiveSafetyCap();
 console.log("regression tests passed");

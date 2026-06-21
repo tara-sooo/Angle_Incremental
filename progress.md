@@ -70,6 +70,7 @@ Original prompt: では、中核ループを完成させてください
 - Replaced the provisional IC list with the new IC1-IC8 constraints and rewards, including IC8's timed vertex drain and Core Boost vertex preservation reward.
 - Added Automation and Statistics main tabs with saved per-upgrade autobuy toggles, Infinity run timing, fastest Infinity time, and last-10 Infinity run records.
 - Added versioned CSS/JS asset URLs and bumped the app version so clients stuck on cached old Infinity Challenge code fetch the refreshed assets.
+- Changed lap speed growth so raw speed keeps increasing in log space while effective speed is restrained by an extra-heavy second softcap instead of a fixed visible cap.
 
 ## TODO
 

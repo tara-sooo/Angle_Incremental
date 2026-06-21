@@ -91,13 +91,14 @@ const BREAK_CAP_REQUIREMENT_LOG10 = 333;
 const MAX_TRACKED_LOG10 = 1000000000;
 const MAX_RENDERED_VERTICES = 10000;
 const MAX_DRAW_VERTICES = 720;
-const MAX_EFFECTIVE_LAP_SPEED_LOG10 = 42;
+const LAP_SPEED_SUPER_SOFTCAP_START_LOG10 = 42;
+const LAP_SPEED_SUPER_SOFTCAP_LOG_STRENGTH = 1;
 const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 14;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_QUARANTINE_KEY = "angle-incremental-save-quarantine";
 const SAVE_VERSION = 7;
-const APP_VERSION = "2026.06.21-cache-bust-ic-display";
+const APP_VERSION = "2026.06.21-lap-speed-log-growth";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const UPDATE_RELOAD_TARGET_KEY = "angle-incremental-update-reload-target";
 const UPDATE_RELOAD_TIME_KEY = "angle-incremental-update-reload-time";
@@ -236,10 +237,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "安定化、自動化/統計タブ、Infinity Challenge刷新を追加しました。",
-    updateResetDock: "巨大値セーブとUI更新頻度を見直し、開けない/重いケースを軽減しました。",
-    updateCanvas: "Core Boost要求値とIP獲得式を更新し、e308以降の購入不具合を修正しました。",
-    updateModalNote: "自動化・統計タブを追加し、IC1-IC8を新仕様へ差し替えました。",
+    updateSummary: "ラップスピードの成長表示と内部処理を更新しました。",
+    updateResetDock: "生ラップスピードはlogで伸び続け、実効速度は超強力な追加ソフトキャップで抑えるようになりました。",
+    updateCanvas: "ソフトキャップ中は実効速度と生速度を分けて表示します。",
+    updateModalNote: "高レベル速度強化で成長が止まって見える問題を軽減しました。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -356,10 +357,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Added stability fixes, Automation/Stats tabs, and refreshed Infinity Challenges.",
-    updateResetDock: "Huge-value saves and UI update cadence were hardened to reduce open/performance failures.",
-    updateCanvas: "Core Boost requirements and IP gain were updated to fix post-e308 purchase issues.",
-    updateModalNote: "Automation, statistics, and the new IC1-IC8 rules are now available.",
+    updateSummary: "Updated lap-speed growth display and internal handling.",
+    updateResetDock: "Raw lap speed now keeps growing in log space while effective speed is restrained by an extra-heavy softcap.",
+    updateCanvas: "Softcapped speed now shows effective speed and raw speed separately.",
+    updateModalNote: "High-level speed upgrades should no longer look like they completely stop growing.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -1248,26 +1249,36 @@ function infinityChallengesUnlocked() {
   return state.infinityCount > 0 && hasInfinityUpgrade("4-1");
 }
 
+function rawLapSpeedLog10() {
+  let multiplierLog = state.speedLevel * log10Value(1.22);
+  if (hasInfinityUpgrade("2-1")) multiplierLog += log10Value(applyInfinityUpgradePower(1.5));
+  if (isChallengeCompleted(3)) multiplierLog += log10Value(1.1);
+  if (state.activeChallenge === 3) multiplierLog *= 0.7;
+  return clampLog10(multiplierLog);
+}
+
 function rawLapSpeedMultiplier() {
-  let multiplierLog = Math.min(state.speedLevel * log10Value(1.22), MAX_EFFECTIVE_LAP_SPEED_LOG10);
-  let multiplier = valueFromLog10(multiplierLog);
-  if (hasInfinityUpgrade("2-1")) multiplier *= applyInfinityUpgradePower(1.5);
-  if (isChallengeCompleted(3)) multiplier *= 1.1;
-  if (state.activeChallenge === 3) multiplier = Math.pow(multiplier, 0.7);
-  return Math.min(multiplier, valueFromLog10(MAX_EFFECTIVE_LAP_SPEED_LOG10));
+  return valueFromLog10(rawLapSpeedLog10());
+}
+
+function effectiveLapSpeedLog10() {
+  const rawLog = rawLapSpeedLog10();
+  const softcapStart = lapSpeedSoftcapStart();
+  const softcapStartLog = log10Value(softcapStart);
+  const softcappedLog = rawLog <= softcapStartLog
+    ? rawLog
+    : softcapStartLog + (rawLog - softcapStartLog) * lapSpeedSoftcapPower();
+  if (softcappedLog <= LAP_SPEED_SUPER_SOFTCAP_START_LOG10) return softcappedLog;
+  return LAP_SPEED_SUPER_SOFTCAP_START_LOG10
+    + Math.log10(1 + softcappedLog - LAP_SPEED_SUPER_SOFTCAP_START_LOG10) * LAP_SPEED_SUPER_SOFTCAP_LOG_STRENGTH;
 }
 
 function lapSpeedMultiplier() {
-  const rawMultiplier = rawLapSpeedMultiplier();
-  const softcapStart = lapSpeedSoftcapStart();
-  const multiplier = rawMultiplier <= softcapStart
-    ? rawMultiplier
-    : softcapStart * Math.pow(rawMultiplier / softcapStart, lapSpeedSoftcapPower());
-  return Math.min(multiplier, valueFromLog10(MAX_EFFECTIVE_LAP_SPEED_LOG10));
+  return valueFromLog10(effectiveLapSpeedLog10());
 }
 
 function isLapSpeedSoftcapped() {
-  return rawLapSpeedMultiplier() > lapSpeedSoftcapStart();
+  return rawLapSpeedLog10() > log10Value(lapSpeedSoftcapStart());
 }
 
 function lapSpeedSoftcapStart() {
@@ -1804,6 +1815,10 @@ function formatMultiplierPreview(current, next) {
   const currentText = `×${current.toFixed(2)}`;
   const nextText = `×${next.toFixed(2)}`;
   return currentText === nextText ? currentText : `${currentText} → ${nextText}`;
+}
+
+function formatMultiplierLog(log) {
+  return `×${formatUiLogNumber(log)}`;
 }
 
 function formatExponentPreview(current, next) {
@@ -2388,8 +2403,8 @@ function updateUi() {
   elements.vertexGainValue.textContent = `+${formatSmallDecimal(vertexGainIncrease())}`;
   elements.lapValue.textContent = formatDuration(lapDuration());
   elements.lapSpeedValue.textContent = isLapSpeedSoftcapped()
-    ? `×${lapSpeedMultiplier().toFixed(2)} ${t("lapSpeedSoftcapped")}`
-    : `×${lapSpeedMultiplier().toFixed(2)}`;
+    ? `${formatMultiplierLog(effectiveLapSpeedLog10())} ${t("lapSpeedSoftcapped")} / raw ${formatMultiplierLog(rawLapSpeedLog10())}`
+    : formatMultiplierLog(effectiveLapSpeedLog10());
   elements.speedLevel.textContent = `${t("level")} ${state.speedLevel}`;
   elements.vertexCount.textContent = `${state.vertices} ${t("vertices")}`;
   elements.gainLevel.textContent = `${t("level")} ${state.gainLevel}`;
@@ -2856,7 +2871,9 @@ function renderGameToText() {
     vertices: state.vertices,
     lapSeconds: Number(lapDuration().toPrecision(6)),
     lapSpeedMultiplier: Number(lapSpeedMultiplier().toPrecision(6)),
-    rawLapSpeedMultiplier: Number(rawLapSpeedMultiplier().toPrecision(6)),
+    lapSpeedLog10: Number(effectiveLapSpeedLog10().toPrecision(6)),
+    rawLapSpeedMultiplier: valueFromLog10(rawLapSpeedLog10()),
+    rawLapSpeedLog10: Number(rawLapSpeedLog10().toPrecision(6)),
     lapSpeedSoftcapStart: Number(lapSpeedSoftcapStart().toPrecision(6)),
     lapSpeedSoftcapPower: Number(lapSpeedSoftcapPower().toPrecision(6)),
     lapSpeedSoftcapped: isLapSpeedSoftcapped(),

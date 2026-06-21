@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=2026.06.21-cache-bust-ic-display" />
+    <link rel="stylesheet" href="styles.css?v=2026.06.21-lap-speed-log-growth" />
   </head>
   <body>
     <main class="shell">
@@ -438,16 +438,16 @@
       <div class="update-modal-card">
         <p class="eyebrow">Update</p>
         <h2 id="updateModalTitle" data-i18n="updateTitle">アップデート</h2>
-        <p data-i18n="updateSummary">CB3/GR5付近からInfinityへ届きやすいように調整しました。</p>
+        <p data-i18n="updateSummary">ラップスピードの成長表示と内部処理を更新しました。</p>
         <ul>
-          <li data-i18n="updateResetDock">ラップ速度の安全上限を引き上げ、後半で速度が止まりにくくなりました。</li>
-          <li data-i18n="updateCanvas">核到達時の獲得量をlog保存し、巨大値のセーブ破損を防ぎます。</li>
-          <li data-i18n="updateModalNote">Generation報酬を強化し、実行直後の弱体感を軽減しました。</li>
+          <li data-i18n="updateResetDock">生ラップスピードはlogで伸び続け、実効速度は超強力な追加ソフトキャップで抑えるようになりました。</li>
+          <li data-i18n="updateCanvas">ソフトキャップ中は実効速度と生速度を分けて表示します。</li>
+          <li data-i18n="updateModalNote">高レベル速度強化で成長が止まって見える問題を軽減しました。</li>
         </ul>
         <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
       </div>
     </div>
 
-    <script src="game.js?v=2026.06.21-cache-bust-ic-display"></script>
+    <script src="game.js?v=2026.06.21-lap-speed-log-growth"></script>
   </body>
 </html>
