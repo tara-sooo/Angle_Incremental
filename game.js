@@ -86,8 +86,9 @@ const MAX_EFFECTIVE_LAP_SPEED_LOG10 = 12;
 const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 14;
 const SAVE_KEY = "angle-incremental-save";
-const SAVE_VERSION = 4;
-const APP_VERSION = "2026.06.21-save-compat-achievements";
+const SAVE_QUARANTINE_KEY = "angle-incremental-save-quarantine";
+const SAVE_VERSION = 5;
+const APP_VERSION = "2026.06.21-landscape-save-recovery";
 const UPDATE_SEEN_KEY = "angle-incremental-seen-version";
 const VERSION_MANIFEST_URL = "version.json";
 const UPDATE_CHECK_INTERVAL_SECONDS = 60;
@@ -204,10 +205,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "巨大な旧セーブで画面が開けなくなる可能性を修正しました。",
-    updateResetDock: "IU 1-2は前提条件なしで購入できるようになりました。",
-    updateCanvas: "実績を新仕様の14個に更新しました。",
-    updateModalNote: "極端な周回速度は安全な有限値に丸め、進行ループが壊れないようにしています。",
+    updateSummary: "横画面で強化欄と実績タブをスクロールできるようにしました。",
+    updateResetDock: "巨大な旧セーブや文字列化された大数セーブの復元を強化しました。",
+    updateCanvas: "復元不能なセーブは退避して、新規状態で起動できるようにしました。",
+    updateModalNote: "IU 3-1の名前から古い実績7への言及を外しました。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -309,10 +310,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Fixed a possible load failure with extremely large old saves.",
-    updateResetDock: "IU 1-2 no longer has a prerequisite.",
-    updateCanvas: "Achievements were updated to the new 14-achievement list.",
-    updateModalNote: "Extreme lap speed is clamped to a safe finite value so the update loop stays valid.",
+    updateSummary: "Upgrade and achievement panels now scroll in landscape layouts.",
+    updateResetDock: "Large old saves and stringified large-number saves are restored more robustly.",
+    updateCanvas: "Unrecoverable saves are quarantined so the game can still open from a fresh state.",
+    updateModalNote: "IU 3-1 no longer mentions the replaced achievement 7.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -490,7 +491,7 @@ const INFINITY_UPGRADES = [
     bit: 3,
     cost: 3,
     requires: ["2-1"],
-    name: { ja: "3-1 実績3と7を獲得するにはこれがほぼ必須です", en: "3-1 Almost Required For Achievements 3 And 7" },
+    name: { ja: "3-1 実績3を獲得するにはこれがほぼ必須です", en: "3-1 Almost Required For Achievement 3" },
     effect: { ja: "GRスコア倍率が^1.5される", en: "Raises GR score multiplier to ^1.5." },
   },
   {
@@ -671,14 +672,26 @@ function normalizeChoice(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback;
 }
 
+function parseSavedNumber(value) {
+  if (typeof value === "number") return value;
+  if (typeof value !== "string") return NaN;
+  const trimmed = value.trim();
+  if (!trimmed) return NaN;
+  if (trimmed === "Infinity") return Infinity;
+  if (trimmed === "-Infinity") return -Infinity;
+  return Number(trimmed);
+}
+
 function sanitizeNumber(value, fallback, min = 0) {
-  return Number.isFinite(value) && value >= min ? value : fallback;
+  const parsed = parseSavedNumber(value);
+  return Number.isFinite(parsed) && parsed >= min ? parsed : fallback;
 }
 
 function sanitizeLog10(value, fallback = -Infinity) {
-  if (value === -Infinity) return -Infinity;
-  if (value === Infinity) return MAX_TRACKED_LOG10;
-  return Number.isFinite(value) ? value : fallback;
+  const parsed = parseSavedNumber(value);
+  if (parsed === -Infinity) return -Infinity;
+  if (parsed === Infinity) return MAX_TRACKED_LOG10;
+  return Number.isFinite(parsed) ? Math.min(parsed, MAX_TRACKED_LOG10) : fallback;
 }
 
 function clampLog10(value) {
@@ -688,13 +701,33 @@ function clampLog10(value) {
 }
 
 function logFromSavedValue(value, fallback = -Infinity) {
-  if (value === Infinity || value === Number.MAX_VALUE) return Math.log10(Number.MAX_VALUE);
-  return log10Value(value) > -Infinity ? log10Value(value) : fallback;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const match = trimmed.match(/^([+-]?(?:\d+\.?\d*|\.\d+))(?:e|\*10\^)([+-]?\d+)$/i);
+    if (match) {
+      const mantissa = Number(match[1]);
+      const exponent = Number(match[2]);
+      if (mantissa > 0 && Number.isFinite(exponent)) {
+        return clampLog10(Math.log10(mantissa) + exponent);
+      }
+    }
+  }
+  const parsed = parseSavedNumber(value);
+  if (parsed === Infinity || parsed === Number.MAX_VALUE) return Math.log10(Number.MAX_VALUE);
+  const log = log10Value(parsed);
+  return log > -Infinity ? log : fallback;
 }
 
 function hydrateLog10(savedLog, savedValue, fallback = -Infinity) {
   const log = sanitizeLog10(savedLog, null);
   return log === null ? logFromSavedValue(savedValue, fallback) : log;
+}
+
+function hydrateLogResource(savedValue, savedLog, fallbackLog = -Infinity, integer = false) {
+  const log = hydrateLog10(savedLog, savedValue, fallbackLog);
+  let value = valueFromLog10(log);
+  if (integer && value !== Number.MAX_VALUE) value = Math.floor(value);
+  return { value, log };
 }
 
 function valueFromLog10(log) {
@@ -735,29 +768,30 @@ function legacyInfinityUpgradeRefundLog10(data) {
 }
 
 function applySaveData(data, saveVersion = SAVE_VERSION) {
-  state.score = sanitizeNumber(data.score, 0);
-  state.scoreLog10 = hydrateLog10(data.scoreLog10, state.score, log10Value(state.score));
-  state.totalScore = sanitizeNumber(data.totalScore, state.score);
-  state.totalScoreLog10 = hydrateLog10(data.totalScoreLog10, state.totalScore, log10Value(state.totalScore));
-  state.generationScore = sanitizeNumber(data.generationScore, state.score);
-  state.generationScoreLog10 = hydrateLog10(data.generationScoreLog10, state.generationScore, log10Value(state.generationScore));
+  const score = hydrateLogResource(data.score, data.scoreLog10);
+  state.score = score.value;
+  state.scoreLog10 = score.log;
+  const totalScore = hydrateLogResource(data.totalScore, data.totalScoreLog10, state.scoreLog10);
+  state.totalScore = totalScore.value;
+  state.totalScoreLog10 = totalScore.log;
+  const generationScore = hydrateLogResource(data.generationScore, data.generationScoreLog10, state.scoreLog10);
+  state.generationScore = generationScore.value;
+  state.generationScoreLog10 = generationScore.log;
   state.vertices = Math.min(MAX_RENDERED_VERTICES, Math.max(3, Math.floor(sanitizeNumber(data.vertices, 3, 3))));
   state.speedLevel = Math.floor(sanitizeNumber(data.speedLevel, 0));
   state.gainLevel = Math.floor(sanitizeNumber(data.gainLevel, 0));
-  state.currentGain = sanitizeNumber(data.currentGain, 1);
-  state.pointProgress = sanitizeNumber(data.pointProgress, 0) % 1;
+  state.currentGain = hydrateLogResource(data.currentGain, data.currentGainLog10, 0).value || 1;
+  state.pointProgress = ((sanitizeNumber(data.pointProgress, 0) % 1) + 1) % 1;
   state.totalVertexProgress = sanitizeNumber(data.totalVertexProgress, state.pointProgress * state.vertices);
-  state.lastVertexIndex = Math.floor(sanitizeNumber(data.lastVertexIndex, 0));
+  state.lastVertexIndex = Math.floor(sanitizeNumber(data.lastVertexIndex, Math.floor(state.totalVertexProgress)));
   state.generationCount = Math.floor(sanitizeNumber(data.generationCount, 0));
-  state.previousGenerationScore = sanitizeNumber(
+  const previousGenerationScore = hydrateLogResource(
     data.previousGenerationScore,
-    state.generationCount > 0 ? GENERATION_UNLOCK_SCORE : 0,
-  );
-  state.previousGenerationScoreLog10 = hydrateLog10(
     data.previousGenerationScoreLog10,
-    state.previousGenerationScore,
     state.generationCount > 0 ? log10Value(GENERATION_UNLOCK_SCORE) : -Infinity,
   );
+  state.previousGenerationScore = previousGenerationScore.value;
+  state.previousGenerationScoreLog10 = previousGenerationScore.log;
   state.generationScoreMultiplier = sanitizeNumber(data.generationScoreMultiplier, 1, 1);
   state.generationCostFactor = Math.max(
     GENERATION_MIN_NEW_COST_FACTOR,
@@ -765,10 +799,12 @@ function applySaveData(data, saveVersion = SAVE_VERSION) {
   );
   state.coreBoostCount = Math.floor(sanitizeNumber(data.coreBoostCount, 0));
   state.infinityCount = Math.floor(sanitizeNumber(data.infinityCount, 0));
-  state.infinityPoints = Math.floor(sanitizeNumber(data.infinityPoints, 0));
-  state.infinityPointsLog10 = hydrateLog10(data.infinityPointsLog10, state.infinityPoints, log10Value(state.infinityPoints));
-  state.infiniteScore = sanitizeNumber(data.infiniteScore, 0);
-  state.infiniteScoreLog10 = hydrateLog10(data.infiniteScoreLog10, state.infiniteScore, log10Value(state.infiniteScore));
+  const infinityPoints = hydrateLogResource(data.infinityPoints, data.infinityPointsLog10, -Infinity, true);
+  state.infinityPoints = infinityPoints.value;
+  state.infinityPointsLog10 = infinityPoints.log;
+  const infiniteScore = hydrateLogResource(data.infiniteScore, data.infiniteScoreLog10);
+  state.infiniteScore = infiniteScore.value;
+  state.infiniteScoreLog10 = infiniteScore.log;
   state.infinityUpgradeMask = Math.floor(sanitizeNumber(data.infinityUpgradeMask, 0));
   if (saveVersion < 3) {
     const refundLog = legacyInfinityUpgradeRefundLog10(data);
@@ -804,8 +840,9 @@ function applySaveData(data, saveVersion = SAVE_VERSION) {
   state.language = normalizeChoice(data.language, ["ja", "en"], "ja");
   state.numberFormat = normalizeChoice(data.numberFormat, ["compact", "scientific", "detailed"], data.detailedNumbers ? "detailed" : "compact");
   state.timeUnit = normalizeChoice(data.timeUnit, ["auto", "seconds", "milliseconds"], "auto");
-  state.lastEarned = sanitizeNumber(data.lastEarned, 0);
-  state.lastEarnedLog10 = hydrateLog10(data.lastEarnedLog10, state.lastEarned, log10Value(state.lastEarned));
+  const lastEarned = hydrateLogResource(data.lastEarned, data.lastEarnedLog10);
+  state.lastEarned = lastEarned.value;
+  state.lastEarnedLog10 = lastEarned.log;
   state.floatingTexts = [];
 }
 
@@ -834,9 +871,25 @@ function saveGame(reason = "auto") {
   }
 }
 
-function loadGame() {
+function quarantineSave(raw) {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      localStorage.setItem(SAVE_QUARANTINE_KEY, JSON.stringify({
+        quarantinedAt: Date.now(),
+        appVersion: APP_VERSION,
+        raw,
+      }));
+    }
+    localStorage.removeItem(SAVE_KEY);
+  } catch (error) {
+    // Quarantine failure should not prevent the game from opening.
+  }
+}
+
+function loadGame() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(SAVE_KEY);
     if (!raw) {
       setSaveStatus(t("noSave"));
       return;
@@ -844,6 +897,7 @@ function loadGame() {
 
     const parsed = JSON.parse(raw);
     if (!parsed.version || parsed.version > SAVE_VERSION || !parsed.state || typeof parsed.state !== "object") {
+      quarantineSave(raw);
       setSaveStatus(t("oldSave"));
       return;
     }
@@ -852,6 +906,7 @@ function loadGame() {
     autoSaveElapsed = 0;
     setSaveStatus(t("loaded"));
   } catch (error) {
+    quarantineSave(raw);
     setSaveStatus(t("loadFailed"));
   }
 }

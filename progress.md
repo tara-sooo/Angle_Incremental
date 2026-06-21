@@ -60,6 +60,9 @@ Original prompt: では、中核ループを完成させてください
 - Fixed extreme legacy saves that could fail to open by hydrating score logs safely, clamping loaded vertex count for rendering, and capping effective lap speed to a finite value.
 - Updated Infinity Upgrade 1-2 so it has no prerequisite while keeping 2-1 gated behind both 1-1 and 1-2.
 - Expanded Achievements to the new 14-item list, added total playtime and no-Generation Core Boost tracking, and migrated old achievement bits so old score-e30 progress maps to the new #7 instead of incorrectly unlocking CB3.
+- Added landscape scrolling for The Angle upgrades, achievements, and the main tab rail so short horizontal screens do not clip controls or achievement rows.
+- Hardened save loading for stringified large numbers such as `1e1300`, and quarantine unrecoverable saves under a backup key before opening from a fresh state.
+- Renamed IU 3-1 to remove the stale achievement 7 reference after the achievement list changed.
 
 ## TODO
 
