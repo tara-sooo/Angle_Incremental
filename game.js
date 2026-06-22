@@ -96,14 +96,14 @@ const BREAK_CAP_REQUIREMENT_LOG10 = 350;
 const MAX_TRACKED_LOG10 = 1000000000;
 const MAX_RENDERED_VERTICES = 10000;
 const MAX_DRAW_VERTICES = 720;
-const LAP_SPEED_SUPER_SOFTCAP_START_LOG10 = 36;
-const LAP_SPEED_SUPER_SOFTCAP_LOG_STRENGTH = 0.75;
+const LAP_SPEED_SUPER_SOFTCAP_START_LOG10 = 22;
+const LAP_SPEED_SUPER_SOFTCAP_LOG_STRENGTH = 0.25;
 const INFINITY_CHALLENGE_COUNT = 8;
 const ACHIEVEMENT_COUNT = 14;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_QUARANTINE_KEY = "angle-incremental-save-quarantine";
 const SAVE_VERSION = 7;
-const APP_VERSION = "2026.06.21-ic8-active-preserve";
+const APP_VERSION = "2026.06.22-ic-gr-rebalance";
 const SAVE_CODE_PREFIX = "ANGLE_SAVE_V2:";
 const SAVE_CODE_SALT = "angle-incremental-save-code-v2";
 const SAVE_CODE_SECRET = "Angle Incremental local save code obfuscation";
@@ -139,6 +139,7 @@ const GENERATION_COST_POWER_IC3_REWARD = 1.08;
 const VERTEX_EPSILON = 1e-9;
 const TAU = Math.PI * 2;
 const BUY_ALL_LIMIT = 1000;
+const AUTOBUY_INTERVAL_SECONDS = 0.1;
 const MAX_VERTEX_PROGRESS_TRACKED = 1000000000000;
 const TEXT = {
   ja: {
@@ -255,10 +256,10 @@ const TEXT = {
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
     updateTitle: "アップデート",
-    updateSummary: "Infinity Challengeとセーブコードを更新しました。",
-    updateResetDock: "IC1/IC7/IC8の制約と報酬、Break Infinite Capの必要値を調整しました。",
-    updateCanvas: "基礎獲得式の表示が数値表記設定とIC状態を反映するようになりました。",
-    updateModalNote: "暗号化セーブコード、IC自動完了、統計の長時間表示を追加しました。",
+    updateSummary: "Infinity ChallengeとGenerationを再調整しました。",
+    updateResetDock: "IC1からIC8までの制約と報酬を新仕様へ更新しました。",
+    updateCanvas: "Generation倍率をlog管理にし、速度の追加ソフトキャップを強化しました。",
+    updateModalNote: "IC7報酬、自動購入頻度、統計のミリ秒表示を修正しました。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -385,10 +386,10 @@ const TEXT = {
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
     updateTitle: "Update",
-    updateSummary: "Infinity Challenges and save codes were updated.",
-    updateResetDock: "IC1/IC7/IC8 rules and the Break Infinite Cap requirement were adjusted.",
-    updateCanvas: "The base gain formula display now reflects number format settings and IC state.",
-    updateModalNote: "Encrypted save codes, IC auto-complete, and long statistics time display were added.",
+    updateSummary: "Infinity Challenges and Generation were rebalanced.",
+    updateResetDock: "IC1 through IC8 restrictions and rewards were updated to the new spec.",
+    updateCanvas: "Generation multipliers now use log tracking, and the extra lap-speed softcap is stronger.",
+    updateModalNote: "IC7 rewards, autobuy frequency, and statistics millisecond display were fixed.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -493,22 +494,22 @@ const ACHIEVEMENTS = [
 const INFINITY_CHALLENGES = [
   {
     name: { ja: "IC1 改悪された計算式", en: "IC1 Worsened Formula" },
-    restriction: { ja: "基礎獲得式の(x/y)^zのyが2倍される", en: "The y in the base (x/y)^z formula is doubled." },
+    restriction: { ja: "基礎獲得式の(x/y)^zのyが10倍される", en: "The y in the base (x/y)^z formula is multiplied by 10." },
     reward: { ja: "yは撤廃される", en: "Removes y from the base formula." },
   },
   {
     name: { ja: "IC2 現実的に書ける範囲で", en: "IC2 Within Writable Bounds" },
-    restriction: { ja: "角の数は500を超えない", en: "Vertices cannot exceed 500." },
+    restriction: { ja: "角の数は200を超えない", en: "Vertices cannot exceed 200." },
     reward: { ja: "upgrade購入スコアが^0.95される", en: "Normal upgrade score costs are raised to ^0.95." },
   },
   {
     name: { ja: "IC3 ナメクジよりは早い", en: "IC3 Faster Than a Slug" },
-    restriction: { ja: "ラップスピードが^0.7され、周回速度アップグレードのコスト増加が3倍になる", en: "Lap speed is raised to ^0.7 and speed upgrade cost growth is tripled." },
+    restriction: { ja: "ラップスピードが^0.8され、周回速度アップグレードのコスト増加が2倍になる", en: "Lap speed is raised to ^0.8 and speed upgrade cost growth is doubled." },
     reward: { ja: "ラップスピードx1.1", en: "Lap speed x1.1." },
   },
   {
     name: { ja: "IC4 うん、それ以上もそれ以下もないよ", en: "IC4 Nothing More, Nothing Less" },
-    restriction: { ja: "頂点獲得量が^0.8される", en: "Gain per vertex is raised to ^0.8." },
+    restriction: { ja: "頂点獲得量が^0.5される", en: "Gain per vertex is raised to ^0.5." },
     reward: { ja: "頂点獲得量が^1.1される", en: "Gain per vertex is raised to ^1.1." },
   },
   {
@@ -518,17 +519,17 @@ const INFINITY_CHALLENGES = [
   },
   {
     name: { ja: "IC6 最初だけ強い", en: "IC6 Strong Only at First" },
-    restriction: { ja: "頂点通過ごとの増加は0.1で固定される", en: "Gain per vertex is fixed at 0.1." },
-    reward: { ja: "Infinity獲得量を×2", en: "Infinity gain x2." },
+    restriction: { ja: "頂点通過ごとの増加は0.001で固定される", en: "Gain per vertex is fixed at 0.001." },
+    reward: { ja: "Infinity獲得量を×2", en: "Infinity count gain x2." },
   },
   {
     name: { ja: "IC7 倹約家もどき", en: "IC7 Pretend Saver" },
-    restriction: { ja: "購入対象の通常アップグレードの必要スコアが1e100以上だと購入できない", en: "Normal upgrades cannot be bought when that upgrade costs at least 1e100." },
-    reward: { ja: "アップグレードを購入する際にスコアを消費しなくなる", en: "Normal upgrades no longer spend score." },
+    restriction: { ja: "スコアが1e30を超えると、アップグレードを購入できなくなる", en: "Normal upgrades cannot be bought above 1e30 score." },
+    reward: { ja: "購入価格以上のスコアがあれば、通常アップグレード購入時にスコアを消費しない", en: "Normal upgrades no longer spend score, but still require enough score to afford them." },
   },
   {
-    name: { ja: "IC8 リアル・タイム・アタック", en: "IC8 Real Time Attack" },
-    restriction: { ja: "角の数は100で始まり点が3秒経過するごとに角の数が1減り、角増加upgradeは購入できず、角はGRとCBでリセットされない", en: "Starts at 100 vertices, loses 1 vertex every 3 seconds, vertex upgrades cannot be bought, and vertices are not reset by Generation or Core Boost." },
+    name: { ja: "IC8 反出生主義", en: "IC8 Anti-Natalism" },
+    restriction: { ja: "角の数は3で始まり角増加アップグレードは購入できず、角はGRとCBでリセットされない", en: "Starts at 3 vertices, vertex upgrades cannot be bought, and vertices are not reset by Generation or Core Boost." },
     reward: { ja: "角の数はGRとCBでリセットされなくなる", en: "Vertices are no longer reset by Generation or Core Boost." },
   },
 ];
@@ -606,6 +607,7 @@ const state = {
   previousGenerationScore: 0,
   previousGenerationScoreLog10: -Infinity,
   generationScoreMultiplier: 1,
+  generationScoreMultiplierLog10: 0,
   generationCostFactor: 1,
   coreBoostCount: 0,
   infinityCount: 0,
@@ -662,6 +664,7 @@ const SAVE_FIELDS = [
   "previousGenerationScore",
   "previousGenerationScoreLog10",
   "generationScoreMultiplier",
+  "generationScoreMultiplierLog10",
   "generationCostFactor",
   "coreBoostCount",
   "infinityCount",
@@ -947,7 +950,11 @@ function applySaveData(data, saveVersion = SAVE_VERSION) {
   );
   state.previousGenerationScore = previousGenerationScore.value;
   state.previousGenerationScoreLog10 = previousGenerationScore.log;
-  state.generationScoreMultiplier = sanitizeNumber(data.generationScoreMultiplier, 1, 1);
+  const savedGenerationMultiplierLog = sanitizeLog10(data.generationScoreMultiplierLog10, null);
+  state.generationScoreMultiplierLog10 = savedGenerationMultiplierLog === null
+    ? log10Value(sanitizeNumber(data.generationScoreMultiplier, 1, 1))
+    : savedGenerationMultiplierLog;
+  state.generationScoreMultiplier = valueFromLog10(state.generationScoreMultiplierLog10);
   state.generationCostFactor = Math.max(
     GENERATION_MIN_NEW_COST_FACTOR,
     Math.min(1, sanitizeNumber(data.generationCostFactor, 1, GENERATION_MIN_NEW_COST_FACTOR)),
@@ -1005,12 +1012,12 @@ function applySaveData(data, saveVersion = SAVE_VERSION) {
     resetBelowInfinity();
     state.activeChallenge = 0;
   }
-  if (state.activeChallenge === 2 && state.vertices > 500) {
-    state.vertices = 500;
+  if (state.activeChallenge === 2 && state.vertices > 200) {
+    state.vertices = 200;
     resetVertexProgress();
   }
-  if (state.activeChallenge === 8 && state.vertices < 3) {
-    state.vertices = 100;
+  if (state.activeChallenge === 8 && state.vertices !== 3) {
+    state.vertices = 3;
     resetVertexProgress();
   }
   state.showFloatingText = data.showFloatingText !== false;
@@ -1227,6 +1234,7 @@ function resetSave() {
     previousGenerationScore: 0,
     previousGenerationScoreLog10: -Infinity,
     generationScoreMultiplier: 1,
+    generationScoreMultiplierLog10: 0,
     generationCostFactor: 1,
     coreBoostCount: 0,
     infinityCount: 0,
@@ -1329,7 +1337,7 @@ function formatSmallDecimal(value) {
 function gainExpressionConfig() {
   const parts = gainExpressionParts();
   if (parts <= 1) return { parts, divisor: 1, rewardRemovesDivisor: false };
-  if (state.activeChallenge === 1) return { parts, divisor: parts * 2, rewardRemovesDivisor: false };
+  if (state.activeChallenge === 1) return { parts, divisor: parts * 10, rewardRemovesDivisor: false };
   if (isChallengeCompleted(1)) return { parts, divisor: 1, rewardRemovesDivisor: true };
   return { parts, divisor: parts, rewardRemovesDivisor: false };
 }
@@ -1408,7 +1416,7 @@ function rawLapSpeedLog10() {
   let multiplierLog = state.speedLevel * log10Value(1.22);
   if (hasInfinityUpgrade("2-1")) multiplierLog += log10Value(applyInfinityUpgradePower(1.5));
   if (isChallengeCompleted(3)) multiplierLog += log10Value(1.1);
-  if (state.activeChallenge === 3) multiplierLog *= 0.7;
+  if (state.activeChallenge === 3) multiplierLog *= 0.8;
   return clampLog10(multiplierLog);
 }
 
@@ -1442,7 +1450,7 @@ function lapSpeedSoftcapStart() {
     LAP_SPEED_SOFTCAP_START,
     60 + (state.generationCount - 1) * 40 + state.coreBoostCount * 65,
   );
-  const relief = Math.min(1.5, Math.max(0, log10Value(state.generationScoreMultiplier)) * 0.08);
+  const relief = Math.min(1.5, Math.max(0, currentGenerationScoreMultiplierLog10()) * 0.08);
   return stagedStart * (1 + relief);
 }
 
@@ -1470,6 +1478,10 @@ function formatDuration(seconds) {
 }
 
 function formatLongDuration(seconds) {
+  if (state.timeUnit === "milliseconds") {
+    const milliseconds = Math.max(0, sanitizeNumber(seconds, 0) * 1000);
+    return `${milliseconds >= 10 ? Math.round(milliseconds) : milliseconds.toFixed(2)}${t("millisecondsUnit")}`;
+  }
   const totalSeconds = Math.max(0, Math.floor(sanitizeNumber(seconds, 0)));
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
@@ -1576,8 +1588,8 @@ function vertexGainIncrease() {
     * infiniteAngleBoost()
     * achievementGainMultiplier()
     * infinityResetBoost;
-  if (state.activeChallenge === 6) return 0.1;
-  if (state.activeChallenge === 4) gain = Math.pow(gain, 0.8);
+  if (state.activeChallenge === 6) return 0.001;
+  if (state.activeChallenge === 4) gain = Math.pow(gain, 0.5);
   if (isChallengeCompleted(4)) gain = Math.pow(gain, 1.1);
   return gain;
 }
@@ -1620,12 +1632,27 @@ function generationCostPower() {
   return 1;
 }
 
+function currentGenerationScoreMultiplierLog10() {
+  const savedLog = sanitizeLog10(state.generationScoreMultiplierLog10, null);
+  return savedLog === null ? log10Value(state.generationScoreMultiplier) : savedLog;
+}
+
+function generationScoreMultiplierBaseEffectLog10(rawMultiplierLog = currentGenerationScoreMultiplierLog10()) {
+  return clampLog10(rawMultiplierLog * generationScorePower());
+}
+
 function generationScoreMultiplierBaseEffect(rawMultiplier = state.generationScoreMultiplier) {
-  return Math.pow(rawMultiplier, generationScorePower());
+  return valueFromLog10(generationScoreMultiplierBaseEffectLog10(log10Value(rawMultiplier)));
 }
 
 function generationAchievementMultiplier() {
   return generationScoreMultiplierBaseEffect();
+}
+
+function applyGenerationAchievementRewardLog10(baseLog) {
+  if (!isAchievementUnlocked(3)) return baseLog;
+  if (baseLog <= 12) return log10Value(1 + (10 ** baseLog - 1) * 2);
+  return clampLog10(baseLog + log10Value(2));
 }
 
 function applyGenerationAchievementReward(baseMultiplier) {
@@ -1633,9 +1660,13 @@ function applyGenerationAchievementReward(baseMultiplier) {
   return 1 + (baseMultiplier - 1) * 2;
 }
 
+function generationScoreMultiplierEffectLog10(includeAchievementReward = true) {
+  const baseLog = generationScoreMultiplierBaseEffectLog10();
+  return includeAchievementReward ? applyGenerationAchievementRewardLog10(baseLog) : baseLog;
+}
+
 function generationScoreMultiplierEffect(includeAchievementReward = true) {
-  const baseMultiplier = generationScoreMultiplierBaseEffect();
-  return includeAchievementReward ? applyGenerationAchievementReward(baseMultiplier) : baseMultiplier;
+  return valueFromLog10(generationScoreMultiplierEffectLog10(includeAchievementReward));
 }
 
 function generationCostFactorEffect() {
@@ -1672,7 +1703,7 @@ function preExpressionScoreGainLog10(baseGain = state.currentGain) {
 
 function finalScoreGainFromBaseLog10(baseLog) {
   const angleLog = angleExpressionFromBaseLog10(baseLog) * coreBoostGainExponent();
-  const boostedLog = angleLog + log10Value(generationScoreMultiplierEffect());
+  const boostedLog = angleLog + generationScoreMultiplierEffectLog10();
   return boostedLog * finalScoreGainPower() - log10Value(finalScoreGainDivisor());
 }
 
@@ -1791,8 +1822,7 @@ function infinityPointGain() {
   if (!canInfinity()) return 0;
   const scoreLog = currentScoreLog10();
   const base = Math.max(1, Math.floor(scoreLog - 307));
-  const challenge6Reward = isChallengeCompleted(6) ? 2 : 1;
-  return Math.max(1, Math.floor(base * challenge6Reward));
+  return Math.max(1, Math.floor(base));
 }
 
 function infiniteScoreGainPerIp() {
@@ -1891,7 +1921,7 @@ function stagedUpgradeCostScalingLog10(costLog) {
 }
 
 function costLog10(kind, base, level, growth) {
-  const growthLog = log10Value(growth) * (state.activeChallenge === 3 && kind === "speed" ? 3 : 1);
+  const growthLog = log10Value(growth) * (state.activeChallenge === 3 && kind === "speed" ? 2 : 1);
   const rawLog = log10Value(base) + level * growthLog;
   const costFactor = generationCostFactorEffect();
   let adjustedLog;
@@ -1931,8 +1961,9 @@ function costs() {
 function generationRewardForLog(generationScoreLog) {
   const depth = Math.max(0, generationScoreLog - log10Value(GENERATION_UNLOCK_SCORE));
   return {
-    scoreMultiplierGain: 1 + Math.min(4.5, 0.65 + Math.log10(1 + depth) * 0.9),
-    costReduction: Math.min(0.18, 0.03 + Math.log10(1 + depth) * 0.032),
+    scoreMultiplierLog10: Math.min(8, Math.log10(1 + depth) * 2),
+    scoreMultiplierGain: valueFromLog10(Math.min(8, Math.log10(1 + depth) * 2)),
+    costReduction: Math.min(0.22, Math.log10(1 + depth) * 0.04),
   };
 }
 
@@ -1959,16 +1990,18 @@ function nextGenerationValues() {
   if (!canRunGeneration()) {
     return {
       scoreMultiplier: generationScoreMultiplierEffect(),
+      scoreMultiplierLog10: generationScoreMultiplierEffectLog10(),
       costFactor: generationCostFactorEffect(),
     };
   }
 
   const reward = generationRewardForLog(currentGenerationScoreLog10());
-  const nextRawScoreMultiplier = state.generationScoreMultiplier * reward.scoreMultiplierGain;
+  const nextRawScoreMultiplierLog = reward.scoreMultiplierLog10;
   const nextRawCostFactor = Math.max(GENERATION_MIN_NEW_COST_FACTOR, state.generationCostFactor * (1 - reward.costReduction));
 
   return {
-    scoreMultiplier: applyGenerationAchievementReward(generationScoreMultiplierBaseEffect(nextRawScoreMultiplier)),
+    scoreMultiplier: valueFromLog10(applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog))),
+    scoreMultiplierLog10: applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog)),
     costFactor: Math.pow(nextRawCostFactor, generationCostPower()) * (hasInfinityUpgrade("3-2") ? applyInfinityUpgradePower(0.95) : 1),
   };
 }
@@ -1991,6 +2024,12 @@ function formatMultiplierPreview(current, next) {
 
 function formatMultiplierLog(log) {
   return `×${formatUiLogNumber(log)}`;
+}
+
+function formatMultiplierLogPreview(currentLog, nextLog) {
+  const currentText = formatMultiplierLog(currentLog);
+  const nextText = formatMultiplierLog(nextLog);
+  return currentText === nextText ? currentText : `${currentText} → ${nextText}`;
 }
 
 function formatExponentPreview(current, next) {
@@ -2107,22 +2146,7 @@ function completeChallengeIfReady() {
 }
 
 function updateChallengeTimers(dt) {
-  if (state.activeChallenge !== 8) {
-    state.ic8VertexDecayElapsed = 0;
-    return;
-  }
-  state.ic8VertexDecayElapsed += dt;
-  const losses = Math.floor(state.ic8VertexDecayElapsed / 3);
-  if (losses <= 0) return;
-  state.ic8VertexDecayElapsed -= losses * 3;
-  const nextVertices = Math.max(3, state.vertices - losses);
-  if (nextVertices !== state.vertices) {
-    const lapFraction = ((state.totalVertexProgress / state.vertices) % 1 + 1) % 1;
-    state.vertices = nextVertices;
-    state.totalVertexProgress = lapFraction * state.vertices;
-    state.pointProgress = lapFraction;
-    state.lastVertexIndex = Math.floor(state.pointProgress * state.vertices) % state.vertices;
-  }
+  if (state.activeChallenge !== 8) state.ic8VertexDecayElapsed = 0;
 }
 
 function update(dt) {
@@ -2132,8 +2156,8 @@ function update(dt) {
 
   if (hasInfinityUpgrade("1-2") && state.automationEnabled) {
     normalAutobuyElapsed += dt;
-    if (normalAutobuyElapsed >= 0.5) {
-      normalAutobuyElapsed %= 0.5;
+    if (normalAutobuyElapsed >= AUTOBUY_INTERVAL_SECONDS) {
+      normalAutobuyElapsed %= AUTOBUY_INTERVAL_SECONDS;
       runAutobuyers();
     }
   } else {
@@ -2616,7 +2640,7 @@ function updateUi() {
   elements.generationButton.disabled = !ready;
   elements.generationCount.textContent = String(state.generationCount);
   const nextGeneration = nextGenerationValues();
-  elements.generationMultiplier.textContent = formatMultiplierPreview(generationScoreMultiplierEffect(), nextGeneration.scoreMultiplier);
+  elements.generationMultiplier.textContent = formatMultiplierLogPreview(generationScoreMultiplierEffectLog10(), nextGeneration.scoreMultiplierLog10);
   elements.generationCostFactor.textContent = formatMultiplierPreview(generationCostFactorEffect(), nextGeneration.costFactor);
 
   elements.coreBoostCount.textContent = String(state.coreBoostCount);
@@ -2695,12 +2719,12 @@ function upgradeCostLog(kind) {
 }
 
 function canBuyNormalUpgrade(kind) {
-  if (state.activeChallenge === 7 && upgradeCostLog(kind) >= 100) return false;
+  if (state.activeChallenge === 7 && currentScoreLog10() > 30) return false;
   if (kind === "vertex") {
     if (state.activeChallenge === 8) return false;
-    if (state.activeChallenge === 2 && state.vertices >= 500) return false;
+    if (state.activeChallenge === 2 && state.vertices >= 200) return false;
   }
-  return canSpendLog(upgradeCostLog(kind)) || isChallengeCompleted(7);
+  return canSpendLog(upgradeCostLog(kind));
 }
 
 function spendNormalUpgrade(kind) {
@@ -2738,7 +2762,7 @@ function buyGain() {
 }
 
 function buyAllUpgrades(options = {}) {
-  if (options instanceof Event) options = {};
+  if (typeof Event !== "undefined" && options instanceof Event) options = {};
   const refresh = options.refresh !== false;
   const persist = options.save !== false;
   const allowSpeed = options.allowSpeed !== false;
@@ -2791,7 +2815,8 @@ function runGeneration() {
   state.generationCount += 1;
   state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   state.previousGenerationScore = valueFromLog10(generationScoreBeforeResetLog);
-  state.generationScoreMultiplier *= reward.scoreMultiplierGain;
+  state.generationScoreMultiplierLog10 = reward.scoreMultiplierLog10;
+  state.generationScoreMultiplier = valueFromLog10(state.generationScoreMultiplierLog10);
   state.generationCostFactor = Math.max(GENERATION_MIN_NEW_COST_FACTOR, nextCostFactor);
 
   state.score = 0;
@@ -2831,6 +2856,7 @@ function resetBelowCoreBoost() {
   state.previousGenerationScore = 0;
   state.previousGenerationScoreLog10 = -Infinity;
   state.generationScoreMultiplier = 1;
+  state.generationScoreMultiplierLog10 = 0;
   state.generationCostFactor = 1;
   state.floatingTexts = [];
 }
@@ -2863,6 +2889,7 @@ function resetBelowInfinity() {
   state.previousGenerationScore = 0;
   state.previousGenerationScoreLog10 = -Infinity;
   state.generationScoreMultiplier = 1;
+  state.generationScoreMultiplierLog10 = 0;
   state.generationCostFactor = 1;
   state.coreBoostCount = 0;
   state.infiniteScore = 0;
@@ -2885,6 +2912,10 @@ function recordInfinityRun(scoreLog, gained, challenge) {
   }
 }
 
+function infinityCountGain() {
+  return isChallengeCompleted(6) ? 2 : 1;
+}
+
 function runInfinity(forced = false) {
   if (!canInfinity()) return;
   if (!forced && state.infinityCount === 0) return;
@@ -2897,7 +2928,7 @@ function runInfinity(forced = false) {
     state.activeChallenge = 0;
   }
 
-  state.infinityCount += 1;
+  state.infinityCount += infinityCountGain();
   addInfinityPoints(gained);
   recordInfinityRun(scoreLogBeforeReset, gained, completedChallenge);
   resetBelowInfinity();
@@ -2926,16 +2957,17 @@ function toggleInfinityChallenge(index = nextChallengeIndex()) {
   if (!infinityChallengesUnlocked()) return;
   if (state.activeChallenge === index) {
     state.activeChallenge = 0;
+    resetBelowInfinity();
   } else if (state.activeChallenge > 0) {
     return;
   } else {
     state.activeChallenge = Math.min(INFINITY_CHALLENGE_COUNT, Math.max(1, Math.floor(index)));
     resetBelowInfinity();
     if (state.activeChallenge === 2) {
-      state.vertices = Math.min(state.vertices, 500);
+      state.vertices = Math.min(state.vertices, 200);
       resetVertexProgress();
     } else if (state.activeChallenge === 8) {
-      state.vertices = 100;
+      state.vertices = 3;
       resetVertexProgress();
     }
   }
@@ -3094,9 +3126,11 @@ function renderGameToText() {
       count: state.generationCount,
       previousGenerationScore: formatUiLogNumber(currentPreviousGenerationScoreLog10()),
       previousGenerationScoreLog10: Number.isFinite(currentPreviousGenerationScoreLog10()) ? Number(currentPreviousGenerationScoreLog10().toPrecision(6)) : null,
-      rawScoreMultiplier: Number(state.generationScoreMultiplier.toFixed(2)),
-      achievementScoreMultiplier: Number(generationAchievementMultiplier().toFixed(2)),
-      scoreMultiplier: Number(generationScoreMultiplierEffect().toFixed(2)),
+      rawScoreMultiplier: formatUiLogNumber(currentGenerationScoreMultiplierLog10()),
+      rawScoreMultiplierLog10: Number(currentGenerationScoreMultiplierLog10().toPrecision(6)),
+      achievementScoreMultiplier: formatUiLogNumber(generationScoreMultiplierBaseEffectLog10()),
+      scoreMultiplier: formatUiLogNumber(generationScoreMultiplierEffectLog10()),
+      scoreMultiplierLog10: Number(generationScoreMultiplierEffectLog10().toPrecision(6)),
       costFactor: Number(generationCostFactorEffect().toFixed(2)),
     },
     coreBoost: {
@@ -3183,12 +3217,15 @@ window.advanceTime = (ms) => {
 window.__angleDebug = {
   state,
   addScore,
+  update,
+  buySpeed,
   runGeneration,
   runCoreBoost,
   runInfinity,
   buyInfinityUpgrade,
   buyAllUpgrades,
   generationRewardFor,
+  generationScoreMultiplierEffectLog10,
   convertIpToInfiniteScore,
   toggleInfinityChallenge,
   breakInfiniteCap,

@@ -74,6 +74,7 @@ Original prompt: では、中核ループを完成させてください
 - Fixed IC1 formula precedence/display, changed IC7 to lock by upgrade cost, changed IC8 to preserve vertices through Generation/Core Boost, raised Break Infinite Cap to e350, and strengthened the second lap-speed softcap.
 - Added encrypted save-code export/import, IC auto-complete automation, and long statistics time formatting with leading zero units omitted.
 - Updated IC8 so its active challenge state also preserves vertices through Generation/Core Boost, matching the displayed restriction text.
+- Rebalanced IC1-IC8 to the latest spec, fixed IC7's no-spend reward to still require affordability, changed IC6 to double Infinity count gain instead of IP, moved GR score multipliers to log tracking, strengthened the post-e22 lap-speed softcap, and increased autobuy to 10 checks per second.
 
 ## TODO
 
