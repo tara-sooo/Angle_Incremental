@@ -32,6 +32,7 @@ function loadBalanceProfile() {
     floatingTexts: [],
     coreBoostCount: 0,
     infinityCount: 0,
+    infinityUpgradeMask: 0,
     infiniteCapBroken: false,
   };
   const purchased = new Set();
@@ -52,6 +53,7 @@ function loadBalanceProfile() {
     log10Value: (value) => Math.log10(value),
     valueFromLog10: (value) => value <= 308 ? 10 ** value : Number.MAX_VALUE,
     clampLog10: (value) => value,
+    parseSavedNumber: (value) => Number(value),
     currentScoreLog10: () => scoreLog10,
     currentGenerationScoreLog10: () => state.generationScoreLog10,
     canInfinity: () => scoreLog10 >= INFINITY_REQUIREMENT_LOG10,
@@ -86,6 +88,10 @@ function loadBalanceProfile() {
     nextGenerationValues() {},
     resetBelowCoreBoost() { state.score = 0; state.scoreLog10 = -Infinity; },
     resetBelowInfinity() { state.score = 0; state.scoreLog10 = -Infinity; },
+    applySaveData(data) {
+      state.generationCostFactor = 0.78;
+      state.infinityUpgradeMask = data.infinityUpgradeMask;
+    },
     updateUi() {},
     draw() {},
     saveGame() {},
@@ -143,6 +149,8 @@ purchased.add("6-1");
 assert.ok(Math.abs(context.generationScorePower() - 3.6) < 1e-12);
 purchased.add("6-2");
 assert.strictEqual(context.balanceGenerationMinCostFactor(), 0.70);
+context.applySaveData({ generationCostFactor: 0.74, infinityUpgradeMask: 1 << 9 });
+assert.strictEqual(state.generationCostFactor, 0.74);
 
 state.coreBoostCount = 2;
 assert.strictEqual(context.coreBoostGainIncreaseMultiplier(), 2);
