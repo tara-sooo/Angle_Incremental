@@ -56,7 +56,7 @@ function runChallenge(index, allowVertexAutobuy) {
     let generations = 0;
     let coreBoosts = 0;
     let maxScoreLog10 = -Infinity;
-    const dt = 1;
+    const dt = 5;
     const maxSeconds = 8 * 60 * 60;
 
     for (let elapsed = 0; elapsed <= maxSeconds; elapsed += dt) {
