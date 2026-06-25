@@ -1,0 +1,20 @@
+name: Temporary balance validation
+
+on:
+  push:
+    branches:
+      - balance/0-1-0-first-infinity-pace
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check game.js
+      - run: node --check game-core.js
+      - run: node --check balance-config.js
+      - run: node --check regression-tests.js
+      - run: node regression-tests.js
