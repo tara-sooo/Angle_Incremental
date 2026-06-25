@@ -1,6 +1,8 @@
 name: Temporary IC clearability validation
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches:
       - balance/0-1-0-first-infinity-pace
