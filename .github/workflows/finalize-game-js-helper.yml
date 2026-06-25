@@ -1,0 +1,100 @@
+name: Finalize Game JS Entrypoint
+
+on:
+  pull_request_target:
+    types: [opened]
+    branches:
+      - next
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  finalize:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'refactor/game-js-single-source-final'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Consolidate source and update regression coverage
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          core_path = Path("game-core.js")
+          if not core_path.exists():
+              raise SystemExit("game-core.js was not found")
+
+          source = core_path.read_text(encoding="utf-8")
+          old_version = 'const APP_VERSION = "2026.06.22-ic-gr-rebalance";'
+          new_version = 'const APP_VERSION = "2026.06.25-iu-core";'
+          if old_version not in source:
+              raise SystemExit("expected APP_VERSION marker was not found")
+          Path("game.js").write_text(source.replace(old_version, new_version, 1), encoding="utf-8")
+
+          tests_path = Path("regression-tests-core.js")
+          tests = tests_path.read_text(encoding="utf-8")
+          old_name = "function testIc7LocksByScoreAndRewardRequiresAffordableCost()"
+          next_name = "function testIc8StartsAtThreeAndPreservesVerticesDuringChallengeAndReward()"
+          start = tests.find(old_name)
+          end = tests.find(next_name, start)
+          if start < 0 or end < 0:
+              raise SystemExit("IC7 regression block was not found")
+          replacement = '''function testIc7LocksByPriceAndRewardRequiresAffordableCost() {
+  const context = loadGame();
+  const { state, buySpeed } = context.window.__angleDebug;
+  state.activeChallenge = 7;
+  state.scoreLog10 = 100;
+  state.speedLevel = 0;
+  assert.strictEqual(context.canBuyNormalUpgrade("speed"), true);
+
+  state.speedLevel = 160;
+  assert.strictEqual(context.canBuyNormalUpgrade("speed"), false);
+
+  state.activeChallenge = 0;
+  state.completedChallenges = 1 << 6;
+  state.scoreLog10 = 0;
+  state.speedLevel = 10;
+  const lockedLevel = state.speedLevel;
+  buySpeed();
+  assert.strictEqual(state.speedLevel, lockedLevel);
+
+  state.speedLevel = 0;
+  state.scoreLog10 = 2;
+  const beforeScore = state.scoreLog10;
+  buySpeed();
+  assert.strictEqual(state.speedLevel, 1);
+  assert.strictEqual(state.scoreLog10, beforeScore);
+}
+
+'''
+          tests_path.write_text(tests[:start] + replacement + tests[end:], encoding="utf-8")
+
+          Path("regression-tests.js").write_text("require('./regression-tests-core.js');\n", encoding="utf-8")
+          Path("version.json").write_text('{\n  "appVersion": "2026.06.25-iu-core"\n}\n', encoding="utf-8")
+          PY
+
+          rm -f game-core.js balance-config.js balance-regression-tests.js core-integration-check.js core-integration-validation.txt
+          rm -rf .github/workflows
+      - name: Validate single-file engine
+        run: |
+          test ! -e game-core.js
+          test ! -e balance-config.js
+          node --check game.js
+          node --check regression-tests.js
+          node --check regression-tests-core.js
+          node regression-tests.js
+      - name: Commit consolidation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: make game.js the sole engine source"
+          git push
