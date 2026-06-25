@@ -1,21 +1,29 @@
 # Angle Incremental 仕様書
 
+対象リリース: **0.1.0**
+
+この文書はゲーム仕様の基準文書である。実装・UI・テストに変更を加える場合は、この仕様書も同時に更新する。
+
 ## 1. ゲーム概要
 
-**Angle Incremental** は、画面中央に表示される図形 **The Angle** を強化し、スコアを増やしていくインクリメンタルゲームである。
+**Angle Incremental** は、画面中央の正多角形 **The Angle** を強化し、Point の周回によってスコアを増やすインクリメンタルゲームである。
 
-プレイヤーはスコアを消費して The Angle を強化し、より効率よくスコアを獲得する。累計スコアが一定値に到達すると **Generation** が解放され、進行度をリセットする代わりに恒久的なブーストを得られる。
+プレイヤーは通常強化で進行を加速し、Generation、Core Boost、Infinity の順に上位リセットを実行する。Infinity 到達後は Infinity Point（IP）で Infinity Upgrade（IU）を購入し、Infinity Challenge（IC）と Break Infinite Cap を目標に進行する。
 
-## 2. 用語定義
+## 2. 用語
 
 | 用語 | 説明 |
 | --- | --- |
-| The Angle | 画面中央に表示される多角形。ゲームの中心要素。 |
+| The Angle | 画面中央に描画される正多角形。ゲームの中心要素。 |
 | Point | The Angle の外周を周回する点。 |
-| 核 | The Angle の一番上の頂点。Point がここに到達するとスコアを獲得する。 |
-| スコア | The Angle の強化に使用する基本リソース。 |
-| 頂点 | The Angle を構成する角。初期値は3。 |
-| Generation | 累計スコア 1,000,000 到達後に解放されるリセット系成長要素。 |
+| 核 | The Angle の最上部の頂点。Point が到達するとスコアを獲得する。 |
+| スコア | 通常強化に使う基本リソース。 |
+| Generation（GR） | 累計スコアを条件に解放される第1リセット層。 |
+| Core Boost（CB） | Generation より上位の第2リセット層。 |
+| Infinity | 第3リセット層。IP と IU を解放する。 |
+| Infinity Point（IP） | IU 購入および Infinite Angle 変換に使うリソース。 |
+| Infinity Upgrade（IU） | IP を使って購入する恒久強化。 |
+| Infinity Challenge（IC） | 制約付き Infinity 到達チャレンジ。 |
 
 ## 3. 初期状態
 
@@ -27,682 +35,334 @@
 | 頂点数 | 3 |
 | Point 数 | 1 |
 | Generation | 未解放 |
+| Core Boost | 0 |
+| Infinity | 0 |
 
-## 4. The Angle と Point
+## 4. 基本ループ
 
-### 4.1 The Angle
+1. Point が The Angle の外周を周回する。
+2. Point が頂点を通過するたび、現在のスコア獲得量が増加する。
+3. Point が核に到達すると、現在のスコア獲得量に応じたスコアを得る。
+4. スコアを消費して通常強化を購入する。
+5. 上位リセットを実行し、恒久的な進行加速を得る。
 
-The Angle は正多角形として扱う。
-
-初期状態では三角形であり、強化によって頂点数を増やすことができる。
-
-### 4.2 Point
-
-Point は The Angle の外周上を一定速度で移動する。
-
-Point は各頂点を順番に通過し、図形を1周する。
-
-### 4.3 核
-
-核は The Angle の一番上の頂点とする。
-
-Point が核に到達するたびに、プレイヤーはスコアを獲得する。
-
-## 5. スコア獲得仕様
-
-### 5.1 基本スコア獲得
-
-Point が核に到達したとき、現在のスコア獲得量に応じてスコアを得る。
+### 4.1 頂点通過による獲得量増加
 
 ```text
-獲得スコア = 現在のスコア獲得量
+スコア獲得量 += 頂点通過ごとの増加値
 ```
 
-### 5.2 頂点通過による獲得量増加
+初期の頂点通過ごとの増加値は `+0.01` とする。通常強化、Core Boost、IU、実績、Infinite Angle、Infinity Challenge 報酬がこの値または最終スコア獲得量を強化する。
 
-Point が各頂点を通過するたびに、スコア獲得量が増加する。
+### 4.2 The Angle の式
 
-```text
-スコア獲得量 += スコア獲得量増加値
-```
-
-初期の増加値は以下とする。
-
-```text
-スコア獲得量増加値 = +x0.01
-```
-
-実装上は「基礎獲得量に対する +0.01 倍分の補正」として扱う。
-
-例:
-
-```text
-基礎獲得量 = 1
-頂点通過ごとの増加値 = 0.01
-頂点を1つ通過するたびに獲得量 +0.01
-```
-
-### 5.3 1周中の獲得量上昇
-
-Point は頂点を通るたびに獲得量を上げるため、頂点数が多いほど1周あたりの獲得量が上昇しやすくなる。
-
-## 6. The Angle の強化
-
-プレイヤーはスコアを消費して The Angle を強化できる。
-
-| 強化名 | 効果 |
-| --- | --- |
-| ラップスピード強化 | Point が1周する速度を上げる。 |
-| 角の追加 | The Angle の頂点数を増やす。 |
-| スコア獲得量増加の強化 | 頂点通過時の獲得量増加値を上げる。 |
-
-通常強化コストは log10 値でも扱い、JavaScript の通常数値上限を超えた後も購入判定と表示を継続できるようにする。
-
-Core Boost や Infinity へ早く到達しすぎないよう、通常強化コストには追加スケーリングを適用する。
-
-初期から中盤にかけては、Generation と Core Boost の進行に応じて緩和される追加スケーリングを使う。
-
-```text
-周回速度: Lv20超過分から 追加log10コスト += 超過Lv^2 x 0.300
-角追加: Lv15超過分から 追加log10コスト += 超過Lv^2 x 1.200
-頂点獲得量: Lv12超過分から 追加log10コスト += 超過Lv^2 x 0.550
-
-Generation係数:
-  GR 0回 = 1.00
-  GR 1回 = 0.90
-  GR 2回 = 0.45
-  GR 3回 = 0.20
-  GR 4回以上 = 0.08
-
-Core Boost緩和:
-  CB 0回 = 1.00
-  CB 1回 = 0.35
-  CB 2回 = 0.10
-  CB 3回以上 = 0
-
-実際の追加log10コスト = 基礎追加log10コスト x Generation係数 x Core Boost緩和
-```
-
-さらに高log帯では、全通常強化に共通する段階スケーリングを追加する。
-
-```text
-コストlog10 > 30:
-  追加log10コスト += (コストlog10 - 30)^2 x 0.020
-
-コストlog10 > 100:
-  追加log10コスト += (コストlog10 - 100)^2 x 0.006
-
-後半スケーリング緩和:
-  緩和係数 = max(0.28, 1 - max(0, Generation回数 - 1) x 0.06 - Core Boost回数 x 0.16)
-  段階スケーリングの追加log10コスト = 追加log10コスト x 緩和係数
-```
-
-### 6.1 ラップスピード強化
-
-Point が The Angle を1周する時間を短縮する。
-
-```text
-周回時間 = 基礎周回時間 / ラップスピード倍率
-```
-
-ラップスピード倍率が一定値を超える場合、実効倍率にはソフトキャップを適用する。
-
-```text
-Generation 0回:
-  実効ラップスピード倍率 = 35 × (生ラップスピード倍率 / 35)^0.22
-
-Generation 1回以上:
-  ソフトキャップ開始点 = min(200, 60 + (Generation回数 - 1) x 40 + Core Boost回数 x 65)
-  ソフトキャップ指数 = min(0.5, 0.24 + (Generation回数 - 1) x 0.06 + Core Boost回数 x 0.10)
-  実効ラップスピード倍率 = ソフトキャップ開始点 × (生ラップスピード倍率 / ソフトキャップ開始点)^ソフトキャップ指数
-
-追加ソフトキャップ:
-  通常ソフトキャップ後の log10(実効ラップスピード倍率) が 22 を超える場合、
-  超過分にはさらに log10 をかける。
-
-  実効log = 22 + log10(1 + 通常ソフトキャップ後log - 22) x 0.25
-```
-
-生ラップスピードは log10 値として伸び続ける。実効ラップスピードは、超強力な追加ソフトキャップで抑える。
-
-これにより、Generation 前はラップスピード強化だけで Core Boost まで到達しにくくし、Generation と Core Boost が進むほど速度投資の価値が戻るようにする。
-
-### 6.2 角の追加
-
-The Angle の頂点数を1つ増やす。
-
-```text
-頂点数 += 1
-```
-
-頂点数が増えることで、Point が1周中に通過する頂点数が増え、スコア獲得量の増加機会も増える。
-
-### 6.3 スコア獲得量増加の強化
-
-頂点通過時に増えるスコア獲得量を強化する。
-
-```text
-頂点通過時の増加値 += 強化量
-```
-
-例:
-
-```text
-初期値: +x0.01
-強化後: +x0.02
-さらに強化後: +x0.03
-```
-
-## 7. スコア獲得量の多項式化
-
-### 7.1 概要
-
-スコア獲得量は、一定の頂点数を超えると The Angle 由来の基礎獲得量に追加式がかかる。
-
-The Angle 由来の基礎獲得量を `x`、現在の頂点数から決まる項数を `y` とする。
+頂点数が4以上の場合、The Angle 由来の基礎獲得量には次の式を適用する。
 
 ```text
 獲得スコア = (x / y) ^ y
-```
-
-頂点数が3の開始状態では `y = 1` となる。この段階では多項式化はまだ発生しておらず、獲得スコアは基礎獲得量 `x` をそのまま使用する。頂点数が4以上になり `y >= 2` となった時点から、上記の追加式を適用する。
-
-この式は表示だけでなく、実際のスコア獲得量に適用される。Generation、Core Boost、実績、Infinity 系の補正は、この式を適用した後に乗算・指数補正する。
-
-### 7.2 項数
-
-`y` は現在の頂点数の平方根をもとに決定する。
-
-```text
-y = floor(sqrt(頂点数))
-```
-
-ただし最大値は10とする。
-
-```text
 y = min(floor(sqrt(頂点数)), 10)
 ```
 
-### 7.3 例
+`x` は基礎獲得量、`y` は頂点数から決まる項数である。頂点数3の開始状態では `y = 1` であり、追加の多項式化は発生しない。
 
-| 頂点数 | sqrt(頂点数) | y |
-| --- | ---: | ---: |
-| 3 | 1.73 | 1 |
-| 4 | 2.00 | 2 |
-| 9 | 3.00 | 3 |
-| 16 | 4.00 | 4 |
-| 100 | 10.00 | 10 |
-| 121 | 11.00 | 10 |
+## 5. 通常強化
 
-## 8. Generation
+| 強化名 | 効果 |
+| --- | --- |
+| ラップスピード強化 | Point の周回速度を上げる。 |
+| 角の追加 | 頂点数を1増やす。 |
+| 頂点獲得量強化 | 頂点通過ごとの増加値を上げる。 |
 
-### 8.1 解放条件
+通常強化コストは log10 値でも管理し、JavaScript の通常数値上限を超える価格でも表示・購入判定を継続する。
 
-累計スコアが以下に到達すると Generation が解放される。
+### 5.1 初期追加スケーリング
+
+```text
+周回速度: Lv20超過分から 追加log10コスト += 超過Lv^2 × 0.00035
+角追加: Lv15超過分から 追加log10コスト += 超過Lv^2 × 0.00140
+頂点獲得量: Lv12超過分から 追加log10コスト += 超過Lv^2 × 0.00065
+```
+
+さらに高コスト帯では、通常強化共通の段階スケーリングを適用する。
+
+```text
+コストlog10 > 30:
+  追加log10コスト += (コストlog10 - 30)^2 × 0.020
+
+コストlog10 > 100:
+  追加log10コスト += (コストlog10 - 100)^2 × 0.006
+```
+
+### 5.2 ラップスピードのソフトキャップ
+
+生ラップスピードは伸び続けるが、実効ラップスピードには複数段階のソフトキャップを適用する。これにより、速度強化だけで上位レイヤーへ過度に早く到達することを防ぐ。
+
+## 6. Generation
+
+### 6.1 解放条件
 
 ```text
 累計スコア >= 1,000,000
 ```
 
-### 8.2 役割
+### 6.2 リセット
 
-Generation は、Generation 未満の進行度をリセットする代わりに強力なブーストを得るシステムである。
+Generation 実行時、現在スコア、通常強化、世代中のスコア、頂点数をリセットする。累計スコア、Generation 回数、Generation 由来の補正は保持する。
 
-リセット後は序盤からやり直すが、Generation 由来の補正により以前より速く進行できる。
+### 6.3 報酬
 
-## 9. Generation 実行時のリセット
+Generation は次の恒久補正を与える。
 
-Generation を実行すると、Generation 未満の進行度がリセットされる。
+- スコア獲得量への乗算・指数補正
+- 通常強化コスト増加分の軽減
 
-### 9.1 リセット対象
+再 Generation は、今回の世代スコアが前回 Generation 実行時の世代スコアを超える場合のみ実行できる。
 
-| 項目 | リセット後 |
-| --- | --- |
-| 現在スコア | 0 |
-| The Angle の強化 | 初期化 |
-| 頂点数 | 3 |
-| ラップスピード強化 | 初期化 |
-| スコア獲得量増加強化 | 初期化 |
+## 7. Core Boost
 
-### 9.2 リセットされない要素
-
-| 項目 | 説明 |
-| --- | --- |
-| Generation 関連の強化 | 恒久的に保持する。 |
-| 累計 Generation 回数 | 保持する。 |
-| Generation 由来のブースト | 保持する。 |
-
-## 10. Generation ブースト
-
-Generation によって、以下のブーストが得られる。
-
-### 10.1 スコア獲得量乗算
-
-スコア獲得量に乗算補正をかける。
-
-```text
-最終獲得スコア = 通常獲得スコア x Generationスコア倍率
-```
-
-### 10.2 強化コスト軽減
-
-The Angle の強化に必要なスコアの増加分を軽減する。
-
-Generation コスト倍率は 1 未満になるほど強力になる。
-
-例:
-
-```text
-0.90 = コスト増加分を10%軽減
-0.75 = コスト増加分を25%軽減
-0.50 = コスト増加分を50%軽減
-```
-
-Generation コスト倍率は、強化コスト全体ではなくコスト増加分にのみ適用する。
-
-```text
-最終強化コスト = 基礎コスト + (通常強化コスト - 基礎コスト) x Generationコスト倍率
-```
-
-## 11. Generation ブーストの強化量
-
-Generation によるブースト量は、その世代中に獲得した累計スコア量によって決まる。
-
-### 11.1 今回の世代スコア
-
-Generation 実行時、現在の世代で稼いだ累計スコアを参照する。
-
-```text
-今回の世代スコア = Generation後から現在までに獲得した累計スコア
-```
-
-### 11.2 ブースト計算方針
-
-今回の世代スコアが高いほど、次回以降の Generation ブーストが強化される。
-
-計算式はバランス調整対象とする。現行の実装式は以下。
-
-```text
-世代深度 = max(0, log10(今回の世代スコア / 1,000,000))
-スコア倍率log10 = min(8, log10(1 + 世代深度) x 2.00)
-コスト軽減率 = min(0.22, log10(1 + 世代深度) x 0.040)
-
-Generationスコア倍率log10 = スコア倍率log10
-Generationコスト倍率 = max(0.78, Generationコスト倍率 x (1 - コスト軽減率))
-```
-
-スコア計算に使う実効 Generation スコア倍率は、Generationスコア倍率log10に指数補正をかける。
-
-```text
-実効Generationスコア倍率log10 = Generationスコア倍率log10 x 2.00
-IU 3-1購入後:
-  実効Generationスコア倍率の指数を x1.5
-実績3達成後:
-  実効Generationスコア倍率 = 1 + (実効Generationスコア倍率 - 1) x 2
-```
-
-既存セーブで Generationコスト倍率 が 0.78 未満の場合は、0.78へ丸める。
-
-### 11.3 再Generation条件
-
-2回目以降の Generation は、今回の世代スコアが前回 Generation 実行時の世代スコアを超えている場合のみ実行できる。
-
-```text
-Generation可能条件 = 今回の世代スコア > 前回Generation時の世代スコア
-```
-
-これにより、前回より弱い Generation を実行して進行が悪化することを防ぐ。
-
-### 11.4 ラップスピードソフトキャップ緩和
-
-Generation を1回以上実行した後は、Generation スコア倍率が伸びるとラップスピードのソフトキャップ開始点が少し上がる。
-
-```text
-ソフトキャップ開始点 = 段階開始点 x (1 + min(1.5, log10(Generationスコア倍率) x 0.08))
-```
-
-Generation 0回の間は、6.1のGR前ソフトキャップを使う。IC1中は Generation が機能しないため、この緩和も無効になる。
-
-## 12. Core Boost
-
-### 12.1 解放条件
-
-所持スコアが以下に到達すると、1回目の Core Boost を実行できる。
+### 7.1 解放条件
 
 ```text
 所持スコア >= 1.00e20
 ```
 
-### 12.2 役割
+### 7.2 リセット
 
-Core Boost は、Generation より上位の2つ目のリセットレイヤーである。
+Core Boost は Generation 以下の進行をリセットする。Core Boost 回数とその恒久補正は保持する。
 
-Core Boost を実行すると、Core Boost 未満の進行度をリセットする代わりに、より強力な恒久ブーストを得る。
+### 7.3 報酬
 
-### 12.3 リセット対象
-
-Core Boost 実行時、以下を初期化する。
-
-| 項目 | リセット後 |
-| --- | --- |
-| 現在スコア | 0 |
-| 累計スコア | 0 |
-| 今回の世代スコア | 0 |
-| The Angle の強化 | 初期化 |
-| 頂点数 | 3 |
-| Generation 回数 | 0 |
-| Generation 由来のブースト | 初期化 |
-
-Core Boost の累計獲得量はリセットされない。
-
-### 12.4 Core Boost ブースト
-
-Core Boost によって、以下のブーストが得られる。
-
-| 強化内容 | 効果 |
-| --- | --- |
-| スコア獲得量増加の増加 | 頂点通過ごとの獲得量増加値を乗算する。 |
-| スコア獲得量の指数増加 | 核到達時のスコア獲得量に指数補正をかける。 |
-
-実装上の初期式は以下とする。
+基本式は以下とする。
 
 ```text
-頂点通過ごとの増加倍率 = 1 + CoreBoost数 x 0.5
-スコア獲得量指数 = 1 + CoreBoost数 x 0.02
-最終獲得スコア = (現在の獲得量 ^ スコア獲得量指数) x Generationスコア倍率
+頂点通過ごとの増加倍率 = 1 + Core Boost回数 × 0.5
+スコア獲得量指数 = 1 + Core Boost回数 × 0.02
 ```
 
-### 12.5 次回要求量
-
-Core Boost を1回獲得するたびに、次回の必要スコアは2乗される。
+IU 7-1 購入後は、頂点通過ごとの増加倍率だけが次の式へ変化する。
 
 ```text
-次回CoreBoost必要スコア = 今回CoreBoost必要スコア ^ 2
+頂点通過ごとの増加倍率 = 1 + Core Boost回数 × 1.0
 ```
 
-例:
+### 7.4 次回要求量
 
-```text
-1回目: 1.00e20
-2回目: 1.00e40
-3回目: 1.00e80
-```
+Core Boost を獲得するたび、次回要求量は指数的に上昇する。必要スコアは log10 値で管理し、通常数値上限を超える要求量も判定できるようにする。
 
-実装上、JavaScript の通常数値で扱える範囲を超える場合は、必要スコア表示と判定を `1.00e308以上` にキャップする。
+## 8. Infinity
 
-## 13. Infinity
-
-### 13.1 解放条件
-
-Infinity は3つ目のリセットレイヤーである。
-
-所持スコアが以下に到達すると、初回 Infinity が強制的に実行される。
+### 8.1 解放条件
 
 ```text
 所持スコア >= 1.80e308
 ```
 
-2回目以降は、条件を満たしているときに任意のタイミングで実行できる。
+初回 Infinity は条件達成時に自動実行する。2回目以降は、条件を満たした状態で任意のタイミングに実行できる。
 
-### 13.2 1.80e308 以降のソフトキャップ
+### 8.2 ソフトキャップ
 
-1.80e308 以降もスコアは伸びるが、Break Infinite Cap までは強力なソフトキャップを受ける。
+Break Infinite Cap 前は、`1.80e308` 以降の所持スコアに強力なソフトキャップを適用する。所持スコアは `scoreLog10` でも保持し、通常数値上限を超えた進行を扱う。
 
-実装上は通常の JavaScript 数値範囲を超えるため、所持スコアは `scoreLog10` でも保持し、1.80e308 以降の伸びを log 空間で圧縮する。
+### 8.3 リセット
 
-### 13.3 Infinity 実行時のリセット
-
-Infinity を実行すると、Infinity 未満の進行度を初期化する。
+Infinity 実行時、Infinity 未満の進行度を初期化する。
 
 | 項目 | リセット後 |
 | --- | --- |
 | 現在スコア | 0 |
-| The Angle の強化 | 初期化 |
+| 通常強化 | 初期化 |
 | Generation | 初期化 |
 | Core Boost | 初期化 |
 | Infinite Score | 0 |
 
-Infinity 回数、Infinity Point、Infinity Upgrade、Infinity Challenge のクリア状況、Break Infinite Cap の状態はリセットされない。
+Infinity 回数、IP、IU、IC クリア状況、Break Infinite Cap 状態、実績はリセットされない。
 
-### 13.4 Infinity Point
+### 8.4 Infinity Point
 
-Infinity を実行すると Infinity Point（IP）を獲得する。
+Infinity 実行時に IP を得る。Infinity 条件を満たしていない場合、IP は得られない。
 
-IP は Infinity Upgrade の購入と Infinite Angle への変換に使用する。
-
-基本獲得量は以下とする。
+Break Infinite Cap 前:
 
 ```text
-IP基本獲得量 = max(1, floor(log10(所持スコア) - 307))
+IP = max(1, floor(log10(所持スコア) - 307))
 ```
 
-ICなどの報酬倍率は、この基本獲得量に乗算した後で整数化する。
+Break Infinite Cap 後:
 
-## 14. Infinity Upgrade
+```text
+IP = max(1, floor(log2(所持スコア) - 307))
+```
 
-Infinity Upgrade は IP を消費して獲得できる恒久強化である。
+実装では `log2(所持スコア)` を `scoreLog10 / log10(2)` として計算する。IC 報酬などの倍率は、基本獲得量に乗算した後で整数化する。
 
-Infinity リセットでは失われない。
+## 9. Infinity Upgrade
 
-IU は順番に購入する必要がある。例として、2-1を購入するには1-1と1-2の購入が必要になる。
+Infinity Upgrade（IU）は IP を消費して購入する恒久強化であり、Infinity リセットでは失われない。
 
-旧IUレベル制セーブは、新IUを未購入に戻し、旧IU購入に使ったIPを返金する。
+- 各IUは、前提IUをすべて購入してから取得できる。
+- 同じ段の複数IUは、同じ前提を満たしていれば任意の順で購入できる。
+- 今後のアップデートで新しいIUを追加できる。
 
 | IU | 必要IP | 前提 | 効果 |
 | --- | ---: | --- | --- |
-| 1-1 リセットは負ではない | 1 | なし | 頂点通過ごとの増加が `max(1, Infinity回数)` 倍される。 |
+| 1-1 リセットは負ではない | 1 | なし | 頂点通過ごとの増加が `Infinity回数 + 1` 倍される。 |
 | 1-2 はじめてのQoL | 1 | なし | 通常強化の自動購入を解放する。 |
-| 2-1 最速タイム | 1 | 1-1, 1-2 | ラップスピードが x1.5 される。 |
-| 3-1 実績3を獲得するにはこれがほぼ必須です | 3 | 2-1 | GR強化項目のスコア倍率指数を x1.5 する。 |
-| 3-2 (必須じゃない方だけど強い) | 3 | 2-1 | GR強化項目のコスト倍率を x0.95 する。 |
+| 2-1 最速タイム | 1 | 1-1, 1-2 | ラップスピードが `×1.5` される。 |
+| 3-1 スコア革命 | 3 | 2-1 | GR スコア倍率が `^1.5` される。 |
+| 3-2 コスト革命 | 3 | 2-1 | GR コスト倍率が `×0.95` される。 |
 | 4-1 縛り縛られ | 5 | 3-1, 3-2 | Infinity Challenge を解放する。 |
+| 5-1 スタートダッシュ | 10 | 4-1 | ラップスピードが `×3` される。 |
+| 5-2 親が地主 | 10 | 4-1 | Generation、Core Boost、Infinity、IC開始・中止によるリセット後、スコア100で開始する。開始時スコアは累計スコア・世代スコアには加算しない。 |
+| 6-1 ほんのりした甘味 | 50 | 5-1, 5-2 | GR スコア倍率がさらに `^1.2` される。 |
+| 6-2 澄んだ視界 | 50 | 5-1, 5-2 | GR コスト倍率の下限が `×0.70` になる。 |
+| 7-1 権力の集中 | 150 | 6-1, 6-2 | Core Boost 由来の増加分だけが2倍になる。式は `1 + Core Boost回数 × 1.0`。 |
+| 7-2 庶民の幸せ | 150 | 6-1, 6-2 | Infinity 回数に応じて通常強化コストを指数的に下げる。 |
 
-## 15. Infinity Challenge
+### 9.1 IU 7-2: 通常強化コスト軽減
 
-Infinity Challenge（IC）は、縛りを課せられた状態で Infinity 到達を目指す要素である。
+IU 7-2 購入後、通常強化コストの最終log10値に次のコスト指数を掛ける。
 
-ICは IU 4-1 を購入すると解放される。Infinity到達前、またはIU 4-1未購入の状態では開始できない。
+```text
+通常強化コスト = 通常強化コスト ^ コスト指数
+```
 
-IC 中に Infinity 条件を満たして Infinity を実行すると、その IC をクリアした扱いになる。
+Infinity 回数を `I` とする。
 
-初期実装の IC は以下とする。
+```text
+I <= 50:
+  コスト指数 = 1 - 0.002 × I
 
-| IC | 縛り | 報酬 |
+I > 50:
+  コスト指数 = 0.8 + 0.1 × exp(-0.005 × (I - 50))
+```
+
+50回目の Infinity でコスト指数は `^0.9` に到達する。以降は効果が逓減し、`^0.8` に漸近する。これは `^0.9` 到達後のソフトキャップとして扱う。
+
+## 10. Infinity Challenge
+
+Infinity Challenge（IC）は、制約付きで Infinity 到達を目指す要素である。IU 4-1 購入後に解放される。
+
+| IC | 制約 | 報酬 |
 | --- | --- | --- |
-| IC1 改悪された計算式 | 基礎獲得式 `(x/y)^z` の `y` が10倍される。 | `y` が撤廃される。 |
-| IC2 現実的に書ける範囲で | 角の数は200を超えない。 | 通常upgrade購入スコアが ^0.95 される。 |
-| IC3 ナメクジよりは早い | ラップスピードが ^0.8 され、周回速度upgradeのコスト増加が2倍になる。 | ラップスピード x1.1。 |
-| IC4 うん、それ以上もそれ以下もないよ | 頂点獲得量が ^0.5 される。 | 頂点獲得量が ^1.1 される。 |
-| IC5 環境配慮 | Core Boost は使えない。 | Core Boost の獲得指数 +0.01。 |
-| IC6 最初だけ強い | 頂点通過ごとの増加は0.001で固定される。 | Infinity 獲得量 x2。 |
-| IC7 倹約家もどき | スコアが1e30を超えると、通常upgradeを購入できない。 | 購入価格以上のスコアがあれば、通常upgrade購入時にスコアを消費しない。 |
-| IC8 反出生主義 | 角の数は3で始まり、角追加upgradeは購入できず、角の数はGenerationとCore Boostでリセットされない。 | 角の数はGenerationとCore Boostでリセットされない。 |
+| IC1 改悪された計算式 | 基礎獲得式の除数が10倍になる。 | 除数を撤廃する。 |
+| IC2 現実的に書ける範囲で | 頂点数は200を超えない。 | 通常強化コストが `^0.95` される。 |
+| IC3 ナメクジよりは早い | ラップスピードが `^0.8` され、周回速度強化のコスト増加が2倍になる。 | ラップスピード `×1.1`。 |
+| IC4 うん、それ以上もそれ以下もないよ | 頂点獲得量が `^0.5` される。 | 頂点獲得量が `^1.1` される。 |
+| IC5 環境配慮 | Core Boost を実行できない。 | Core Boost の獲得指数 `+0.01`。 |
+| IC6 最初だけ強い | 頂点通過ごとの増加は0.001で固定される。 | Infinity 獲得量 `×2`。 |
+| IC7 倹約家もどき | **価格が1e30を超える通常強化**を購入できない。 | 購入価格以上のスコアがある通常強化は、購入時にスコアを消費しない。 |
+| IC8 反出生主義 | 頂点数は3で始まり、角追加を購入できず、Generation と Core Boost で頂点数がリセットされない。 | 頂点数が Generation と Core Boost でリセットされない。 |
 
-## 16. Break Infinite Cap
+IC 中に Infinity 条件を満たして Infinity を実行すると、その IC はクリア済みになる。IC 自動完了がオンの場合、この Infinity 実行は自動化できる。
 
-所持スコアが以下に到達すると、Break Infinite Cap を実行できる。
+## 11. Break Infinite Cap
+
+### 11.1 実行条件
 
 ```text
 所持スコア >= 1.00e350
 ```
 
-Break Infinite Cap 実行後は、1.80e308 以降の強力なソフトキャップが破壊される。
+### 11.2 効果
 
-## 17. Infinite Angle
+Break Infinite Cap は恒久的な状態である。実行後は `1.80e308` 以降の強力なスコアソフトキャップを除去する。
 
-Infinite Angle（IA）は Infinity 版の新しい図形である。
+Infinity の実行条件そのものは引き続き `1.80e308` のままである。Break Infinite Cap は現在、IC全クリアを追加条件としない。
 
-IP を消費して Infinite Score を獲得できる。初期実装では1回の変換に 1.00e20 IP が必要で、変換量は +10 Infinite Score とする。
+## 12. Infinite Angle
 
-Infinite Score の量に応じて、The Angle の「頂点通過ごとのスコア獲得量増加」が強化される。
+Infinite Angle（IA）は IP を Infinite Score に変換する恒久進行要素である。
 
-Infinity を実行すると Infinite Score は0になるが、Infinity Upgrade はリセットされない。
+- 変換コスト: `1.00e20 IP`
+- 変換量: `+10 Infinite Score`
+- Infinite Score は頂点通過ごとのスコア獲得量増加を強化する。
+- Infinity 実行時、Infinite Score は0に戻る。
+- IU は Infinity 実行後も保持される。
 
-## 18. 自動化と統計
+## 13. 自動化と統計
 
-IU 1-2 を購入すると、自動化タブで通常強化の自動購入を使用できる。
+IU 1-2 購入後、通常強化の自動購入を使用できる。
 
-自動化は全体オン/オフに加えて、周回速度、角追加、頂点獲得量ごとに個別オン/オフを持つ。解放直後は自動化全体はオフで、プレイヤーが手動でオンにする。
+- 全体オン/オフと、周回速度・角追加・頂点獲得量ごとの個別オン/オフを持つ。
+- 自動購入は0.1秒ごとに購入を試行する。
+- IU 4-1 購入後は、IC 自動完了をオンにできる。
 
-自動購入は0.1秒ごとに購入を試行する。
+統計タブでは総プレイ時間、現在のInfinity周回、最速Infinity、過去10回のInfinity記録を表示する。
 
-Infinity Challenge解放後、自動化タブで「IC自動完了」をオンにできる。オンの場合、IC中にInfinity条件を満たすと自動的にInfinityを実行し、そのICをクリアする。
+## 14. 実績
 
-統計タブでは以下を表示する。
-
-| 項目 | 内容 |
-| --- | --- |
-| 総プレイ時間 | セーブ内の累計プレイ時間 |
-| 現在のInfinity周回 | 前回Infinity、または新規開始からの経過時間 |
-| 最速Infinity | 記録済みInfinity周回の最短時間 |
-| 過去10回のInfinity | 時間、到達スコアlog、獲得IP、クリアIC |
-
-統計タブの時間は通常「何日何時間何分何秒」形式で表示する。先頭の0単位は省略し、途中の0単位は残す。設定で時間単位をミリ秒にした場合、統計タブもミリ秒表示にする。
-
-## 19. セーブコード
-
-設定タブでセーブコードを書き出し・読み込みできる。
-
-セーブコードは `ANGLE_SAVE_V2:` で始まる。内部のセーブJSONはAES-GCMで暗号化され、直接編集すると認証に失敗して読み込めない。
-
-## 20. 推奨データ構造
-
-```text
-score
-scoreLog10
-totalScore
-generationScore
-
-angleVertexCount
-lapSpeedLevel
-scoreGainIncreaseLevel
-
-baseScoreGain
-currentScoreGain
-scoreGainIncreasePerVertex
-lapSpeedMultiplier
-
-generationCount
-generationScoreMultiplier
-generationScoreMultiplierLog10
-generationCostReductionMultiplier
-
-coreBoostCount
-coreBoostRequirement
-coreBoostGainIncreaseMultiplier
-coreBoostGainExponent
-
-infinityCount
-infinityPoints
-infinityUpgradeMask
-activeInfinityChallenge
-completedInfinityChallenges
-infiniteCapBroken
-infiniteScore
-achievementMask
-currentInfinityRunTime
-fastestInfinityTime
-lastInfinityRuns
-automationEnabled
-autoBuySpeed
-autoBuyVertex
-autoBuyGain
-autoCompleteChallenges
-ic8VertexDecayElapsed
-```
-
-## 21. 実績
-
-実績はいかなるゲーム内リセットの影響も受けない恒久要素である。
-
-実績を1つ達成するたびに、頂点通過ごとのスコア獲得量増加に以下の倍率がかかる。
+実績はすべてのゲーム内リセットを超えて保持される恒久要素である。
 
 ```text
 実績増加倍率 = 1.01 ^ 達成済み実績数
 ```
 
-実績によっては、共通報酬に加えて追加報酬を得る。
+実績には追加報酬を持つものがある。代表的な進行条件は、頂点数増加、Generation、Core Boost、Infinity、IU購入、ICクリア、累計プレイ時間である。
 
-| No. | 実績名 | 条件 | 追加報酬 |
-| --- | --- | --- | --- |
-| 1 | 頂点すなわち角度 | 角の数を増やす | なし |
-| 2 | 世代を超えて | Generation を実行する | なし |
-| 3 | e(この実績の番号)分のブースト | GR由来の単純なスコア獲得量の乗算値が 1000 を超える | GR の単純なスコア獲得量の乗算の効果が 2 倍 |
-| 4 | 角と核はダブルミーニングでもあり | Core Boost 1 に到達 | なし |
-| 5 | 目視できない | ラップスピードが 100 を超える | なし |
-| 6 | contagon | 頂点の数が 30 を超える | なし |
-| 7 | スケーリングは始まっている | 所持スコアが e30 を超える | なし |
-| 8 | 増幅、増幅、増幅 | CB3 に到達 | なし |
-| 9 | 宇宙は収縮する | Infinity に到達 | なし |
-| 10 | 根元から | Infinity Upgrades を購入 | なし |
-| 11 | Tips:目を休める時間です | 累計5時間プレイする | なし |
-| 12 | 一代で成り上がれ | GRなしでCB1に到達 | なし |
-| 13 | かつての記憶 | IU4-1を購入 | なし |
-| 14 | 乗り越える時 | Infinity Challengeを1つクリア | なし |
+## 15. セーブ
 
-## 22. ゲームループ
+セーブデータはローカルストレージへ自動・手動保存する。セーブコードは `ANGLE_SAVE_V2:` で始まり、AES-GCM を用いた暗号化形式で書き出し・読み込みできる。
+
+主要な保存項目には、スコアとそのlog10値、Generation、Core Boost、Infinity、IUマスク、IC状態、Break Infinite Cap、Infinite Score、実績、自動化設定、統計値が含まれる。
+
+## 16. バージョン管理
+
+公開バージョンは Semantic Versioning 形式を採用する。
 
 ```text
-1. Point が The Angle の外周を移動する
-2. Point が頂点を通過する
-3. スコア獲得量が増加する
-4. Point が核に到達する
-5. スコアを獲得する
-6. プレイヤーがスコアを消費して強化する
-7. 累計スコアが 1,000,000 を超える
-8. Generation が解放される
-9. Generation を実行してブーストを得る
-10. 強化された状態で再スタートする
-11. 所持スコアが 1.00e20 に到達する
-12. Core Boost を実行して、Generation 以下をリセットしつつ恒久ブーストを得る
-13. 所持スコアが 1.80e308 に到達する
-14. 初回 Infinity が強制実行され、IP を獲得する
-15. IP で Infinity Upgrade または Infinite Angle を強化する
-16. Infinity Challenge を攻略して追加ブーストを得る
-17. 1.00e350 に到達して Break Infinite Cap を実行する
-18. 条件を満たした実績が恒久的に解放される
+major.minor.patch
 ```
 
-## 23. 最小実装範囲
+- `major`: セーブ互換性を壊す大規模変更。
+- `minor`: 新レイヤー、新しいIU、新しいICなどの後方互換な機能追加。
+- `patch`: バグ修正、調整、文言・UI修正。
 
-最初の実装では、以下の範囲を満たせば中核ループが成立する。
+現在の対象リリースは `0.1.0` とする。ランタイムの `APP_VERSION` と `version.json` の `appVersion` は常に同じ文字列に揃える。更新検知機構はこの一致を前提にしている。
+
+## 17. 推奨データ構造
 
 ```text
-・三角形の The Angle を表示
-・Point が外周を周回
-・核到達時にスコア獲得
-・頂点通過時にスコア獲得量増加
-・ラップスピード強化
-・角の追加
-・スコア獲得量増加強化
-・累計スコア 1,000,000 で Generation 解放
-・Generation 実行でリセットと倍率付与
-・所持スコア 1.00e20 で Core Boost 解放
-・Core Boost 実行で Generation 以下をリセットし、獲得量増加倍率と獲得量指数を付与
-・所持スコア 1.80e308 で Infinity 解放
-・Infinity 実行で IP を獲得し、Infinity 未満をリセット
-・IP による Infinity Upgrade と Infinite Angle 変換
-・Infinity Challenge の開始、クリア、報酬
-・所持スコア 1.00e350 で Break Infinite Cap
-・実績の達成、保存、恒久報酬
+score
+scoreLog10
+totalScore
+totalScoreLog10
+generationScore
+generationScoreLog10
+vertices
+speedLevel
+gainLevel
+currentGain
+currentGainLog10
+generationCount
+generationScoreMultiplier
+generationScoreMultiplierLog10
+generationCostFactor
+coreBoostCount
+infinityCount
+infinityPoints
+infinityPointsLog10
+infinityUpgradeMask
+activeChallenge
+completedChallenges
+infiniteCapBroken
+infiniteScore
+infiniteScoreLog10
+achievementMask
+automationEnabled
+autoBuySpeed
+autoBuyVertex
+autoBuyGain
+autoCompleteChallenges
+currentInfinityRunTime
+fastestInfinityTime
+lastInfinityRuns
 ```
 
-## 24. 未確定・調整項目
+## 18. 今後の拡張
 
-| 項目 | 内容 |
-| --- | --- |
-| 初期周回時間 | Point が1周する秒数。 |
-| 初期スコア獲得量 | 核到達時の最初の獲得量。 |
-| 強化コスト式 | 各強化の価格上昇カーブ。 |
-| 頂点数の上限 | 無限にするか、一定数で制限するか。 |
-| 乗算表記の開始条件 | 何頂点から表示を変えるか。 |
-| Generation 倍率式 | 世代スコアから倍率をどう算出するか。 |
-| Generation 実行条件 | 1,000,000 到達後いつでも実行可能にするか。 |
-| Core Boost 効果式 | CB数から増加倍率・指数をどう伸ばすか。 |
-| Infinity Point 式 | 到達スコアから IP をどう算出するか。 |
-| Infinity Upgrade | 強化種類、コスト、上限。 |
-| Infinity Challenge | IC の数、縛り、報酬、挑戦条件。 |
-| Break Infinite Cap | IC クリアを必須条件にするか。 |
-| Infinite Angle | 図形として独立描画するか、数値強化から始めるか。 |
-| 実績追加報酬 | 既存8種以降の個別報酬をどう拡張するか。 |
-| 複数 Point の有無 | 後半要素として追加するか。 |
+- IUの新しい段と分岐
+- 新しいInfinity Challenge
+- Infinite Angle の独立した図形表示
+- 後半の複数 Point
+- 実績の個別追加報酬
+- バランス調整に伴う通常強化・リセット報酬の数値改定
