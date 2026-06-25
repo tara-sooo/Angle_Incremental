@@ -1,0 +1,23 @@
+core integration checks passed
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+true !== false
+
+    at testIc7LocksByScoreAndRewardRequiresAffordableCost (/home/runner/work/Angle_Incremental/Angle_Incremental/regression-tests-core.js:308:10)
+    at run (/home/runner/work/Angle_Incremental/Angle_Incremental/regression-tests-core.js:458:3)
+    at Object.<anonymous> (/home/runner/work/Angle_Incremental/Angle_Incremental/regression-tests-core.js:469:1)
+    at Module._compile (node:internal/modules/cjs/loader:1781:14)
+    at Object..js (node:internal/modules/cjs/loader:1913:10)
+    at Module.load (node:internal/modules/cjs/loader:1505:32)
+    at Function._load (node:internal/modules/cjs/loader:1309:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:254:19)
+    at Module.require (node:internal/modules/cjs/loader:1527:12)
+    at require (node:internal/modules/helpers:147:16) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+validation_status=1
