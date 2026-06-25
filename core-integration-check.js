@@ -1,0 +1,11 @@
+const assert = require('assert');
+const fs = require('fs');
+const core = fs.readFileSync('game-core.js', 'utf8');
+assert.strictEqual(fs.existsSync('balance-config.js'), false);
+assert(core.includes('// BEGIN INTEGRATED BALANCE RULES'));
+assert(core.includes('function balanceRunGeneration()'));
+assert(core.includes('function balanceInfinityUpgradeCostExponent()'));
+assert(core.includes('function balanceApplyResetStartScore()'));
+assert(core.includes('scoreMultiplierLog10 = Math.min('));
+assert(core.indexOf('// BEGIN INTEGRATED BALANCE RULES') < core.indexOf('elements.generationButton.addEventListener'));
+console.log('core integration checks passed');
