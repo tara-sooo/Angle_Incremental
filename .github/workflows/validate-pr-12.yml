@@ -1,8 +1,10 @@
 name: Validate PR 12
 
 on:
-  issue_comment:
-    types: [created]
+  pull_request_target:
+    types: [reopened]
+    branches:
+      - next
 
 permissions:
   contents: write
@@ -11,10 +13,7 @@ permissions:
 
 jobs:
   validate:
-    if: >-
-      github.event.issue.pull_request &&
-      github.event.issue.number == 12 &&
-      github.event.comment.body == '/validate-pr-12'
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'refactor/game-js-single-source-final'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
