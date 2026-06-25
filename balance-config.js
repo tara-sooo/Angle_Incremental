@@ -39,6 +39,15 @@ function balanceCanBuyNormalUpgrade(kind) {
   return canSpendLog(costLog);
 }
 
+function balanceInfinityPointGain() {
+  if (!canInfinity()) return 0;
+  const scoreLog10 = currentScoreLog10();
+  const base = state.infiniteCapBroken
+    ? Math.floor(scoreLog10 / Math.log10(2) - 307)
+    : Math.floor(scoreLog10 - 307);
+  return Math.max(1, base);
+}
+
 INFINITY_CHALLENGES[6].restriction = {
   ja: "ショップの価格が1e30を超えると、通常アップグレードを購入できなくなる",
   en: "Normal upgrades whose cost exceeds 1e30 cannot be bought.",
@@ -48,6 +57,7 @@ generationRewardForLog = balanceGenerationRewardForLog;
 earlyLayerCostScalingFactor = () => 1;
 preGenerationCostScalingLog10 = balancePreGenerationCostScalingLog10;
 canBuyNormalUpgrade = balanceCanBuyNormalUpgrade;
+infinityPointGain = balanceInfinityPointGain;
 
 if (window.__angleDebug) window.__angleDebug.balanceProfile = BALANCE_PROFILE;
 if (typeof updateUi === "function") updateUi();
