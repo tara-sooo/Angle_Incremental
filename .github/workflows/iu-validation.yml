@@ -1,0 +1,19 @@
+name: Infinity Upgrade Validation
+
+on:
+  push:
+    branches:
+      - feature/infinity-upgrade-expansion
+
+jobs:
+  balance-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --check game.js
+      - run: node --check balance-config.js
+      - run: node --check balance-regression-tests.js
+      - run: node balance-regression-tests.js
