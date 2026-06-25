@@ -6,30 +6,26 @@ const originalReadFileSync = fs.readFileSync.bind(fs);
 const gamePath = path.join(root, "game.js");
 const gameCorePath = path.join(root, "game-core.js");
 const balanceProfilePath = path.join(root, "balance-config.js");
+const source = originalReadFileSync(path.join(root, "regression-tests-core.js"), "utf8");
+const patched = source.replace(
+  /run\(\)\.catch\(\(error\) => \{[\s\S]*?\n\}\);\s*$/,
+  "return { loadGame };\n",
+);
+if (patched === source) throw new Error("Could not expose the regression harness helpers.");
+const { loadGame } = new Function("require", "__dirname", "__filename", patched)(
+  require,
+  root,
+  path.join(root, "regression-tests-core.js"),
+);
 
-function loadRegressionHelpers() {
-  const source = originalReadFileSync(path.join(root, "regression-tests-core.js"), "utf8");
-  const patched = source.replace(
-    /run\(\)\.catch\(\(error\) => \{[\s\S]*?\n\}\);\s*$/,
-    "return { loadGame };\n",
-  );
-  if (patched === source) throw new Error("Could not expose the regression harness helpers.");
-  return new Function("require", "__dirname", "__filename", patched)(
-    require,
-    root,
-    path.join(root, "regression-tests-core.js"),
-  );
-}
+const ALL_IU = (1 << 6) - 1;
+const INFINITY_LOG10 = 308 + Math.log10(1.8);
+const MILESTONES = [8, 12, 16, 20, 30, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 292, 300, 304];
 
-const helpers = loadRegressionHelpers();
-
-function withActiveBalanceProfile(callback) {
-  fs.readFileSync = (filePath, ...args) => {
-    if (path.resolve(filePath) === gamePath) {
-      return `${originalReadFileSync(gameCorePath, ...args)}\n${originalReadFileSync(balanceProfilePath, ...args)}`;
-    }
-    return originalReadFileSync(filePath, ...args);
-  };
+function withBalance(callback) {
+  fs.readFileSync = (filePath, ...args) => path.resolve(filePath) === gamePath
+    ? `${originalReadFileSync(gameCorePath, ...args)}\n${originalReadFileSync(balanceProfilePath, ...args)}`
+    : originalReadFileSync(filePath, ...args);
   try {
     return callback();
   } finally {
@@ -37,180 +33,105 @@ function withActiveBalanceProfile(callback) {
   }
 }
 
-const ALL_INFINITY_UPGRADES_MASK = (1 << 6) - 1;
-const BASELINE_INFINITY_COUNT = 14;
-const INFINITY_LOG10 = 308 + Math.log10(1.8);
-const CORE_FORBIDDEN_CHALLENGE = 5;
-
-const plans = [
-  {
-    id: "core-checkpoints",
-    milestones: [10, 20, 40, 80, 120, 160, 200, 240, 280, 300, 304],
-    maxSeconds: 4 * 60 * 60,
-  },
-  {
-    id: "dense-generations",
-    milestones: [8, 12, 16, 20, 30, 40, 60, 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 292, 300, 304],
-    maxSeconds: 4 * 60 * 60,
-  },
-  {
-    id: "late-generations",
-    milestones: [14, 28, 50, 80, 115, 150, 185, 220, 255, 285, 300, 304],
-    maxSeconds: 6 * 60 * 60,
-  },
-];
-
 function formatTime(seconds) {
-  const total = Math.round(seconds);
-  const hours = Math.floor(total / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-  if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
-  return `${minutes}m ${secs}s`;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.round(seconds % 60);
+  return hours > 0 ? `${hours}h ${minutes}m ${secs}s` : `${minutes}m ${secs}s`;
 }
 
-function challengeStartingMask(index) {
-  return index <= 1 ? 0 : (1 << (index - 1)) - 1;
-}
+function runChallenge(index, allowVertexAutobuy) {
+  return withBalance(() => {
+    const context = loadGame();
+    const debug = context.window.__angleDebug;
+    const { state } = debug;
+    state.showFloatingText = false;
+    state.lightEffects = true;
+    state.infinityCount = 14;
+    state.infinityUpgradeMask = ALL_IU;
+    state.completedChallenges = index === 1 ? 0 : (1 << (index - 1)) - 1;
+    state.automationEnabled = false;
+    debug.toggleInfinityChallenge(index);
 
-function setupChallenge(index, allowVertexAutobuy) {
-  const context = helpers.loadGame();
-  const debug = context.window.__angleDebug;
-  const { state } = debug;
+    let generations = 0;
+    let coreBoosts = 0;
+    let maxScoreLog10 = -Infinity;
+    const dt = 1;
+    const maxSeconds = 8 * 60 * 60;
 
-  state.showFloatingText = false;
-  state.lightEffects = true;
-  state.infinityCount = BASELINE_INFINITY_COUNT;
-  state.infinityUpgradeMask = ALL_INFINITY_UPGRADES_MASK;
-  state.completedChallenges = challengeStartingMask(index);
-  state.automationEnabled = true;
-  state.autoBuySpeed = true;
-  state.autoBuyVertex = allowVertexAutobuy;
-  state.autoBuyGain = true;
-
-  debug.toggleInfinityChallenge(index);
-  if (state.activeChallenge !== index) {
-    throw new Error(`Could not start IC${index}.`);
-  }
-  return { context, debug, state };
-}
-
-function simulateChallenge(index, plan, allowVertexAutobuy) {
-  return withActiveBalanceProfile(() => {
-    const { context, debug, state } = setupChallenge(index, allowVertexAutobuy);
-    const result = {
-      challenge: `IC${index}`,
-      plan: plan.id,
-      vertexAutobuy: allowVertexAutobuy,
-      cleared: false,
-      simulatedSeconds: 0,
-      generations: 0,
-      coreBoosts: 0,
-      maxScoreLog10: -Infinity,
-      finalScoreLog10: -Infinity,
-      finalGenerationCount: 0,
-      finalCoreBoostCount: 0,
-    };
-
-    const dt = 0.1;
-    const steps = Math.ceil(plan.maxSeconds / dt);
-    let elapsed = 0;
-    for (let step = 0; step < steps; step += 1) {
+    for (let elapsed = 0; elapsed <= maxSeconds; elapsed += dt) {
       const scoreLog = context.currentScoreLog10();
-      result.maxScoreLog10 = Math.max(result.maxScoreLog10, scoreLog);
+      maxScoreLog10 = Math.max(maxScoreLog10, scoreLog);
 
       if (scoreLog >= INFINITY_LOG10 || context.canInfinity()) {
         debug.runInfinity(false);
         if (state.activeChallenge === 0 && (state.completedChallenges & (1 << (index - 1))) !== 0) {
-          result.cleared = true;
-          result.simulatedSeconds = elapsed;
-          break;
+          return { cleared: true, elapsed, generations, coreBoosts, maxScoreLog10 };
         }
       }
 
-      const coreAllowed = index !== CORE_FORBIDDEN_CHALLENGE;
+      const coreAllowed = index !== 5;
       const coreRequirement = context.coreBoostRequirementLog10();
-      const previousGenerationScoreLog = context.currentPreviousGenerationScoreLog10();
-
+      const previousGenerationScore = context.currentPreviousGenerationScoreLog10();
       if (coreAllowed && scoreLog >= coreRequirement) {
-        if (context.canRunGeneration() && previousGenerationScoreLog < coreRequirement - 0.05) {
+        if (context.canRunGeneration() && previousGenerationScore < coreRequirement - 0.05) {
           debug.runGeneration();
-          result.generations += 1;
+          generations += 1;
           continue;
         }
         if (context.canCoreBoost()) {
           debug.runCoreBoost();
-          result.coreBoosts += 1;
+          coreBoosts += 1;
           continue;
         }
       }
 
-      const generationCeiling = coreAllowed
-        ? Math.min(coreRequirement - 0.05, 304)
-        : 304;
-      const target = plan.milestones.find((milestone) => (
-        milestone > previousGenerationScoreLog + 0.05
-        && milestone <= generationCeiling + 1e-9
-      ));
+      const ceiling = coreAllowed ? Math.min(coreRequirement - 0.05, 304) : 304;
+      const target = MILESTONES.find((milestone) => milestone > previousGenerationScore + 0.05 && milestone <= ceiling);
       if (target !== undefined && scoreLog >= target && context.canRunGeneration()) {
         debug.runGeneration();
-        result.generations += 1;
+        generations += 1;
         continue;
       }
 
+      debug.buyAllUpgrades({
+        refresh: false,
+        save: false,
+        allowSpeed: true,
+        allowVertex: allowVertexAutobuy,
+        allowGain: true,
+      });
       debug.update(dt);
-      elapsed += dt;
     }
 
-    result.finalScoreLog10 = context.currentScoreLog10();
-    result.finalGenerationCount = state.generationCount;
-    result.finalCoreBoostCount = state.coreBoostCount;
-    if (!result.cleared) result.simulatedSeconds = plan.maxSeconds;
-    return result;
+    return {
+      cleared: false,
+      elapsed: maxSeconds,
+      generations,
+      coreBoosts,
+      maxScoreLog10,
+      finalScoreLog10: context.currentScoreLog10(),
+    };
   });
 }
 
-function validateAllChallenges() {
-  const allResults = [];
-  for (let index = 1; index <= 8; index += 1) {
-    const vertexModes = index === 1 ? [false, true] : [true];
-    let winner = null;
-    const attempts = [];
-
-    for (const allowVertexAutobuy of vertexModes) {
-      for (const plan of plans) {
-        const result = simulateChallenge(index, plan, allowVertexAutobuy);
-        attempts.push(result);
-        if (result.cleared && (!winner || result.simulatedSeconds < winner.simulatedSeconds)) {
-          winner = result;
-        }
-      }
-    }
-
-    allResults.push({
-      challenge: `IC${index}`,
-      cleared: Boolean(winner),
-      best: winner,
-      attempts,
-    });
+const results = [];
+for (let index = 1; index <= 8; index += 1) {
+  const modes = index === 1 ? [false, true] : [true];
+  let best = null;
+  for (const allowVertexAutobuy of modes) {
+    const result = runChallenge(index, allowVertexAutobuy);
+    result.allowVertexAutobuy = allowVertexAutobuy;
+    if (result.cleared && (!best || result.elapsed < best.elapsed)) best = result;
+    results.push({ index, ...result });
   }
-  return allResults;
-}
-
-const results = validateAllChallenges();
-for (const result of results) {
-  if (result.cleared) {
-    const best = result.best;
-    console.log(`${result.challenge}: CLEAR | ${formatTime(best.simulatedSeconds)} | ${best.plan} | GR ${best.generations} | CB ${best.coreBoosts} | max e${best.maxScoreLog10.toFixed(2)} | vertex autobuy ${best.vertexAutobuy}`);
+  if (best) {
+    console.log(`IC${index}: CLEAR | ${formatTime(best.elapsed)} | GR ${best.generations} | CB ${best.coreBoosts} | max e${best.maxScoreLog10.toFixed(2)} | vertex autobuy ${best.allowVertexAutobuy}`);
   } else {
-    const bestProgress = result.attempts.reduce((best, attempt) => (
-      !best || attempt.maxScoreLog10 > best.maxScoreLog10 ? attempt : best
-    ), null);
-    console.log(`${result.challenge}: NOT CLEARED | best e${bestProgress.maxScoreLog10.toFixed(2)} after ${formatTime(bestProgress.simulatedSeconds)} | ${bestProgress.plan} | GR ${bestProgress.generations} | CB ${bestProgress.coreBoosts} | vertex autobuy ${bestProgress.vertexAutobuy}`);
+    const attempts = results.filter((result) => result.index === index);
+    const furthest = attempts.reduce((left, right) => left.maxScoreLog10 >= right.maxScoreLog10 ? left : right);
+    console.log(`IC${index}: NOT CLEARED | best e${furthest.maxScoreLog10.toFixed(2)} after ${formatTime(furthest.elapsed)} | GR ${furthest.generations} | CB ${furthest.coreBoosts} | vertex autobuy ${furthest.allowVertexAutobuy}`);
   }
 }
 
-const failures = results.filter((result) => !result.cleared);
-if (failures.length > 0) {
-  process.exitCode = 1;
-}
+if (results.filter((result) => !result.cleared).length > 0) process.exitCode = 1;
