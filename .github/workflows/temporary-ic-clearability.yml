@@ -7,6 +7,10 @@ on:
     branches:
       - balance/0-1-0-first-infinity-pace
 
+concurrency:
+  group: ic-clearability-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
