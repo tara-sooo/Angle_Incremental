@@ -166,6 +166,28 @@ function balanceGenerationMinCostFactor() {
   return hasInfinityUpgrade("6-2") ? 0.70 : GENERATION_MIN_NEW_COST_FACTOR;
 }
 
+function balanceRestoreGenerationCostFactor(rawValue, upgradeMask = state.infinityUpgradeMask) {
+  if ((Math.floor(Number(upgradeMask) || 0) & (1 << 9)) === 0) return;
+  const value = parseSavedNumber(rawValue);
+  if (!Number.isFinite(value)) return;
+  state.generationCostFactor = Math.max(0.70, Math.min(1, value));
+}
+
+function balanceRestoreGenerationCostFactorFromLocalSave() {
+  if (typeof localStorage === "undefined" || typeof SAVE_KEY === "undefined") return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
+    if (saved && saved.state) {
+      balanceRestoreGenerationCostFactor(
+        saved.state.generationCostFactor,
+        saved.state.infinityUpgradeMask,
+      );
+    }
+  } catch (error) {
+    // The core save loader already handles malformed saves safely.
+  }
+}
+
 function balanceInfinityUpgradeCostExponent() {
   if (!hasInfinityUpgrade("7-2")) return 1;
   const config = BALANCE_PROFILE.infinityUpgradeCostReduction;
@@ -286,6 +308,7 @@ function balanceNextGenerationValues() {
 
 const balanceResetBelowCoreBoost = resetBelowCoreBoost;
 const balanceResetBelowInfinity = resetBelowInfinity;
+const balanceApplySaveData = applySaveData;
 
 function balanceCreateInfinityUpgradeRows() {
   clearElement(elements.infinityUpgradeTree);
@@ -346,8 +369,13 @@ resetBelowInfinity = function balanceResetInfinity() {
   balanceResetBelowInfinity();
   balanceApplyResetStartScore();
 };
+applySaveData = function balanceApplySaveDataWrapper(data, saveVersion) {
+  balanceApplySaveData(data, saveVersion);
+  balanceRestoreGenerationCostFactor(data && data.generationCostFactor, data && data.infinityUpgradeMask);
+};
 createInfinityUpgradeRows = balanceCreateInfinityUpgradeRows;
 
+balanceRestoreGenerationCostFactorFromLocalSave();
 if (typeof elements !== "undefined" && elements.infinityUpgradeTree) createInfinityUpgradeRows();
 if (window.__angleDebug) window.__angleDebug.balanceProfile = BALANCE_PROFILE;
 if (typeof updateUi === "function") updateUi();
