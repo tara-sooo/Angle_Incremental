@@ -29,9 +29,9 @@ function balancePreGenerationCostScalingLog10(kind, level) {
   return excess * excess * scaling.logScale;
 }
 
-window.generationRewardForLog = balanceGenerationRewardForLog;
-window.earlyLayerCostScalingFactor = () => 1;
-window.preGenerationCostScalingLog10 = balancePreGenerationCostScalingLog10;
+generationRewardForLog = balanceGenerationRewardForLog;
+earlyLayerCostScalingFactor = () => 1;
+preGenerationCostScalingLog10 = balancePreGenerationCostScalingLog10;
 
 if (window.__angleDebug) window.__angleDebug.balanceProfile = BALANCE_PROFILE;
 if (typeof updateUi === "function") updateUi();
