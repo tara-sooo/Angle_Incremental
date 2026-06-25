@@ -100,17 +100,21 @@ jobs:
           Path("balance-regression-tests.js").unlink(missing_ok=True)
           Path(".github/workflows/integrate-core-balance.yml").unlink()
           PY
-      - name: Validate integrated engine
+      - name: Validate and commit integration
         run: |
-          node --check game.js
-          node --check game-core.js
-          node --check regression-tests.js
-          node --check core-integration-check.js
-          node regression-tests.js
-      - name: Commit integration
-        run: |
+          set +e
+          {
+            node --check game.js
+            node --check game-core.js
+            node --check regression-tests.js
+            node --check core-integration-check.js
+            node regression-tests.js
+          } > core-integration-validation.log 2>&1
+          validation_status=$?
+          printf 'validation_status=%s\n' "$validation_status" >> core-integration-validation.log
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.com"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "refactor: integrate balance rules into core engine"
           git push
+          exit "$validation_status"
