@@ -1,1 +1,1 @@
-Core integration validation will be rerun with the IC7 price-cap expectation.
+Running the integrated core validation.
