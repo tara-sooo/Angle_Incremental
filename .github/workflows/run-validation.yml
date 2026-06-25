@@ -1,0 +1,95 @@
+name: Run Core Validation
+
+on:
+  push:
+    branches:
+      - test/core-integration-validation
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Update IC7 regression and validate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("regression-tests-core.js")
+          source = path.read_text(encoding="utf-8")
+          old = '''function testIc7LocksByScoreAndRewardRequiresAffordableCost() {
+  const context = loadGame();
+  const { state, buySpeed } = context.window.__angleDebug;
+  state.activeChallenge = 7;
+  state.scoreLog10 = 30;
+  state.speedLevel = 0;
+  assert.strictEqual(context.canBuyNormalUpgrade("speed"), true);
+
+  state.scoreLog10 = 30.001;
+  assert.strictEqual(context.canBuyNormalUpgrade("speed"), false);
+
+  state.activeChallenge = 0;
+  state.completedChallenges = 1 << 6;
+  state.scoreLog10 = 0;
+  state.speedLevel = 10;
+  const lockedLevel = state.speedLevel;
+  buySpeed();
+  assert.strictEqual(state.speedLevel, lockedLevel);
+
+  state.speedLevel = 0;
+  state.scoreLog10 = 2;
+  const beforeScore = state.scoreLog10;
+  buySpeed();
+  assert.strictEqual(state.speedLevel, 1);
+  assert.strictEqual(state.scoreLog10, beforeScore);
+}'''
+          new = '''function testIc7LocksByPriceAndRewardRequiresAffordableCost() {
+  const context = loadGame();
+  const { state, buySpeed } = context.window.__angleDebug;
+  state.activeChallenge = 7;
+  state.scoreLog10 = 100;
+  state.speedLevel = 0;
+  assert.strictEqual(context.canBuyNormalUpgrade("speed"), true);
+
+  state.speedLevel = 160;
+  assert.strictEqual(context.canBuyNormalUpgrade("speed"), false);
+
+  state.activeChallenge = 0;
+  state.completedChallenges = 1 << 6;
+  state.scoreLog10 = 0;
+  state.speedLevel = 10;
+  const lockedLevel = state.speedLevel;
+  buySpeed();
+  assert.strictEqual(state.speedLevel, lockedLevel);
+
+  state.speedLevel = 0;
+  state.scoreLog10 = 2;
+  const beforeScore = state.scoreLog10;
+  buySpeed();
+  assert.strictEqual(state.speedLevel, 1);
+  assert.strictEqual(state.scoreLog10, beforeScore);
+}'''
+          if old not in source:
+              raise SystemExit("IC7 regression block not found")
+          path.write_text(source.replace(old, new, 1), encoding="utf-8")
+          PY
+          set +e
+          node regression-tests.js > core-integration-validation.txt 2>&1
+          validation_status=$?
+          printf 'validation_status=%s\n' "$validation_status" >> core-integration-validation.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/run-validation.yml
+          git rm .github/workflows/update-ic7-regression.yml || true
+          git add -f regression-tests-core.js core-integration-validation.txt
+          git commit -m "test: validate integrated core refactor"
+          git push
+          exit "$validation_status"
