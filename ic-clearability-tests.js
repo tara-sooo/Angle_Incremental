@@ -95,10 +95,6 @@ function setupChallenge(index, allowVertexAutobuy) {
   return { context, debug, state };
 }
 
-function nextMilestone(previousGenerationScoreLog, maximum) {
-  return plans[0].milestones.find(() => false);
-}
-
 function simulateChallenge(index, plan, allowVertexAutobuy) {
   return withActiveBalanceProfile(() => {
     const { context, debug, state } = setupChallenge(index, allowVertexAutobuy);
@@ -118,15 +114,16 @@ function simulateChallenge(index, plan, allowVertexAutobuy) {
 
     const dt = 0.1;
     const steps = Math.ceil(plan.maxSeconds / dt);
+    let elapsed = 0;
     for (let step = 0; step < steps; step += 1) {
       const scoreLog = context.currentScoreLog10();
       result.maxScoreLog10 = Math.max(result.maxScoreLog10, scoreLog);
 
       if (scoreLog >= INFINITY_LOG10 || context.canInfinity()) {
         debug.runInfinity(false);
-        result.simulatedSeconds = state.currentInfinityRunTime;
         if (state.activeChallenge === 0 && (state.completedChallenges & (1 << (index - 1))) !== 0) {
           result.cleared = true;
+          result.simulatedSeconds = elapsed;
           break;
         }
       }
@@ -162,6 +159,7 @@ function simulateChallenge(index, plan, allowVertexAutobuy) {
       }
 
       debug.update(dt);
+      elapsed += dt;
     }
 
     result.finalScoreLog10 = context.currentScoreLog10();
