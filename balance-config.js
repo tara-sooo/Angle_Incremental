@@ -29,9 +29,25 @@ function balancePreGenerationCostScalingLog10(kind, level) {
   return excess * excess * scaling.logScale;
 }
 
+function balanceCanBuyNormalUpgrade(kind) {
+  const costLog = upgradeCostLog(kind);
+  if (state.activeChallenge === 7 && costLog > 30) return false;
+  if (kind === "vertex") {
+    if (state.activeChallenge === 8) return false;
+    if (state.activeChallenge === 2 && state.vertices >= 200) return false;
+  }
+  return canSpendLog(costLog);
+}
+
+INFINITY_CHALLENGES[6].restriction = {
+  ja: "ショップの価格が1e30を超えると、通常アップグレードを購入できなくなる",
+  en: "Normal upgrades whose cost exceeds 1e30 cannot be bought.",
+};
+
 generationRewardForLog = balanceGenerationRewardForLog;
 earlyLayerCostScalingFactor = () => 1;
 preGenerationCostScalingLog10 = balancePreGenerationCostScalingLog10;
+canBuyNormalUpgrade = balanceCanBuyNormalUpgrade;
 
 if (window.__angleDebug) window.__angleDebug.balanceProfile = BALANCE_PROFILE;
 if (typeof updateUi === "function") updateUi();
