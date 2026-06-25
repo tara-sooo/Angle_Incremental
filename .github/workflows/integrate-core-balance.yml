@@ -1,0 +1,112 @@
+name: Integrate Core Balance
+
+on:
+  push:
+    branches:
+      - refactor/core-balance-integration
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Integrate balance profile into the core engine
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          core_path = Path("game-core.js")
+          profile_path = Path("balance-config.js")
+          core = core_path.read_text(encoding="utf-8")
+          profile = profile_path.read_text(encoding="utf-8")
+
+          start_marker = "// BEGIN INTEGRATED BALANCE RULES"
+          end_marker = "// END INTEGRATED BALANCE RULES"
+          anchor = "window.render_game_to_text = renderGameToText;"
+          if start_marker in core:
+              raise SystemExit("integrated balance rules already present")
+          if anchor not in core:
+              raise SystemExit("integration anchor not found")
+
+          integrated_profile = profile.replace(
+              "if (window.__angleDebug) window.__angleDebug.balanceProfile = BALANCE_PROFILE;\n",
+              "",
+          )
+          integrated_profile = integrated_profile.replace(
+              "if (typeof elements !== \"undefined\" && elements.infinityUpgradeTree) createInfinityUpgradeRows();\n",
+              "",
+          )
+          block = (
+              f"{start_marker}\n"
+              "// This section is part of the engine so reset, save, UI, and input bindings share one source of truth.\n"
+              f"{integrated_profile.rstrip()}\n"
+              f"{end_marker}\n\n"
+          )
+          core = core.replace(anchor, block + anchor, 1)
+          core_path.write_text(core, encoding="utf-8")
+
+          Path("game.js").write_text(
+              "// Bootstrap the integrated game engine.\n"
+              "document.write('<script src=\"game-core.js?v=0.1.0-iu-core\"><\\/script>');\n",
+              encoding="utf-8",
+          )
+          Path("version.json").write_text(
+              '{\n  "appVersion": "2026.06.25-iu-core"\n}\n',
+              encoding="utf-8",
+          )
+          Path("core-integration-check.js").write_text(
+              "const assert = require('assert');\n"
+              "const fs = require('fs');\n"
+              "const core = fs.readFileSync('game-core.js', 'utf8');\n"
+              "assert.strictEqual(fs.existsSync('balance-config.js'), false);\n"
+              "assert(core.includes('// BEGIN INTEGRATED BALANCE RULES'));\n"
+              "assert(core.includes('function balanceRunGeneration()'));\n"
+              "assert(core.includes('function balanceInfinityUpgradeCostExponent()'));\n"
+              "assert(core.includes('function balanceApplyResetStartScore()'));\n"
+              "assert(core.includes('scoreMultiplierLog10 = Math.min('));\n"
+              "assert(core.indexOf('// BEGIN INTEGRATED BALANCE RULES') < core.indexOf('elements.generationButton.addEventListener'));\n"
+              "console.log('core integration checks passed');\n",
+              encoding="utf-8",
+          )
+          Path("regression-tests.js").write_text(
+              "const fs = require('fs');\n"
+              "const path = require('path');\n\n"
+              "const originalReadFileSync = fs.readFileSync.bind(fs);\n"
+              "const gamePath = path.join(__dirname, 'game.js');\n"
+              "const gameCorePath = path.join(__dirname, 'game-core.js');\n\n"
+              "fs.readFileSync = (filePath, ...args) => {\n"
+              "  if (path.resolve(filePath) === gamePath) return originalReadFileSync(gameCorePath, ...args);\n"
+              "  return originalReadFileSync(filePath, ...args);\n"
+              "};\n\n"
+              "require('./regression-tests-core.js');\n"
+              "require('./core-integration-check.js');\n",
+              encoding="utf-8",
+          )
+
+          profile_path.unlink()
+          Path("balance-regression-tests.js").unlink(missing_ok=True)
+          Path(".github/workflows/integrate-core-balance.yml").unlink()
+          PY
+      - name: Validate integrated engine
+        run: |
+          node --check game.js
+          node --check game-core.js
+          node --check regression-tests.js
+          node --check core-integration-check.js
+          node regression-tests.js
+      - name: Commit integration
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: integrate balance rules into core engine"
+          git push
