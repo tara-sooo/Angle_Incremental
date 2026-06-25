@@ -1,0 +1,44 @@
+name: Verify Integrated Core
+
+on:
+  push:
+    branches:
+      - refactor/core-balance-integration
+  pull_request:
+    branches:
+      - next
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          ref: ${{ github.head_ref || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run validation and preserve output
+        run: |
+          set +e
+          {
+            node --check game.js
+            node --check game-core.js
+            node --check regression-tests.js
+            node --check core-integration-check.js
+            node regression-tests.js
+          } > core-integration-validation.txt 2>&1
+          validation_status=$?
+          printf 'validation_status=%s\n' "$validation_status" >> core-integration-validation.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/verify-core-integration.yml
+          git add -f core-integration-validation.txt
+          git commit -m "test: record integrated core validation"
+          git push
+          exit "$validation_status"
