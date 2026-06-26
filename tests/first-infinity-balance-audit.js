@@ -5,6 +5,7 @@ const { loadRuntime } = require("./runtime-harness-esm.js");
 const candidatePath = path.join(__dirname, "..", "src", "main.js");
 const reportPath = path.join(__dirname, "..", "first-infinity-balance-report.json");
 const SEARCH_HORIZON_SECONDS = 90 * 60;
+const MAX_CORE_HITS_PER_DECISION = 200_000;
 
 function finiteLog(value) {
   return value === -Infinity ? null : Number(value.toPrecision(12));
@@ -65,6 +66,7 @@ async function simulate(policy, options = {}) {
   let generationResets = 0;
   let coreBoostResets = 0;
   let elapsed = 0;
+  let performanceCeiling = null;
 
   runtime.saveGame = () => true;
   runtime.updateUi = () => {};
@@ -101,6 +103,19 @@ async function simulate(policy, options = {}) {
     }
 
     const dt = Math.min(decisionInterval, maxSeconds - elapsed);
+    const estimatedCoreHits = dt / runtime.lapDuration() * runtime.coreVertexIndices().length;
+    if (estimatedCoreHits > MAX_CORE_HITS_PER_DECISION) {
+      performanceCeiling = {
+        atSeconds: seconds(elapsed),
+        estimatedCoreHits: Number(estimatedCoreHits.toPrecision(8)),
+        lapDurationSeconds: Number(runtime.lapDuration().toPrecision(8)),
+        scoreLog10: finiteLog(runtime.currentScoreLog10()),
+        speedLevel: state.speedLevel,
+        generationCount: state.generationCount,
+        coreBoostCount: state.coreBoostCount,
+      };
+      break;
+    }
     update(dt);
     elapsed += dt;
   }
@@ -123,6 +138,7 @@ async function simulate(policy, options = {}) {
     generationResets,
     coreBoostResets,
     highestCoreBoostCount: Math.max(state.coreBoostCount, coreBoostResets),
+    performanceCeiling,
     final: {
       scoreLog10: finiteLog(runtime.currentScoreLog10()),
       generationScoreLog10: finiteLog(runtime.currentGenerationScoreLog10()),
@@ -182,6 +198,7 @@ function buildPolicies() {
 function resultOrder(left, right) {
   if (left.reachedInfinity !== right.reachedInfinity) return left.reachedInfinity ? -1 : 1;
   if (left.reachedInfinity && right.reachedInfinity) return left.firstInfinitySeconds - right.firstInfinitySeconds;
+  if (Boolean(left.performanceCeiling) !== Boolean(right.performanceCeiling)) return left.performanceCeiling ? -1 : 1;
   const leftScore = left.final.scoreLog10 ?? -Infinity;
   const rightScore = right.final.scoreLog10 ?? -Infinity;
   return rightScore - leftScore;
@@ -220,9 +237,11 @@ async function runFirstInfinityBalanceAudit() {
       noInfinityBenefits: "No Infinity Upgrade or automation is used before the first Infinity.",
       searchHorizonSeconds: SEARCH_HORIZON_SECONDS,
       policySearch: "First GR targets e12/e35/e80; later GR gaps +5/+20/+60 log; CB buffers +0/+25 log.",
+      performanceCeiling: `Stops a policy before one decision would process more than ${MAX_CORE_HITS_PER_DECISION.toLocaleString()} core hits.`,
     },
     searchedPolicyCount: policies.length,
     reachedWithinHorizonCount: gridResults.filter((result) => result.reachedInfinity).length,
+    hitPerformanceCeilingCount: gridResults.filter((result) => Boolean(result.performanceCeiling)).length,
     topGridResults: gridResults.slice(0, 12),
     baselineReferences: gridResults.filter((result) => !result.policy.useGeneration || !result.policy.useCoreBoost),
     sensitivity,
@@ -233,10 +252,12 @@ async function runFirstInfinityBalanceAudit() {
   console.log("FIRST_INFINITY_BALANCE_AUDIT", JSON.stringify({
     searchedPolicyCount: policies.length,
     reachedWithinHorizonCount: report.reachedWithinHorizonCount,
+    hitPerformanceCeilingCount: report.hitPerformanceCeilingCount,
     best: {
       policy: best.policy,
       firstInfinitySeconds: best.firstInfinitySeconds,
       reachedInfinity: best.reachedInfinity,
+      performanceCeiling: best.performanceCeiling,
       finalScoreLog10: best.final.scoreLog10,
     },
   }));
