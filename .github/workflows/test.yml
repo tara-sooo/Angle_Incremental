@@ -1,5 +1,9 @@
 name: Test
-on: [pull_request]
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -8,4 +12,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node regression-tests.js
+      - name: Run regression suite
+        run: |
+          set +e
+          node regression-tests.js > regression-output.txt 2>&1
+          status=$?
+          cat regression-output.txt
+          exit "$status"
+      - name: Upload regression output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-output
+          path: regression-output.txt
+          if-no-files-found: error
