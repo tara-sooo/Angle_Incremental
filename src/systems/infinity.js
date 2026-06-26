@@ -49,7 +49,7 @@ function infinityChallengesUnlocked() {
 
 function infinitySoftcapPower() {
   if (runtime.state.infiniteCapBroken) return 1;
-  return Math.min(0.32, 0.08 + completedChallengeCount() * 0.02);
+  return 0.08;
 }
 
 function isChallengeCompleted(index) {
