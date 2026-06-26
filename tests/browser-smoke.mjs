@@ -108,6 +108,7 @@ try {
     "every game ESM module must use the current versioned URL",
   );
 
+  await page.locator("#updateModalClose").click();
   await page.evaluate(() => {
     window.__angleFullscreenRequests = 0;
     Object.defineProperty(document.documentElement, "requestFullscreen", {
