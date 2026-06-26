@@ -1,2 +1,2 @@
 Temporary marker for release-fix CI validation. Do not merge.
-Revision 9 validates the visible editable and non-editable fullscreen shortcut targets.
+Revision 10 validates the enabled angle-tab fullscreen shortcut target.
