@@ -1,8 +1,10 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const { loadRuntime } = require("./runtime-harness-esm.js");
 
 const candidatePath = path.join(__dirname, "..", "src", "main.js");
+const reportPath = path.join(__dirname, "..", "legacy-regression-audit-report.json");
 const SAVE_KEY = "angle-incremental-save";
 
 function setLogResource(state, key, log) {
@@ -190,6 +192,7 @@ async function runLegacyRegressionAudit() {
     assert.equal(batched.batchUsed, true, "audit: approximation scenario must exercise batch vertex processing");
   }
 
+  fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log("LEGACY_REGRESSION_AUDIT", JSON.stringify(report));
   return report;
 }
