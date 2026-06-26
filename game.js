@@ -13,6 +13,7 @@
   }
 
   loadClassicScript("./src/runtime/core.js")
+    .then(() => loadClassicScript("./src/data/progression-definitions.js"))
     .then(() => loadClassicScript("./src/data/balance-profile.js"))
     .then(() => loadClassicScript("./src/systems/balance-formulas.js"))
     .then(() => loadClassicScript("./src/systems/balance-runtime.js"))
