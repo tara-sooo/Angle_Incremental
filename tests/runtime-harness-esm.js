@@ -213,10 +213,11 @@ async function evaluateEsmRuntime(context, entryPath) {
     });
     cache.set(resolved, module);
     await module.link(async (specifier, referencingModule) => {
-      if (!specifier.startsWith(".")) {
+      const fileSpecifier = specifier.split(/[?#]/, 1)[0];
+      if (!fileSpecifier.startsWith(".")) {
         throw new Error(`Unsupported module specifier: ${specifier}`);
       }
-      return loadModule(path.resolve(path.dirname(referencingModule.identifier), specifier));
+      return loadModule(path.resolve(path.dirname(referencingModule.identifier), fileSpecifier));
     });
     return module;
   }
