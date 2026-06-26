@@ -151,6 +151,11 @@
     saveGame("manual");
   };
 
+  elements.generationButton.removeEventListener("click", baseRunGeneration);
+  elements.generationButton.addEventListener("click", runGeneration);
+  elements.coreBoostButton.removeEventListener("click", baseRunCoreBoost);
+  elements.coreBoostButton.addEventListener("click", runCoreBoost);
+
   loadGame();
   createInfinityUpgradeRows();
   updateUi();
