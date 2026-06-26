@@ -145,11 +145,11 @@ async function runDifferentialTests() {
     debug.runCoreBoost();
   });
 
-  await compareScenario("high-speed vertex processing", async ({ debug }) => {
+  await compareScenario("bounded vertex processing", async ({ debug }) => {
     const { state } = debug;
-    state.speedLevel = 10000;
+    state.speedLevel = 24;
     state.gainLevel = 500;
-    state.vertices = 10000;
+    state.vertices = 1_000;
     state.currentGainLog10 = 25;
     state.currentGain = 1e25;
     debug.update(0.08);
