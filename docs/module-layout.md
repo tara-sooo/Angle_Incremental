@@ -11,4 +11,4 @@ The browser still uses classic scripts while the refactor moves existing subsyst
 - `src/systems/balance-runtime.js` connects balance formulas to reset flow, save restoration, and the Infinity Upgrade UI.
 - `src/systems/progression-data-runtime.js` activates external progression data and rebuilds the affected UI rows after the legacy core has initialized.
 
-`game.js` is an ordered loader. Current data modules are runtime-authoritative but are still mirrored in `core.js` during the transition. The next reduction removes those legacy mirrors and then converts the remaining shared-global scripts to explicit ES module imports.
+`game.js` is an ordered loader. The extracted data modules are runtime-authoritative but are still mirrored in `core.js` during the transition. This is intentional: the next refactor removes the mirrored legacy declarations only after the external modules have passed browser and regression validation.
