@@ -11,6 +11,16 @@ function hasUpgrade(state, bit) {
   return (state.infinityUpgradeMask & (1 << bit)) !== 0;
 }
 
+function saveWithInfinityPoints(points) {
+  return JSON.stringify({
+    version: 7,
+    state: {
+      infinityPoints: points,
+      infinityPointsLog10: Math.log10(points),
+    },
+  });
+}
+
 async function runIc7PriceCapModuleRuntimeTest() {
   const runtimePath = path.join(__dirname, "..", "src", "main.js");
   const { debug } = await loadRuntime(runtimePath);
@@ -58,6 +68,19 @@ async function runIc7PriceCapModuleRuntimeTest() {
   assert.ok(hasUpgrade(remainder.debug.state, 5), "a near-6 IP balance must buy the 5 IP unlock");
   assert.strictEqual(remainder.debug.state.infinityPoints, 1, "6 IP minus 5 IP must normalize to exactly 1 IP");
   assert.strictEqual(remainder.debug.state.infinityPointsLog10, 0, "the 1 IP remainder must use the canonical zero log value");
+
+  const saved = await loadRuntime(runtimePath);
+  saved.context.localStorage.setItem("angle-incremental-save", saveWithInfinityPoints(5.999999999999999));
+  saved.debug.loadGame();
+  assert.strictEqual(saved.debug.state.infinityPoints, 6, "loading an old near-integer IP balance must normalize it");
+  assert.strictEqual(saved.debug.state.infinityPointsLog10, Math.log10(6), "loaded IP must use the canonical log value");
+
+  saved.debug.state.infinityPoints = 5.999999999999999;
+  saved.debug.state.infinityPointsLog10 = Math.log10(5.999999999999999);
+  saved.debug.saveGame("manual");
+  const persisted = JSON.parse(saved.context.localStorage.getItem("angle-incremental-save"));
+  assert.strictEqual(persisted.state.infinityPoints, 6, "saving must normalize a near-integer IP balance");
+  assert.strictEqual(persisted.state.infinityPointsLog10, Math.log10(6), "saved IP must use the canonical log value");
 
   const insufficient = await loadRuntime(runtimePath);
   insufficient.debug.state.infinityPoints = 4.99;
