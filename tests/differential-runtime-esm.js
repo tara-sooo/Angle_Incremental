@@ -14,9 +14,17 @@ function disableAchievementChecks(instance) {
   }
 }
 
+function removeAchievementRunMetadata(records) {
+  records?.forEach((record) => {
+    delete record.noGenerationCoreBoost;
+  });
+}
+
 function compatibilitySnapshot(instance) {
   const value = snapshot(instance);
   delete value.view.achievements.total;
+  removeAchievementRunMetadata(value.state.lastInfinityRuns);
+  removeAchievementRunMetadata(value.view.statistics.lastInfinityRuns);
   return value;
 }
 
