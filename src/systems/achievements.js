@@ -156,6 +156,12 @@ const ACHIEVEMENTS = [
   },
 ];
 
+Object.defineProperty(runtime, "ACHIEVEMENT_COUNT", {
+  configurable: true,
+  enumerable: true,
+  get: () => ACHIEVEMENTS.length,
+});
+
 function isAchievementUnlocked(id) {
   return (runtime.state.achievementMask & (1 << (id - 1))) !== 0;
 }
