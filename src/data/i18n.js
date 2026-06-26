@@ -116,11 +116,11 @@ const TEXT = {
     updateReloadDeferred: "更新待機中：手動リロードしてください",
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
-    updateTitle: "アップデート",
-    updateSummary: "Infinity ChallengeとGenerationを再調整しました。",
-    updateResetDock: "IC1からIC8までの制約と報酬を新仕様へ更新しました。",
-    updateCanvas: "Generation倍率をlog管理にし、速度の追加ソフトキャップを強化しました。",
-    updateModalNote: "IC7報酬、自動購入頻度、統計のミリ秒表示を修正しました。",
+    updateTitle: "0.1.0 アップデート",
+    updateSummary: "Angle Incrementalの最初の番号付きアップデートです。",
+    updateResetDock: "Infinity、Infinity Upgrade、IC1〜IC8、Break Infinite Capを追加しました。",
+    updateCanvas: "Automation、Statistics、セーブコード、安定したセーブ読み込みを追加しました。",
+    updateModalNote: "実績を25個へ拡張し、共通報酬と個別報酬を実装しました。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -246,11 +246,11 @@ const TEXT = {
     updateReloadDeferred: "Update waiting: reload manually",
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
-    updateTitle: "Update",
-    updateSummary: "Infinity Challenges and Generation were rebalanced.",
-    updateResetDock: "IC1 through IC8 restrictions and rewards were updated to the new spec.",
-    updateCanvas: "Generation multipliers now use log tracking, and the extra lap-speed softcap is stronger.",
-    updateModalNote: "IC7 rewards, autobuy frequency, and statistics millisecond display were fixed.",
+    updateTitle: "Version 0.1.0",
+    updateSummary: "Angle Incremental's first numbered update.",
+    updateResetDock: "Added Infinity, Infinity Upgrades, IC1–IC8, and Break Infinite Cap.",
+    updateCanvas: "Added Automation, Statistics, save codes, and more resilient save loading.",
+    updateModalNote: "Expanded Achievements to 25, including shared and individual rewards.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -272,4 +272,3 @@ function t(key) {
 }
 expose("TEXT", () => TEXT);
 expose("t", () => t, (value) => { t = value; });
-
