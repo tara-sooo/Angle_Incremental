@@ -15,6 +15,7 @@ fs.readFileSync = (file, ...args) => {
 async function main() {
   require("./regression-tests-core.js");
   await require("./tests/differential-runtime-esm.js").runDifferentialTests();
+  await require("./tests/ic7-price-cap-module-runtime.js").runIc7PriceCapModuleRuntimeTest();
 }
 
 main().catch((error) => {
