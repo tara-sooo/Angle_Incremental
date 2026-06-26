@@ -192,13 +192,14 @@ function resetBelowInfinity() {
   runtime.state.floatingTexts = [];
 }
 
-function recordInfinityRun(scoreLog, gained, challenge) {
+function recordInfinityRun(scoreLog, gained, challenge, noGenerationCoreBoost = false) {
   const record = {
     time: runtime.state.currentInfinityRunTime,
     scoreLog10: scoreLog,
     ipGain: gained,
     challenge,
   };
+  if (noGenerationCoreBoost) record.noGenerationCoreBoost = true;
   runtime.state.lastInfinityRuns.unshift(record);
   runtime.state.lastInfinityRuns = runtime.state.lastInfinityRuns.slice(0, 10);
   if (record.time > 0 && (runtime.state.fastestInfinityTime <= 0 || record.time < runtime.state.fastestInfinityTime)) {
@@ -226,8 +227,7 @@ function runInfinity(forced = false) {
   const gained = runtime.infinityPointGain();
   runtime.state.infinityCount += infinityCountGain();
   addInfinityPoints(gained);
-  recordInfinityRun(scoreLogBeforeReset, gained, completedChallenge);
-  if (noGenerationOrCoreBoost) runtime.state.noGenerationCoreBoostInfinityReached = true;
+  recordInfinityRun(scoreLogBeforeReset, gained, completedChallenge, noGenerationOrCoreBoost);
   runtime.checkAchievements(true);
   runtime.resetBelowInfinity();
   runtime.state.currentInfinityRunTime = 0;
@@ -301,6 +301,7 @@ function balanceInfinityUpgradeCostExponent() {
     + (config.softcapStartExponent - config.softcapAsymptoteExponent)
       * Math.exp(-Math.max(0, postSoftcapInfinities) * config.postSoftcapDecay);
 }
+
 expose("infinityUpgradeById", () => infinityUpgradeById, (value) => { infinityUpgradeById = value; });
 expose("hasInfinityUpgrade", () => hasInfinityUpgrade, (value) => { hasInfinityUpgrade = value; });
 expose("infinityUpgradeName", () => infinityUpgradeName, (value) => { infinityUpgradeName = value; });
@@ -315,6 +316,7 @@ expose("isChallengeCompleted", () => isChallengeCompleted, (value) => { isChalle
 expose("completedChallengeCount", () => completedChallengeCount, (value) => { completedChallengeCount = value; });
 expose("nextChallengeIndex", () => nextChallengeIndex, (value) => { nextChallengeIndex = value; });
 expose("challengeStateText", () => challengeStateText, (value) => { challengeStateText = value; });
+expose("challengeName", () => challengeName, (value) => { challengeName = value; });
 expose("challengeRestriction", () => challengeRestriction, (value) => { challengeRestriction = value; });
 expose("challengeReward", () => challengeReward, (value) => { challengeReward = value; });
 expose("infiniteAngleEfficiency", () => infiniteAngleEfficiency, (value) => { infiniteAngleEfficiency = value; });
