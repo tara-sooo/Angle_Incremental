@@ -92,6 +92,17 @@ async function runIc7PriceCapModuleRuntimeTest() {
     false,
     "normalization must not allow a materially insufficient IP balance",
   );
+
+  const nonMicroShortfall = await loadRuntime(runtimePath);
+  nonMicroShortfall.debug.state.infinityPoints = 4.999999999;
+  nonMicroShortfall.debug.state.infinityPointsLog10 = Math.log10(4.999999999);
+  nonMicroShortfall.debug.state.infinityUpgradeMask = (1 << 3) | (1 << 4);
+  nonMicroShortfall.debug.buyInfinityUpgrade("4-1");
+  assert.strictEqual(
+    hasUpgrade(nonMicroShortfall.debug.state, 5),
+    false,
+    "normalization must correct floating-point noise without rounding a non-micro shortfall up",
+  );
 }
 
 module.exports = { runIc7PriceCapModuleRuntimeTest };
