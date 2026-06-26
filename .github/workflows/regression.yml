@@ -3,7 +3,14 @@ name: Regression Suite
 on:
   pull_request:
     branches:
+      - main
       - next
+      - "release/**"
+  push:
+    branches:
+      - main
+      - next
+      - "release/**"
 
 jobs:
   regression:
