@@ -46,6 +46,11 @@ function applySetting(key, value) {
   runtime.saveGame("manual");
 }
 
+function isEditableKeyboardTarget(target) {
+  if (!target || typeof target.closest !== "function") return false;
+  return Boolean(target.closest("input, textarea, select, [contenteditable], [role=\"textbox\"]"));
+}
+
 function bindEvents() {
   runtime.elements.speedUpgrade.addEventListener("click", runtime.buySpeed);
   runtime.elements.vertexUpgrade.addEventListener("click", runtime.buyVertex);
@@ -92,7 +97,17 @@ function bindEvents() {
       return;
     }
     if (updateModalVisible) return;
-    if (event.key.toLowerCase() === "f") {
+    if (
+      !event.defaultPrevented
+      && !event.isComposing
+      && !event.ctrlKey
+      && !event.metaKey
+      && !event.altKey
+      && !event.shiftKey
+      && !isEditableKeyboardTarget(event.target)
+      && event.key.toLowerCase() === "f"
+    ) {
+      event.preventDefault();
       if (document.fullscreenElement) document.exitFullscreen();
       else document.documentElement.requestFullscreen();
     }
@@ -101,4 +116,5 @@ function bindEvents() {
 expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
+expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
 expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });
