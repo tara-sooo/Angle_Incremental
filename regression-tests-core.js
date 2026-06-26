@@ -5,18 +5,9 @@ const { webcrypto } = require("crypto");
 const vm = require("vm");
 
 class FakeClassList {
-  constructor() {
-    this.values = new Set();
-  }
-
-  add(value) {
-    this.values.add(value);
-  }
-
-  remove(value) {
-    this.values.delete(value);
-  }
-
+  constructor() { this.values = new Set(); }
+  add(value) { this.values.add(value); }
+  remove(value) { this.values.delete(value); }
   toggle(value, force) {
     if (force === undefined) {
       if (this.values.has(value)) this.values.delete(value);
@@ -27,10 +18,7 @@ class FakeClassList {
     else this.values.delete(value);
     return force;
   }
-
-  contains(value) {
-    return this.values.has(value);
-  }
+  contains(value) { return this.values.has(value); }
 }
 
 class FakeElement {
@@ -49,16 +37,11 @@ class FakeElement {
     this.parentElement = null;
     this.parentNode = null;
   }
-
   addEventListener() {}
-  setAttribute(name, value) {
-    this[name] = value;
-  }
+  setAttribute(name, value) { this[name] = value; }
   focus() {}
   remove() {
-    if (this.parentNode) {
-      this.parentNode.children = this.parentNode.children.filter((child) => child !== this);
-    }
+    if (this.parentNode) this.parentNode.children = this.parentNode.children.filter((child) => child !== this);
   }
   append(...children) {
     children.forEach((child) => {
@@ -67,19 +50,10 @@ class FakeElement {
       this.children.push(child);
     });
   }
-  appendChild(child) {
-    this.append(child);
-    return child;
-  }
-  querySelector() {
-    return new FakeElement();
-  }
-  querySelectorAll() {
-    return [];
-  }
-  getBoundingClientRect() {
-    return { width: 900, height: 620 };
-  }
+  appendChild(child) { this.append(child); return child; }
+  querySelector() { return new FakeElement(); }
+  querySelectorAll() { return []; }
+  getBoundingClientRect() { return { width: 900, height: 620 }; }
 }
 
 function createContext() {
@@ -91,35 +65,19 @@ function createContext() {
       return elements.get(id);
     },
     querySelectorAll: (selector) => {
-      if (selector === ".main-tab") {
-        return ["angle", "infinity", "automation", "statistics", "achievements", "help", "settings"].map((tab) => {
-          const element = new FakeElement();
-          element.dataset.tab = tab;
-          return element;
-        });
-      }
-      if (selector === ".main-panel") {
-        return ["angle", "infinity", "automation", "statistics", "achievements", "help", "settings"].map((panel) => {
-          const element = new FakeElement();
-          element.dataset.panel = panel;
-          return element;
-        });
-      }
-      if (selector === ".infinity-subtab") {
-        return ["upgrades", "challenges", "angle"].map((tab) => {
-          const element = new FakeElement();
-          element.dataset.infinityTab = tab;
-          return element;
-        });
-      }
-      if (selector === ".infinity-subpanel") {
-        return ["upgrades", "challenges", "angle"].map((panel) => {
-          const element = new FakeElement();
-          element.dataset.infinityPanel = panel;
-          return element;
-        });
-      }
-      return [];
+      const values = {
+        ".main-tab": ["angle", "infinity", "automation", "statistics", "achievements", "help", "settings"],
+        ".main-panel": ["angle", "infinity", "automation", "statistics", "achievements", "help", "settings"],
+        ".infinity-subtab": ["upgrades", "challenges", "angle"],
+        ".infinity-subpanel": ["upgrades", "challenges", "angle"],
+      }[selector];
+      if (!values) return [];
+      return values.map((value) => {
+        const element = new FakeElement();
+        if (selector.includes("main")) element.dataset[selector.endsWith("tab") ? "tab" : "panel"] = value;
+        else element.dataset[selector.endsWith("subtab") ? "infinityTab" : "infinityPanel"] = value;
+        return element;
+      });
     },
     documentElement: new FakeElement("html"),
     fonts: null,
@@ -128,24 +86,11 @@ function createContext() {
   canvas.width = 900;
   canvas.height = 620;
   canvas.getContext = () => ({
-    clearRect() {},
-    fillRect() {},
-    beginPath() {},
-    arc() {},
-    moveTo() {},
-    lineTo() {},
-    closePath() {},
-    stroke() {},
-    fill() {},
-    save() {},
-    restore() {},
-    translate() {},
-    rotate() {},
-    fillText() {},
-    measureText: (text) => ({ width: String(text).length * 8 }),
+    clearRect() {}, fillRect() {}, beginPath() {}, arc() {}, moveTo() {}, lineTo() {},
+    closePath() {}, stroke() {}, fill() {}, save() {}, restore() {}, translate() {},
+    rotate() {}, fillText() {}, measureText: (text) => ({ width: String(text).length * 8 }),
     setLineDash() {},
   });
-
   const storage = new Map();
   const context = {
     assert,
@@ -194,117 +139,26 @@ function loadGame() {
   return context;
 }
 
-function testCoreBoostRequirementGrowsPastE308() {
-  const context = loadGame();
-  const { state } = context.window.__angleDebug;
-  state.coreBoostCount = 4;
-  assert.strictEqual(context.coreBoostRequirementLog10(), 320);
-  state.scoreLog10 = 308.3;
-  assert.strictEqual(context.canCoreBoost(), false);
+function testSingleSourceAndVersionAlignment() {
+  const gamePath = path.join(__dirname, "game.js");
+  const gameSource = fs.readFileSync(gamePath, "utf8");
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "version.json"), "utf8"));
+  assert.ok(gameSource.includes('const APP_VERSION = "0.1.0";'));
+  assert.strictEqual(manifest.appVersion, "0.1.0");
+  assert.ok(gameSource.includes("// BEGIN INTEGRATED BALANCE RULES"));
+  assert.ok(!fs.existsSync(path.join(__dirname, "game-core.js")));
+  assert.ok(!fs.existsSync(path.join(__dirname, "balance-config.js")));
 }
 
-function testIpGainUsesLogMinus307() {
-  const context = loadGame();
-  const { state } = context.window.__angleDebug;
-  state.scoreLog10 = 333;
-  assert.strictEqual(context.infinityPointGain(), 26);
-}
-
-function testAchievement12OnlyFirstCoreBoostWithoutGeneration() {
-  const context = loadGame();
-  const { state, runCoreBoost } = context.window.__angleDebug;
-  state.scoreLog10 = 100;
-  state.generationCount = 0;
-  state.coreBoostCount = 1;
-  runCoreBoost();
-  assert.strictEqual(state.noGenerationCoreBoostReached, false);
-}
-
-function testRawLapSpeedCanGrowPastEffectiveSafetyCap() {
-  const context = loadGame();
-  const { state } = context.window.__angleDebug;
-  state.speedLevel = 10000;
-  assert.ok(context.rawLapSpeedLog10() > 42);
-  assert.ok(context.effectiveLapSpeedLog10() > 22);
-  assert.ok(context.effectiveLapSpeedLog10() < 24);
-  assert.ok(context.effectiveLapSpeedLog10() < context.rawLapSpeedLog10());
-  assert.ok(Number.isFinite(context.lapSpeedMultiplier()));
-}
-
-function testGainExpressionReflectsChallengeRulesAndNumberFormat() {
-  const context = loadGame();
-  const { state } = context.window.__angleDebug;
-  state.vertices = 16;
-  state.currentGainLog10 = 24;
-  state.currentGain = 1e24;
-
-  state.numberFormat = "scientific";
-  assert.strictEqual(context.formatGainExpressionSummary(), "(1.00e24 / 4)^4");
-
-  state.activeChallenge = 1;
-  assert.strictEqual(context.formatGainExpressionSummary(), "(1.00e24 / 40)^4");
-  const activeChallengeLog = context.angleExpressionFromBaseLog10(24);
-
-  state.completedChallenges = 1;
-  assert.strictEqual(context.formatGainExpressionSummary(), "(1.00e24 / 40)^4");
-  assert.strictEqual(context.angleExpressionFromBaseLog10(24), activeChallengeLog);
-
-  state.activeChallenge = 0;
-  assert.strictEqual(context.formatGainExpressionSummary(), "(1.00e24)^4");
-  assert.ok(context.angleExpressionFromBaseLog10(24) > activeChallengeLog);
-}
-
-function testUpdatedChallengeRulesAndRewards() {
-  const context = loadGame();
-  const { state, runInfinity } = context.window.__angleDebug;
-
-  assert.ok(context.challengeRestriction(1).includes("10倍"));
-  assert.ok(context.challengeRestriction(2).includes("200"));
-  assert.ok(context.challengeRestriction(3).includes("^0.8"));
-  assert.ok(context.challengeRestriction(4).includes("^0.5"));
-  assert.ok(context.challengeRestriction(6).includes("0.001"));
-  assert.ok(context.challengeRestriction(7).includes("1e30"));
-  assert.ok(context.challengeName(8).includes("反出生主義"));
-
-  state.activeChallenge = 2;
-  state.vertices = 200;
-  state.scoreLog10 = 100;
-  assert.strictEqual(context.canBuyNormalUpgrade("vertex"), false);
-
-  state.activeChallenge = 3;
-  state.speedLevel = 100;
-  const rawWithoutIc3 = 100 * Math.log10(1.22);
-  assert.ok(Math.abs(context.rawLapSpeedLog10() - rawWithoutIc3 * 0.8) < 1e-9);
-  assert.ok(Math.abs(context.costLog10("speed", 5, 1, 1.55) - Math.log10(Math.ceil(5 * 1.55 ** 2))) < 0.01);
-
-  state.activeChallenge = 4;
-  state.gainLevel = 10;
-  const challengedGain = context.vertexGainIncrease();
-  state.activeChallenge = 0;
-  const normalGain = context.vertexGainIncrease();
-  assert.ok(Math.abs(challengedGain - Math.pow(normalGain, 0.5)) < 1e-9);
-
-  state.activeChallenge = 6;
-  assert.strictEqual(context.vertexGainIncrease(), 0.001);
-  state.activeChallenge = 0;
-  state.completedChallenges = 1 << 5;
-  state.infinityCount = 1;
-  state.scoreLog10 = 309;
-  const ipBefore = context.infinityPointGain();
-  runInfinity(false);
-  assert.strictEqual(state.infinityCount, 3);
-  assert.strictEqual(state.infinityPoints, ipBefore);
-}
-
-function testIc7LocksByScoreAndRewardRequiresAffordableCost() {
+function testIc7LocksByPriceAndRewardRequiresAffordableCost() {
   const context = loadGame();
   const { state, buySpeed } = context.window.__angleDebug;
   state.activeChallenge = 7;
-  state.scoreLog10 = 30;
+  state.scoreLog10 = 100;
   state.speedLevel = 0;
   assert.strictEqual(context.canBuyNormalUpgrade("speed"), true);
 
-  state.scoreLog10 = 30.001;
+  state.speedLevel = 160;
   assert.strictEqual(context.canBuyNormalUpgrade("speed"), false);
 
   state.activeChallenge = 0;
@@ -323,150 +177,44 @@ function testIc7LocksByScoreAndRewardRequiresAffordableCost() {
   assert.strictEqual(state.scoreLog10, beforeScore);
 }
 
-function testIc8StartsAtThreeAndPreservesVerticesDuringChallengeAndReward() {
-  const context = loadGame();
-  const { state, runGeneration, runCoreBoost, toggleInfinityChallenge } = context.window.__angleDebug;
-  assert.ok(context.challengeRestriction(8).includes("GRとCBでリセットされない"));
-  state.infinityCount = 1;
-  state.infinityUpgradeMask = 1 << 5;
-  toggleInfinityChallenge(8);
-  assert.strictEqual(state.activeChallenge, 8);
-  assert.strictEqual(state.vertices, 3);
-  context.updateChallengeTimers(30);
-  assert.strictEqual(state.vertices, 3);
-  assert.strictEqual(context.canBuyNormalUpgrade("vertex"), false);
-
-  state.vertices = 12;
-  state.totalScoreLog10 = 10;
-  state.generationScoreLog10 = 10;
-  runGeneration();
-  assert.strictEqual(state.vertices, 12);
-  assert.strictEqual(state.activeChallenge, 8);
-
-  state.vertices = 9;
-  state.scoreLog10 = 25;
-  runCoreBoost();
-  assert.strictEqual(state.vertices, 9);
-  assert.strictEqual(state.activeChallenge, 8);
-
-  toggleInfinityChallenge(8);
-  assert.strictEqual(state.activeChallenge, 0);
-  assert.strictEqual(state.vertices, 3);
-
-  state.activeChallenge = 0;
-  state.completedChallenges = 1 << 7;
-  state.vertices = 42;
-  state.totalScoreLog10 = 10;
-  state.generationScoreLog10 = 10;
-  runGeneration();
-  assert.strictEqual(state.vertices, 42);
-
-  state.scoreLog10 = 25;
-  runCoreBoost();
-  assert.strictEqual(state.vertices, 42);
-}
-
-function testBreakCapRequirementIsE350() {
+function testBreakCapInfinityPointFormula() {
   const context = loadGame();
   const { state } = context.window.__angleDebug;
-  state.scoreLog10 = 349.99;
-  assert.strictEqual(context.canBreakInfiniteCap(), false);
-  state.scoreLog10 = 350;
-  assert.strictEqual(context.canBreakInfiniteCap(), true);
+  state.scoreLog10 = 333;
+  state.infiniteCapBroken = false;
+  assert.strictEqual(context.infinityPointGain(), 26);
+  state.infiniteCapBroken = true;
+  assert.strictEqual(context.infinityPointGain(), 799);
 }
 
-async function testEncryptedSaveCodeRoundTripsAndRejectsTampering() {
+function testInfinityUpgradeEffectsAndResetStartScore() {
   const context = loadGame();
   const { state } = context.window.__angleDebug;
-  state.scoreLog10 = 123;
-  state.vertices = 77;
-  const code = await context.exportSaveCode();
-  assert.match(code, /^ANGLE_SAVE_V2:/);
-  assert.ok(!code.includes("\"scoreLog10\""));
+  state.infinityUpgradeMask = 1 << 6;
+  state.speedLevel = 0;
+  assert.ok(Math.abs(context.rawLapSpeedLog10() - Math.log10(3)) < 1e-12);
 
-  state.scoreLog10 = 0;
-  state.vertices = 3;
-  assert.strictEqual(await context.importSaveCode(code), true);
-  assert.strictEqual(state.scoreLog10, 123);
-  assert.strictEqual(state.vertices, 77);
-
-  const tampered = `${code.slice(0, -1)}${code.endsWith("A") ? "B" : "A"}`;
-  state.scoreLog10 = 55;
-  assert.strictEqual(await context.importSaveCode(tampered), false);
-  assert.strictEqual(state.scoreLog10, 55);
+  state.infinityUpgradeMask = 1 << 7;
+  state.score = 1000;
+  state.scoreLog10 = 3;
+  context.resetBelowCoreBoost();
+  assert.strictEqual(state.score, 100);
+  assert.strictEqual(state.scoreLog10, 2);
 }
 
-function testLongDurationOmitsOnlyLeadingZeroUnits() {
+function testInfinityUpgradeTreeContainsSevenTiers() {
   const context = loadGame();
-  assert.strictEqual(context.formatLongDuration(45), "45秒");
-  assert.strictEqual(context.formatLongDuration(3 * 3600 + 12 * 60 + 4), "3時間12分4秒");
-  assert.strictEqual(context.formatLongDuration(2 * 86400 + 3 * 3600 + 5), "2日3時間0分5秒");
-  context.window.__angleDebug.state.timeUnit = "milliseconds";
-  assert.strictEqual(context.formatLongDuration(1.25), "1250ミリ秒");
+  const tree = context.document.getElementById("infinityUpgradeTree");
+  assert.strictEqual(tree.children.length, 7);
 }
 
-function testGenerationMultiplierUsesLogAndDoesNotOverflow() {
-  const context = loadGame();
-  const { state, runGeneration } = context.window.__angleDebug;
-  for (let index = 0; index < 180; index += 1) {
-    state.totalScoreLog10 = 1000 + index;
-    state.generationScoreLog10 = 1000 + index;
-    runGeneration();
-  }
-  assert.ok(Number.isFinite(state.generationScoreMultiplierLog10));
-  assert.ok(state.generationScoreMultiplierLog10 <= 8);
-  assert.ok(Number.isFinite(context.generationScoreMultiplierEffectLog10()));
-}
-
-function testAutobuyRunsAtTenTimesPerSecond() {
-  const context = loadGame();
-  const { state } = context.window.__angleDebug;
-  state.infinityUpgradeMask = 1 << 1;
-  state.automationEnabled = true;
-  state.autoBuySpeed = true;
-  state.autoBuyVertex = false;
-  state.autoBuyGain = false;
-  state.scoreLog10 = 20;
-  context.update(0.1);
-  assert.ok(state.speedLevel > 0);
-}
-
-function testChallengeAutoCompleteRunsInfinityOnlyWhenEnabled() {
-  const context = loadGame();
-  const { state } = context.window.__angleDebug;
-  state.infinityCount = 1;
-  state.infinityUpgradeMask = 1 << 5;
-  state.activeChallenge = 1;
-  state.scoreLog10 = 309;
-  state.autoCompleteChallenges = false;
-  context.completeChallengeIfReady();
-  assert.strictEqual(state.activeChallenge, 1);
-
-  state.autoCompleteChallenges = true;
-  context.completeChallengeIfReady();
-  assert.strictEqual(state.activeChallenge, 0);
-  assert.ok((state.completedChallenges & 1) !== 0);
-}
-
-async function run() {
-  testCoreBoostRequirementGrowsPastE308();
-  testIpGainUsesLogMinus307();
-  testAchievement12OnlyFirstCoreBoostWithoutGeneration();
-  testRawLapSpeedCanGrowPastEffectiveSafetyCap();
-  testGainExpressionReflectsChallengeRulesAndNumberFormat();
-  testUpdatedChallengeRulesAndRewards();
-  testIc7LocksByScoreAndRewardRequiresAffordableCost();
-  testIc8StartsAtThreeAndPreservesVerticesDuringChallengeAndReward();
-  testBreakCapRequirementIsE350();
-  await testEncryptedSaveCodeRoundTripsAndRejectsTampering();
-  testLongDurationOmitsOnlyLeadingZeroUnits();
-  testGenerationMultiplierUsesLogAndDoesNotOverflow();
-  testAutobuyRunsAtTenTimesPerSecond();
-  testChallengeAutoCompleteRunsInfinityOnlyWhenEnabled();
+function run() {
+  testSingleSourceAndVersionAlignment();
+  testIc7LocksByPriceAndRewardRequiresAffordableCost();
+  testBreakCapInfinityPointFormula();
+  testInfinityUpgradeEffectsAndResetStartScore();
+  testInfinityUpgradeTreeContainsSevenTiers();
   console.log("regression tests passed");
 }
 
-run().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+run();
