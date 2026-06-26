@@ -3,9 +3,6 @@ import { runtime, expose } from "../runtime/shared.js";
 // Extracted mechanically from the next-runtime baseline.
 // Functions retain their original global runtime dependencies during the classic-script migration phase.
 
-const INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10 = 1e-12;
-const INFINITY_POINT_INTEGER_NORMALIZATION_TOLERANCE = 1e-9;
-
 function infinityUpgradeById(id) {
   return runtime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === id);
 }
@@ -126,38 +123,24 @@ function infiniteScoreGainPerIpLog10() {
   return runtime.log10Value(infiniteScoreGainPerIp());
 }
 
-function setInfinityPointBalanceFromLog10(balanceLog) {
-  const balance = runtime.valueFromLog10(balanceLog);
-  const nearestInteger = Math.round(balance);
-  const shouldNormalizeInteger = Number.isSafeInteger(nearestInteger)
-    && Math.abs(balance - nearestInteger) <= INFINITY_POINT_INTEGER_NORMALIZATION_TOLERANCE;
-  runtime.state.infinityPointsLog10 = shouldNormalizeInteger
-    ? (nearestInteger > 0 ? runtime.log10Value(nearestInteger) : -Infinity)
-    : balanceLog;
-  runtime.state.infinityPoints = shouldNormalizeInteger ? nearestInteger : balance;
+function setInfinityPointBalanceFromLog10(balanceLog10) {
+  runtime.state.infinityPointsLog10 = balanceLog10;
+  runtime.normalizeInfinityPointState();
 }
 
-function canSpendInfinityPoints(costLog) {
-  const currentLog = runtime.currentInfinityPointsLog10();
-  return currentLog >= costLog
-    || (Number.isFinite(currentLog)
-      && Number.isFinite(costLog)
-      && costLog - currentLog <= INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10);
+function canSpendInfinityPoints(costLog10) {
+  runtime.normalizeInfinityPointState();
+  return runtime.currentInfinityPointsLog10() >= costLog10;
 }
 
 function addInfinityPoints(amount) {
-  const amountLog = runtime.log10Value(amount);
-  setInfinityPointBalanceFromLog10(runtime.combineLog10(runtime.currentInfinityPointsLog10(), amountLog));
+  const amountLog10 = runtime.log10Value(amount);
+  setInfinityPointBalanceFromLog10(runtime.combineLog10(runtime.currentInfinityPointsLog10(), amountLog10));
 }
 
-function spendInfinityPoints(costLog) {
-  if (!canSpendInfinityPoints(costLog)) return false;
-  const currentLog = runtime.currentInfinityPointsLog10();
-  if (currentLog <= costLog + INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10) {
-    setInfinityPointBalanceFromLog10(-Infinity);
-    return true;
-  }
-  setInfinityPointBalanceFromLog10(runtime.subtractLog10(currentLog, costLog));
+function spendInfinityPoints(costLog10) {
+  if (!canSpendInfinityPoints(costLog10)) return false;
+  setInfinityPointBalanceFromLog10(runtime.subtractLog10(runtime.currentInfinityPointsLog10(), costLog10));
   return true;
 }
 
