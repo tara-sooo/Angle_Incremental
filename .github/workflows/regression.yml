@@ -38,10 +38,12 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run browser ESM smoke test
         run: node tests/browser-smoke.mjs
-      - name: Upload browser smoke diagnostics
+      - name: Upload smoke and audit diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: browser-smoke-report
-          path: browser-smoke-report.json
+          name: regression-diagnostics
+          path: |
+            browser-smoke-report.json
+            legacy-regression-audit-report.json
           if-no-files-found: warn
