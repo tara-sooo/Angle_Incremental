@@ -120,17 +120,27 @@ try {
     });
   });
   await page.locator('[data-tab="settings"]').click();
-  await page.locator("#saveCodeArea").focus();
-  await page.keyboard.press("f");
+  const saveCodeArea = page.locator("#saveCodeArea");
+  await saveCodeArea.focus();
+  report.focusBeforeInput = await page.evaluate(() => ({
+    activeId: document.activeElement?.id ?? null,
+    activeTagName: document.activeElement?.tagName ?? null,
+    settingsActive: document.querySelector('.main-panel[data-panel="settings"]')?.classList.contains("is-active") ?? false,
+  }));
+  assert.equal(report.focusBeforeInput.activeId, "saveCodeArea", "save-code area must hold focus before typing");
+  assert.equal(report.focusBeforeInput.settingsActive, true, "settings panel must be active before save-code typing");
+  await saveCodeArea.press("f");
+  report.fullscreenRequestsAfterInput = await page.evaluate(() => window.__angleFullscreenRequests);
   assert.equal(
-    await page.evaluate(() => window.__angleFullscreenRequests),
+    report.fullscreenRequestsAfterInput,
     0,
     "typing f in the save-code area must not toggle fullscreen",
   );
   await page.locator("#buyAllUpgrade").focus();
   await page.keyboard.press("f");
+  report.fullscreenRequestsAfterButton = await page.evaluate(() => window.__angleFullscreenRequests);
   assert.equal(
-    await page.evaluate(() => window.__angleFullscreenRequests),
+    report.fullscreenRequestsAfterButton,
     1,
     "plain f outside an editable element must still toggle fullscreen",
   );
