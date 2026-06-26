@@ -66,16 +66,16 @@ const address = server.address();
 if (!address || typeof address === "string") throw new Error("failed to bind smoke-test server");
 
 const browser = await chromium.launch({ headless: true });
+const errors = [];
+const moduleRequests = [];
 const report = {
   result: "running",
   expectedAssetVersion: EXPECTED_ASSET_VERSION,
-  errors: [],
+  errors,
   moduleRequests: [],
 };
 try {
   const page = await browser.newPage();
-  const errors = [];
-  const moduleRequests = [];
   const localOrigin = `http://127.0.0.1:${address.port}`;
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
@@ -125,7 +125,7 @@ try {
     0,
     "typing f in the save-code area must not toggle fullscreen",
   );
-  await page.evaluate(() => document.activeElement?.blur());
+  await page.locator("#buyAllUpgrade").focus();
   await page.keyboard.press("f");
   assert.equal(
     await page.evaluate(() => window.__angleFullscreenRequests),
@@ -141,6 +141,7 @@ try {
   report.failure = error instanceof Error ? error.stack || error.message : String(error);
   throw error;
 } finally {
+  report.moduleRequests = moduleRequests.map((url) => url.toString());
   try {
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   } catch (error) {
