@@ -17,6 +17,7 @@ async function main() {
   await require("./tests/differential-runtime-esm.js").runDifferentialTests();
   await require("./tests/ic7-price-cap-module-runtime.js").runIc7PriceCapModuleRuntimeTest();
   await require("./tests/achievements-v2-module-runtime.js").runAchievementV2ModuleRuntimeTest();
+  await require("./tests/release-audit-module-runtime.js").runReleaseAudit();
 }
 
 main().catch((error) => {
