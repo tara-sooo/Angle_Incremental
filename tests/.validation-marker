@@ -1,2 +1,2 @@
 Temporary marker for release-fix CI validation. Do not merge.
-Revision 3 collects browser smoke diagnostics when validation fails.
+Revision 4 validates the explicit non-editable fullscreen shortcut path.
