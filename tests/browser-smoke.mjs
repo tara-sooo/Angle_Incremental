@@ -137,13 +137,14 @@ try {
     "typing f in the save-code area must not toggle fullscreen",
   );
 
-  await page.locator('[data-tab="angle"]').click();
-  await page.locator("#buyAllUpgrade").focus();
+  const angleTab = page.locator('[data-tab="angle"]');
+  await angleTab.click();
+  await angleTab.focus();
   report.focusBeforeButton = await page.evaluate(() => ({
-    activeId: document.activeElement?.id ?? null,
+    activeTab: document.activeElement?.dataset?.tab ?? null,
     angleActive: document.querySelector('.main-panel[data-panel="angle"]')?.classList.contains("is-active") ?? false,
   }));
-  assert.equal(report.focusBeforeButton.activeId, "buyAllUpgrade", "buy-all button must hold focus before shortcut testing");
+  assert.equal(report.focusBeforeButton.activeTab, "angle", "angle tab must hold focus before shortcut testing");
   assert.equal(report.focusBeforeButton.angleActive, true, "angle panel must be active before normal shortcut testing");
   await page.keyboard.press("f");
   report.fullscreenRequestsAfterButton = await page.evaluate(() => window.__angleFullscreenRequests);
