@@ -86,8 +86,8 @@ runtime.achievementCount = () => runtime.ACHIEVEMENTS.reduce(
   0,
 );
 runtime.achievementGainMultiplier = () => Math.pow(1.01, runtime.achievementCount());
-runtime.TEXT.ja.achievementRewardText = "達成ごとにスコア獲得量 ×1.01";
-runtime.TEXT.en.achievementRewardText = "Each achievement multiplies score gain by 1.01";
+runtime.TEXT.ja.achievementRewardText = "達成ごとに頂点通過ごとの増加 ×1.01";
+runtime.TEXT.en.achievementRewardText = "Each achievement multiplies gain per vertex by 1.01";
 
 runtime.vertexGainIncrease = function achievementVertexGainIncrease() {
   const infinityResetBoost = runtime.hasInfinityUpgrade("1-1")
@@ -96,111 +96,12 @@ runtime.vertexGainIncrease = function achievementVertexGainIncrease() {
   let gain = (0.01 + runtime.state.gainLevel * 0.01)
     * runtime.coreBoostGainIncreaseMultiplier()
     * runtime.infiniteAngleBoost()
+    * runtime.achievementGainMultiplier()
     * infinityResetBoost;
   if (runtime.state.activeChallenge === 6) return 0.001;
   if (runtime.state.activeChallenge === 4) gain = Math.pow(gain, 0.5);
   if (runtime.isChallengeCompleted(4)) gain = Math.pow(gain, 1.1);
   return gain;
-};
-
-runtime.finalScoreGainFromBaseLog10 = function achievementFinalScoreGainFromBaseLog10(baseLog) {
-  const angleLog = runtime.angleExpressionFromBaseLog10(baseLog) * runtime.coreBoostGainExponent();
-  const boostedLog = angleLog + runtime.generationScoreMultiplierEffectLog10();
-  return boostedLog * runtime.finalScoreGainPower()
-    - runtime.log10Value(runtime.finalScoreGainDivisor())
-    + Math.log10(runtime.achievementGainMultiplier());
-};
-
-runtime.finalScoreGainLog10 = function achievementFinalScoreGainLog10(baseGain = runtime.state.currentGain) {
-  const baseLog = baseGain === runtime.state.currentGain
-    ? runtime.currentGainLog10()
-    : runtime.log10Value(Math.max(baseGain, 0));
-  return runtime.finalScoreGainFromBaseLog10(baseLog);
-};
-
-runtime.finalScoreGain = function achievementFinalScoreGain(baseGain = runtime.state.currentGain) {
-  const gainLog = runtime.finalScoreGainLog10(baseGain);
-  return gainLog <= 308 ? 10 ** gainLog : Infinity;
-};
-
-runtime.sumCoreHitGains = function achievementSumCoreHitGains(firstCoreStep, coreHits, increase) {
-  const stride = runtime.state.vertices;
-  if (coreHits > runtime.MAX_EXACT_CORE_HITS) {
-    let earned = 0;
-    const segmentSize = coreHits / runtime.CORE_HIT_APPROX_SEGMENTS;
-    for (let segment = 0; segment < runtime.CORE_HIT_APPROX_SEGMENTS; segment += 1) {
-      const midHit = (segment + 0.5) * segmentSize;
-      const stepAtMid = firstCoreStep + midHit * stride;
-      const gainLog = runtime.gainAfterIncreaseLog10(increase, stepAtMid);
-      earned += runtime.valueFromLog10(runtime.finalScoreGainFromBaseLog10(gainLog)) * segmentSize;
-    }
-    return earned;
-  }
-
-  let earned = 0;
-  for (let hit = 0; hit < coreHits; hit += 1) {
-    const gainLog = runtime.gainAfterIncreaseLog10(increase, firstCoreStep + hit * stride);
-    earned += runtime.valueFromLog10(runtime.finalScoreGainFromBaseLog10(gainLog));
-  }
-  return earned;
-};
-
-runtime.passVertex = function achievementPassVertex(index) {
-  runtime.addCurrentGain(runtime.vertexGainIncrease());
-  if (!runtime.isCoreVertex(index)) return false;
-
-  const gainLog = runtime.finalScoreGainLog10();
-  const resetByInfinity = runtime.addScore(runtime.valueFromLog10(gainLog), gainLog);
-  if (resetByInfinity) return true;
-  if (runtime.state.showFloatingText && !runtime.state.lightEffects) {
-    runtime.state.floatingTexts.push({
-      text: `+${runtime.formatUiLogNumber(gainLog)}`,
-      life: 1,
-      x: runtime.canvas.width / 2,
-      y: runtime.canvas.height * 0.16,
-    });
-  }
-  return false;
-};
-
-runtime.processManyVertices = function achievementProcessManyVertices(start, end) {
-  const count = end - start + 1;
-  if (count <= 0) return false;
-
-  const increase = runtime.vertexGainIncrease();
-  const coreBatches = runtime.coreVertexIndices()
-    .map((coreIndex) => {
-      const coreOffset = ((coreIndex - (start % runtime.state.vertices)) + runtime.state.vertices) % runtime.state.vertices;
-      const coreHits = coreOffset >= count ? 0 : Math.floor((count - 1 - coreOffset) / runtime.state.vertices) + 1;
-      return { coreHits, firstCoreStep: coreOffset + 1 };
-    })
-    .filter((batch) => batch.coreHits > 0);
-  const coreHits = coreBatches.reduce((total, batch) => total + batch.coreHits, 0);
-
-  if (coreHits > 0) {
-    let earned = 0;
-    let lastCoreStep = 0;
-    coreBatches.forEach((batch) => {
-      earned += runtime.sumCoreHitGains(batch.firstCoreStep, batch.coreHits, increase);
-      lastCoreStep = Math.max(lastCoreStep, batch.firstCoreStep + (batch.coreHits - 1) * runtime.state.vertices);
-    });
-    const batchLog = runtime.log10Value(Math.max(coreHits, 1))
-      + runtime.finalScoreGainFromBaseLog10(runtime.gainAfterIncreaseLog10(increase, lastCoreStep));
-    const earnedLog = Number.isFinite(earned) ? runtime.log10Value(earned) : batchLog;
-    const resetByInfinity = runtime.addScore(earned, earnedLog);
-    if (resetByInfinity) return true;
-    if (runtime.state.showFloatingText && !runtime.state.lightEffects) {
-      runtime.state.floatingTexts.push({
-        text: `+${runtime.formatUiLogNumber(earnedLog)}`,
-        life: 1,
-        x: runtime.canvas.width / 2,
-        y: runtime.canvas.height * 0.16,
-      });
-    }
-  }
-
-  runtime.addCurrentGain(increase * count);
-  return false;
 };
 
 const baseGenerationCostFactorEffect = runtime.generationCostFactorEffect;
