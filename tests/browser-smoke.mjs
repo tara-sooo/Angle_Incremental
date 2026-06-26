@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const reportPath = path.join(root, "browser-smoke-report.json");
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -65,6 +66,12 @@ const address = server.address();
 if (!address || typeof address === "string") throw new Error("failed to bind smoke-test server");
 
 const browser = await chromium.launch({ headless: true });
+const report = {
+  result: "running",
+  expectedAssetVersion: EXPECTED_ASSET_VERSION,
+  errors: [],
+  moduleRequests: [],
+};
 try {
   const page = await browser.newPage();
   const errors = [];
@@ -127,8 +134,18 @@ try {
   );
 
   assert.deepEqual(errors, []);
+  report.result = "passed";
   console.log("browser ESM smoke test passed");
+} catch (error) {
+  report.result = "failed";
+  report.failure = error instanceof Error ? error.stack || error.message : String(error);
+  throw error;
 } finally {
+  try {
+    await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  } catch (error) {
+    console.error("failed to write browser smoke report", error);
+  }
   await browser.close();
   await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 }
