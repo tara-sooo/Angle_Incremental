@@ -46,9 +46,18 @@ function applySetting(key, value) {
   runtime.saveGame("manual");
 }
 
+function isEditableElement(element) {
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  const tagName = typeof element.tagName === "string" ? element.tagName.toLowerCase() : "";
+  if (tagName === "input" || tagName === "textarea" || tagName === "select") return true;
+  if (typeof element.closest === "function" && element.closest("[contenteditable], [role=\"textbox\"]")) return true;
+  return typeof element.getAttribute === "function" && element.getAttribute("role") === "textbox";
+}
+
 function isEditableKeyboardTarget(target) {
-  if (!target || typeof target.closest !== "function") return false;
-  return Boolean(target.closest("input, textarea, select, [contenteditable], [role=\"textbox\"]"));
+  const activeElement = typeof document === "undefined" ? null : document.activeElement;
+  return isEditableElement(target) || isEditableElement(activeElement);
 }
 
 function bindEvents() {
