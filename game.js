@@ -17,5 +17,6 @@
     .then(() => loadClassicScript("./src/data/balance-profile.js"))
     .then(() => loadClassicScript("./src/systems/balance-formulas.js"))
     .then(() => loadClassicScript("./src/systems/balance-runtime.js"))
+    .then(() => loadClassicScript("./src/systems/progression-data-runtime.js"))
     .catch((error) => console.error("Angle Incremental failed to load", error));
 })();
