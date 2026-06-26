@@ -1,2 +1,2 @@
 Temporary marker for release-fix CI validation. Do not merge.
-Revision 4 validates the explicit non-editable fullscreen shortcut path.
+Revision 5 validates the update-modal-aware fullscreen shortcut check.
