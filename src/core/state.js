@@ -48,6 +48,7 @@ const state = {
   autoCompleteChallenges: false,
   ic8VertexDecayElapsed: 0,
   noGenerationCoreBoostReached: false,
+  noGenerationCoreBoostInfinityReached: false,
   showFloatingText: true,
   lightEffects: false,
   showFps: false,
@@ -105,6 +106,7 @@ const SAVE_FIELDS = [
   "autoCompleteChallenges",
   "ic8VertexDecayElapsed",
   "noGenerationCoreBoostReached",
+  "noGenerationCoreBoostInfinityReached",
   "showFloatingText",
   "lightEffects",
   "showFps",
@@ -123,4 +125,3 @@ function normalizeChoice(value, allowed, fallback) {
 expose("state", () => state);
 expose("SAVE_FIELDS", () => SAVE_FIELDS);
 expose("normalizeChoice", () => normalizeChoice, (value) => { normalizeChoice = value; });
-
