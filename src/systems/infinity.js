@@ -112,7 +112,8 @@ function infinityPointGain() {
   if (!canInfinity()) return 0;
   const scoreLog = runtime.currentScoreLog10();
   const base = Math.max(1, Math.floor(scoreLog - 307));
-  return Math.max(1, Math.floor(base));
+  const gained = Math.max(1, Math.floor(base));
+  return gained * (runtime.isAchievementUnlocked(17) ? 2 : 1);
 }
 
 function infiniteScoreGainPerIp() {
@@ -214,17 +215,21 @@ function runInfinity(forced = false) {
   if (!forced && runtime.state.infinityCount === 0) return;
 
   const scoreLogBeforeReset = runtime.currentScoreLog10();
-  const gained = infinityPointGain();
   const completedChallenge = runtime.state.activeChallenge;
-  if (runtime.state.activeChallenge > 0) {
-    runtime.state.completedChallenges |= 1 << (runtime.state.activeChallenge - 1);
+  const noGenerationOrCoreBoost = runtime.state.generationCount === 0 && runtime.state.coreBoostCount === 0;
+  if (completedChallenge > 0) {
+    runtime.state.completedChallenges |= 1 << (completedChallenge - 1);
     runtime.state.activeChallenge = 0;
+    runtime.checkAchievements(true);
   }
 
+  const gained = runtime.infinityPointGain();
   runtime.state.infinityCount += infinityCountGain();
   addInfinityPoints(gained);
   recordInfinityRun(scoreLogBeforeReset, gained, completedChallenge);
-  resetBelowInfinity();
+  if (noGenerationOrCoreBoost) runtime.state.noGenerationCoreBoostInfinityReached = true;
+  runtime.checkAchievements(true);
+  runtime.resetBelowInfinity();
   runtime.state.currentInfinityRunTime = 0;
   runtime.updateUi();
   runtime.saveGame("manual");
@@ -281,7 +286,8 @@ function balanceInfinityPointGain() {
   const base = runtime.state.infiniteCapBroken
     ? Math.floor(scoreLog10 / Math.log10(2) - 307)
     : Math.floor(scoreLog10 - 307);
-  return Math.max(1, base);
+  const gained = Math.max(1, base);
+  return gained * (runtime.isAchievementUnlocked(17) ? 2 : 1);
 }
 
 function balanceInfinityUpgradeCostExponent() {
@@ -309,7 +315,6 @@ expose("isChallengeCompleted", () => isChallengeCompleted, (value) => { isChalle
 expose("completedChallengeCount", () => completedChallengeCount, (value) => { completedChallengeCount = value; });
 expose("nextChallengeIndex", () => nextChallengeIndex, (value) => { nextChallengeIndex = value; });
 expose("challengeStateText", () => challengeStateText, (value) => { challengeStateText = value; });
-expose("challengeName", () => challengeName, (value) => { challengeName = value; });
 expose("challengeRestriction", () => challengeRestriction, (value) => { challengeRestriction = value; });
 expose("challengeReward", () => challengeReward, (value) => { challengeReward = value; });
 expose("infiniteAngleEfficiency", () => infiniteAngleEfficiency, (value) => { infiniteAngleEfficiency = value; });
