@@ -78,6 +78,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     }
     runtime.state.infinityUpgradeMask = 0;
   }
+  runtime.normalizeInfinityPointState();
   runtime.state.ipGainUpgradeLevel = 0;
   runtime.state.infiniteAngleUpgradeLevel = 0;
   runtime.state.softcapUpgradeLevel = 0;
@@ -135,6 +136,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
 }
 
 function serializeSaveData() {
+  runtime.normalizeInfinityPointState();
   const data = {};
   runtime.SAVE_FIELDS.forEach((field) => {
     data[field] = runtime.state[field];
@@ -151,7 +153,7 @@ function bytesToBase64Url(bytes) {
   bytes.forEach((byte) => {
     binary += String.fromCharCode(byte);
   });
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function base64UrlToBytes(value) {
@@ -394,4 +396,3 @@ expose("saveGame", () => saveGame, (value) => { saveGame = value; });
 expose("quarantineSave", () => quarantineSave, (value) => { quarantineSave = value; });
 expose("loadGame", () => loadGame, (value) => { loadGame = value; });
 expose("resetSave", () => resetSave, (value) => { resetSave = value; });
-
