@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=2026.06.22-ic-gr-rebalance" />
+    <link rel="stylesheet" href="styles.css?v=0.1.0" />
   </head>
   <body>
     <main class="shell">
@@ -36,7 +36,7 @@
         <button class="main-tab" type="button" data-tab="achievements" aria-selected="false">
           <span class="tab-icon">★</span>
           <span class="tab-code">ACH</span>
-          <small id="achievementTabState">0/14</small>
+          <small id="achievementTabState">0/25</small>
         </button>
         <button class="main-tab" type="button" data-tab="help" aria-selected="false">
           <span class="tab-icon">?</span>
@@ -334,7 +334,7 @@
               <p class="eyebrow">Achievements</p>
               <h1>Achievements</h1>
             </div>
-            <div class="unlock-note" id="achievementSummary">0/14 実績</div>
+            <div class="unlock-note" id="achievementSummary">0/25 実績</div>
           </header>
 
           <section class="achievement-overview">
@@ -448,17 +448,17 @@
     <div id="updateModal" class="update-modal" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle" hidden>
       <div class="update-modal-card">
         <p class="eyebrow">Update</p>
-        <h2 id="updateModalTitle" data-i18n="updateTitle">アップデート</h2>
-        <p data-i18n="updateSummary">Infinity ChallengeとGenerationを再調整しました。</p>
+        <h2 id="updateModalTitle" data-i18n="updateTitle">0.1.0 アップデート</h2>
+        <p data-i18n="updateSummary">Angle Incrementalの最初の番号付きアップデートです。</p>
         <ul>
-          <li data-i18n="updateResetDock">IC1からIC8までの制約と報酬を新仕様へ更新しました。</li>
-          <li data-i18n="updateCanvas">Generation倍率をlog管理にし、速度の追加ソフトキャップを強化しました。</li>
-          <li data-i18n="updateModalNote">IC7報酬、自動購入頻度、統計のミリ秒表示を修正しました。</li>
+          <li data-i18n="updateResetDock">Infinity、Infinity Upgrade、IC1〜IC8、Break Infinite Capを追加しました。</li>
+          <li data-i18n="updateCanvas">Automation、Statistics、セーブコード、安定したセーブ読み込みを追加しました。</li>
+          <li data-i18n="updateModalNote">実績を25個へ拡張し、共通報酬と個別報酬を実装しました。</li>
         </ul>
         <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
       </div>
     </div>
 
-    <script type="module" src="src/main.js?v=2026.06.22-ic-gr-rebalance"></script>
+    <script type="module" src="src/main.js?v=0.1.0"></script>
   </body>
 </html>
