@@ -4,8 +4,8 @@ const { loadRuntime } = require("./runtime-harness-esm.js");
 
 const candidatePath = path.join(__dirname, "..", "src", "main.js");
 const reportPath = path.join(__dirname, "..", "first-infinity-balance-report.json");
-const SEARCH_HORIZON_SECONDS = 90 * 60;
-const MAX_CORE_HITS_PER_DECISION = 200_000;
+const SEARCH_HORIZON_SECONDS = 30 * 60;
+const MAX_CORE_HITS_PER_SECOND = 20_000;
 
 function finiteLog(value) {
   return value === -Infinity ? null : Number(value.toPrecision(12));
@@ -29,16 +29,16 @@ function shouldRunGeneration(runtime, policy) {
   if (!policy.useGeneration || !runtime.canRunGeneration()) return false;
   const generationScoreLog = runtime.currentGenerationScoreLog10();
   if (runtime.state.generationCount <= 0) return generationScoreLog >= policy.firstGenerationLog;
-  const nextTarget = Math.max(
+  return generationScoreLog >= Math.max(
     policy.firstGenerationLog,
     runtime.generationRequirementLog10() + policy.generationGapLog,
   );
-  return generationScoreLog >= nextTarget;
 }
 
 function shouldRunCoreBoost(runtime, policy) {
-  if (!policy.useCoreBoost || !runtime.canCoreBoost()) return false;
-  return runtime.currentScoreLog10() >= runtime.coreBoostRequirementLog10() + policy.coreBufferLog;
+  return policy.useCoreBoost
+    && runtime.canCoreBoost()
+    && runtime.currentScoreLog10() >= runtime.coreBoostRequirementLog10() + policy.coreBufferLog;
 }
 
 function describeEvent(runtime, elapsed, kind) {
@@ -103,11 +103,11 @@ async function simulate(policy, options = {}) {
     }
 
     const dt = Math.min(decisionInterval, maxSeconds - elapsed);
-    const estimatedCoreHits = dt / runtime.lapDuration() * runtime.coreVertexIndices().length;
-    if (estimatedCoreHits > MAX_CORE_HITS_PER_DECISION) {
+    const coreHitsPerSecond = runtime.coreVertexIndices().length / runtime.lapDuration();
+    if (coreHitsPerSecond > MAX_CORE_HITS_PER_SECOND) {
       performanceCeiling = {
         atSeconds: seconds(elapsed),
-        estimatedCoreHits: Number(estimatedCoreHits.toPrecision(8)),
+        coreHitsPerSecond: Number(coreHitsPerSecond.toPrecision(8)),
         lapDurationSeconds: Number(runtime.lapDuration().toPrecision(8)),
         scoreLog10: finiteLog(runtime.currentScoreLog10()),
         speedLevel: state.speedLevel,
@@ -137,7 +137,6 @@ async function simulate(policy, options = {}) {
     infinityScoreLog10: infinityRecord ? finiteLog(infinityRecord.scoreLog10) : null,
     generationResets,
     coreBoostResets,
-    highestCoreBoostCount: Math.max(state.coreBoostCount, coreBoostResets),
     performanceCeiling,
     final: {
       scoreLog10: finiteLog(runtime.currentScoreLog10()),
@@ -154,54 +153,20 @@ async function simulate(policy, options = {}) {
 }
 
 function buildPolicies() {
-  const policies = [
-    {
-      useGeneration: false,
-      useCoreBoost: false,
-      firstGenerationLog: null,
-      generationGapLog: null,
-      coreBufferLog: null,
-    },
-    {
-      useGeneration: false,
-      useCoreBoost: true,
-      firstGenerationLog: null,
-      generationGapLog: null,
-      coreBufferLog: 0,
-    },
-    {
-      useGeneration: false,
-      useCoreBoost: true,
-      firstGenerationLog: null,
-      generationGapLog: null,
-      coreBufferLog: 25,
-    },
+  return [
+    { useGeneration: false, useCoreBoost: true, firstGenerationLog: null, generationGapLog: null, coreBufferLog: 0 },
+    { useGeneration: true, firstGenerationLog: 12, generationGapLog: 5, useCoreBoost: true, coreBufferLog: 0 },
+    { useGeneration: true, firstGenerationLog: 35, generationGapLog: 20, useCoreBoost: true, coreBufferLog: 0 },
+    { useGeneration: true, firstGenerationLog: 80, generationGapLog: 60, useCoreBoost: true, coreBufferLog: 0 },
+    { useGeneration: true, firstGenerationLog: 35, generationGapLog: 20, useCoreBoost: true, coreBufferLog: 25 },
   ];
-
-  [12, 35, 80].forEach((firstGenerationLog) => {
-    [5, 20, 60].forEach((generationGapLog) => {
-      [0, 25].forEach((coreBufferLog) => {
-        policies.push({
-          useGeneration: true,
-          firstGenerationLog,
-          generationGapLog,
-          useCoreBoost: true,
-          coreBufferLog,
-        });
-      });
-    });
-  });
-
-  return policies;
 }
 
 function resultOrder(left, right) {
   if (left.reachedInfinity !== right.reachedInfinity) return left.reachedInfinity ? -1 : 1;
   if (left.reachedInfinity && right.reachedInfinity) return left.firstInfinitySeconds - right.firstInfinitySeconds;
   if (Boolean(left.performanceCeiling) !== Boolean(right.performanceCeiling)) return left.performanceCeiling ? -1 : 1;
-  const leftScore = left.final.scoreLog10 ?? -Infinity;
-  const rightScore = right.final.scoreLog10 ?? -Infinity;
-  return rightScore - leftScore;
+  return (right.final.scoreLog10 ?? -Infinity) - (left.final.scoreLog10 ?? -Infinity);
 }
 
 async function runFirstInfinityBalanceAudit() {
@@ -236,14 +201,13 @@ async function runFirstInfinityBalanceAudit() {
       firstInfinity: "The first Infinity is the automatic Infinity reset triggered when score reaches 1.8e308.",
       noInfinityBenefits: "No Infinity Upgrade or automation is used before the first Infinity.",
       searchHorizonSeconds: SEARCH_HORIZON_SECONDS,
-      policySearch: "First GR targets e12/e35/e80; later GR gaps +5/+20/+60 log; CB buffers +0/+25 log.",
-      performanceCeiling: `Stops a policy before one decision would process more than ${MAX_CORE_HITS_PER_DECISION.toLocaleString()} core hits.`,
+      policies: "No-GR; aggressive GR e12/+5; middle GR e35/+20; delayed GR e80/+60; and middle GR with CB delayed by 25 log.",
+      performanceCeiling: `Stops a policy above ${MAX_CORE_HITS_PER_SECOND.toLocaleString()} core hits per second, where the current exact-core batch path becomes a separate performance concern.`,
     },
     searchedPolicyCount: policies.length,
     reachedWithinHorizonCount: gridResults.filter((result) => result.reachedInfinity).length,
     hitPerformanceCeilingCount: gridResults.filter((result) => Boolean(result.performanceCeiling)).length,
-    topGridResults: gridResults.slice(0, 12),
-    baselineReferences: gridResults.filter((result) => !result.policy.useGeneration || !result.policy.useCoreBoost),
+    gridResults,
     sensitivity,
   };
 
