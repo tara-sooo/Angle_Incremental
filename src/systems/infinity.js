@@ -112,7 +112,8 @@ function infinityPointGain() {
   if (!canInfinity()) return 0;
   const scoreLog = runtime.currentScoreLog10();
   const base = Math.max(1, Math.floor(scoreLog - 307));
-  return Math.max(1, Math.floor(base));
+  const gained = Math.max(1, Math.floor(base));
+  return gained * (runtime.isAchievementUnlocked(17) ? 2 : 1);
 }
 
 function infiniteScoreGainPerIp() {
@@ -191,13 +192,14 @@ function resetBelowInfinity() {
   runtime.state.floatingTexts = [];
 }
 
-function recordInfinityRun(scoreLog, gained, challenge) {
+function recordInfinityRun(scoreLog, gained, challenge, noGenerationCoreBoost = false) {
   const record = {
     time: runtime.state.currentInfinityRunTime,
     scoreLog10: scoreLog,
     ipGain: gained,
     challenge,
   };
+  if (noGenerationCoreBoost) record.noGenerationCoreBoost = true;
   runtime.state.lastInfinityRuns.unshift(record);
   runtime.state.lastInfinityRuns = runtime.state.lastInfinityRuns.slice(0, 10);
   if (record.time > 0 && (runtime.state.fastestInfinityTime <= 0 || record.time < runtime.state.fastestInfinityTime)) {
@@ -214,17 +216,20 @@ function runInfinity(forced = false) {
   if (!forced && runtime.state.infinityCount === 0) return;
 
   const scoreLogBeforeReset = runtime.currentScoreLog10();
-  const gained = infinityPointGain();
   const completedChallenge = runtime.state.activeChallenge;
-  if (runtime.state.activeChallenge > 0) {
-    runtime.state.completedChallenges |= 1 << (runtime.state.activeChallenge - 1);
+  const noGenerationOrCoreBoost = runtime.state.generationCount === 0 && runtime.state.coreBoostCount === 0;
+  if (completedChallenge > 0) {
+    runtime.state.completedChallenges |= 1 << (completedChallenge - 1);
     runtime.state.activeChallenge = 0;
+    runtime.checkAchievements(true);
   }
 
+  const gained = runtime.infinityPointGain();
   runtime.state.infinityCount += infinityCountGain();
   addInfinityPoints(gained);
-  recordInfinityRun(scoreLogBeforeReset, gained, completedChallenge);
-  resetBelowInfinity();
+  recordInfinityRun(scoreLogBeforeReset, gained, completedChallenge, noGenerationOrCoreBoost);
+  runtime.checkAchievements(true);
+  runtime.resetBelowInfinity();
   runtime.state.currentInfinityRunTime = 0;
   runtime.updateUi();
   runtime.saveGame("manual");
@@ -281,7 +286,8 @@ function balanceInfinityPointGain() {
   const base = runtime.state.infiniteCapBroken
     ? Math.floor(scoreLog10 / Math.log10(2) - 307)
     : Math.floor(scoreLog10 - 307);
-  return Math.max(1, base);
+  const gained = Math.max(1, base);
+  return gained * (runtime.isAchievementUnlocked(17) ? 2 : 1);
 }
 
 function balanceInfinityUpgradeCostExponent() {
@@ -295,6 +301,7 @@ function balanceInfinityUpgradeCostExponent() {
     + (config.softcapStartExponent - config.softcapAsymptoteExponent)
       * Math.exp(-Math.max(0, postSoftcapInfinities) * config.postSoftcapDecay);
 }
+
 expose("infinityUpgradeById", () => infinityUpgradeById, (value) => { infinityUpgradeById = value; });
 expose("hasInfinityUpgrade", () => hasInfinityUpgrade, (value) => { hasInfinityUpgrade = value; });
 expose("infinityUpgradeName", () => infinityUpgradeName, (value) => { infinityUpgradeName = value; });

@@ -123,4 +123,3 @@ function normalizeChoice(value, allowed, fallback) {
 expose("state", () => state);
 expose("SAVE_FIELDS", () => SAVE_FIELDS);
 expose("normalizeChoice", () => normalizeChoice, (value) => { normalizeChoice = value; });
-

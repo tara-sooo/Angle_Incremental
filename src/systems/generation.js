@@ -13,6 +13,12 @@ function generationCostPower() {
   return 1;
 }
 
+function generationCostFactorWithBonuses(rawCostFactor) {
+  const upgradeFactor = runtime.hasInfinityUpgrade("3-2") ? runtime.applyInfinityUpgradePower(0.95) : 1;
+  const achievementFactor = runtime.isAchievementUnlocked(20) ? 0.98 : 1;
+  return Math.pow(rawCostFactor, generationCostPower()) * upgradeFactor * achievementFactor;
+}
+
 function currentGenerationScoreMultiplierLog10() {
   const savedLog = runtime.sanitizeLog10(runtime.state.generationScoreMultiplierLog10, null);
   return savedLog === null ? runtime.log10Value(runtime.state.generationScoreMultiplier) : savedLog;
@@ -51,8 +57,7 @@ function generationScoreMultiplierEffect(includeAchievementReward = true) {
 }
 
 function generationCostFactorEffect() {
-  const upgradeFactor = runtime.hasInfinityUpgrade("3-2") ? runtime.applyInfinityUpgradePower(0.95) : 1;
-  return Math.pow(runtime.state.generationCostFactor, generationCostPower()) * upgradeFactor;
+  return generationCostFactorWithBonuses(runtime.state.generationCostFactor);
 }
 
 function generationRewardForLog(generationScoreLog) {
@@ -99,7 +104,7 @@ function nextGenerationValues() {
   return {
     scoreMultiplier: runtime.valueFromLog10(applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog))),
     scoreMultiplierLog10: applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog)),
-    costFactor: Math.pow(nextRawCostFactor, generationCostPower()) * (runtime.hasInfinityUpgrade("3-2") ? runtime.applyInfinityUpgradePower(0.95) : 1),
+    costFactor: generationCostFactorWithBonuses(nextRawCostFactor),
   };
 }
 
@@ -233,7 +238,7 @@ function balanceNextGenerationValues() {
   return {
     scoreMultiplier: runtime.valueFromLog10(applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog))),
     scoreMultiplierLog10: applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog)),
-    costFactor: Math.pow(nextRawCostFactor, generationCostPower()) * (runtime.hasInfinityUpgrade("3-2") ? runtime.applyInfinityUpgradePower(0.95) : 1),
+    costFactor: generationCostFactorWithBonuses(nextRawCostFactor),
   };
 }
 expose("generationScorePower", () => generationScorePower, (value) => { generationScorePower = value; });
@@ -262,4 +267,3 @@ expose("balanceGenerationScorePower", () => balanceGenerationScorePower, (value)
 expose("balanceApplyResetStartScore", () => balanceApplyResetStartScore, (value) => { balanceApplyResetStartScore = value; });
 expose("balanceRunGeneration", () => balanceRunGeneration, (value) => { balanceRunGeneration = value; });
 expose("balanceNextGenerationValues", () => balanceNextGenerationValues, (value) => { balanceNextGenerationValues = value; });
-

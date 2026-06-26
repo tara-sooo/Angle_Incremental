@@ -4,6 +4,7 @@ const vm = require("node:vm");
 const { webcrypto } = require("node:crypto");
 
 const candidateRuntimePath = path.resolve(__dirname, "..", "src", "main.js");
+const sharedRuntimePath = path.resolve(__dirname, "..", "src", "runtime", "shared.js");
 
 class FakeClassList {
   constructor() {
@@ -222,18 +223,21 @@ async function evaluateEsmRuntime(context, entryPath) {
 
   const entry = await loadModule(entryPath);
   await entry.evaluate();
+  return cache;
 }
 
 async function loadRuntime(runtimePath, initialStorage) {
   const { context, storage } = createContext(initialStorage);
   vm.createContext(context);
+  let runtime = null;
   if (path.resolve(runtimePath) === candidateRuntimePath) {
-    await evaluateEsmRuntime(context, runtimePath);
+    const cache = await evaluateEsmRuntime(context, runtimePath);
+    runtime = cache.get(sharedRuntimePath)?.namespace.runtime || null;
   } else {
     const source = fs.readFileSync(runtimePath, "utf8");
     vm.runInContext(source, context, { filename: path.basename(runtimePath) });
   }
-  return { context, storage, debug: context.window.__angleDebug };
+  return { context, storage, debug: context.window.__angleDebug, runtime };
 }
 
 function stableValue(value) {

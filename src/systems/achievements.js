@@ -88,7 +88,79 @@ const ACHIEVEMENTS = [
     reward: { ja: "", en: "" },
     isUnlocked: () => runtime.completedChallengeCount() > 0,
   },
+  {
+    title: { ja: "流石に最初よりは早い", en: "Faster Than the Beginning" },
+    condition: { ja: "Infinityに10回到達", en: "Reach Infinity 10 times." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.state.infinityCount >= 10,
+  },
+  {
+    title: { ja: "実は3より弱い", en: "Actually Weaker Than 3" },
+    condition: { ja: "IC4をクリア", en: "Complete IC4." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.isChallengeCompleted(4),
+  },
+  {
+    title: { ja: "おとなしく寝た方がいい", en: "You Should Just Sleep" },
+    condition: { ja: "IC3をクリア", en: "Complete IC3." },
+    reward: { ja: "IP獲得量が×2", en: "Infinity Point gain x2." },
+    isUnlocked: () => runtime.isChallengeCompleted(3),
+  },
+  {
+    title: { ja: "大雑把", en: "Roughly" },
+    condition: { ja: "e314スコアに到達", en: "Reach 1e314 score." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.currentScoreLog10() >= 314,
+  },
+  {
+    title: { ja: "固めのカップ麺", en: "Firm Cup Noodles" },
+    condition: { ja: "最速Infinity時間が2分を切る", en: "Get a fastest Infinity time below 2 minutes." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.state.fastestInfinityTime > 0 && runtime.state.fastestInfinityTime < 120,
+  },
+  {
+    title: { ja: "小学生だったら数えきれないね", en: "Too Many for an Elementary Schooler" },
+    condition: { ja: "所持IPが100に到達", en: "Hold 100 IP." },
+    reward: { ja: "GRのコスト倍率はさらに×0.98される", en: "The GR cost factor is additionally multiplied by 0.98." },
+    isUnlocked: () => runtime.currentInfinityPointsLog10() >= 2,
+  },
+  {
+    title: { ja: "昔はこれが最難関でした", en: "This Used to Be the Hardest" },
+    condition: { ja: "IC5をクリア", en: "Complete IC5." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.isChallengeCompleted(5),
+  },
+  {
+    title: { ja: "伝説の一代目", en: "Legendary First Generation" },
+    condition: { ja: "GR、CBなしでInfinityに到達", en: "Reach Infinity without Generation or Core Boost." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.state.lastInfinityRuns.some((record) => Boolean(record.noGenerationCoreBoost)),
+  },
+  {
+    title: { ja: "寄り添う心", en: "A Heart That Stays Close" },
+    condition: { ja: "IU7-1、7-2を購入", en: "Buy IU 7-1 and 7-2." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.hasInfinityUpgrade("7-1") && runtime.hasInfinityUpgrade("7-2"),
+  },
+  {
+    title: { ja: "SDGsよりは簡単な課題", en: "An Easier Goal Than the SDGs" },
+    condition: { ja: "ICを8つクリア", en: "Complete all 8 ICs." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.completedChallengeCount() >= 8,
+  },
+  {
+    title: { ja: "大きな壁でも問題なし", en: "No Problem, Even With a Big Wall" },
+    condition: { ja: "Break Infinite Capを実行する", en: "Break the Infinite Cap." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.state.infiniteCapBroken,
+  },
 ];
+
+Object.defineProperty(runtime, "ACHIEVEMENT_COUNT", {
+  configurable: true,
+  enumerable: true,
+  get: () => ACHIEVEMENTS.length,
+});
 
 function isAchievementUnlocked(id) {
   return (runtime.state.achievementMask & (1 << (id - 1))) !== 0;
@@ -138,4 +210,3 @@ expose("achievementCount", () => achievementCount, (value) => { achievementCount
 expose("achievementGainMultiplier", () => achievementGainMultiplier, (value) => { achievementGainMultiplier = value; });
 expose("showAchievementNotification", () => showAchievementNotification, (value) => { showAchievementNotification = value; });
 expose("checkAchievements", () => checkAchievements, (value) => { checkAchievements = value; });
-
