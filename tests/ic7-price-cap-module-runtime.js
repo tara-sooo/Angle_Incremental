@@ -42,20 +42,22 @@ async function runIc7PriceCapModuleRuntimeTest() {
   affordabilityState.infinityUpgradeMask = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 4);
   affordability.debug.buyInfinityUpgrade("3-1");
   assert.ok(hasUpgrade(affordabilityState, 3), "the setup must purchase 3-1");
-  assert.ok(
-    affordabilityState.infinityPointsLog10 < Math.log10(5),
-    "subtracting 3 IP from 8 IP must preserve the historical floating-point boundary",
-  );
-  assert.strictEqual(
-    JSON.parse(affordability.context.window.render_game_to_text()).infinity.points,
-    "5",
-    "the UI rounds the residual balance to 5 IP",
-  );
+  assert.strictEqual(affordabilityState.infinityPoints, 5, "8 IP minus 3 IP must normalize to exactly 5 IP");
+  assert.strictEqual(affordabilityState.infinityPointsLog10, Math.log10(5), "the normalized 5 IP balance must use the canonical log value");
 
   affordability.debug.buyInfinityUpgrade("4-1");
-  assert.ok(hasUpgrade(affordabilityState, 5), "a displayed 5 IP balance must buy the 5 IP challenge unlock");
+  assert.ok(hasUpgrade(affordabilityState, 5), "an exact 5 IP balance must buy the 5 IP challenge unlock");
   assert.strictEqual(affordabilityState.infinityPoints, 0, "an exact-cost purchase must leave no spendable IP");
   assert.strictEqual(affordabilityState.infinityPointsLog10, -Infinity, "an exact-cost purchase must normalize the log balance to zero");
+
+  const remainder = await loadRuntime(runtimePath);
+  remainder.debug.state.infinityPoints = 5.999999999999999;
+  remainder.debug.state.infinityPointsLog10 = Math.log10(5.999999999999999);
+  remainder.debug.state.infinityUpgradeMask = (1 << 3) | (1 << 4);
+  remainder.debug.buyInfinityUpgrade("4-1");
+  assert.ok(hasUpgrade(remainder.debug.state, 5), "a near-6 IP balance must buy the 5 IP unlock");
+  assert.strictEqual(remainder.debug.state.infinityPoints, 1, "6 IP minus 5 IP must normalize to exactly 1 IP");
+  assert.strictEqual(remainder.debug.state.infinityPointsLog10, 0, "the 1 IP remainder must use the canonical zero log value");
 
   const insufficient = await loadRuntime(runtimePath);
   insufficient.debug.state.infinityPoints = 4.99;
@@ -65,7 +67,7 @@ async function runIc7PriceCapModuleRuntimeTest() {
   assert.strictEqual(
     hasUpgrade(insufficient.debug.state, 5),
     false,
-    "the boundary tolerance must not allow a materially insufficient IP balance",
+    "normalization must not allow a materially insufficient IP balance",
   );
 }
 
