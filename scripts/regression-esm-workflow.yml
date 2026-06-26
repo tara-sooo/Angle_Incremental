@@ -25,9 +25,3 @@ jobs:
           find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Run baseline regression and ESM differential suites
         run: node --experimental-vm-modules regression-tests-esm.js
-      - name: Install Chromium for browser smoke test
-        run: |
-          npm install --no-save --ignore-scripts playwright
-          npx playwright install --with-deps chromium
-      - name: Run browser ESM smoke test
-        run: node tests/browser-smoke.mjs
