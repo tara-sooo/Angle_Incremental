@@ -1,2 +1,2 @@
 Temporary marker for release-fix CI validation. Do not merge.
-Revision 2 validates the fixed Infinity softcap regression coverage.
+Revision 3 collects browser smoke diagnostics when validation fails.
