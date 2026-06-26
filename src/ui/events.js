@@ -1,5 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.1.0";
 
 // Extracted mechanically from the next-runtime baseline.
 // bindEvents is called by src/main.js at the original initialization point.
@@ -61,6 +62,7 @@ function isEditableKeyboardTarget(target) {
 }
 
 function bindEvents() {
+  installNumericStabilityFixes();
   runtime.elements.speedUpgrade.addEventListener("click", runtime.buySpeed);
   runtime.elements.vertexUpgrade.addEventListener("click", runtime.buyVertex);
   runtime.elements.gainUpgrade.addEventListener("click", runtime.buyGain);
