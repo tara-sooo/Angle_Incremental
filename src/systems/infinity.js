@@ -3,6 +3,8 @@ import { runtime, expose } from "../runtime/shared.js";
 // Extracted mechanically from the next-runtime baseline.
 // Functions retain their original global runtime dependencies during the classic-script migration phase.
 
+const INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10 = 1e-12;
+
 function infinityUpgradeById(id) {
   return runtime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === id);
 }
@@ -124,7 +126,11 @@ function infiniteScoreGainPerIpLog10() {
 }
 
 function canSpendInfinityPoints(costLog) {
-  return runtime.currentInfinityPointsLog10() >= costLog;
+  const currentLog = runtime.currentInfinityPointsLog10();
+  return currentLog >= costLog
+    || (Number.isFinite(currentLog)
+      && Number.isFinite(costLog)
+      && costLog - currentLog <= INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10);
 }
 
 function addInfinityPoints(amount) {
@@ -135,7 +141,13 @@ function addInfinityPoints(amount) {
 
 function spendInfinityPoints(costLog) {
   if (!canSpendInfinityPoints(costLog)) return false;
-  runtime.state.infinityPointsLog10 = runtime.subtractLog10(runtime.currentInfinityPointsLog10(), costLog);
+  const currentLog = runtime.currentInfinityPointsLog10();
+  if (currentLog <= costLog + INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10) {
+    runtime.state.infinityPointsLog10 = -Infinity;
+    runtime.state.infinityPoints = 0;
+    return true;
+  }
+  runtime.state.infinityPointsLog10 = runtime.subtractLog10(currentLog, costLog);
   runtime.state.infinityPoints = runtime.valueFromLog10(runtime.state.infinityPointsLog10);
   return true;
 }
@@ -332,4 +344,3 @@ expose("toggleInfinityChallenge", () => toggleInfinityChallenge, (value) => { to
 expose("breakInfiniteCap", () => breakInfiniteCap, (value) => { breakInfiniteCap = value; });
 expose("balanceInfinityPointGain", () => balanceInfinityPointGain, (value) => { balanceInfinityPointGain = value; });
 expose("balanceInfinityUpgradeCostExponent", () => balanceInfinityUpgradeCostExponent, (value) => { balanceInfinityUpgradeCostExponent = value; });
-
