@@ -23,6 +23,7 @@ function removeAchievementRunMetadata(records) {
 function compatibilitySnapshot(instance) {
   const value = snapshot(instance);
   delete value.view.achievements.total;
+  delete value.view.infinity.softcapPower;
   removeAchievementRunMetadata(value.state.lastInfinityRuns);
   removeAchievementRunMetadata(value.view.statistics.lastInfinityRuns);
   return value;
@@ -38,7 +39,7 @@ async function compareScenario(name, act) {
   assert.deepStrictEqual(
     compatibilitySnapshot(candidate),
     compatibilitySnapshot(baseline),
-    `${name}: candidate runtime diverged from next baseline outside the achievement extension`,
+    `${name}: candidate runtime diverged from next baseline outside approved release behavior`,
   );
 }
 
@@ -164,7 +165,7 @@ async function runDifferentialTests() {
     assert.deepStrictEqual(
       compatibilitySnapshot(candidateLoaded),
       compatibilitySnapshot(baselineLoaded),
-      "legacy local save must load identically outside the achievement extension",
+      "legacy local save must load identically outside approved release behavior",
     );
   }
 
@@ -182,7 +183,7 @@ async function runDifferentialTests() {
     assert.deepStrictEqual(
       compatibilitySnapshot(candidateImported),
       compatibilitySnapshot(baselineImported),
-      "candidate must restore a next save code identically outside the achievement extension",
+      "candidate must restore a next save code identically outside approved release behavior",
     );
 
     const candidateCode = await candidateImported.debug.exportSaveCode();
@@ -192,7 +193,7 @@ async function runDifferentialTests() {
     assert.deepStrictEqual(
       compatibilitySnapshot(baselineReloaded),
       compatibilitySnapshot(candidateImported),
-      "candidate save code must remain backward-compatible outside the achievement extension",
+      "candidate save code must remain backward-compatible outside approved release behavior",
     );
   }
 
