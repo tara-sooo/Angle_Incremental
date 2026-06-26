@@ -1,2 +1,2 @@
 Temporary marker for release-fix CI validation. Do not merge.
-Revision 6 validates focused-input detection for the fullscreen shortcut.
+Revision 7 validates the fullscreen shortcut with the visible save-code input focused.
