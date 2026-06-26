@@ -12,6 +12,28 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Capture IU 7-2 diagnostic
+        run: |
+          node - <<'NODE' > regression-diagnostic.txt 2>&1
+          const fs = require("fs");
+          let source = fs.readFileSync("regression-tests-core.js", "utf8");
+          source = source.replace(/run\(\)\.catch\(\(error\) => \{\n  console\.error\(error\);\n  process\.exitCode = 1;\n\}\);\n?$/, "");
+          source += `
+          const diagnostic = loadGame();
+          const diagnosticState = diagnostic.window.__angleDebug.state;
+          diagnosticState.infinityUpgradeMask = 1 << 11;
+          diagnosticState.infinityCount = 0;
+          diagnosticState.generationCount = 0;
+          diagnosticState.generationCostFactor = 1;
+          const baseline = diagnostic.costLog10("speed", 5, 0, 1.55);
+          diagnosticState.infinityCount = 50;
+          const reduced = diagnostic.costLog10("speed", 5, 0, 1.55);
+          console.log(JSON.stringify({ hasUpgrade: diagnostic.hasInfinityUpgrade("7-2"), baseline, reduced, ratio: reduced / baseline }));
+          `;
+          fs.writeFileSync(".regression-diagnostic.js", source);
+          require("./.regression-diagnostic.js");
+          NODE
+          cat regression-diagnostic.txt
       - name: Run regression suite
         run: |
           set +e
@@ -24,5 +46,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: regression-output
-          path: regression-output.txt
+          path: |
+            regression-output.txt
+            regression-diagnostic.txt
           if-no-files-found: error
