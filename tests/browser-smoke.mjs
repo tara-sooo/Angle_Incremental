@@ -13,6 +13,27 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
+const EXPECTED_ASSET_VERSION = "0.1.0";
+const EXPECTED_MODULE_PATHS = [
+  "/src/main.js",
+  "/src/runtime/shared.js",
+  "/src/ui/dom.js",
+  "/src/core/constants.js",
+  "/src/data/i18n.js",
+  "/src/data/infinity-data.js",
+  "/src/core/state.js",
+  "/src/core/numbers.js",
+  "/src/core/save.js",
+  "/src/systems/achievements.js",
+  "/src/ui/render-canvas.js",
+  "/src/ui/render-ui.js",
+  "/src/systems/angle.js",
+  "/src/systems/generation.js",
+  "/src/systems/core-boost.js",
+  "/src/systems/infinity.js",
+  "/src/systems/infinity-point-normalization.js",
+  "/src/ui/events.js",
+];
 
 function resolveRequestPath(requestUrl) {
   const parsed = new URL(requestUrl, "http://127.0.0.1");
@@ -47,12 +68,20 @@ const browser = await chromium.launch({ headless: true });
 try {
   const page = await browser.newPage();
   const errors = [];
+  const moduleRequests = [];
+  const localOrigin = `http://127.0.0.1:${address.port}`;
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
     if (message.type() === "error") errors.push(message.text());
   });
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.origin === localOrigin && url.pathname.startsWith("/src/") && url.pathname.endsWith(".js")) {
+      moduleRequests.push(url);
+    }
+  });
 
-  await page.goto(`http://127.0.0.1:${address.port}/index.html`, { waitUntil: "networkidle" });
+  await page.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
   await page.waitForFunction(() => (
     typeof window.render_game_to_text === "function"
     && Boolean(window.__angleDebug?.state)
@@ -62,6 +91,41 @@ try {
   assert.equal(snapshot.vertices, 3);
   assert.equal(snapshot.infinity.count, 0);
   assert.equal(typeof snapshot.score, "string");
+
+  const requestedModulePaths = new Set(moduleRequests.map((url) => url.pathname));
+  EXPECTED_MODULE_PATHS.forEach((modulePath) => {
+    assert.ok(requestedModulePaths.has(modulePath), `expected ${modulePath} to be requested`);
+  });
+  assert.ok(
+    moduleRequests.every((url) => url.searchParams.get("v") === EXPECTED_ASSET_VERSION),
+    "every game ESM module must use the current versioned URL",
+  );
+
+  await page.evaluate(() => {
+    window.__angleFullscreenRequests = 0;
+    Object.defineProperty(document.documentElement, "requestFullscreen", {
+      configurable: true,
+      value: () => {
+        window.__angleFullscreenRequests += 1;
+        return Promise.resolve();
+      },
+    });
+  });
+  await page.locator("#saveCodeArea").focus();
+  await page.keyboard.press("f");
+  assert.equal(
+    await page.evaluate(() => window.__angleFullscreenRequests),
+    0,
+    "typing f in the save-code area must not toggle fullscreen",
+  );
+  await page.evaluate(() => document.activeElement?.blur());
+  await page.keyboard.press("f");
+  assert.equal(
+    await page.evaluate(() => window.__angleFullscreenRequests),
+    1,
+    "plain f outside an editable element must still toggle fullscreen",
+  );
+
   assert.deepEqual(errors, []);
   console.log("browser ESM smoke test passed");
 } finally {
