@@ -17,7 +17,7 @@ async function runReleaseAudit() {
     const instance = await loadRuntime(candidatePath, storage);
     const actual = instance.debug.state.generationCostFactor;
     console.log(`AUDIT_IU6_2_RELOAD_FACTOR=${actual}`);
-    assert.equal(actual, 0.78, "audit probe expects the current reload regression");
+    assert.equal(actual, 0.70, "IU6-2 must preserve its 0.70 Generation cost-factor floor after reload");
   }
 
   {
@@ -29,7 +29,7 @@ async function runReleaseAudit() {
     state.scoreLog10 = 20;
     runtime.runCoreBoost();
     console.log(`AUDIT_IU5_2_CORE_RESET_SCORE_LOG10=${state.scoreLog10}`);
-    assert.equal(state.scoreLog10, -Infinity, "audit probe expects the current core-reset regression");
+    assert.equal(state.scoreLog10, 2, "IU5-2 must apply its 100-score start after Core Boost");
   }
 }
 
