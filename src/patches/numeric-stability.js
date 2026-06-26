@@ -52,12 +52,12 @@ function currentLog10FromState(value, savedLog) {
 
 function coreBoostRequirementWithoutEarlyCap() {
   const count = Math.max(0, Math.floor(runtime.state.coreBoostCount));
-  const requirementLogLog10 = Math.log10(Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT))
-    + count * Math.log10(2);
-  if (!Number.isFinite(requirementLogLog10) || requirementLogLog10 >= MAX_NATIVE_VALUE_LOG10) {
-    return MAX_GAME_LOG10;
+  const multiplier = 2 ** count;
+  if (Number.isFinite(multiplier)) {
+    const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
+    if (Number.isFinite(requirementLog10)) return requirementLog10;
   }
-  return 10 ** requirementLogLog10;
+  return MAX_GAME_LOG10;
 }
 
 function normalizedSavedVertices(data) {
