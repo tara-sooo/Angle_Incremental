@@ -29,7 +29,7 @@ const INFINITY_CHALLENGES = [
     reward: { ja: "核増幅の獲得指数+0.01", en: "Core Boost gain exponent +0.01." },
   },
   {
-    name: { ja: "IC6 下剋上された", en: "IC6 Strong Only at First" },
+    name: { ja: "IC6 下剋上された", en: "IC6 Overthrown from Below" },
     restriction: { ja: "頂点通過ごとの増加は0.001で固定される", en: "Gain per vertex is fixed at 0.001." },
     reward: { ja: "Infinity獲得量を×2", en: "Infinity count gain x2." },
   },
