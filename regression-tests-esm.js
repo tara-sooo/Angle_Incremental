@@ -4,6 +4,7 @@ const path = require("node:path");
 const originalReadFileSync = fs.readFileSync.bind(fs);
 const legacyGamePath = path.join(__dirname, "game.js");
 const baselineRuntimePath = path.join(__dirname, "tests", "fixtures", "next-runtime.js");
+const failureReportPath = path.join(__dirname, "regression-failure.txt");
 
 fs.readFileSync = (file, ...args) => {
   if (path.resolve(String(file)) === legacyGamePath) {
@@ -21,6 +22,12 @@ async function main() {
 }
 
 main().catch((error) => {
+  const detail = error instanceof Error ? error.stack || error.message : String(error);
+  try {
+    fs.writeFileSync(failureReportPath, `${detail}\n`);
+  } catch (writeError) {
+    console.error("failed to write regression failure diagnostics", writeError);
+  }
   console.error(error);
   process.exitCode = 1;
 });
