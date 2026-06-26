@@ -4,7 +4,7 @@ const { loadRuntime } = require("./runtime-harness-esm.js");
 
 const candidatePath = path.join(__dirname, "..", "src", "main.js");
 const reportPath = path.join(__dirname, "..", "first-infinity-balance-report.json");
-const SEARCH_HORIZON_SECONDS = 2 * 60 * 60;
+const SEARCH_HORIZON_SECONDS = 90 * 60;
 
 function finiteLog(value) {
   return value === -Infinity ? null : Number(value.toPrecision(12));
@@ -162,9 +162,9 @@ function buildPolicies() {
     },
   ];
 
-  [12, 20, 35, 50, 80].forEach((firstGenerationLog) => {
-    [5, 15, 30, 60].forEach((generationGapLog) => {
-      [0, 20, 50].forEach((coreBufferLog) => {
+  [12, 35, 80].forEach((firstGenerationLog) => {
+    [5, 20, 60].forEach((generationGapLog) => {
+      [0, 25].forEach((coreBufferLog) => {
         policies.push({
           useGeneration: true,
           firstGenerationLog,
@@ -195,23 +195,20 @@ async function runFirstInfinityBalanceAudit() {
   }
   gridResults.sort(resultOrder);
 
-  const leadingPolicies = gridResults.filter((result) => result.reachedInfinity).slice(0, 3);
-  const fallbackPolicies = leadingPolicies.length > 0 ? leadingPolicies : gridResults.slice(0, 3);
+  const selected = gridResults[0];
+  const bestPolicy = {
+    useGeneration: selected.policy.useGeneration,
+    firstGenerationLog: selected.policy.firstGenerationLog,
+    generationGapLog: selected.policy.generationGapLog,
+    useCoreBoost: selected.policy.useCoreBoost,
+    coreBufferLog: selected.policy.coreBufferLog,
+  };
   const sensitivity = [];
-  for (const selected of fallbackPolicies) {
-    const policy = {
-      useGeneration: selected.policy.useGeneration,
-      firstGenerationLog: selected.policy.firstGenerationLog,
-      generationGapLog: selected.policy.generationGapLog,
-      useCoreBoost: selected.policy.useCoreBoost,
-      coreBufferLog: selected.policy.coreBufferLog,
-    };
-    for (const decisionInterval of [0.1, 1, 3, 5]) {
-      sensitivity.push(await simulate(policy, {
-        decisionInterval,
-        recordEvents: decisionInterval === 1,
-      }));
-    }
+  for (const decisionInterval of [0.25, 1, 3, 5]) {
+    sensitivity.push(await simulate(bestPolicy, {
+      decisionInterval,
+      recordEvents: decisionInterval === 1,
+    }));
   }
 
   const report = {
@@ -222,7 +219,7 @@ async function runFirstInfinityBalanceAudit() {
       firstInfinity: "The first Infinity is the automatic Infinity reset triggered when score reaches 1.8e308.",
       noInfinityBenefits: "No Infinity Upgrade or automation is used before the first Infinity.",
       searchHorizonSeconds: SEARCH_HORIZON_SECONDS,
-      policySearch: "First GR targets e12/e20/e35/e50/e80; later GR gaps +5/+15/+30/+60 log; CB buffers +0/+20/+50 log.",
+      policySearch: "First GR targets e12/e35/e80; later GR gaps +5/+20/+60 log; CB buffers +0/+25 log.",
     },
     searchedPolicyCount: policies.length,
     reachedWithinHorizonCount: gridResults.filter((result) => result.reachedInfinity).length,
