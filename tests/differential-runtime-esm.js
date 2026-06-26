@@ -1,0 +1,172 @@
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const { loadRuntime, snapshot } = require("./runtime-harness-esm.js");
+
+const baselinePath = path.join(__dirname, "fixtures", "next-runtime.js");
+const candidatePath = path.join(__dirname, "..", "src", "main.js");
+
+async function compareScenario(name, act) {
+  const baseline = await loadRuntime(baselinePath);
+  const candidate = await loadRuntime(candidatePath);
+  await act(baseline);
+  await act(candidate);
+  assert.deepStrictEqual(
+    snapshot(candidate),
+    snapshot(baseline),
+    `${name}: candidate runtime diverged from next baseline`,
+  );
+}
+
+function setLogResource(state, key, log) {
+  state[`${key}Log10`] = log;
+  state[key] = log <= 308 ? 10 ** log : Number.MAX_VALUE;
+}
+
+function seedLateGameState(instance) {
+  const { state } = instance.debug;
+  state.infinityCount = 3;
+  state.infinityUpgradeMask = (1 << 7) | (1 << 9) | (1 << 10) | (1 << 11);
+  state.completedChallenges = (1 << 5) | (1 << 7);
+  state.vertices = 47;
+  state.speedLevel = 321;
+  state.gainLevel = 123;
+  state.generationCount = 6;
+  state.generationCostFactor = 0.7;
+  setLogResource(state, "score", 333);
+  setLogResource(state, "totalScore", 350);
+  setLogResource(state, "generationScore", 333);
+  setLogResource(state, "infinityPoints", 6);
+  setLogResource(state, "infiniteScore", 12);
+}
+
+async function makeStoredSave(runtimePath) {
+  const instance = await loadRuntime(runtimePath);
+  seedLateGameState(instance);
+  instance.debug.saveGame("manual");
+  return new Map(instance.storage);
+}
+
+async function runDifferentialTests() {
+  await compareScenario("initial state and rendering", async () => {});
+
+  await compareScenario("normal upgrades and medium-speed simulation", async ({ debug }) => {
+    const { state } = debug;
+    setLogResource(state, "score", 60);
+    setLogResource(state, "totalScore", 60);
+    setLogResource(state, "generationScore", 60);
+    for (let index = 0; index < 12; index += 1) {
+      debug.buySpeed();
+      debug.buyAllUpgrades();
+    }
+    debug.update(0.5);
+  });
+
+  await compareScenario("Generation and Core Boost reset sequence", async ({ debug }) => {
+    const { state } = debug;
+    setLogResource(state, "score", 40);
+    setLogResource(state, "totalScore", 40);
+    setLogResource(state, "generationScore", 40);
+    debug.runGeneration();
+    setLogResource(state, "score", 120);
+    debug.runCoreBoost();
+  });
+
+  await compareScenario("IU5-2 reset start score and IU6-2 floor", async ({ debug }) => {
+    const { state } = debug;
+    state.infinityCount = 1;
+    state.infinityUpgradeMask = (1 << 7) | (1 << 9);
+    state.generationCostFactor = 0.7;
+    setLogResource(state, "score", 20);
+    setLogResource(state, "totalScore", 20);
+    setLogResource(state, "generationScore", 20);
+    debug.runGeneration();
+    setLogResource(state, "score", 120);
+    debug.runCoreBoost();
+  });
+
+  await compareScenario("Infinity Challenge 6 reward", async ({ debug }) => {
+    const { state } = debug;
+    state.infinityCount = 1;
+    state.completedChallenges = 1 << 5;
+    setLogResource(state, "score", 309);
+    debug.runInfinity(false);
+  });
+
+  await compareScenario("Infinity Challenge 7 affordability and reward", async ({ debug }) => {
+    const { state } = debug;
+    state.activeChallenge = 7;
+    setLogResource(state, "score", 100);
+    state.speedLevel = 160;
+    debug.buySpeed();
+    state.activeChallenge = 0;
+    state.completedChallenges = 1 << 6;
+    state.speedLevel = 0;
+    setLogResource(state, "score", 2);
+    debug.buySpeed();
+  });
+
+  await compareScenario("Infinity Challenge 8 active preservation", async ({ debug }) => {
+    const { state } = debug;
+    state.infinityCount = 1;
+    state.infinityUpgradeMask = 1 << 5;
+    debug.toggleInfinityChallenge(8);
+    state.vertices = 12;
+    setLogResource(state, "totalScore", 10);
+    setLogResource(state, "generationScore", 10);
+    debug.runGeneration();
+    state.vertices = 9;
+    setLogResource(state, "score", 25);
+    debug.runCoreBoost();
+  });
+
+  await compareScenario("high-speed vertex processing", async ({ debug }) => {
+    const { state } = debug;
+    state.speedLevel = 10000;
+    state.gainLevel = 500;
+    state.vertices = 10000;
+    state.currentGainLog10 = 25;
+    state.currentGain = 1e25;
+    debug.update(0.08);
+    debug.update(0.08);
+  });
+
+  {
+    const baselineSave = await makeStoredSave(baselinePath);
+    const baselineLoaded = await loadRuntime(baselinePath, baselineSave);
+    const candidateLoaded = await loadRuntime(candidatePath, baselineSave);
+    assert.deepStrictEqual(
+      snapshot(candidateLoaded),
+      snapshot(baselineLoaded),
+      "legacy local save must load identically in candidate runtime",
+    );
+  }
+
+  {
+    const baselineSource = await loadRuntime(baselinePath);
+    seedLateGameState(baselineSource);
+    const baselineCode = await baselineSource.debug.exportSaveCode();
+
+    const baselineImported = await loadRuntime(baselinePath);
+    const candidateImported = await loadRuntime(candidatePath);
+    assert.equal(await baselineImported.debug.importSaveCode(baselineCode), true, "next baseline must import its own save code");
+    assert.equal(await candidateImported.debug.importSaveCode(baselineCode), true, "candidate must import a next save code");
+    assert.deepStrictEqual(
+      snapshot(candidateImported),
+      snapshot(baselineImported),
+      "candidate must restore a next save code identically",
+    );
+
+    const candidateCode = await candidateImported.debug.exportSaveCode();
+    const baselineReloaded = await loadRuntime(baselinePath);
+    assert.equal(await baselineReloaded.debug.importSaveCode(candidateCode), true, "next baseline must import a candidate save code");
+    assert.deepStrictEqual(
+      snapshot(baselineReloaded),
+      snapshot(candidateImported),
+      "candidate save code must remain backward-compatible",
+    );
+  }
+
+  console.log("ESM differential runtime tests passed");
+}
+
+module.exports = { runDifferentialTests };

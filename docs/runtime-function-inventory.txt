@@ -1,0 +1,176 @@
+  26 t
+  30 setSaveStatus
+  34 shouldShowUpdateModal
+  42 closeUpdateModal
+  52 showUpdateModalIfNeeded
+  58 storedUpdateReloadTime
+  66 markUpdateDeferred
+  75 reloadForRemoteUpdate
+ 120 normalizeChoice
+ 124 formatNumber
+ 140 formatUiNumber
+ 148 formatUiLogNumber
+ 155 formatLogNumber
+ 165 formatScientificLog
+ 173 formatPowerOfTen
+ 177 formatSmallDecimal
+ 181 gainExpressionConfig
+ 189 formatGainExpression
+ 197 gainExpressionParts
+ 201 hasMultiplicativeGainExpression
+ 205 formatGainExpressionSummary
+ 209 challengeText
+ 215 infinityUpgradeById
+ 219 hasInfinityUpgrade
+ 224 infinityUpgradeName
+ 230 infinityUpgradeEffectText
+ 236 infinityUpgradeEffectPower
+ 240 applyInfinityUpgradePower
+ 245 infinityUpgradePrerequisitesMet
+ 249 canBuyInfinityUpgrade
+ 255 infinityChallengesUnlocked
+ 259 rawLapSpeedLog10
+ 267 rawLapSpeedMultiplier
+ 271 effectiveLapSpeedLog10
+ 283 lapSpeedMultiplier
+ 287 isLapSpeedSoftcapped
+ 291 lapSpeedSoftcapStart
+ 301 lapSpeedSoftcapPower
+ 309 lapDuration
+ 313 formatDuration
+ 324 formatLongDuration
+ 347 currentScoreLog10
+ 351 currentLog10ForValue
+ 357 currentTotalScoreLog10
+ 361 currentGenerationScoreLog10
+ 365 currentGainLog10
+ 369 setCurrentGainLog10
+ 374 addCurrentGain
+ 379 gainAfterIncreaseLog10
+ 384 currentPreviousGenerationScoreLog10
+ 388 currentInfinityPointsLog10
+ 392 currentInfiniteScoreLog10
+ 396 scoreDisplay
+ 403 infinitySoftcapPower
+ 408 applyInfinitySoftcap
+ 413 vertexGainIncrease
+ 426 coreBoostRequirementLog10
+ 432 coreBoostRequirement
+ 437 canCoreBoost
+ 442 coreBoostBonusPower
+ 446 coreBoostGainIncreaseMultiplier
+ 450 coreBoostGainExponent
+ 454 generationScorePower
+ 460 generationCostPower
+ 464 currentGenerationScoreMultiplierLog10
+ 469 generationScoreMultiplierBaseEffectLog10
+ 473 generationScoreMultiplierBaseEffect
+ 477 generationAchievementMultiplier
+ 481 applyGenerationAchievementRewardLog10
+ 487 applyGenerationAchievementReward
+ 492 generationScoreMultiplierEffectLog10
+ 497 generationScoreMultiplierEffect
+ 501 generationCostFactorEffect
+ 506 finalScoreGainPower
+ 510 finalScoreGainDivisor
+ 514 finalScoreGain
+ 519 angleExpressionFromBaseLog10
+ 525 angleExpressionLog10
+ 529 preExpressionScoreGainLog10
+ 533 finalScoreGainFromBaseLog10
+ 539 finalScoreGainLog10
+ 544 isChallengeCompleted
+ 548 completedChallengeCount
+ 556 nextChallengeIndex
+ 563 challengeStateText
+ 569 challengeName
+ 573 challengeRestriction
+ 577 challengeReward
+ 581 coreVertexIndices
+ 585 isCoreVertex
+ 589 infiniteAngleEfficiency
+ 593 infiniteAngleBoost
+ 600 infiniteAngleConversionCostLog10
+ 604 canInfinity
+ 608 infinityPointGain
+ 615 infiniteScoreGainPerIp
+ 619 infiniteScoreGainPerIpLog10
+ 623 canSpendInfinityPoints
+ 627 addInfinityPoints
+ 633 spendInfinityPoints
+ 640 addInfiniteScoreLog
+ 645 canBreakInfiniteCap
+ 649 sumCoreHitGains
+ 673 earlyLayerCostScalingFactor
+ 690 preGenerationCostScalingLog10
+ 699 stagedUpgradeCostScalingLog10
+ 710 costLog10
+ 728 cost
+ 732 costLogs
+ 740 costs
+ 748 generationRewardForLog
+ 757 generationRewardFor
+ 761 generationRequirementLog10
+ 766 generationRequirement
+ 770 canRunGeneration
+ 776 nextGenerationValues
+ 796 nextCoreBoostValues
+ 806 formatMultiplierPreview
+ 812 formatMultiplierLog
+ 816 formatMultiplierLogPreview
+ 822 formatExponentPreview
+ 828 addScore
+ 851 passVertex
+ 869 processManyVertices
+ 910 normalizeVertexProgress
+ 918 runAutobuyers
+ 929 completeChallengeIfReady
+ 935 updateChallengeTimers
+ 939 update
+ 990 spendLog
+1004 spend
+1008 upgradeCostLog
+1013 canBuyNormalUpgrade
+1022 spendNormalUpgrade
+1028 resetVertexProgress
+1034 buySpeed
+1041 buyVertex
+1049 buyGain
+1056 buyAllUpgrades
+1096 shouldPreserveVerticesThroughEarlyReset
+1100 runGeneration
+1131 resetBelowCoreBoost
+1156 runCoreBoost
+1165 resetBelowInfinity
+1193 recordInfinityRun
+1207 infinityCountGain
+1211 runInfinity
+1232 buyInfinityUpgrade
+1241 convertIpToInfiniteScore
+1248 toggleInfinityChallenge
+1270 switchMainTab
+1283 switchInfinitySubtab
+1295 applySetting
+1312 breakInfiniteCap
+1319 resizeCanvas
+1334 currentFrameTime
+1339 frame
+1361 renderGameToText
+1511 balanceGenerationRewardForLog
+1524 balancePreGenerationCostScalingLog10
+1531 balanceCanBuyNormalUpgrade
+1541 balanceInfinityPointGain
+1550 balanceGenerationMinCostFactor
+1554 balanceRestoreGenerationCostFactor
+1561 balanceRestoreGenerationCostFactorFromLocalSave
+1576 balanceInfinityUpgradeCostExponent
+1588 balanceCostLog10
+1601 balanceRawLapSpeedLog10
+1610 balanceGenerationScorePower
+1617 balanceCoreBoostGainIncreaseMultiplier
+1622 balanceVertexGainIncrease
+1637 balanceApplyResetStartScore
+1643 balanceRunGeneration
+1673 balanceNextGenerationValues
+1698 balanceCreateInfinityUpgradeRows
+TOTAL 175

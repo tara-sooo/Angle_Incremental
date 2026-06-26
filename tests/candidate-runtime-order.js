@@ -1,0 +1,18 @@
+module.exports = [
+  "src/ui/dom.js",
+  "src/core/constants.js",
+  "src/data/i18n.js",
+  "src/data/infinity-data.js",
+  "src/core/state.js",
+  "src/core/numbers.js",
+  "src/core/save.js",
+  "src/systems/achievements.js",
+  "src/ui/render-canvas.js",
+  "src/ui/render-ui.js",
+  "src/systems/angle.js",
+  "src/systems/generation.js",
+  "src/systems/core-boost.js",
+  "src/systems/infinity.js",
+  "src/ui/events.js",
+  "src/main.js",
+];
