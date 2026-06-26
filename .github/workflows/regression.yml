@@ -32,6 +32,8 @@ jobs:
           find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check
       - name: Run baseline regression and ESM differential suites
         run: node --experimental-vm-modules regression-tests-esm.js
+      - name: Audit first Infinity balance
+        run: node --experimental-vm-modules tests/first-infinity-balance-audit.js
       - name: Install Chromium for browser smoke test
         run: |
           npm install --no-save --ignore-scripts playwright
@@ -46,4 +48,5 @@ jobs:
           path: |
             browser-smoke-report.json
             regression-failure.txt
+            first-infinity-balance-report.json
           if-no-files-found: warn
