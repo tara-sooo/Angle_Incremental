@@ -119,6 +119,7 @@ try {
       },
     });
   });
+  await page.locator('[data-tab="settings"]').click();
   await page.locator("#saveCodeArea").focus();
   await page.keyboard.press("f");
   assert.equal(
