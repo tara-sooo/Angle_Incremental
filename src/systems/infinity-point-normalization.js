@@ -3,6 +3,8 @@ import { runtime } from "../runtime/shared.js";
 const INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10 = 1e-12;
 const INFINITY_POINT_INTEGER_NORMALIZATION_TOLERANCE = 1e-9;
 
+// Infinity Points are an integer resource. This establishes one canonical value
+// after every addition, subtraction, load, and save operation.
 function normalizeInfinityPointState() {
   const balanceLog10 = runtime.state.infinityPointsLog10;
   const balance = runtime.valueFromLog10(balanceLog10);
