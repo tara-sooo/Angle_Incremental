@@ -123,20 +123,24 @@ function infiniteScoreGainPerIpLog10() {
   return runtime.log10Value(infiniteScoreGainPerIp());
 }
 
-function canSpendInfinityPoints(costLog) {
-  return runtime.currentInfinityPointsLog10() >= costLog;
+function setInfinityPointBalanceFromLog10(balanceLog10) {
+  runtime.state.infinityPointsLog10 = balanceLog10;
+  runtime.normalizeInfinityPointState();
+}
+
+function canSpendInfinityPoints(costLog10) {
+  runtime.normalizeInfinityPointState();
+  return runtime.currentInfinityPointsLog10() >= costLog10;
 }
 
 function addInfinityPoints(amount) {
-  const amountLog = runtime.log10Value(amount);
-  runtime.state.infinityPointsLog10 = runtime.combineLog10(runtime.currentInfinityPointsLog10(), amountLog);
-  runtime.state.infinityPoints = runtime.valueFromLog10(runtime.state.infinityPointsLog10);
+  const amountLog10 = runtime.log10Value(amount);
+  setInfinityPointBalanceFromLog10(runtime.combineLog10(runtime.currentInfinityPointsLog10(), amountLog10));
 }
 
-function spendInfinityPoints(costLog) {
-  if (!canSpendInfinityPoints(costLog)) return false;
-  runtime.state.infinityPointsLog10 = runtime.subtractLog10(runtime.currentInfinityPointsLog10(), costLog);
-  runtime.state.infinityPoints = runtime.valueFromLog10(runtime.state.infinityPointsLog10);
+function spendInfinityPoints(costLog10) {
+  if (!canSpendInfinityPoints(costLog10)) return false;
+  setInfinityPointBalanceFromLog10(runtime.subtractLog10(runtime.currentInfinityPointsLog10(), costLog10));
   return true;
 }
 
@@ -332,4 +336,3 @@ expose("toggleInfinityChallenge", () => toggleInfinityChallenge, (value) => { to
 expose("breakInfiniteCap", () => breakInfiniteCap, (value) => { breakInfiniteCap = value; });
 expose("balanceInfinityPointGain", () => balanceInfinityPointGain, (value) => { balanceInfinityPointGain = value; });
 expose("balanceInfinityUpgradeCostExponent", () => balanceInfinityUpgradeCostExponent, (value) => { balanceInfinityUpgradeCostExponent = value; });
-

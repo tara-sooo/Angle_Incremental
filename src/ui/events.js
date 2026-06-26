@@ -1,4 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
+import "../systems/infinity-point-normalization.js";
 
 // Extracted mechanically from the next-runtime baseline.
 // bindEvents is called by src/main.js at the original initialization point.
@@ -101,4 +102,3 @@ expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value;
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
 expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });
-

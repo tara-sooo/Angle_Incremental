@@ -7,6 +7,20 @@ function setScoreLog(state, scoreLog10) {
   state.score = scoreLog10 <= 308 ? 10 ** scoreLog10 : Number.MAX_VALUE;
 }
 
+function hasUpgrade(state, bit) {
+  return (state.infinityUpgradeMask & (1 << bit)) !== 0;
+}
+
+function saveWithInfinityPoints(points) {
+  return JSON.stringify({
+    version: 7,
+    state: {
+      infinityPoints: points,
+      infinityPointsLog10: Math.log10(points),
+    },
+  });
+}
+
 async function runIc7PriceCapModuleRuntimeTest() {
   const runtimePath = path.join(__dirname, "..", "src", "main.js");
   const { debug } = await loadRuntime(runtimePath);
@@ -29,6 +43,65 @@ async function runIc7PriceCapModuleRuntimeTest() {
     state.speedLevel,
     cappedLevel,
     "IC7 must reject a normal upgrade whose own cost exceeds 1e30",
+  );
+
+  const affordability = await loadRuntime(runtimePath);
+  const affordabilityState = affordability.debug.state;
+  affordabilityState.infinityPoints = 8;
+  affordabilityState.infinityPointsLog10 = Math.log10(8);
+  affordabilityState.infinityUpgradeMask = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 4);
+  affordability.debug.buyInfinityUpgrade("3-1");
+  assert.ok(hasUpgrade(affordabilityState, 3), "the setup must purchase 3-1");
+  assert.strictEqual(affordabilityState.infinityPoints, 5, "8 IP minus 3 IP must normalize to exactly 5 IP");
+  assert.strictEqual(affordabilityState.infinityPointsLog10, Math.log10(5), "the normalized 5 IP balance must use the canonical log value");
+
+  affordability.debug.buyInfinityUpgrade("4-1");
+  assert.ok(hasUpgrade(affordabilityState, 5), "an exact 5 IP balance must buy the 5 IP challenge unlock");
+  assert.strictEqual(affordabilityState.infinityPoints, 0, "an exact-cost purchase must leave no spendable IP");
+  assert.strictEqual(affordabilityState.infinityPointsLog10, -Infinity, "an exact-cost purchase must normalize the log balance to zero");
+
+  const remainder = await loadRuntime(runtimePath);
+  remainder.debug.state.infinityPoints = 5.999999999999999;
+  remainder.debug.state.infinityPointsLog10 = Math.log10(5.999999999999999);
+  remainder.debug.state.infinityUpgradeMask = (1 << 3) | (1 << 4);
+  remainder.debug.buyInfinityUpgrade("4-1");
+  assert.ok(hasUpgrade(remainder.debug.state, 5), "a near-6 IP balance must buy the 5 IP unlock");
+  assert.strictEqual(remainder.debug.state.infinityPoints, 1, "6 IP minus 5 IP must normalize to exactly 1 IP");
+  assert.strictEqual(remainder.debug.state.infinityPointsLog10, 0, "the 1 IP remainder must use the canonical zero log value");
+
+  const saved = await loadRuntime(runtimePath);
+  saved.context.localStorage.setItem("angle-incremental-save", saveWithInfinityPoints(5.999999999999999));
+  saved.debug.loadGame();
+  assert.strictEqual(saved.debug.state.infinityPoints, 6, "loading an old near-integer IP balance must normalize it");
+  assert.strictEqual(saved.debug.state.infinityPointsLog10, Math.log10(6), "loaded IP must use the canonical log value");
+
+  saved.debug.state.infinityPoints = 5.999999999999999;
+  saved.debug.state.infinityPointsLog10 = Math.log10(5.999999999999999);
+  saved.debug.saveGame("manual");
+  const persisted = JSON.parse(saved.context.localStorage.getItem("angle-incremental-save"));
+  assert.strictEqual(persisted.state.infinityPoints, 6, "saving must normalize a near-integer IP balance");
+  assert.strictEqual(persisted.state.infinityPointsLog10, Math.log10(6), "saved IP must use the canonical log value");
+
+  const insufficient = await loadRuntime(runtimePath);
+  insufficient.debug.state.infinityPoints = 4.99;
+  insufficient.debug.state.infinityPointsLog10 = Math.log10(4.99);
+  insufficient.debug.state.infinityUpgradeMask = (1 << 3) | (1 << 4);
+  insufficient.debug.buyInfinityUpgrade("4-1");
+  assert.strictEqual(
+    hasUpgrade(insufficient.debug.state, 5),
+    false,
+    "normalization must not allow a materially insufficient IP balance",
+  );
+
+  const nonMicroShortfall = await loadRuntime(runtimePath);
+  nonMicroShortfall.debug.state.infinityPoints = 4.999999999;
+  nonMicroShortfall.debug.state.infinityPointsLog10 = Math.log10(4.999999999);
+  nonMicroShortfall.debug.state.infinityUpgradeMask = (1 << 3) | (1 << 4);
+  nonMicroShortfall.debug.buyInfinityUpgrade("4-1");
+  assert.strictEqual(
+    hasUpgrade(nonMicroShortfall.debug.state, 5),
+    false,
+    "normalization must correct floating-point noise without rounding a non-micro shortfall up",
   );
 }
 
