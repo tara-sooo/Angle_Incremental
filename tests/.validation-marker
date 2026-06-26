@@ -1,2 +1,2 @@
 Temporary marker for release-fix CI validation. Do not merge.
-Revision 7 validates the fullscreen shortcut with the visible save-code input focused.
+Revision 8 captures save-code focus diagnostics before the fullscreen shortcut check.
