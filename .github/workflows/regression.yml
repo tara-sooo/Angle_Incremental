@@ -1,0 +1,22 @@
+name: Regression Suite
+
+on:
+  pull_request:
+    branches:
+      - next
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check syntax
+        run: |
+          node --check game.js
+          node --check regression-tests.js
+          node --check regression-tests-core.js
+      - name: Run regression suite
+        run: node regression-tests.js
