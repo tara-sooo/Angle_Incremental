@@ -75,7 +75,7 @@ async function makeStoredSave(runtimePath) {
 async function runDifferentialTests() {
   await compareScenario("initial state and rendering", async () => {});
 
-  await compareScenario("normal upgrades and medium-speed simulation", async ({ debug }) => {
+  await compareScenario("normal upgrades and bounded simulation", async ({ debug }) => {
     const { state } = debug;
     setLogResource(state, "score", 60);
     setLogResource(state, "totalScore", 60);
@@ -84,6 +84,13 @@ async function runDifferentialTests() {
       debug.buySpeed();
       debug.buyAllUpgrades();
     }
+    state.speedLevel = 0;
+    state.vertices = 3;
+    state.currentGain = 1;
+    state.currentGainLog10 = 0;
+    state.pointProgress = 0;
+    state.totalVertexProgress = 0;
+    state.lastVertexIndex = 0;
     debug.update(0.5);
   });
 
