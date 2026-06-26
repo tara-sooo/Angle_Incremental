@@ -1,5 +1,6 @@
 import { runtime } from "../runtime/shared.js";
 
+const INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10 = 1e-12;
 const INFINITY_POINT_INTEGER_NORMALIZATION_TOLERANCE = 1e-9;
 
 function normalizeInfinityPointState() {
@@ -19,6 +20,35 @@ function normalizeInfinityPointState() {
   runtime.state.infinityPoints = isNearSafeInteger ? nearestInteger : balance;
 }
 
+function setInfinityPointBalanceFromLog10(balanceLog10) {
+  runtime.state.infinityPointsLog10 = balanceLog10;
+  normalizeInfinityPointState();
+}
+
+function canSpendInfinityPoints(costLog10) {
+  const currentLog10 = runtime.currentInfinityPointsLog10();
+  return currentLog10 >= costLog10
+    || (Number.isFinite(currentLog10)
+      && Number.isFinite(costLog10)
+      && costLog10 - currentLog10 <= INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10);
+}
+
+function addInfinityPoints(amount) {
+  const amountLog10 = runtime.log10Value(amount);
+  setInfinityPointBalanceFromLog10(runtime.combineLog10(runtime.currentInfinityPointsLog10(), amountLog10));
+}
+
+function spendInfinityPoints(costLog10) {
+  if (!canSpendInfinityPoints(costLog10)) return false;
+  const currentLog10 = runtime.currentInfinityPointsLog10();
+  if (currentLog10 <= costLog10 + INFINITY_POINT_AFFORDABILITY_TOLERANCE_LOG10) {
+    setInfinityPointBalanceFromLog10(-Infinity);
+    return true;
+  }
+  setInfinityPointBalanceFromLog10(runtime.subtractLog10(currentLog10, costLog10));
+  return true;
+}
+
 const applySaveData = runtime.applySaveData;
 runtime.applySaveData = (data, saveVersion) => {
   applySaveData(data, saveVersion);
@@ -31,4 +61,7 @@ runtime.serializeSaveData = () => {
   return serializeSaveData();
 };
 
+runtime.canSpendInfinityPoints = canSpendInfinityPoints;
+runtime.addInfinityPoints = addInfinityPoints;
+runtime.spendInfinityPoints = spendInfinityPoints;
 runtime.normalizeInfinityPointState = normalizeInfinityPointState;
