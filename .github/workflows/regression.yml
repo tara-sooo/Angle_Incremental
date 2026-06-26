@@ -16,7 +16,12 @@ jobs:
       - name: Check syntax
         run: |
           node --check game.js
+          node --check src/runtime/core.js
+          node --check src/data/balance-profile.js
+          node --check src/systems/balance-formulas.js
+          node --check src/systems/balance-runtime.js
           node --check regression-tests.js
           node --check regression-tests-core.js
+          node --check regression-tests-modules.js
       - name: Run regression suite
-        run: node regression-tests.js
+        run: node regression-tests-modules.js
