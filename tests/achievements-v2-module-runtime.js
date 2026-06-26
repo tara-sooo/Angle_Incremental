@@ -78,6 +78,19 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { state } = instance.debug;
     const { runtime } = instance;
 
+    state.completedChallenges = 0;
+    assert.equal(runtime.infinitySoftcapPower(), 0.08, "the pre-break Infinity softcap must start at 0.08");
+    state.completedChallenges = (1 << 8) - 1;
+    assert.equal(runtime.infinitySoftcapPower(), 0.08, "clearing ICs must not relax the pre-break Infinity softcap");
+    state.infiniteCapBroken = true;
+    assert.equal(runtime.infinitySoftcapPower(), 1, "breaking the cap must remove the Infinity softcap");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
     state.infinityCount = 10;
     state.completedChallenges = (1 << 8) - 1;
     state.fastestInfinityTime = 119;
