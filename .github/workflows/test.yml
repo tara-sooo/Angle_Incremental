@@ -1,8 +1,9 @@
 name: Test
+
 on:
   pull_request:
-    types:
-      - reopened
+    types: [reopened]
+
 jobs:
   test:
     runs-on: ubuntu-latest
