@@ -194,6 +194,16 @@ function loadGame() {
   return context;
 }
 
+function testSingleEngineSourceAndVersionAlignment() {
+  const gameSource = fs.readFileSync(path.join(__dirname, "game.js"), "utf8");
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "version.json"), "utf8"));
+  assert.ok(gameSource.includes('const APP_VERSION = "0.1.0";'));
+  assert.ok(gameSource.includes("// BEGIN INTEGRATED BALANCE RULES"));
+  assert.strictEqual(manifest.appVersion, "0.1.0");
+  assert.strictEqual(fs.existsSync(path.join(__dirname, "game-core.js")), false);
+  assert.strictEqual(fs.existsSync(path.join(__dirname, "balance-config.js")), false);
+}
+
 function testCoreBoostRequirementGrowsPastE308() {
   const context = loadGame();
   const { state } = context.window.__angleDebug;
@@ -208,6 +218,14 @@ function testIpGainUsesLogMinus307() {
   const { state } = context.window.__angleDebug;
   state.scoreLog10 = 333;
   assert.strictEqual(context.infinityPointGain(), 26);
+}
+
+function testBreakCapUsesLog2InfinityPointFormula() {
+  const context = loadGame();
+  const { state } = context.window.__angleDebug;
+  state.scoreLog10 = 333;
+  state.infiniteCapBroken = true;
+  assert.strictEqual(context.infinityPointGain(), 799);
 }
 
 function testAchievement12OnlyFirstCoreBoostWithoutGeneration() {
@@ -296,15 +314,15 @@ function testUpdatedChallengeRulesAndRewards() {
   assert.strictEqual(state.infinityPoints, ipBefore);
 }
 
-function testIc7LocksByScoreAndRewardRequiresAffordableCost() {
+function testIc7LocksByPriceAndRewardRequiresAffordableCost() {
   const context = loadGame();
   const { state, buySpeed } = context.window.__angleDebug;
   state.activeChallenge = 7;
-  state.scoreLog10 = 30;
+  state.scoreLog10 = 100;
   state.speedLevel = 0;
   assert.strictEqual(context.canBuyNormalUpgrade("speed"), true);
 
-  state.scoreLog10 = 30.001;
+  state.speedLevel = 160;
   assert.strictEqual(context.canBuyNormalUpgrade("speed"), false);
 
   state.activeChallenge = 0;
@@ -364,6 +382,70 @@ function testIc8StartsAtThreeAndPreservesVerticesDuringChallengeAndReward() {
   state.scoreLog10 = 25;
   runCoreBoost();
   assert.strictEqual(state.vertices, 42);
+}
+
+function testInfinityUpgradeRules() {
+  {
+    const context = loadGame();
+    const { state } = context.window.__angleDebug;
+    state.infinityUpgradeMask = 1 << 0;
+    state.infinityCount = 2;
+    state.gainLevel = 0;
+    state.coreBoostCount = 0;
+    assert.ok(Math.abs(context.vertexGainIncrease() - 0.03) < 1e-12);
+  }
+
+  {
+    const context = loadGame();
+    const { state } = context.window.__angleDebug;
+    state.infinityUpgradeMask = 1 << 6;
+    state.speedLevel = 0;
+    assert.ok(Math.abs(context.rawLapSpeedLog10() - Math.log10(3)) < 1e-12);
+  }
+
+  {
+    const context = loadGame();
+    const { state, runGeneration } = context.window.__angleDebug;
+    state.infinityUpgradeMask = 1 << 7;
+    state.totalScoreLog10 = 10;
+    state.generationScoreLog10 = 10;
+    runGeneration();
+    assert.strictEqual(state.score, 100);
+    assert.strictEqual(state.scoreLog10, 2);
+    assert.strictEqual(state.totalScoreLog10, 10);
+    assert.strictEqual(state.generationScoreLog10, -Infinity);
+  }
+
+  {
+    const context = loadGame();
+    const { state, runGeneration } = context.window.__angleDebug;
+    state.infinityUpgradeMask = 1 << 9;
+    state.generationCount = 1;
+    state.generationCostFactor = 0.69;
+    state.totalScoreLog10 = 100;
+    state.generationScoreLog10 = 100;
+    runGeneration();
+    assert.strictEqual(state.generationCostFactor, 0.7);
+  }
+
+  {
+    const context = loadGame();
+    const { state } = context.window.__angleDebug;
+    state.infinityUpgradeMask = 1 << 10;
+    state.coreBoostCount = 2;
+    assert.strictEqual(context.coreBoostGainIncreaseMultiplier(), 3);
+  }
+
+  {
+    const context = loadGame();
+    const { state } = context.window.__angleDebug;
+    state.infinityUpgradeMask = 1 << 11;
+    state.infinityCount = 50;
+    state.generationCount = 0;
+    state.generationCostFactor = 1;
+    const baseCostLog = Math.log10(5);
+    assert.ok(Math.abs(context.costLog10("speed", 5, 0, 1.55) - baseCostLog * 0.9) < 1e-12);
+  }
 }
 
 function testBreakCapRequirementIsE350() {
@@ -449,14 +531,17 @@ function testChallengeAutoCompleteRunsInfinityOnlyWhenEnabled() {
 }
 
 async function run() {
+  testSingleEngineSourceAndVersionAlignment();
   testCoreBoostRequirementGrowsPastE308();
   testIpGainUsesLogMinus307();
+  testBreakCapUsesLog2InfinityPointFormula();
   testAchievement12OnlyFirstCoreBoostWithoutGeneration();
   testRawLapSpeedCanGrowPastEffectiveSafetyCap();
   testGainExpressionReflectsChallengeRulesAndNumberFormat();
   testUpdatedChallengeRulesAndRewards();
-  testIc7LocksByScoreAndRewardRequiresAffordableCost();
+  testIc7LocksByPriceAndRewardRequiresAffordableCost();
   testIc8StartsAtThreeAndPreservesVerticesDuringChallengeAndReward();
+  testInfinityUpgradeRules();
   testBreakCapRequirementIsE350();
   await testEncryptedSaveCodeRoundTripsAndRejectsTampering();
   testLongDurationOmitsOnlyLeadingZeroUnits();
