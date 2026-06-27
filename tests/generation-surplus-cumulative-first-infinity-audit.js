@@ -5,7 +5,7 @@ const { loadRuntime } = require("./runtime-harness-esm.js");
 const candidatePath = path.join(__dirname, "..", "src", "main.js");
 const reportPath = path.join(__dirname, "..", "generation-surplus-cumulative-first-infinity-report.json");
 const ACTION_INTERVAL_SECONDS = 0.25;
-const HORIZON_SECONDS = 3 * 60 * 60;
+const HORIZON_SECONDS = 90 * 60;
 
 function currentLog(runtime, key) {
   return runtime.currentLog10ForValue(runtime.state[key], runtime.state[`${key}Log10`]);
@@ -17,7 +17,6 @@ function installPreInfinityAggregateBatch(runtime) {
   runtime.processManyVertices = function aggregatePreInfinityVertices(start, end) {
     const count = end - start + 1;
     if (count <= 0) return false;
-
     const increase = runtime.vertexGainIncrease();
     const events = runtime.coreVertexIndices()
       .map((index) => {
@@ -73,39 +72,23 @@ async function simulate(policy) {
     if (time + 1e-9 >= nextAction) {
       debug.buyAllUpgrades({ refresh: false, save: false });
       buyAllCalls += 1;
-
       const scoreLog = runtime.currentScoreLog10();
       const coreRequirementLog = runtime.coreBoostRequirementLog10();
       const generationRequirementLog = runtime.generationRequirementLog10();
       const generationScoreLog = currentLog(runtime, "generationScore");
-      const canCoreBoost = runtime.canCoreBoost();
       const canGeneration = policy.depth !== null
         && state.coreBoostCount >= policy.minimumCoreBoostCount
         && runtime.canRunGeneration()
         && generationScoreLog >= generationRequirementLog + policy.depth;
 
-      if (canCoreBoost) {
+      if (runtime.canCoreBoost()) {
         debug.runCoreBoost();
         coreBoosts += 1;
-        resetTimeline.push({
-          type: "CB",
-          time,
-          coreBoostCountBefore: state.coreBoostCount - 1,
-          scoreLog10: scoreLog,
-          requirementLog10: coreRequirementLog,
-        });
+        resetTimeline.push({ type: "CB", time, coreBoostCountBefore: state.coreBoostCount - 1, scoreLog10: scoreLog, requirementLog10: coreRequirementLog });
       } else if (canGeneration) {
         debug.runGeneration();
         generations += 1;
-        resetTimeline.push({
-          type: "GR",
-          time,
-          coreBoostCount: state.coreBoostCount,
-          generationCountBefore: state.generationCount - 1,
-          scoreLog10: generationScoreLog,
-          requirementLog10: generationRequirementLog,
-          surplusLog10: generationScoreLog - generationRequirementLog,
-        });
+        resetTimeline.push({ type: "GR", time, coreBoostCount: state.coreBoostCount, generationCountBefore: state.generationCount - 1, scoreLog10: generationScoreLog, requirementLog10: generationRequirementLog, surplusLog10: generationScoreLog - generationRequirementLog });
       }
       nextAction += ACTION_INTERVAL_SECONDS;
     }
@@ -131,36 +114,25 @@ async function simulate(policy) {
 }
 
 function createPolicies() {
-  const policies = [
+  return [
     { name: "no-generation", depth: null, minimumCoreBoostCount: Infinity },
+    { name: "d5_from-start", depth: 5, minimumCoreBoostCount: 0 },
+    { name: "d10_from-start", depth: 10, minimumCoreBoostCount: 0 },
+    { name: "d15_from-start", depth: 15, minimumCoreBoostCount: 0 },
+    { name: "d20_from-start", depth: 20, minimumCoreBoostCount: 0 },
+    { name: "d25_from-start", depth: 25, minimumCoreBoostCount: 0 },
+    { name: "d30_from-start", depth: 30, minimumCoreBoostCount: 0 },
+    { name: "d20_after-cb2", depth: 20, minimumCoreBoostCount: 2 },
+    { name: "d20_after-cb3", depth: 20, minimumCoreBoostCount: 3 },
+    { name: "d20_after-cb4", depth: 20, minimumCoreBoostCount: 4 },
   ];
-
-  for (const depth of [5, 8, 10, 12, 15, 18, 20, 25, 30, 40]) {
-    policies.push({ name: `d${depth}_from-start`, depth, minimumCoreBoostCount: 0 });
-  }
-
-  for (const minimumCoreBoostCount of [1, 2, 3, 4]) {
-    for (const depth of [10, 15, 20, 25]) {
-      policies.push({
-        name: `d${depth}_after-cb${minimumCoreBoostCount}`,
-        depth,
-        minimumCoreBoostCount,
-      });
-    }
-  }
-
-  return policies;
 }
 
 async function runGenerationSurplusCumulativeFirstInfinityAudit() {
   const policies = createPolicies();
   const results = [];
   for (const policy of policies) results.push(await simulate(policy));
-
-  const winners = results
-    .filter((result) => result.reachedInfinity)
-    .sort((left, right) => left.firstInfinitySeconds - right.firstInfinitySeconds);
-
+  const winners = results.filter((result) => result.reachedInfinity).sort((left, right) => left.firstInfinitySeconds - right.firstInfinitySeconds);
   const report = {
     experiment: {
       rewardSource: "Generation Score minus the current Generation requirement",
@@ -182,18 +154,8 @@ async function runGenerationSurplusCumulativeFirstInfinityAudit() {
     winners,
     nonWinners: results.filter((result) => !result.reachedInfinity),
   };
-
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  console.log("GENERATION_SURPLUS_CUMULATIVE_FIRST_INFINITY", JSON.stringify({
-    candidates: policies.length,
-    best: report.best && {
-      name: report.best.name,
-      seconds: report.best.firstInfinitySeconds,
-      generations: report.best.generations,
-      generationsBeforeCb3: report.best.generationsBeforeCb3,
-      coreBoosts: report.best.coreBoosts,
-    },
-  }));
+  console.log("GENERATION_SURPLUS_CUMULATIVE_FIRST_INFINITY", JSON.stringify({ candidates: policies.length, best: report.best && { name: report.best.name, seconds: report.best.firstInfinitySeconds, generations: report.best.generations, generationsBeforeCb3: report.best.generationsBeforeCb3, coreBoosts: report.best.coreBoosts } }));
   return report;
 }
 
