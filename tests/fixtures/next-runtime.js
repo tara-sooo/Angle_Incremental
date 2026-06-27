@@ -3335,8 +3335,8 @@ BALANCE_INFINITY_UPGRADES.forEach((definition) => {
 
 function balanceGenerationRewardForLog(generationScoreLog) {
   const depth = Math.max(0, generationScoreLog - log10Value(GENERATION_UNLOCK_SCORE));
-  const shallowScoreLift = 0.60 * (1 - Math.exp(-depth / 4)) * Math.exp(-depth / 90);
-  const shallowCostLift = 0.13 * (1 - Math.exp(-depth / 5)) * Math.exp(-depth / 80);
+  const shallowScoreLift = 0.60 * (1 - Math.exp(-depth / 4));
+  const shallowCostLift = 0.13 * (1 - Math.exp(-depth / 5));
   const scoreMultiplierLog10 = Math.min(
     8,
     Math.log10(1 + depth) * BALANCE_PROFILE.generationRewardLogCoefficient + shallowScoreLift,

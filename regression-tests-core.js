@@ -513,6 +513,15 @@ function testGenerationRewardFavorsShallowRunsWithoutDeepSpike() {
   assert.ok(deep.costReduction <= 0.24);
 }
 
+function testGenerationRewardDoesNotDecreaseAtHigherDepth() {
+  const context = loadGame();
+  const earlier = context.window.__angleDebug.generationRewardFor(1e25);
+  const later = context.window.__angleDebug.generationRewardFor(1e46);
+
+  assert.ok(later.scoreMultiplierLog10 >= earlier.scoreMultiplierLog10);
+  assert.ok(later.costReduction >= earlier.costReduction);
+}
+
 function testGenerationRelievesEarlyUpgradeScaling() {
   const context = loadGame();
   const { state } = context.window.__angleDebug;
@@ -574,6 +583,7 @@ async function run() {
   testLongDurationOmitsOnlyLeadingZeroUnits();
   testGenerationMultiplierUsesLogAndDoesNotOverflow();
   testGenerationRewardFavorsShallowRunsWithoutDeepSpike();
+  testGenerationRewardDoesNotDecreaseAtHigherDepth();
   testGenerationRelievesEarlyUpgradeScaling();
   testAutobuyRunsAtTenTimesPerSecond();
   testChallengeAutoCompleteRunsInfinityOnlyWhenEnabled();
