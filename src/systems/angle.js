@@ -476,7 +476,11 @@ function balancePreGenerationCostScalingLog10(kind, level) {
   const scaling = runtime.BALANCE_PROFILE.initialUpgradeCostScaling[kind];
   if (!scaling) return 0;
   const excess = Math.max(0, level - scaling.startsAfter);
-  return excess * excess * scaling.logScale;
+  let generationRelief = 1;
+  if (runtime.state.generationCount === 1) generationRelief = 0.35;
+  else if (runtime.state.generationCount === 2) generationRelief = 0.16;
+  else if (runtime.state.generationCount >= 3) generationRelief = 0.08;
+  return excess * excess * scaling.logScale * generationRelief;
 }
 
 function balanceCanBuyNormalUpgrade(kind) {
@@ -584,4 +588,3 @@ expose("balanceCanBuyNormalUpgrade", () => balanceCanBuyNormalUpgrade, (value) =
 expose("balanceCostLog10", () => balanceCostLog10, (value) => { balanceCostLog10 = value; });
 expose("balanceRawLapSpeedLog10", () => balanceRawLapSpeedLog10, (value) => { balanceRawLapSpeedLog10 = value; });
 expose("balanceVertexGainIncrease", () => balanceVertexGainIncrease, (value) => { balanceVertexGainIncrease = value; });
-

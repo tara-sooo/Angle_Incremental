@@ -502,6 +502,31 @@ function testGenerationMultiplierUsesLogAndDoesNotOverflow() {
   assert.ok(Number.isFinite(context.generationScoreMultiplierEffectLog10()));
 }
 
+function testGenerationRewardFavorsShallowRunsWithoutDeepSpike() {
+  const context = loadGame();
+  const shallow = context.window.__angleDebug.generationRewardFor(1e10);
+  const deep = context.window.__angleDebug.generationRewardFor(1e106);
+
+  assert.ok(shallow.scoreMultiplierLog10 > 0.48);
+  assert.ok(shallow.costReduction > 0.09);
+  assert.ok(deep.scoreMultiplierLog10 < 1.3);
+  assert.ok(deep.costReduction <= 0.24);
+}
+
+function testGenerationRelievesEarlyUpgradeScaling() {
+  const context = loadGame();
+  const { state } = context.window.__angleDebug;
+
+  state.speedLevel = 80;
+  state.generationCount = 0;
+  const beforeGeneration = context.costLog10("speed", 5, state.speedLevel, 1.55);
+
+  state.generationCount = 1;
+  const afterGeneration = context.costLog10("speed", 5, state.speedLevel, 1.55);
+
+  assert.ok(afterGeneration < beforeGeneration - 0.5);
+}
+
 function testAutobuyRunsAtTenTimesPerSecond() {
   const context = loadGame();
   const { state } = context.window.__angleDebug;
@@ -548,6 +573,8 @@ async function run() {
   await testEncryptedSaveCodeRoundTripsAndRejectsTampering();
   testLongDurationOmitsOnlyLeadingZeroUnits();
   testGenerationMultiplierUsesLogAndDoesNotOverflow();
+  testGenerationRewardFavorsShallowRunsWithoutDeepSpike();
+  testGenerationRelievesEarlyUpgradeScaling();
   testAutobuyRunsAtTenTimesPerSecond();
   testChallengeAutoCompleteRunsInfinityOnlyWhenEnabled();
   console.log("regression tests passed");

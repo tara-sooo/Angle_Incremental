@@ -3211,11 +3211,11 @@ function renderGameToText() {
 // 0.1.0 balance profile.
 // Generation owns score scaling; early upgrade scaling no longer changes with GR or CB count.
 const BALANCE_PROFILE = Object.freeze({
-  generationRewardLogCoefficient: 0.37,
+  generationRewardLogCoefficient: 0.20,
   initialUpgradeCostScaling: Object.freeze({
-    speed: Object.freeze({ startsAfter: 20, logScale: 0.00035 }),
-    vertex: Object.freeze({ startsAfter: 15, logScale: 0.00140 }),
-    gain: Object.freeze({ startsAfter: 12, logScale: 0.00065 }),
+    speed: Object.freeze({ startsAfter: 10, logScale: 0.00140 }),
+    vertex: Object.freeze({ startsAfter: 8, logScale: 0.00560 }),
+    gain: Object.freeze({ startsAfter: 6, logScale: 0.00260 }),
   }),
   infinityUpgradeCostReduction: Object.freeze({
     perInfinity: 0.002,
@@ -3335,14 +3335,16 @@ BALANCE_INFINITY_UPGRADES.forEach((definition) => {
 
 function balanceGenerationRewardForLog(generationScoreLog) {
   const depth = Math.max(0, generationScoreLog - log10Value(GENERATION_UNLOCK_SCORE));
+  const shallowScoreLift = 0.60 * (1 - Math.exp(-depth / 4)) * Math.exp(-depth / 90);
+  const shallowCostLift = 0.13 * (1 - Math.exp(-depth / 5)) * Math.exp(-depth / 80);
   const scoreMultiplierLog10 = Math.min(
     8,
-    Math.log10(1 + depth) * BALANCE_PROFILE.generationRewardLogCoefficient,
+    Math.log10(1 + depth) * BALANCE_PROFILE.generationRewardLogCoefficient + shallowScoreLift,
   );
   return {
     scoreMultiplierLog10,
     scoreMultiplierGain: valueFromLog10(scoreMultiplierLog10),
-    costReduction: Math.min(0.22, Math.log10(1 + depth) * 0.04),
+    costReduction: Math.min(0.24, Math.log10(1 + depth) * 0.04 + shallowCostLift),
   };
 }
 
@@ -3350,7 +3352,11 @@ function balancePreGenerationCostScalingLog10(kind, level) {
   const scaling = BALANCE_PROFILE.initialUpgradeCostScaling[kind];
   if (!scaling) return 0;
   const excess = Math.max(0, level - scaling.startsAfter);
-  return excess * excess * scaling.logScale;
+  let generationRelief = 1;
+  if (state.generationCount === 1) generationRelief = 0.35;
+  else if (state.generationCount === 2) generationRelief = 0.16;
+  else if (state.generationCount >= 3) generationRelief = 0.08;
+  return excess * excess * scaling.logScale * generationRelief;
 }
 
 function balanceCanBuyNormalUpgrade(kind) {

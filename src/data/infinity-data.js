@@ -100,11 +100,11 @@ const INFINITY_UPGRADES = [
 ];
 
 const BALANCE_PROFILE = Object.freeze({
-  generationRewardLogCoefficient: 0.37,
+  generationRewardLogCoefficient: 0.20,
   initialUpgradeCostScaling: Object.freeze({
-    speed: Object.freeze({ startsAfter: 20, logScale: 0.00035 }),
-    vertex: Object.freeze({ startsAfter: 15, logScale: 0.00140 }),
-    gain: Object.freeze({ startsAfter: 12, logScale: 0.00065 }),
+    speed: Object.freeze({ startsAfter: 10, logScale: 0.00140 }),
+    vertex: Object.freeze({ startsAfter: 8, logScale: 0.00560 }),
+    gain: Object.freeze({ startsAfter: 6, logScale: 0.00260 }),
   }),
   infinityUpgradeCostReduction: Object.freeze({
     perInfinity: 0.002,
