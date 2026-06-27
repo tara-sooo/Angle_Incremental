@@ -60,19 +60,6 @@ function generationCostFactorEffect() {
   return generationCostFactorWithBonuses(runtime.state.generationCostFactor);
 }
 
-function generationRewardForLog(generationScoreLog) {
-  const depth = Math.max(0, generationScoreLog - runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE));
-  return {
-    scoreMultiplierLog10: Math.min(8, Math.log10(1 + depth) * 2),
-    scoreMultiplierGain: runtime.valueFromLog10(Math.min(8, Math.log10(1 + depth) * 2)),
-    costReduction: Math.min(0.22, Math.log10(1 + depth) * 0.04),
-  };
-}
-
-function generationRewardFor(generationScore) {
-  return generationRewardForLog(runtime.log10Value(generationScore));
-}
-
 function generationRequirementLog10() {
   if (runtime.state.generationCount <= 0) return runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE);
   return Math.max(runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE), runtime.currentPreviousGenerationScoreLog10());
@@ -80,6 +67,40 @@ function generationRequirementLog10() {
 
 function generationRequirement() {
   return runtime.valueFromLog10(generationRequirementLog10());
+}
+
+function generationSurplusForLog(generationScoreLog) {
+  return Math.max(0, generationScoreLog - generationRequirementLog10());
+}
+
+function generationRewardForLog(generationScoreLog) {
+  const surplus = generationSurplusForLog(generationScoreLog);
+  const scaledSurplus = Math.log10(1 + surplus);
+  return {
+    scoreMultiplierLog10: Math.min(
+      runtime.GENERATION_SURPLUS_REWARD_LOG_CAP,
+      scaledSurplus * runtime.GENERATION_SURPLUS_REWARD_LOG_COEFFICIENT,
+    ),
+    scoreMultiplierGain: runtime.valueFromLog10(Math.min(
+      runtime.GENERATION_SURPLUS_REWARD_LOG_CAP,
+      scaledSurplus * runtime.GENERATION_SURPLUS_REWARD_LOG_COEFFICIENT,
+    )),
+    costReduction: Math.min(
+      runtime.GENERATION_SURPLUS_COST_REDUCTION_CAP,
+      scaledSurplus * runtime.GENERATION_SURPLUS_COST_REDUCTION_COEFFICIENT,
+    ),
+  };
+}
+
+function generationRewardFor(generationScore) {
+  return generationRewardForLog(runtime.log10Value(generationScore));
+}
+
+function nextGenerationRawMultiplierLog10(rewardLog) {
+  return Math.min(
+    runtime.GENERATION_MULTIPLIER_LOG_CAP,
+    currentGenerationScoreMultiplierLog10() + Math.max(0, rewardLog),
+  );
 }
 
 function canRunGeneration() {
@@ -98,7 +119,7 @@ function nextGenerationValues() {
   }
 
   const reward = generationRewardForLog(runtime.currentGenerationScoreLog10());
-  const nextRawScoreMultiplierLog = reward.scoreMultiplierLog10;
+  const nextRawScoreMultiplierLog = nextGenerationRawMultiplierLog10(reward.scoreMultiplierLog10);
   const nextRawCostFactor = Math.max(runtime.GENERATION_MIN_NEW_COST_FACTOR, runtime.state.generationCostFactor * (1 - reward.costReduction));
 
   return {
@@ -113,12 +134,13 @@ function runGeneration() {
 
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
+  const nextRawScoreMultiplierLog = nextGenerationRawMultiplierLog10(reward.scoreMultiplierLog10);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
   const preservedVertices = runtime.shouldPreserveVerticesThroughEarlyReset() ? runtime.state.vertices : 3;
   runtime.state.generationCount += 1;
   runtime.state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
-  runtime.state.generationScoreMultiplierLog10 = reward.scoreMultiplierLog10;
+  runtime.state.generationScoreMultiplierLog10 = nextRawScoreMultiplierLog;
   runtime.state.generationScoreMultiplier = runtime.valueFromLog10(runtime.state.generationScoreMultiplierLog10);
   runtime.state.generationCostFactor = Math.max(runtime.GENERATION_MIN_NEW_COST_FACTOR, nextCostFactor);
 
@@ -140,15 +162,21 @@ function runGeneration() {
 }
 
 function balanceGenerationRewardForLog(generationScoreLog) {
-  const depth = Math.max(0, generationScoreLog - runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE));
+  const surplus = generationSurplusForLog(generationScoreLog);
+  const scaledSurplus = Math.log10(1 + surplus);
+  const coefficient = runtime.BALANCE_PROFILE?.generationRewardLogCoefficient
+    ?? runtime.GENERATION_SURPLUS_REWARD_LOG_COEFFICIENT;
   const scoreMultiplierLog10 = Math.min(
-    8,
-    Math.log10(1 + depth) * runtime.BALANCE_PROFILE.generationRewardLogCoefficient,
+    runtime.GENERATION_SURPLUS_REWARD_LOG_CAP,
+    scaledSurplus * coefficient,
   );
   return {
     scoreMultiplierLog10,
     scoreMultiplierGain: runtime.valueFromLog10(scoreMultiplierLog10),
-    costReduction: Math.min(0.22, Math.log10(1 + depth) * 0.04),
+    costReduction: Math.min(
+      runtime.GENERATION_SURPLUS_COST_REDUCTION_CAP,
+      scaledSurplus * runtime.GENERATION_SURPLUS_COST_REDUCTION_COEFFICIENT,
+    ),
   };
 }
 
@@ -195,12 +223,13 @@ function balanceRunGeneration() {
   if (!canRunGeneration()) return;
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
+  const nextRawScoreMultiplierLog = nextGenerationRawMultiplierLog10(reward.scoreMultiplierLog10);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
   const preservedVertices = runtime.shouldPreserveVerticesThroughEarlyReset() ? runtime.state.vertices : 3;
   runtime.state.generationCount += 1;
   runtime.state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
-  runtime.state.generationScoreMultiplierLog10 = reward.scoreMultiplierLog10;
+  runtime.state.generationScoreMultiplierLog10 = nextRawScoreMultiplierLog;
   runtime.state.generationScoreMultiplier = runtime.valueFromLog10(runtime.state.generationScoreMultiplierLog10);
   runtime.state.generationCostFactor = Math.max(balanceGenerationMinCostFactor(), nextCostFactor);
   runtime.state.score = 0;
@@ -230,7 +259,7 @@ function balanceNextGenerationValues() {
     };
   }
   const reward = generationRewardForLog(runtime.currentGenerationScoreLog10());
-  const nextRawScoreMultiplierLog = reward.scoreMultiplierLog10;
+  const nextRawScoreMultiplierLog = nextGenerationRawMultiplierLog10(reward.scoreMultiplierLog10);
   const nextRawCostFactor = Math.max(
     balanceGenerationMinCostFactor(),
     runtime.state.generationCostFactor * (1 - reward.costReduction),
@@ -241,6 +270,7 @@ function balanceNextGenerationValues() {
     costFactor: generationCostFactorWithBonuses(nextRawCostFactor),
   };
 }
+
 expose("generationScorePower", () => generationScorePower, (value) => { generationScorePower = value; });
 expose("generationCostPower", () => generationCostPower, (value) => { generationCostPower = value; });
 expose("currentGenerationScoreMultiplierLog10", () => currentGenerationScoreMultiplierLog10, (value) => { currentGenerationScoreMultiplierLog10 = value; });
@@ -252,10 +282,12 @@ expose("applyGenerationAchievementReward", () => applyGenerationAchievementRewar
 expose("generationScoreMultiplierEffectLog10", () => generationScoreMultiplierEffectLog10, (value) => { generationScoreMultiplierEffectLog10 = value; });
 expose("generationScoreMultiplierEffect", () => generationScoreMultiplierEffect, (value) => { generationScoreMultiplierEffect = value; });
 expose("generationCostFactorEffect", () => generationCostFactorEffect, (value) => { generationCostFactorEffect = value; });
-expose("generationRewardForLog", () => generationRewardForLog, (value) => { generationRewardForLog = value; });
-expose("generationRewardFor", () => generationRewardFor, (value) => { generationRewardFor = value; });
 expose("generationRequirementLog10", () => generationRequirementLog10, (value) => { generationRequirementLog10 = value; });
 expose("generationRequirement", () => generationRequirement, (value) => { generationRequirement = value; });
+expose("generationSurplusForLog", () => generationSurplusForLog, (value) => { generationSurplusForLog = value; });
+expose("generationRewardForLog", () => generationRewardForLog, (value) => { generationRewardForLog = value; });
+expose("generationRewardFor", () => generationRewardFor, (value) => { generationRewardFor = value; });
+expose("nextGenerationRawMultiplierLog10", () => nextGenerationRawMultiplierLog10, (value) => { nextGenerationRawMultiplierLog10 = value; });
 expose("canRunGeneration", () => canRunGeneration, (value) => { canRunGeneration = value; });
 expose("nextGenerationValues", () => nextGenerationValues, (value) => { nextGenerationValues = value; });
 expose("runGeneration", () => runGeneration, (value) => { runGeneration = value; });
