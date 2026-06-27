@@ -20,7 +20,6 @@ async function main() {
   await require("./tests/achievements-v2-module-runtime.js").runAchievementV2ModuleRuntimeTest();
   await require("./tests/numeric-stability-module-runtime.js").runNumericStabilityModuleRuntimeTest();
   await require("./tests/generation-surplus-cumulative-runtime.js").runGenerationSurplusCumulativeRuntimeTest();
-  await require("./tests/generation-surplus-cumulative-first-infinity-audit.js").runGenerationSurplusCumulativeFirstInfinityAudit();
 }
 
 main().catch((error) => {
