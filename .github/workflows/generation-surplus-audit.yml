@@ -24,5 +24,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: generation-surplus-cumulative-report
-          path: generation-surplus-cumulative-first-infinity-report.json
+          path: generation-surplus-cumulative-precision-report.json
           if-no-files-found: error
