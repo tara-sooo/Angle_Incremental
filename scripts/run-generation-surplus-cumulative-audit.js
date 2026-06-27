@@ -1,6 +1,6 @@
-const { runFastAudit } = require("../tests/generation-surplus-cumulative-fast-audit.js");
+const { runPrecisionAudit } = require("../tests/generation-surplus-cumulative-precision-audit.js");
 
-runFastAudit().catch((error) => {
+runPrecisionAudit().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
