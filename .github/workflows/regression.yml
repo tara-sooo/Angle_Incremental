@@ -12,6 +12,10 @@ on:
       - next
       - "release/**"
 
+concurrency:
+  group: audit-generation-delay-sweep-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   regression:
     runs-on: ubuntu-latest
