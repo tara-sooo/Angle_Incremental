@@ -46,6 +46,7 @@ async function simulateGenerationDelay(generationDelaySeconds) {
   const state = debug.state;
   state.showFloatingText = false;
   state.lightEffects = true;
+  runtime.saveGame = () => {};
   installPreInfinityAggregateBatch(runtime);
 
   const buyAllIntervalSeconds = 0.25;
@@ -130,6 +131,7 @@ async function runGenerationDelaySweepAudit() {
       buyAllIntervalSeconds: 0.25,
       coreBoostPolicy: "Run Core Boost on the first 0.25-second poll after it becomes available.",
       generationPolicy: "Run Generation after it has remained continuously available for the specified delay. A Core Boost restarts the wait because it resets the run.",
+      persistence: "Disabled only in the audit runtime; saving does not affect simulation state.",
       horizonSeconds: 6 * 60 * 60,
       timingResolutionSeconds: 0.25,
     },
