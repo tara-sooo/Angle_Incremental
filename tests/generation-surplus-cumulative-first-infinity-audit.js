@@ -11,6 +11,12 @@ function currentLog(runtime, key) {
   return runtime.currentLog10ForValue(runtime.state[key], runtime.state[`${key}Log10`]);
 }
 
+function canAffordAnyNormalUpgrade(runtime) {
+  const scoreLog = runtime.currentScoreLog10();
+  const costs = runtime.costLogs();
+  return scoreLog >= Math.min(costs.speed, costs.vertex, costs.gain);
+}
+
 // First Infinity is below the Infinity softcap. This only replaces the
 // per-frame batching implementation so a policy sweep remains practical.
 function installPreInfinityAggregateBatch(runtime) {
@@ -70,8 +76,10 @@ async function simulate(policy) {
     }
 
     if (time + 1e-9 >= nextAction) {
-      debug.buyAllUpgrades({ refresh: false, save: false });
-      buyAllCalls += 1;
+      if (canAffordAnyNormalUpgrade(runtime)) {
+        debug.buyAllUpgrades({ refresh: false, save: false });
+        buyAllCalls += 1;
+      }
       const scoreLog = runtime.currentScoreLog10();
       const coreRequirementLog = runtime.coreBoostRequirementLog10();
       const generationRequirementLog = runtime.generationRequirementLog10();
