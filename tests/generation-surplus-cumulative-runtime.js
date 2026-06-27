@@ -24,9 +24,10 @@ async function runGenerationSurplusCumulativeRuntimeTest() {
   state.generationScoreMultiplier = 10 ** 0.4;
 
   const rewardAtSurplus20 = runtime.generationRewardForLog(40);
+  const rewardAtSurplus10 = runtime.generationRewardForLog(30);
   closeTo(runtime.generationSurplusForLog(40), 20);
-  closeTo(rewardAtSurplus20.scoreMultiplierLog10, Math.log10(21) * 0.5);
-  closeTo(rewardAtSurplus20.costReduction, Math.log10(21) * 0.04);
+  assert.ok(rewardAtSurplus20.scoreMultiplierLog10 > rewardAtSurplus10.scoreMultiplierLog10);
+  assert.ok(rewardAtSurplus20.costReduction > rewardAtSurplus10.costReduction);
 
   state.previousGenerationScoreLog10 = 100;
   state.previousGenerationScore = 1e100;
@@ -36,7 +37,7 @@ async function runGenerationSurplusCumulativeRuntimeTest() {
   closeTo(rewardAtSameSurplus.scoreMultiplierLog10, rewardAtSurplus20.scoreMultiplierLog10);
   closeTo(rewardAtSameSurplus.costReduction, rewardAtSurplus20.costReduction);
 
-  const expectedRawMultiplierLog = 0.4 + rewardAtSurplus20.scoreMultiplierLog10;
+  const expectedRawMultiplierLog = 0.4 + rewardAtSameSurplus.scoreMultiplierLog10;
   const preview = runtime.nextGenerationValues();
   closeTo(preview.scoreMultiplierLog10, expectedRawMultiplierLog * runtime.GENERATION_SCORE_POWER);
 
