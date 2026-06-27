@@ -1,6 +1,6 @@
-const { runGenerationSurplusCumulativeFirstInfinityAudit } = require("../tests/generation-surplus-cumulative-first-infinity-audit.js");
+const { runFastAudit } = require("../tests/generation-surplus-cumulative-fast-audit.js");
 
-runGenerationSurplusCumulativeFirstInfinityAudit().catch((error) => {
+runFastAudit().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
