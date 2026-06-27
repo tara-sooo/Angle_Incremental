@@ -19,7 +19,7 @@ async function main() {
   await require("./tests/ic7-price-cap-module-runtime.js").runIc7PriceCapModuleRuntimeTest();
   await require("./tests/achievements-v2-module-runtime.js").runAchievementV2ModuleRuntimeTest();
   await require("./tests/numeric-stability-module-runtime.js").runNumericStabilityModuleRuntimeTest();
-  await require("./tests/first-infinity-strategy-refine-audit.js").runFirstInfinityStrategyRefineAudit();
+  await require("./tests/first-infinity-strategy-final-refine-audit.js").runFirstInfinityStrategyFinalRefineAudit();
 }
 
 main().catch((error) => {
