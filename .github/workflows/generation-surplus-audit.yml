@@ -1,0 +1,28 @@
+name: Generation Surplus Audit
+
+on:
+  pull_request:
+    branches:
+      - "release/**"
+
+concurrency:
+  group: experiment-generation-surplus-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run first Infinity policy audit
+        run: node --experimental-vm-modules scripts/run-generation-surplus-cumulative-audit.js
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generation-surplus-cumulative-report
+          path: generation-surplus-cumulative-first-infinity-report.json
+          if-no-files-found: error
