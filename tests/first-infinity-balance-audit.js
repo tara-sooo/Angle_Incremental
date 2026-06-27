@@ -12,9 +12,9 @@ function resourceLog(runtime, key) {
   );
 }
 
-// First Infinity occurs before the Infinity softcap applies. For this audit only,
-// use the game's pre-fix aggregate path to make multi-hour policy sweeps practical.
-// The exact numeric-stability suite separately verifies the live batch implementation.
+// First Infinity occurs before the Infinity softcap applies. For broad policy sweeps,
+// this aggregate path is much faster and has sub-action-interval timing resolution.
+// A separate exact scenario below validates the most practical winning policy.
 function installFastPreInfinityBatch(runtime) {
   runtime.processManyVertices = function fastPreInfinityBatch(start, end) {
     const count = end - start + 1;
@@ -53,13 +53,14 @@ async function runScenario({
   actionIntervalSeconds,
   generationDepth,
   minimumGenerationsBeforeCore = 0,
+  fastBatch = true,
   maxSeconds = 6 * 60 * 60,
 }) {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const state = debug.state;
   state.showFloatingText = false;
   state.lightEffects = true;
-  installFastPreInfinityBatch(runtime);
+  if (fastBatch) installFastPreInfinityBatch(runtime);
 
   let elapsed = 0;
   let nextActionAt = 0;
@@ -102,6 +103,7 @@ async function runScenario({
     actionIntervalSeconds,
     generationDepth,
     minimumGenerationsBeforeCore,
+    fastBatch,
     reachedInfinity: state.infinityCount > 0,
     elapsedSeconds: elapsed,
     recordedInfinitySeconds: firstRun ? firstRun.time : null,
@@ -118,7 +120,7 @@ async function runScenario({
 }
 
 async function runFirstInfinityBalanceAudit() {
-  const scenarios = [
+  const sweepScenarios = [
     { name: "near-optimal_d8_0.25s", actionIntervalSeconds: 0.25, generationDepth: 8 },
     { name: "near-optimal_d12_0.25s", actionIntervalSeconds: 0.25, generationDepth: 12 },
     { name: "near-optimal_d20_0.25s", actionIntervalSeconds: 0.25, generationDepth: 20 },
@@ -134,10 +136,23 @@ async function runFirstInfinityBalanceAudit() {
   ];
 
   const results = [];
-  for (const scenario of scenarios) results.push(await runScenario(scenario));
+  for (const scenario of sweepScenarios) results.push(await runScenario(scenario));
+
+  const exactValidation = await runScenario({
+    name: "exact_practical_d20_1s",
+    actionIntervalSeconds: 1,
+    generationDepth: 20,
+    fastBatch: false,
+  });
+  results.push(exactValidation);
 
   const reached = results.filter((result) => result.reachedInfinity);
-  const ordered = [...reached].sort((left, right) => left.recordedInfinitySeconds - right.recordedInfinitySeconds);
+  const orderedSweep = results.filter((result) => result.fastBatch && result.reachedInfinity)
+    .sort((left, right) => left.recordedInfinitySeconds - right.recordedInfinitySeconds);
+  const matchingFastScenario = results.find((result) => result.name === "practical_d20_1s");
+  const exactDeltaSeconds = exactValidation.reachedInfinity && matchingFastScenario
+    ? exactValidation.recordedInfinitySeconds - matchingFastScenario.recordedInfinitySeconds
+    : null;
   const report = {
     assumptions: {
       newSave: true,
@@ -146,21 +161,24 @@ async function runFirstInfinityBalanceAudit() {
       generationPolicy: "Run Generation once Generation Score is at least the prior Generation requirement plus the configured log10 depth.",
       coreBoostPolicy: "Run Core Boost as soon as available, unless the scenario requires at least one Generation first.",
       auditHorizonSeconds: 6 * 60 * 60,
-      batchMode: "Fast aggregate mode is valid here because pre-Infinity score has no Infinity softcap; result timing granularity is the action interval.",
+      batchMode: "Fast aggregate sweep is valid before the Infinity softcap; the practical d20 policy is additionally validated with the live exact batch implementation.",
     },
-    fastest: ordered[0] || null,
-    slowestReached: ordered.length > 0 ? ordered[ordered.length - 1] : null,
+    fastestSweep: orderedSweep[0] || null,
+    exactValidation,
+    exactValidationDeltaSeconds: exactDeltaSeconds,
     scenarios: results,
   };
 
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log("FIRST_INFINITY_BALANCE_AUDIT", JSON.stringify({
-    reached: reached.length,
-    fastest: report.fastest && {
-      name: report.fastest.name,
-      seconds: report.fastest.recordedInfinitySeconds,
-      generations: report.fastest.generations,
-      coreBoosts: report.fastest.coreBoosts,
+    fastestSweep: report.fastestSweep && {
+      name: report.fastestSweep.name,
+      seconds: report.fastestSweep.recordedInfinitySeconds,
+    },
+    exactValidation: {
+      reached: exactValidation.reachedInfinity,
+      seconds: exactValidation.recordedInfinitySeconds,
+      deltaSeconds: exactDeltaSeconds,
     },
   }));
   return report;
