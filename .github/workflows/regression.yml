@@ -46,4 +46,5 @@ jobs:
           path: |
             browser-smoke-report.json
             regression-failure.txt
+            gr-delay-first-infinity-audit-report.json
           if-no-files-found: warn
