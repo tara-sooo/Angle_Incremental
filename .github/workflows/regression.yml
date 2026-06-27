@@ -50,5 +50,5 @@ jobs:
           path: |
             browser-smoke-report.json
             regression-failure.txt
-            first-infinity-strategy-refine-report.json
+            first-infinity-strategy-final-refine-report.json
           if-no-files-found: warn
