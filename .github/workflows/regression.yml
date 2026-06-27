@@ -50,5 +50,4 @@ jobs:
           path: |
             browser-smoke-report.json
             regression-failure.txt
-            generation-surplus-cumulative-first-infinity-report.json
           if-no-files-found: warn
