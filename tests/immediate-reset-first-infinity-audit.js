@@ -124,24 +124,14 @@ async function simulate({ name, priority, buyAllIntervalSeconds, resetPollSecond
 async function runImmediateResetFirstInfinityAudit() {
   const scenarios = [
     {
-      name: "generation-priority_buy-all-3s",
+      name: "generation-priority_buy-all-0.25s",
       priority: "generation",
-      buyAllIntervalSeconds: 3,
+      buyAllIntervalSeconds: 0.25,
     },
     {
-      name: "core-boost-priority_buy-all-3s",
+      name: "core-boost-priority_buy-all-0.25s",
       priority: "coreBoost",
-      buyAllIntervalSeconds: 3,
-    },
-    {
-      name: "generation-priority_buy-all-10s",
-      priority: "generation",
-      buyAllIntervalSeconds: 10,
-    },
-    {
-      name: "core-boost-priority_buy-all-10s",
-      priority: "coreBoost",
-      buyAllIntervalSeconds: 10,
+      buyAllIntervalSeconds: 0.25,
     },
   ];
 
@@ -152,7 +142,7 @@ async function runImmediateResetFirstInfinityAudit() {
     assumptions: {
       newSave: true,
       noInfinityUpgradesOrAutomation: true,
-      buyAllPolicy: "Press Buy All at the specified interval.",
+      buyAllPolicy: "Press Buy All every 0.25 seconds.",
       resetPolicy: "Poll reset buttons every 0.25 seconds and activate the selected priority immediately when available.",
       simultaneousAvailability: "Priority determines whether Generation or Core Boost is clicked first; the resulting reset makes the other unavailable.",
       horizonSeconds: 6 * 60 * 60,
