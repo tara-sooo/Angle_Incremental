@@ -37,6 +37,7 @@ function installPreInfinityAggregateBatch(runtime) {
         + runtime.finalScoreGainFromBaseLog10(runtime.gainAfterIncreaseLog10(increase, lastStep));
       if (runtime.addScore(earned, Number.isFinite(earned) ? runtime.log10Value(earned) : fallbackLog)) return true;
     }
+
     runtime.addCurrentGain(increase * count);
     return false;
   };
