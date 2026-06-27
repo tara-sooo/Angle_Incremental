@@ -536,6 +536,42 @@ function testGenerationRelievesEarlyUpgradeScaling() {
   assert.ok(afterGeneration < beforeGeneration - 0.5);
 }
 
+function simulateInitialInfinityRoute(generationsBeforeCoreBoost, stepSeconds = 10, maxSeconds = 2 * 60 * 60) {
+  const context = loadGame();
+  const { state } = context.window.__angleDebug;
+  const events = [];
+
+  for (let elapsed = 0; elapsed <= maxSeconds; elapsed += stepSeconds) {
+    context.buyAllUpgrades({ save: false, refresh: false });
+    if (context.canInfinity()) return { elapsed, state, events };
+
+    if (context.canCoreBoost() && state.generationCount >= generationsBeforeCoreBoost) {
+      events.push({ type: "coreBoost", elapsed, generationCount: state.generationCount });
+      context.runCoreBoost();
+    } else if (context.canRunGeneration() && state.generationCount < generationsBeforeCoreBoost) {
+      events.push({ type: "generation", elapsed, generationCount: state.generationCount + 1 });
+      context.runGeneration();
+    }
+
+    context.update(stepSeconds);
+    if (state.infinityCount > 0) return { elapsed: elapsed + stepSeconds, state, events };
+  }
+
+  return { elapsed: null, state, events };
+}
+
+function testGenerationRoutesBeatNoGenerationBeforeFirstInfinity() {
+  const noGeneration = simulateInitialInfinityRoute(0, 30);
+  const oneGeneration = simulateInitialInfinityRoute(1, 10);
+  const twoGenerations = simulateInitialInfinityRoute(2, 10);
+
+  assert.strictEqual(noGeneration.state.infinityCount, 0);
+  assert.strictEqual(oneGeneration.state.infinityCount, 1);
+  assert.strictEqual(twoGenerations.state.infinityCount, 1);
+  assert.ok(twoGenerations.elapsed < oneGeneration.elapsed);
+  assert.ok(twoGenerations.elapsed <= 70 * 60);
+}
+
 function testAutobuyRunsAtTenTimesPerSecond() {
   const context = loadGame();
   const { state } = context.window.__angleDebug;
@@ -585,6 +621,7 @@ async function run() {
   testGenerationRewardFavorsShallowRunsWithoutDeepSpike();
   testGenerationRewardDoesNotDecreaseAtHigherDepth();
   testGenerationRelievesEarlyUpgradeScaling();
+  testGenerationRoutesBeatNoGenerationBeforeFirstInfinity();
   testAutobuyRunsAtTenTimesPerSecond();
   testChallengeAutoCompleteRunsInfinityOnlyWhenEnabled();
   console.log("regression tests passed");

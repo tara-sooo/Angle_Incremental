@@ -477,9 +477,9 @@ function balancePreGenerationCostScalingLog10(kind, level) {
   if (!scaling) return 0;
   const excess = Math.max(0, level - scaling.startsAfter);
   let generationRelief = 1;
-  if (runtime.state.generationCount === 1) generationRelief = 0.35;
-  else if (runtime.state.generationCount === 2) generationRelief = 0.16;
-  else if (runtime.state.generationCount >= 3) generationRelief = 0.08;
+  if (runtime.state.generationCount === 1) generationRelief = 0.25;
+  else if (runtime.state.generationCount === 2) generationRelief = 0.10;
+  else if (runtime.state.generationCount >= 3) generationRelief = 0.05;
   return excess * excess * scaling.logScale * generationRelief;
 }
 

@@ -87,9 +87,9 @@ y = min(floor(sqrt(頂点数)), 10)
 
 ```text
 Generation 0回: ×1.00
-Generation 1回: ×0.35
-Generation 2回: ×0.16
-Generation 3回以上: ×0.08
+Generation 1回: ×0.25
+Generation 2回: ×0.10
+Generation 3回以上: ×0.05
 ```
 
 さらに高コスト帯では、通常強化共通の段階スケーリングを適用する。
