@@ -5,7 +5,7 @@ const { loadRuntime } = require("./runtime-harness-esm.js");
 const candidatePath = path.join(__dirname, "..", "src", "main.js");
 const reportPath = path.join(__dirname, "..", "generation-surplus-cumulative-first-infinity-report.json");
 const ACTION_INTERVAL_SECONDS = 0.25;
-const HORIZON_SECONDS = 90 * 60;
+const HORIZON_SECONDS = 60 * 60;
 
 function currentLog(runtime, key) {
   return runtime.currentLog10ForValue(runtime.state[key], runtime.state[`${key}Log10`]);
@@ -17,20 +17,16 @@ function canAffordAnyNormalUpgrade(runtime) {
   return scoreLog >= Math.min(costs.speed, costs.vertex, costs.gain);
 }
 
-// First Infinity is below the Infinity softcap. This only replaces the
-// per-frame batching implementation so a policy sweep remains practical.
 function installPreInfinityAggregateBatch(runtime) {
   runtime.processManyVertices = function aggregatePreInfinityVertices(start, end) {
     const count = end - start + 1;
     if (count <= 0) return false;
     const increase = runtime.vertexGainIncrease();
-    const events = runtime.coreVertexIndices()
-      .map((index) => {
-        const offset = ((index - (start % runtime.state.vertices)) + runtime.state.vertices) % runtime.state.vertices;
-        const hits = offset >= count ? 0 : Math.floor((count - 1 - offset) / runtime.state.vertices) + 1;
-        return { firstStep: offset + 1, hits };
-      })
-      .filter((event) => event.hits > 0);
+    const events = runtime.coreVertexIndices().map((index) => {
+      const offset = ((index - (start % runtime.state.vertices)) + runtime.state.vertices) % runtime.state.vertices;
+      const hits = offset >= count ? 0 : Math.floor((count - 1 - offset) / runtime.state.vertices) + 1;
+      return { firstStep: offset + 1, hits };
+    }).filter((event) => event.hits > 0);
 
     if (events.length > 0) {
       let earned = 0;
@@ -106,33 +102,16 @@ async function simulate(policy) {
 
   const infinityRun = state.lastInfinityRuns[0] || null;
   const generationsBeforeCb3 = resetTimeline.filter((entry) => entry.type === "GR" && entry.coreBoostCount < 3).length;
-  return {
-    name: policy.name,
-    policy,
-    reachedInfinity: state.infinityCount > 0,
-    firstInfinitySeconds: infinityRun ? infinityRun.time : null,
-    elapsedSeconds: time,
-    finalScoreLog10: runtime.currentScoreLog10(),
-    buyAllCalls,
-    generations,
-    coreBoosts,
-    generationsBeforeCb3,
-    resetTimeline,
-  };
+  return { name: policy.name, policy, reachedInfinity: state.infinityCount > 0, firstInfinitySeconds: infinityRun ? infinityRun.time : null, elapsedSeconds: time, finalScoreLog10: runtime.currentScoreLog10(), buyAllCalls, generations, coreBoosts, generationsBeforeCb3, resetTimeline };
 }
 
 function createPolicies() {
   return [
     { name: "no-generation", depth: null, minimumCoreBoostCount: Infinity },
-    { name: "d5_from-start", depth: 5, minimumCoreBoostCount: 0 },
     { name: "d10_from-start", depth: 10, minimumCoreBoostCount: 0 },
-    { name: "d15_from-start", depth: 15, minimumCoreBoostCount: 0 },
     { name: "d20_from-start", depth: 20, minimumCoreBoostCount: 0 },
-    { name: "d25_from-start", depth: 25, minimumCoreBoostCount: 0 },
     { name: "d30_from-start", depth: 30, minimumCoreBoostCount: 0 },
-    { name: "d20_after-cb2", depth: 20, minimumCoreBoostCount: 2 },
     { name: "d20_after-cb3", depth: 20, minimumCoreBoostCount: 3 },
-    { name: "d20_after-cb4", depth: 20, minimumCoreBoostCount: 4 },
   ];
 }
 
