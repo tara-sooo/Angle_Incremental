@@ -44,13 +44,15 @@ function prepareVertexScenario(instance, { scoreLog10, currentGainLog10, infinit
   runtime.completeChallengeIfReady = () => false;
 }
 
-async function simulateVertexSteps({ targetVertexSteps, batch, scoreLog10, currentGainLog10, infiniteCapBroken }) {
+async function simulateVertexSteps({ targetVertexSteps, batch, scoreLog10, currentGainLog10, infiniteCapBroken, infinityCount = 1, forceExactCoreHits = false }) {
   const instance = await loadRuntime(candidatePath);
   const { runtime } = instance;
   const { state, update } = instance.debug;
   prepareVertexScenario(instance, { scoreLog10, currentGainLog10, infiniteCapBroken });
+  state.infinityCount = infinityCount;
 
   overrideRuntimeConstant(runtime, "MAX_VERTEX_STEPS_PER_FRAME", batch ? 5000 : Number.MAX_SAFE_INTEGER);
+  if (forceExactCoreHits) overrideRuntimeConstant(runtime, "MAX_CORE_HITS_PER_FRAME", Number.MAX_SAFE_INTEGER);
   let batchUsed = false;
   const baseProcessManyVertices = runtime.processManyVertices;
   runtime.processManyVertices = (...args) => {
@@ -69,6 +71,9 @@ async function simulateVertexSteps({ targetVertexSteps, batch, scoreLog10, curre
     totalVertexProgress: state.totalVertexProgress,
     pointProgress: state.pointProgress,
     lastVertexIndex: state.lastVertexIndex,
+    infinityCount: state.infinityCount,
+    infinityPointsLog10: runtime.currentInfinityPointsLog10(),
+    lastInfinityRun: state.lastInfinityRuns[0],
   };
 }
 
@@ -155,6 +160,36 @@ async function runNumericStabilityModuleRuntimeTest() {
       infiniteCapBroken: false,
     });
     assertSameSimulation(exact, batched, "Infinity softcap batch");
+  }
+
+  {
+    const exact = await simulateVertexSteps({
+      targetVertexSteps: 6_006,
+      batch: false,
+      scoreLog10: 307.99,
+      currentGainLog10: 306.5,
+      infiniteCapBroken: false,
+      infinityCount: 0,
+      forceExactCoreHits: true,
+    });
+    const batched = await simulateVertexSteps({
+      targetVertexSteps: 6_006,
+      batch: true,
+      scoreLog10: 307.99,
+      currentGainLog10: 306.5,
+      infiniteCapBroken: false,
+      infinityCount: 0,
+    });
+
+    assert.equal(batched.batchUsed, true, "first Infinity scenario must exercise the batch path");
+    assert.equal(batched.infinityCount, exact.infinityCount, "batched first Infinity should reset at the same point as exact processing");
+    assert.equal(batched.lastInfinityRun.ipGain, exact.lastInfinityRun.ipGain, "batched first Infinity must not include post-threshold IP gain");
+    assertClose(
+      batched.lastInfinityRun.scoreLog10,
+      exact.lastInfinityRun.scoreLog10,
+      1e-10,
+      "batched first Infinity must record the first crossing score",
+    );
   }
 
   {

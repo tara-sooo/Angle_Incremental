@@ -137,6 +137,17 @@ function processManyVerticesExactly(start, end) {
       (totalLog, batch) => runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, batch.coreHits, increase)),
       -Infinity,
     );
+    const projectedScoreLog = runtime.clampLog10(
+      runtime.applyInfinitySoftcap(runtime.combineLog10(runtime.currentScoreLog10(), scoreLog)),
+    );
+    if (runtime.state.infinityCount === 0 && projectedScoreLog >= runtime.INFINITY_REQUIREMENT_LOG10) {
+      const vertices = Math.max(3, runtime.state.vertices);
+      for (let vertex = start; vertex <= end; vertex += 1) {
+        if (runtime.passVertex(vertex % vertices)) return true;
+      }
+      return false;
+    }
+
     const scoreValue = runtime.valueFromLog10(scoreLog);
     const resetByInfinity = runtime.addScore(scoreValue, scoreLog);
     if (resetByInfinity) return true;
