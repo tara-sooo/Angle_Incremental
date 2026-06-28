@@ -214,6 +214,38 @@ const BALANCE_INFINITY_UPGRADES = [
     name: { ja: "7-2 庶民の幸せ", en: "7-2 Commoners' Happiness" },
     effect: { ja: "Infinity回数に応じて通常強化コストを下げる", en: "Lowers normal-upgrade costs based on Infinity count." },
   },
+  {
+    id: "8-1",
+    bit: 12,
+    cost: 200,
+    requires: ["7-1", "7-2"],
+    name: { ja: "8-1 遅すぎたので一気に", en: "8-1 Too Slow, All At Once" },
+    effect: { ja: "GR、CB、Infinityの自動化を解放する", en: "Unlocks Generation, Core Boost, and Infinity automation." },
+  },
+  {
+    id: "9-1",
+    bit: 13,
+    cost: 200,
+    requires: ["8-1"],
+    name: { ja: "9-1 法律改正", en: "9-1 Legal Reform" },
+    effect: { ja: "Break前のIP獲得式がlog7(score)-307になる", en: "Before Break, changes IP gain to log7(score)-307." },
+  },
+  {
+    id: "10-1",
+    bit: 14,
+    cost: 3000,
+    requires: ["9-1"],
+    name: { ja: "10-1 親が政治家", en: "10-1 Politician Parents" },
+    effect: { ja: "最初からCBを2つ獲得する", en: "Start with 2 Core Boosts." },
+  },
+  {
+    id: "10-2",
+    bit: 15,
+    cost: 7000,
+    requires: ["9-1"],
+    name: { ja: "10-2 面白くないアップグレードだと思ったでしょうね", en: "10-2 You Thought This Was Boring" },
+    effect: { ja: "スコアが^1.2される", en: "Raises held score to ^1.2." },
+  },
 ];
 
 expose("INFINITY_CHALLENGES", () => INFINITY_CHALLENGES);

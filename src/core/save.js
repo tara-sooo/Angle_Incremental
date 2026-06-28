@@ -109,8 +109,23 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.autoBuyVertex = runtime.sanitizeBoolean(data.autoBuyVertex, true);
   runtime.state.autoBuyGain = runtime.sanitizeBoolean(data.autoBuyGain, true);
   runtime.state.autoCompleteChallenges = runtime.sanitizeBoolean(data.autoCompleteChallenges, false);
+  runtime.state.autoRunGeneration = runtime.sanitizeBoolean(data.autoRunGeneration, false);
+  runtime.state.autoGenerationMode = runtime.normalizeChoice(data.autoGenerationMode, ["or", "and"], "or");
+  runtime.state.autoGenerationScoreThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationScoreThreshold, 10));
+  runtime.state.autoGenerationCostThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationCostThreshold, 1));
+  runtime.state.autoRunCoreBoost = runtime.sanitizeBoolean(data.autoRunCoreBoost, false);
+  runtime.state.autoRunInfinity = runtime.sanitizeBoolean(data.autoRunInfinity, false);
+  runtime.state.autoInfinityPointThreshold = Math.max(1, runtime.sanitizeNumber(data.autoInfinityPointThreshold, 10));
   runtime.state.ic8VertexDecayElapsed = runtime.sanitizeNumber(data.ic8VertexDecayElapsed, 0);
   runtime.state.noGenerationCoreBoostReached = Boolean(data.noGenerationCoreBoostReached);
+  runtime.state.currentInfinityRunHadGeneration = runtime.sanitizeBoolean(
+    data.currentInfinityRunHadGeneration,
+    runtime.state.generationCount > 0,
+  );
+  runtime.state.currentInfinityRunHadCoreBoost = runtime.sanitizeBoolean(
+    data.currentInfinityRunHadCoreBoost,
+    runtime.state.coreBoostCount > (runtime.hasInfinityUpgrade("10-1") ? 2 : 0),
+  );
   if (runtime.state.activeChallenge > 0 && !runtime.infinityChallengesUnlocked()) {
     runtime.resetBelowInfinity();
     runtime.state.activeChallenge = 0;
@@ -363,8 +378,17 @@ function resetSave() {
     autoBuyVertex: true,
     autoBuyGain: true,
     autoCompleteChallenges: false,
+    autoRunGeneration: false,
+    autoGenerationMode: "or",
+    autoGenerationScoreThreshold: 10,
+    autoGenerationCostThreshold: 1,
+    autoRunCoreBoost: false,
+    autoRunInfinity: false,
+    autoInfinityPointThreshold: 10,
     ic8VertexDecayElapsed: 0,
     noGenerationCoreBoostReached: false,
+    currentInfinityRunHadGeneration: false,
+    currentInfinityRunHadCoreBoost: false,
     showFloatingText: true,
     lightEffects: false,
     showFps: false,

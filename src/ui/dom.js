@@ -81,6 +81,13 @@ const elements = {
   autoBuyVertexToggle: document.getElementById("autoBuyVertexToggle"),
   autoBuyGainToggle: document.getElementById("autoBuyGainToggle"),
   autoCompleteChallengesToggle: document.getElementById("autoCompleteChallengesToggle"),
+  autoRunGenerationToggle: document.getElementById("autoRunGenerationToggle"),
+  autoGenerationModeSelect: document.getElementById("autoGenerationModeSelect"),
+  autoGenerationScoreThresholdInput: document.getElementById("autoGenerationScoreThresholdInput"),
+  autoGenerationCostThresholdInput: document.getElementById("autoGenerationCostThresholdInput"),
+  autoRunCoreBoostToggle: document.getElementById("autoRunCoreBoostToggle"),
+  autoRunInfinityToggle: document.getElementById("autoRunInfinityToggle"),
+  autoInfinityPointThresholdInput: document.getElementById("autoInfinityPointThresholdInput"),
   automationLockNote: document.getElementById("automationLockNote"),
   currentInfinityRunTime: document.getElementById("currentInfinityRunTime"),
   totalPlayTime: document.getElementById("totalPlayTime"),
@@ -97,4 +104,3 @@ const elements = {
 expose("canvas", () => canvas);
 expose("ctx", () => ctx);
 expose("elements", () => elements);
-

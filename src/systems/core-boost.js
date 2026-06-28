@@ -74,6 +74,7 @@ function resetBelowCoreBoost() {
 function runCoreBoost() {
   if (!canCoreBoost()) return;
   if (runtime.state.coreBoostCount === 0 && runtime.state.generationCount <= 0) runtime.state.noGenerationCoreBoostReached = true;
+  runtime.state.currentInfinityRunHadCoreBoost = true;
   runtime.state.coreBoostCount += 1;
   resetBelowCoreBoost();
   runtime.updateUi();

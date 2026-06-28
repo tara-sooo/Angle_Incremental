@@ -111,6 +111,7 @@ function nextGenerationValues() {
 function runGeneration() {
   if (!canRunGeneration()) return;
 
+  runtime.state.currentInfinityRunHadGeneration = true;
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
@@ -195,6 +196,7 @@ function balanceApplyResetStartScore() {
 
 function balanceRunGeneration() {
   if (!canRunGeneration()) return;
+  runtime.state.currentInfinityRunHadGeneration = true;
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);

@@ -7,28 +7,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=0.1.2" />
+    <link rel="stylesheet" href="styles.css?v=0.2.0" />
     <!-- Keep this version aligned with version.json and APP_VERSION. -->
     <script type="importmap">
       {
         "imports": {
-          "./src/runtime/shared.js": "./src/runtime/shared.js?v=0.1.2",
-          "./src/ui/dom.js": "./src/ui/dom.js?v=0.1.2",
-          "./src/core/constants.js": "./src/core/constants.js?v=0.1.2",
-          "./src/data/i18n.js": "./src/data/i18n.js?v=0.1.2",
-          "./src/data/infinity-data.js": "./src/data/infinity-data.js?v=0.1.2",
-          "./src/core/state.js": "./src/core/state.js?v=0.1.2",
-          "./src/core/numbers.js": "./src/core/numbers.js?v=0.1.2",
-          "./src/core/save.js": "./src/core/save.js?v=0.1.2",
-          "./src/systems/achievements.js": "./src/systems/achievements.js?v=0.1.2",
-          "./src/ui/render-canvas.js": "./src/ui/render-canvas.js?v=0.1.2",
-          "./src/ui/render-ui.js": "./src/ui/render-ui.js?v=0.1.2",
-          "./src/systems/angle.js": "./src/systems/angle.js?v=0.1.2",
-          "./src/systems/generation.js": "./src/systems/generation.js?v=0.1.2",
-          "./src/systems/core-boost.js": "./src/systems/core-boost.js?v=0.1.2",
-          "./src/systems/infinity.js": "./src/systems/infinity.js?v=0.1.2",
-          "./src/systems/infinity-point-normalization.js": "./src/systems/infinity-point-normalization.js?v=0.1.2",
-          "./src/ui/events.js": "./src/ui/events.js?v=0.1.2"
+          "./src/runtime/shared.js": "./src/runtime/shared.js?v=0.2.0",
+          "./src/ui/dom.js": "./src/ui/dom.js?v=0.2.0",
+          "./src/core/constants.js": "./src/core/constants.js?v=0.2.0",
+          "./src/data/i18n.js": "./src/data/i18n.js?v=0.2.0",
+          "./src/data/infinity-data.js": "./src/data/infinity-data.js?v=0.2.0",
+          "./src/core/state.js": "./src/core/state.js?v=0.2.0",
+          "./src/core/numbers.js": "./src/core/numbers.js?v=0.2.0",
+          "./src/core/save.js": "./src/core/save.js?v=0.2.0",
+          "./src/systems/achievements.js": "./src/systems/achievements.js?v=0.2.0",
+          "./src/ui/render-canvas.js": "./src/ui/render-canvas.js?v=0.2.0",
+          "./src/ui/render-ui.js": "./src/ui/render-ui.js?v=0.2.0",
+          "./src/systems/angle.js": "./src/systems/angle.js?v=0.2.0",
+          "./src/systems/generation.js": "./src/systems/generation.js?v=0.2.0",
+          "./src/systems/core-boost.js": "./src/systems/core-boost.js?v=0.2.0",
+          "./src/systems/infinity.js": "./src/systems/infinity.js?v=0.2.0",
+          "./src/systems/infinity-point-normalization.js": "./src/systems/infinity-point-normalization.js?v=0.2.0",
+          "./src/ui/events.js": "./src/ui/events.js?v=0.2.0"
         }
       }
     </script>
@@ -321,6 +321,37 @@
                 <label for="autoCompleteChallengesToggle" data-i18n="autoCompleteChallenges">IC自動完了</label>
                 <input id="autoCompleteChallengesToggle" type="checkbox" />
               </div>
+              <div class="setting-row">
+                <label for="autoRunGenerationToggle" data-i18n="autoRunGeneration">GR自動実行</label>
+                <input id="autoRunGenerationToggle" type="checkbox" />
+              </div>
+              <div class="setting-row">
+                <label for="autoGenerationModeSelect" data-i18n="autoGenerationMode">GR条件</label>
+                <select id="autoGenerationModeSelect">
+                  <option value="or" data-i18n="autoGenerationModeOr">どちらか</option>
+                  <option value="and" data-i18n="autoGenerationModeAnd">両方</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <label for="autoGenerationScoreThresholdInput" data-i18n="autoGenerationScoreThreshold">GRスコア改善(%)</label>
+                <input id="autoGenerationScoreThresholdInput" type="number" min="0" step="0.1" value="10" />
+              </div>
+              <div class="setting-row">
+                <label for="autoGenerationCostThresholdInput" data-i18n="autoGenerationCostThreshold">GRコスト改善(%)</label>
+                <input id="autoGenerationCostThresholdInput" type="number" min="0" step="0.1" value="1" />
+              </div>
+              <div class="setting-row">
+                <label for="autoRunCoreBoostToggle" data-i18n="autoRunCoreBoost">CB自動実行</label>
+                <input id="autoRunCoreBoostToggle" type="checkbox" />
+              </div>
+              <div class="setting-row">
+                <label for="autoRunInfinityToggle" data-i18n="autoRunInfinity">Infinity自動実行</label>
+                <input id="autoRunInfinityToggle" type="checkbox" />
+              </div>
+              <div class="setting-row">
+                <label for="autoInfinityPointThresholdInput" data-i18n="autoInfinityPointThreshold">Infinity実行IP</label>
+                <input id="autoInfinityPointThresholdInput" type="number" min="1" step="1" value="10" />
+              </div>
             </section>
           </div>
         </section>
@@ -472,17 +503,17 @@
     <div id="updateModal" class="update-modal" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle" hidden>
       <div class="update-modal-card">
         <p class="eyebrow">Update</p>
-        <h2 id="updateModalTitle" data-i18n="updateTitle">0.1.2 アップデート</h2>
-        <p data-i18n="updateSummary">実績報酬と核増幅プレビューの表示不整合を修正しました。</p>
+        <h2 id="updateModalTitle" data-i18n="updateTitle">0.2.0 アップデート</h2>
+        <p data-i18n="updateSummary">新しいInfinity Upgradeを追加しました。</p>
         <ul>
-          <li data-i18n="updateResetDock">初回Infinity直前の高速周回で、余分な核到達分が集計されないようにしました。</li>
-          <li data-i18n="updateCanvas">複数コア時の高速バッチ処理も時系列順の進行と一致するようにしました。</li>
-          <li data-i18n="updateModalNote">セーブデータの互換性は維持されています。</li>
+          <li data-i18n="updateResetDock">IU 8-1から10-2までの新しい強化で、Infinity後半の進行が広がります。</li>
+          <li data-i18n="updateCanvas">IU 8-1でGeneration、Core Boost、Infinityの自動化を解放できます。</li>
+          <li data-i18n="updateModalNote">IU 9-1以降ではIP獲得式、初期Core Boost、スコア強化が追加されます。</li>
         </ul>
         <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
       </div>
     </div>
 
-    <script type="module" src="src/main.js?v=0.1.2"></script>
+    <script type="module" src="src/main.js?v=0.2.0"></script>
   </body>
 </html>

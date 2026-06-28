@@ -375,6 +375,49 @@ function runAutobuyers() {
   });
 }
 
+function shouldAutoRunGeneration() {
+  if (!runtime.canRunGeneration()) return false;
+
+  const currentScoreLog = runtime.generationScoreMultiplierEffectLog10();
+  const currentCostFactor = runtime.generationCostFactorEffect();
+  const next = runtime.nextGenerationValues();
+  const scoreThresholdLog = runtime.log10Value(1 + Math.max(0, runtime.state.autoGenerationScoreThreshold) / 100);
+  const costThreshold = Math.max(0, runtime.state.autoGenerationCostThreshold) / 100;
+  const scoreImproved = next.scoreMultiplierLog10 - currentScoreLog >= scoreThresholdLog;
+  const costImproved = currentCostFactor > 0
+    && (currentCostFactor - next.costFactor) / currentCostFactor >= costThreshold;
+
+  return runtime.state.autoGenerationMode === "and"
+    ? scoreImproved && costImproved
+    : scoreImproved || costImproved;
+}
+
+function runLayerAutomation() {
+  if (!runtime.hasInfinityUpgrade("8-1") || !runtime.state.automationEnabled) return false;
+
+  if (
+    runtime.state.autoRunInfinity
+    && runtime.state.infinityCount > 0
+    && runtime.canInfinity()
+    && runtime.infinityPointGain() >= Math.max(1, runtime.state.autoInfinityPointThreshold)
+  ) {
+    runtime.runInfinity(false);
+    return true;
+  }
+
+  if (runtime.state.autoRunCoreBoost && runtime.canCoreBoost()) {
+    runtime.runCoreBoost();
+    return true;
+  }
+
+  if (runtime.state.autoRunGeneration && shouldAutoRunGeneration()) {
+    runtime.runGeneration();
+    return true;
+  }
+
+  return false;
+}
+
 
 
 
@@ -416,6 +459,7 @@ function update(dt) {
     }
   }
   if (runtime.completeChallengeIfReady()) return;
+  if (runLayerAutomation()) return;
 
   runtime.normalizeVertexProgress();
   runtime.state.lastVertexIndex = Math.floor(runtime.state.pointProgress * runtime.state.vertices) % runtime.state.vertices;
@@ -638,10 +682,18 @@ function renderGameToText() {
     },
     automation: {
       unlocked: runtime.hasInfinityUpgrade("1-2"),
+      layerUnlocked: runtime.hasInfinityUpgrade("8-1"),
       enabled: runtime.state.automationEnabled,
       speed: runtime.state.autoBuySpeed,
       vertex: runtime.state.autoBuyVertex,
       gain: runtime.state.autoBuyGain,
+      generation: runtime.state.autoRunGeneration,
+      generationMode: runtime.state.autoGenerationMode,
+      generationScoreThreshold: runtime.state.autoGenerationScoreThreshold,
+      generationCostThreshold: runtime.state.autoGenerationCostThreshold,
+      coreBoost: runtime.state.autoRunCoreBoost,
+      infinity: runtime.state.autoRunInfinity,
+      infinityPointThreshold: runtime.state.autoInfinityPointThreshold,
     },
     statistics: {
       totalPlayTime: Number(runtime.state.totalPlayTime.toFixed(1)),
@@ -720,6 +772,8 @@ expose("markUpdateDeferred", () => markUpdateDeferred, (value) => { markUpdateDe
 expose("reloadForRemoteUpdate", () => reloadForRemoteUpdate, (value) => { reloadForRemoteUpdate = value; });
 expose("checkForRemoteUpdate", () => checkForRemoteUpdate, (value) => { checkForRemoteUpdate = value; });
 expose("runAutobuyers", () => runAutobuyers, (value) => { runAutobuyers = value; });
+expose("shouldAutoRunGeneration", () => shouldAutoRunGeneration, (value) => { shouldAutoRunGeneration = value; });
+expose("runLayerAutomation", () => runLayerAutomation, (value) => { runLayerAutomation = value; });
 expose("update", () => update, (value) => { update = value; });
 expose("currentFrameTime", () => currentFrameTime, (value) => { currentFrameTime = value; });
 expose("lastTime", () => lastTime, (value) => { lastTime = value; });
@@ -752,11 +806,13 @@ runtime.resetBelowCoreBoost = function balanceResetCoreBoost() {
 };
 runtime.resetBelowInfinity = function balanceResetInfinity() {
   balanceResetBelowInfinity();
+  runtime.applyStartingCoreBoosts();
   runtime.balanceApplyResetStartScore();
 };
 runtime.applySaveData = function balanceApplySaveDataWrapper(data, saveVersion) {
   balanceApplySaveData(data, saveVersion);
   runtime.balanceRestoreGenerationCostFactor(data && data.generationCostFactor, data && data.infinityUpgradeMask);
+  runtime.applyStartingCoreBoosts();
 };
 runtime.createInfinityUpgradeRows = runtime.balanceCreateInfinityUpgradeRows;
 

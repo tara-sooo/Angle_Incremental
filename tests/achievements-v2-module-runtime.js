@@ -78,6 +78,47 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { state } = instance.debug;
     const { runtime } = instance;
 
+    state.infinityCount = 1;
+    state.infinityUpgradeMask = 1 << 14;
+    state.generationCount = 0;
+    state.coreBoostCount = 2;
+    setLogResource(state, "score", 309);
+    runtime.runInfinity(false);
+
+    assert.equal(
+      state.lastInfinityRuns[0].noGenerationCoreBoost,
+      true,
+      "IU 10-1 starting Core Boosts should not block the no-GR/CB Infinity record",
+    );
+    assert.equal(runtime.isAchievementUnlocked(22), true, "IU 10-1 should not block achievement 22 by itself");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
+    state.infinityCount = 1;
+    state.infinityUpgradeMask = 1 << 14;
+    state.coreBoostCount = 2;
+    setLogResource(state, "score", 90);
+    runtime.runCoreBoost();
+    setLogResource(state, "score", 309);
+    runtime.runInfinity(false);
+
+    assert.equal(
+      state.lastInfinityRuns[0].noGenerationCoreBoost,
+      undefined,
+      "manual Core Boost after IU 10-1 must still block the no-GR/CB Infinity record",
+    );
+    assert.equal(runtime.isAchievementUnlocked(22), false, "manual Core Boost after IU 10-1 must block achievement 22");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
     state.completedChallenges = 0;
     assert.equal(runtime.infinitySoftcapPower(), 0.08, "the pre-break Infinity softcap must start at 0.08");
     state.completedChallenges = (1 << 8) - 1;
