@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.1.1";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.1.2";
 
 // Extracted mechanically from the next-runtime baseline.
 // bindEvents is called by src/main.js at the original initialization point.
