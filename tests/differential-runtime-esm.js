@@ -101,9 +101,14 @@ const NORMAL_UPGRADE_BALANCE_PATHS = [
   "view.upgrades.costs.gainLog10",
 ];
 
-const NORMAL_UPGRADE_VIEW_BALANCE_PATHS = NORMAL_UPGRADE_BALANCE_PATHS
-  .filter((path) => path.startsWith("view."))
-  .map((path) => path.slice("view.".length));
+const NORMAL_UPGRADE_COST_VIEW_BALANCE_PATHS = [
+  "upgrades.costs.speed",
+  "upgrades.costs.speedLog10",
+  "upgrades.costs.vertex",
+  "upgrades.costs.vertexLog10",
+  "upgrades.costs.gain",
+  "upgrades.costs.gainLog10",
+];
 
 function seedLateGameState(instance) {
   const { state } = instance.debug;
@@ -159,17 +164,6 @@ async function runDifferentialTests() {
     debug.runGeneration();
     setLogResource(state, "score", 120);
     debug.runCoreBoost();
-  }, {
-    approvedBalancePaths: [
-      "state.generationScoreMultiplier",
-      "state.generationScoreMultiplierLog10",
-      "state.generationCostReduction",
-      "state.generationCostFactor",
-      "view.generation.scoreMultiplier",
-      "view.generation.scoreMultiplierLog10",
-      "view.generation.costFactor",
-      "view.generation.costReduction",
-    ],
   });
 
   await compareScenario("IU5-2 reset start score and IU6-2 floor", async ({ debug }) => {
@@ -265,8 +259,8 @@ async function runDifferentialTests() {
       "legacy local save state must load identically outside approved release behavior",
     );
     assert.deepStrictEqual(
-      withoutApprovedBalanceFields(candidateSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
-      withoutApprovedBalanceFields(baselineSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
+      withoutApprovedBalanceFields(candidateSnapshot.view, NORMAL_UPGRADE_COST_VIEW_BALANCE_PATHS),
+      withoutApprovedBalanceFields(baselineSnapshot.view, NORMAL_UPGRADE_COST_VIEW_BALANCE_PATHS),
       "legacy local save view must load identically outside approved release behavior",
     );
   }
@@ -290,8 +284,8 @@ async function runDifferentialTests() {
       "candidate must restore a next save code state identically outside approved release behavior",
     );
     assert.deepStrictEqual(
-      withoutApprovedBalanceFields(candidateImportedSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
-      withoutApprovedBalanceFields(baselineImportedSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
+      withoutApprovedBalanceFields(candidateImportedSnapshot.view, NORMAL_UPGRADE_COST_VIEW_BALANCE_PATHS),
+      withoutApprovedBalanceFields(baselineImportedSnapshot.view, NORMAL_UPGRADE_COST_VIEW_BALANCE_PATHS),
       "candidate must restore a next save code view identically outside approved release behavior",
     );
 
@@ -306,8 +300,8 @@ async function runDifferentialTests() {
       "candidate save code state must remain backward-compatible outside approved release behavior",
     );
     assert.deepStrictEqual(
-      withoutApprovedBalanceFields(baselineReloadedSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
-      withoutApprovedBalanceFields(candidateImportedSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
+      withoutApprovedBalanceFields(baselineReloadedSnapshot.view, NORMAL_UPGRADE_COST_VIEW_BALANCE_PATHS),
+      withoutApprovedBalanceFields(candidateImportedSnapshot.view, NORMAL_UPGRADE_COST_VIEW_BALANCE_PATHS),
       "candidate save code view must remain backward-compatible outside approved release behavior",
     );
   }
