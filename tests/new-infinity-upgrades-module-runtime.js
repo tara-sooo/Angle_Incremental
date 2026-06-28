@@ -89,6 +89,19 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
   {
     const { runtime, debug } = await loadRuntime(candidatePath);
     const { state } = debug;
+    setLogResource(state, "score", 2);
+    state.infinityUpgradeMask = purchasedMaskThrough(15);
+    assert.notEqual(runtime.scoreDisplay(), runtime.formatNumber(100), "IU 10-2 small score display must not show raw score");
+    assert.equal(
+      runtime.scoreDisplay(),
+      runtime.formatNumber(runtime.valueFromLog10(2.4)),
+      "IU 10-2 small score display must use the exponentiated effective score",
+    );
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
     state.infinityUpgradeMask = purchasedMaskThrough(12);
     state.automationEnabled = true;
     state.autoRunInfinity = true;

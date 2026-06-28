@@ -128,7 +128,7 @@ function scoreDisplay() {
   const scoreLog = currentScoreLog10();
   if (runtime.state.numberFormat === "scientific" && scoreLog > -Infinity) return runtime.formatScientificLog(scoreLog);
   if (scoreLog >= (runtime.state.numberFormat === "detailed" ? 3 : 18)) return runtime.formatLogNumber(scoreLog);
-  return runtime.formatNumber(runtime.state.score);
+  return runtime.formatNumber(runtime.valueFromLog10(scoreLog));
 }
 
 function applyInfinitySoftcap(rawLog10) {
