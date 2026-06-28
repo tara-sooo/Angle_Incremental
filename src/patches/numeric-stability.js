@@ -3,6 +3,8 @@ import { runtime } from "../runtime/shared.js";
 const MAX_GAME_LOG10 = Number.MAX_VALUE;
 const MAX_NATIVE_VALUE_LOG10 = Math.log10(Number.MAX_VALUE);
 const MAX_GAME_VERTICES = 1_000_000_000_000;
+const MAX_EXACT_BATCH_CORE_HITS = 2048;
+const CORE_HIT_BATCH_APPROX_SEGMENTS = 256;
 let installed = false;
 
 function clampGameLog10(value) {
@@ -82,46 +84,74 @@ function addCurrentGainForVertexSteps(stepCount) {
   runtime.setCurrentGainLog10(runtime.combineLog10(runtime.currentGainLog10(), addedLog));
 }
 
-function coreEventsBetween(start, end) {
+function coreBatchesBetween(start, end) {
   const count = end - start + 1;
   if (count <= 0) return [];
   const vertices = Math.max(3, runtime.state.vertices);
-  const events = [];
-  runtime.coreVertexIndices().forEach((coreIndex) => {
-    const coreOffset = ((coreIndex - (start % vertices)) + vertices) % vertices;
-    for (let step = coreOffset + 1; step <= count; step += vertices) {
-      events.push({ step, index: coreIndex });
-    }
-  });
-  return events.sort((left, right) => left.step - right.step || left.index - right.index);
+  return runtime.coreVertexIndices()
+    .map((coreIndex) => {
+      const coreOffset = ((coreIndex - (start % vertices)) + vertices) % vertices;
+      const coreHits = coreOffset >= count ? 0 : Math.floor((count - 1 - coreOffset) / vertices) + 1;
+      return { coreHits, firstCoreStep: coreOffset + 1 };
+    })
+    .filter((batch) => batch.coreHits > 0);
 }
 
-function passCoreVertexWithoutBurstText(index, suppressFloatingText) {
-  if (!suppressFloatingText) return runtime.passVertex(index);
-  const previousFloatingTextSetting = runtime.state.showFloatingText;
-  runtime.state.showFloatingText = false;
-  try {
-    return runtime.passVertex(index);
-  } finally {
-    runtime.state.showFloatingText = previousFloatingTextSetting;
+function coreBatchScoreLog10(firstCoreStep, coreHits, increase) {
+  const vertices = Math.max(3, runtime.state.vertices);
+  let totalLog = -Infinity;
+
+  if (coreHits <= MAX_EXACT_BATCH_CORE_HITS) {
+    for (let hit = 0; hit < coreHits; hit += 1) {
+      const step = firstCoreStep + hit * vertices;
+      const gainLog = runtime.gainAfterIncreaseLog10(increase, step);
+      totalLog = runtime.combineLog10(totalLog, runtime.finalScoreGainFromBaseLog10(gainLog));
+    }
+    return totalLog;
   }
+
+  const segments = Math.min(CORE_HIT_BATCH_APPROX_SEGMENTS, coreHits);
+  const segmentSize = coreHits / segments;
+  for (let segment = 0; segment < segments; segment += 1) {
+    const midHit = (segment + 0.5) * segmentSize;
+    const step = firstCoreStep + midHit * vertices;
+    const gainLog = runtime.gainAfterIncreaseLog10(increase, step);
+    totalLog = runtime.combineLog10(
+      totalLog,
+      runtime.finalScoreGainFromBaseLog10(gainLog) + Math.log10(segmentSize),
+    );
+  }
+  return totalLog;
 }
 
 function processManyVerticesExactly(start, end) {
   const count = end - start + 1;
   if (count <= 0) return false;
 
-  const events = coreEventsBetween(start, end);
-  const suppressFloatingText = events.length > 1 && runtime.state.showFloatingText && !runtime.state.lightEffects;
-  let processedSteps = 0;
+  const increase = runtime.vertexGainIncrease();
+  if (!(increase > 0)) return false;
+  const batches = coreBatchesBetween(start, end);
 
-  for (const event of events) {
-    addCurrentGainForVertexSteps(event.step - processedSteps - 1);
-    if (passCoreVertexWithoutBurstText(event.index, suppressFloatingText)) return true;
-    processedSteps = event.step;
+  if (batches.length > 0) {
+    const scoreLog = batches.reduce(
+      (totalLog, batch) => runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, batch.coreHits, increase)),
+      -Infinity,
+    );
+    const scoreValue = runtime.valueFromLog10(scoreLog);
+    const resetByInfinity = runtime.addScore(scoreValue, scoreLog);
+    if (resetByInfinity) return true;
+
+    if (runtime.state.showFloatingText && !runtime.state.lightEffects) {
+      runtime.state.floatingTexts.push({
+        text: `+${runtime.formatUiLogNumber(scoreLog)}`,
+        life: 1,
+        x: runtime.canvas.width / 2,
+        y: runtime.canvas.height * 0.16,
+      });
+    }
   }
 
-  addCurrentGainForVertexSteps(count - processedSteps);
+  addCurrentGainForVertexSteps(count);
   return false;
 }
 

@@ -175,6 +175,41 @@ async function runNumericStabilityModuleRuntimeTest() {
     assertSameSimulation(exact, batched, "post-cap high-speed batch");
   }
 
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    const { state, update } = instance.debug;
+    prepareVertexScenario(instance, {
+      scoreLog10: 50,
+      currentGainLog10: 0,
+      infiniteCapBroken: true,
+    });
+    state.speedLevel = 300;
+    state.vertices = 3;
+
+    let passVertexCalls = 0;
+    runtime.passVertex = () => {
+      passVertexCalls += 1;
+      return false;
+    };
+
+    runtime.processManyVertices(1, 60_006);
+    assert.ok(
+      passVertexCalls <= 64,
+      `high-speed batches must not visit every core hit; got ${passVertexCalls} passVertex calls`,
+    );
+
+    let batchUsed = false;
+    const baseProcessManyVertices = runtime.processManyVertices;
+    runtime.processManyVertices = (...args) => {
+      batchUsed = true;
+      return baseProcessManyVertices(...args);
+    };
+
+    update(1 / 60);
+    assert.equal(batchUsed, true, "high-speed low-vertex updates must use the batch path");
+  }
+
   console.log("Numeric stability module runtime tests passed");
 }
 
