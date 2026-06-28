@@ -128,32 +128,45 @@ function totalCoreHitsInBatches(batches) {
   return batches.reduce((total, batch) => total + batch.coreHits, 0);
 }
 
-function coreScoreLogForFirstHits(batches, hitLimit, increase) {
-  let remaining = hitLimit;
-  let totalLog = -Infinity;
-
-  for (const batch of batches) {
-    if (remaining <= 0) break;
-    const hits = Math.min(batch.coreHits, remaining);
-    totalLog = runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, hits, increase));
-    remaining -= hits;
-  }
-
-  return totalLog;
+function coreHitsThroughStep(batch, step, vertices) {
+  if (step < batch.firstCoreStep) return 0;
+  return Math.min(batch.coreHits, Math.floor((step - batch.firstCoreStep) / vertices) + 1);
 }
 
-function coreStepForHit(batches, hitIndex) {
-  let remaining = hitIndex;
-  const vertices = Math.max(3, runtime.state.vertices);
+function countCoreHitsThroughStep(batches, step, vertices) {
+  return batches.reduce((total, batch) => total + coreHitsThroughStep(batch, step, vertices), 0);
+}
 
-  for (const batch of batches) {
-    if (remaining <= batch.coreHits) {
-      return batch.firstCoreStep + (remaining - 1) * vertices;
+function coreStepForChronologicalHit(batches, hitIndex) {
+  if (hitIndex <= 0 || hitIndex > totalCoreHitsInBatches(batches)) return null;
+  const vertices = Math.max(3, runtime.state.vertices);
+  let low = Math.min(...batches.map((batch) => batch.firstCoreStep));
+  let high = Math.max(...batches.map((batch) => batch.firstCoreStep + (batch.coreHits - 1) * vertices));
+  let step = null;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (countCoreHitsThroughStep(batches, mid, vertices) >= hitIndex) {
+      step = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
     }
-    remaining -= batch.coreHits;
   }
 
-  return null;
+  return step;
+}
+
+function coreScoreLogForFirstHits(batches, hitLimit, increase) {
+  const cutoffStep = coreStepForChronologicalHit(batches, hitLimit);
+  if (cutoffStep === null) return -Infinity;
+  const vertices = Math.max(3, runtime.state.vertices);
+
+  return batches.reduce((totalLog, batch) => {
+    const hits = coreHitsThroughStep(batch, cutoffStep, vertices);
+    if (hits <= 0) return totalLog;
+    return runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, hits, increase));
+  }, -Infinity);
 }
 
 function projectedScoreLogAfterCoreHits(batches, hitLimit, increase) {
@@ -181,7 +194,7 @@ function firstInfinityCrossingCoreHit(batches, increase) {
   if (crossingHit === null) return null;
   return {
     hit: crossingHit,
-    step: coreStepForHit(batches, crossingHit),
+    step: coreStepForChronologicalHit(batches, crossingHit),
   };
 }
 

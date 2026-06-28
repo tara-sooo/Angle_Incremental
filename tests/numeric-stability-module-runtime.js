@@ -44,12 +44,26 @@ function prepareVertexScenario(instance, { scoreLog10, currentGainLog10, infinit
   runtime.completeChallengeIfReady = () => false;
 }
 
-async function simulateVertexSteps({ targetVertexSteps, batch, scoreLog10, currentGainLog10, infiniteCapBroken, infinityCount = 1, forceExactCoreHits = false }) {
+async function simulateVertexSteps({
+  targetVertexSteps,
+  batch,
+  scoreLog10,
+  currentGainLog10,
+  infiniteCapBroken,
+  infinityCount = 1,
+  forceExactCoreHits = false,
+  vertices = 3,
+  coreVertexIndices = null,
+  gainLevel = 0,
+}) {
   const instance = await loadRuntime(candidatePath);
   const { runtime } = instance;
   const { state, update } = instance.debug;
   prepareVertexScenario(instance, { scoreLog10, currentGainLog10, infiniteCapBroken });
+  state.vertices = vertices;
+  state.gainLevel = gainLevel;
   state.infinityCount = infinityCount;
+  if (coreVertexIndices) runtime.coreVertexIndices = () => coreVertexIndices;
 
   overrideRuntimeConstant(runtime, "MAX_VERTEX_STEPS_PER_FRAME", batch ? 5000 : Number.MAX_SAFE_INTEGER);
   if (forceExactCoreHits) overrideRuntimeConstant(runtime, "MAX_CORE_HITS_PER_FRAME", Number.MAX_SAFE_INTEGER);
@@ -201,6 +215,45 @@ async function runNumericStabilityModuleRuntimeTest() {
       exact.lastInfinityRun.scoreLog10,
       1e-10,
       "batched first Infinity must record the first crossing score",
+    );
+  }
+
+  {
+    const exact = await simulateVertexSteps({
+      targetVertexSteps: 6_006,
+      batch: false,
+      scoreLog10: 307.5,
+      currentGainLog10: 0,
+      infiniteCapBroken: false,
+      infinityCount: 0,
+      forceExactCoreHits: true,
+      vertices: 6,
+      coreVertexIndices: [0, 3],
+      gainLevel: 1e308,
+    });
+    const batched = await simulateVertexSteps({
+      targetVertexSteps: 6_006,
+      batch: true,
+      scoreLog10: 307.5,
+      currentGainLog10: 0,
+      infiniteCapBroken: false,
+      infinityCount: 0,
+      vertices: 6,
+      coreVertexIndices: [0, 3],
+      gainLevel: 1e308,
+    });
+
+    assert.equal(batched.batchUsed, true, "multi-core first Infinity scenario must exercise the batch path");
+    assert.ok(
+      batched.passVertexCalls <= batched.maxCoreHitsPerFrame,
+      `multi-core first Infinity replay must stay bounded; got ${batched.passVertexCalls} passVertex calls`,
+    );
+    assert.equal(batched.lastInfinityRun.ipGain, exact.lastInfinityRun.ipGain, "multi-core batched first Infinity must preserve chronological IP gain");
+    assertClose(
+      batched.lastInfinityRun.scoreLog10,
+      exact.lastInfinityRun.scoreLog10,
+      1e-10,
+      "multi-core batched first Infinity must preserve chronological crossing score",
     );
   }
 
