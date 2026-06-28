@@ -24,6 +24,29 @@ function compatibilitySnapshot(instance) {
   const value = snapshot(instance);
   delete value.view.achievements.total;
   delete value.view.infinity.softcapPower;
+  [
+    "autoRunGeneration",
+    "autoGenerationMode",
+    "autoGenerationScoreThreshold",
+    "autoGenerationCostThreshold",
+    "autoRunCoreBoost",
+    "autoRunInfinity",
+    "autoInfinityPointThreshold",
+  ].forEach((field) => delete value.state[field]);
+  [
+    "layerUnlocked",
+    "generation",
+    "generationMode",
+    "generationScoreThreshold",
+    "generationCostThreshold",
+    "coreBoost",
+    "infinity",
+    "infinityPointThreshold",
+  ].forEach((field) => delete value.view.automation[field]);
+  value.view.infinity.upgrades = value.view.infinity.upgrades.filter((upgrade) => {
+    const tier = Number(String(upgrade.id).split("-", 1)[0]);
+    return tier < 8;
+  });
   removeAchievementRunMetadata(value.state.lastInfinityRuns);
   removeAchievementRunMetadata(value.view.statistics.lastInfinityRuns);
   return value;

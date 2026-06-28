@@ -241,6 +241,7 @@ function canSpend(amount) {
 
 function updateAutomationUi() {
   const unlocked = runtime.hasInfinityUpgrade("1-2");
+  const layerUnlocked = runtime.hasInfinityUpgrade("8-1");
   if (!runtime.elements.automationMasterToggle) return;
   runtime.elements.automationLockNote.textContent = unlocked ? runtime.t("infinityUpgradeAvailable") : runtime.t("automationLocked");
   runtime.elements.automationMasterToggle.disabled = !unlocked;
@@ -248,11 +249,29 @@ function updateAutomationUi() {
   runtime.elements.autoBuyVertexToggle.disabled = !unlocked;
   runtime.elements.autoBuyGainToggle.disabled = !unlocked;
   if (runtime.elements.autoCompleteChallengesToggle) runtime.elements.autoCompleteChallengesToggle.disabled = !runtime.infinityChallengesUnlocked();
+  [
+    runtime.elements.autoRunGenerationToggle,
+    runtime.elements.autoGenerationModeSelect,
+    runtime.elements.autoGenerationScoreThresholdInput,
+    runtime.elements.autoGenerationCostThresholdInput,
+    runtime.elements.autoRunCoreBoostToggle,
+    runtime.elements.autoRunInfinityToggle,
+    runtime.elements.autoInfinityPointThresholdInput,
+  ].forEach((element) => {
+    if (element) element.disabled = !layerUnlocked;
+  });
   syncFormControl(runtime.elements.automationMasterToggle, unlocked && runtime.state.automationEnabled);
   syncFormControl(runtime.elements.autoBuySpeedToggle, runtime.state.autoBuySpeed);
   syncFormControl(runtime.elements.autoBuyVertexToggle, runtime.state.autoBuyVertex);
   syncFormControl(runtime.elements.autoBuyGainToggle, runtime.state.autoBuyGain);
   if (runtime.elements.autoCompleteChallengesToggle) syncFormControl(runtime.elements.autoCompleteChallengesToggle, runtime.state.autoCompleteChallenges);
+  if (runtime.elements.autoRunGenerationToggle) syncFormControl(runtime.elements.autoRunGenerationToggle, runtime.state.autoRunGeneration);
+  if (runtime.elements.autoGenerationModeSelect) syncFormControl(runtime.elements.autoGenerationModeSelect, runtime.state.autoGenerationMode);
+  if (runtime.elements.autoGenerationScoreThresholdInput) syncFormControl(runtime.elements.autoGenerationScoreThresholdInput, runtime.state.autoGenerationScoreThreshold);
+  if (runtime.elements.autoGenerationCostThresholdInput) syncFormControl(runtime.elements.autoGenerationCostThresholdInput, runtime.state.autoGenerationCostThreshold);
+  if (runtime.elements.autoRunCoreBoostToggle) syncFormControl(runtime.elements.autoRunCoreBoostToggle, runtime.state.autoRunCoreBoost);
+  if (runtime.elements.autoRunInfinityToggle) syncFormControl(runtime.elements.autoRunInfinityToggle, runtime.state.autoRunInfinity);
+  if (runtime.elements.autoInfinityPointThresholdInput) syncFormControl(runtime.elements.autoInfinityPointThresholdInput, runtime.state.autoInfinityPointThreshold);
 }
 
 function infinityRunRecordText(record, index) {
@@ -446,6 +465,9 @@ function balanceCreateInfinityUpgradeRows() {
     ["5-1", "5-2"],
     ["6-1", "6-2"],
     ["7-1", "7-2"],
+    ["8-1"],
+    ["9-1"],
+    ["10-1", "10-2"],
   ];
   tiers.forEach((rowIds, rowIndex) => {
     const tier = document.createElement("div");

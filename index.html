@@ -321,6 +321,37 @@
                 <label for="autoCompleteChallengesToggle" data-i18n="autoCompleteChallenges">IC自動完了</label>
                 <input id="autoCompleteChallengesToggle" type="checkbox" />
               </div>
+              <div class="setting-row">
+                <label for="autoRunGenerationToggle" data-i18n="autoRunGeneration">GR自動実行</label>
+                <input id="autoRunGenerationToggle" type="checkbox" />
+              </div>
+              <div class="setting-row">
+                <label for="autoGenerationModeSelect" data-i18n="autoGenerationMode">GR条件</label>
+                <select id="autoGenerationModeSelect">
+                  <option value="or" data-i18n="autoGenerationModeOr">どちらか</option>
+                  <option value="and" data-i18n="autoGenerationModeAnd">両方</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <label for="autoGenerationScoreThresholdInput" data-i18n="autoGenerationScoreThreshold">GRスコア改善(%)</label>
+                <input id="autoGenerationScoreThresholdInput" type="number" min="0" step="0.1" value="10" />
+              </div>
+              <div class="setting-row">
+                <label for="autoGenerationCostThresholdInput" data-i18n="autoGenerationCostThreshold">GRコスト改善(%)</label>
+                <input id="autoGenerationCostThresholdInput" type="number" min="0" step="0.1" value="1" />
+              </div>
+              <div class="setting-row">
+                <label for="autoRunCoreBoostToggle" data-i18n="autoRunCoreBoost">CB自動実行</label>
+                <input id="autoRunCoreBoostToggle" type="checkbox" />
+              </div>
+              <div class="setting-row">
+                <label for="autoRunInfinityToggle" data-i18n="autoRunInfinity">Infinity自動実行</label>
+                <input id="autoRunInfinityToggle" type="checkbox" />
+              </div>
+              <div class="setting-row">
+                <label for="autoInfinityPointThresholdInput" data-i18n="autoInfinityPointThreshold">Infinity実行IP</label>
+                <input id="autoInfinityPointThresholdInput" type="number" min="1" step="1" value="10" />
+              </div>
             </section>
           </div>
         </section>

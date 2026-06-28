@@ -57,8 +57,26 @@ function lapDuration() {
   return runtime.BASE_LAP_SECONDS / lapSpeedMultiplier();
 }
 
-function currentScoreLog10() {
+function scoreExponent() {
+  return runtime.hasInfinityUpgrade("10-2") ? 1.2 : 1;
+}
+
+function rawCurrentScoreLog10() {
   return currentLog10ForValue(runtime.state.score, runtime.state.scoreLog10);
+}
+
+function effectiveScoreLog10FromRaw(rawLog) {
+  if (rawLog === -Infinity) return -Infinity;
+  return runtime.clampLog10(rawLog * scoreExponent());
+}
+
+function rawScoreLog10FromEffective(effectiveLog) {
+  if (effectiveLog === -Infinity) return -Infinity;
+  return runtime.clampLog10(effectiveLog / scoreExponent());
+}
+
+function currentScoreLog10() {
+  return effectiveScoreLog10FromRaw(rawCurrentScoreLog10());
 }
 
 function currentLog10ForValue(value, savedLog) {
@@ -277,7 +295,7 @@ function costs() {
 }
 
 function addScore(amount, amountLog10 = runtime.log10Value(amount)) {
-  const previousScoreLog = currentScoreLog10();
+  const previousScoreLog = rawCurrentScoreLog10();
   const rawScoreLog = runtime.combineLog10(previousScoreLog, amountLog10);
   const cappedScoreLog = runtime.clampLog10(applyInfinitySoftcap(rawScoreLog));
 
@@ -375,8 +393,9 @@ function spendLog(amountLog) {
   }
 
   const remainingLog = runtime.subtractLog10(scoreLog, amountLog);
-  runtime.state.scoreLog10 = remainingLog;
-  runtime.state.score = runtime.valueFromLog10(remainingLog);
+  const rawRemainingLog = rawScoreLog10FromEffective(remainingLog);
+  runtime.state.scoreLog10 = rawRemainingLog;
+  runtime.state.score = runtime.valueFromLog10(rawRemainingLog);
   return true;
 }
 
@@ -538,6 +557,10 @@ expose("lapSpeedSoftcapStart", () => lapSpeedSoftcapStart, (value) => { lapSpeed
 expose("lapSpeedSoftcapPower", () => lapSpeedSoftcapPower, (value) => { lapSpeedSoftcapPower = value; });
 expose("lapDuration", () => lapDuration, (value) => { lapDuration = value; });
 expose("currentScoreLog10", () => currentScoreLog10, (value) => { currentScoreLog10 = value; });
+expose("rawCurrentScoreLog10", () => rawCurrentScoreLog10, (value) => { rawCurrentScoreLog10 = value; });
+expose("scoreExponent", () => scoreExponent, (value) => { scoreExponent = value; });
+expose("effectiveScoreLog10FromRaw", () => effectiveScoreLog10FromRaw, (value) => { effectiveScoreLog10FromRaw = value; });
+expose("rawScoreLog10FromEffective", () => rawScoreLog10FromEffective, (value) => { rawScoreLog10FromEffective = value; });
 expose("currentLog10ForValue", () => currentLog10ForValue, (value) => { currentLog10ForValue = value; });
 expose("currentTotalScoreLog10", () => currentTotalScoreLog10, (value) => { currentTotalScoreLog10 = value; });
 expose("currentGenerationScoreLog10", () => currentGenerationScoreLog10, (value) => { currentGenerationScoreLog10 = value; });

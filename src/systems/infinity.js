@@ -192,6 +192,12 @@ function resetBelowInfinity() {
   runtime.state.floatingTexts = [];
 }
 
+function applyStartingCoreBoosts() {
+  if (hasInfinityUpgrade("10-1") && runtime.state.coreBoostCount < 2) {
+    runtime.state.coreBoostCount = 2;
+  }
+}
+
 function recordInfinityRun(scoreLog, gained, challenge, noGenerationCoreBoost = false) {
   const record = {
     time: runtime.state.currentInfinityRunTime,
@@ -237,11 +243,13 @@ function runInfinity(forced = false) {
 
 function buyInfinityUpgrade(id) {
   const upgrade = infinityUpgradeById(id);
-  if (!upgrade || !canBuyInfinityUpgrade(id)) return;
-  if (!spendInfinityPoints(runtime.log10Value(upgrade.cost))) return;
+  if (!upgrade || !canBuyInfinityUpgrade(id)) return false;
+  if (!spendInfinityPoints(runtime.log10Value(upgrade.cost))) return false;
   runtime.state.infinityUpgradeMask |= 1 << upgrade.bit;
+  if (id === "10-1") applyStartingCoreBoosts();
   runtime.updateUi();
   runtime.saveGame("manual");
+  return true;
 }
 
 function convertIpToInfiniteScore() {
@@ -283,9 +291,10 @@ function breakInfiniteCap() {
 function balanceInfinityPointGain() {
   if (!canInfinity()) return 0;
   const scoreLog10 = runtime.currentScoreLog10();
-  const base = runtime.state.infiniteCapBroken
-    ? Math.floor(scoreLog10 / Math.log10(2) - 307)
-    : Math.floor(scoreLog10 - 307);
+  let base;
+  if (runtime.state.infiniteCapBroken) base = Math.floor(scoreLog10 / Math.log10(2) - 307);
+  else if (hasInfinityUpgrade("9-1")) base = Math.floor(scoreLog10 / Math.log10(7) - 307);
+  else base = Math.floor(scoreLog10 - 307);
   const gained = Math.max(1, base);
   return gained * (runtime.isAchievementUnlocked(17) ? 2 : 1);
 }
@@ -334,6 +343,7 @@ expose("canBreakInfiniteCap", () => canBreakInfiniteCap, (value) => { canBreakIn
 expose("completeChallengeIfReady", () => completeChallengeIfReady, (value) => { completeChallengeIfReady = value; });
 expose("updateChallengeTimers", () => updateChallengeTimers, (value) => { updateChallengeTimers = value; });
 expose("resetBelowInfinity", () => resetBelowInfinity, (value) => { resetBelowInfinity = value; });
+expose("applyStartingCoreBoosts", () => applyStartingCoreBoosts, (value) => { applyStartingCoreBoosts = value; });
 expose("recordInfinityRun", () => recordInfinityRun, (value) => { recordInfinityRun = value; });
 expose("infinityCountGain", () => infinityCountGain, (value) => { infinityCountGain = value; });
 expose("runInfinity", () => runInfinity, (value) => { runInfinity = value; });
