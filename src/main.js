@@ -405,7 +405,10 @@ function update(dt) {
   const start = Math.floor(previousAbsolute + runtime.VERTEX_EPSILON) + 1;
   const end = Math.floor(runtime.state.totalVertexProgress + runtime.VERTEX_EPSILON);
   const vertexSteps = end - start + 1;
-  if (vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME) {
+  const estimatedCoreHits = vertexSteps > 0
+    ? Math.ceil(vertexSteps / Math.max(3, runtime.state.vertices)) * runtime.coreVertexIndices().length
+    : 0;
+  if (vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME || estimatedCoreHits > runtime.MAX_CORE_HITS_PER_FRAME) {
     if (runtime.processManyVertices(start, end)) return;
   } else {
     for (let vertex = start; vertex <= end; vertex += 1) {

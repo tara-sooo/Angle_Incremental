@@ -196,10 +196,12 @@ function loadGame() {
 
 function testSingleEngineSourceAndVersionAlignment() {
   const gameSource = fs.readFileSync(path.join(__dirname, "game.js"), "utf8");
+  const constantsSource = fs.readFileSync(path.join(__dirname, "src", "core", "constants.js"), "utf8");
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "version.json"), "utf8"));
   assert.ok(gameSource.includes('const APP_VERSION = "0.1.0";'));
   assert.ok(gameSource.includes("// BEGIN INTEGRATED BALANCE RULES"));
-  assert.strictEqual(manifest.appVersion, "0.1.0");
+  assert.ok(constantsSource.includes('const APP_VERSION = "0.1.1";'));
+  assert.strictEqual(manifest.appVersion, "0.1.1");
   assert.strictEqual(fs.existsSync(path.join(__dirname, "game-core.js")), false);
   assert.strictEqual(fs.existsSync(path.join(__dirname, "balance-config.js")), false);
 }
