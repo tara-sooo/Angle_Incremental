@@ -1,0 +1,27 @@
+name: Regression Suite
+
+on:
+  pull_request:
+    branches:
+      - next
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify baseline fixture
+        run: node scripts/check-runtime-baseline.js
+      - name: Verify ESM entrypoint order
+        run: node scripts/check-runtime-esm-loader-order.js
+      - name: Check syntax
+        run: |
+          node --check game.js
+          node --check regression-tests-esm.js
+          node --check regression-tests-core.js
+          find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Run baseline regression and ESM differential suites
+        run: node --experimental-vm-modules regression-tests-esm.js
