@@ -29,6 +29,17 @@ function compatibilitySnapshot(instance) {
   return value;
 }
 
+function deletePath(value, pathParts) {
+  const parent = pathParts.slice(0, -1).reduce((current, key) => current?.[key], value);
+  if (parent && Object.hasOwn(parent, pathParts.at(-1))) delete parent[pathParts.at(-1)];
+}
+
+function withoutApprovedBalanceFields(value, paths = []) {
+  const copy = structuredClone(value);
+  paths.forEach((path) => deletePath(copy, path.split(".")));
+  return copy;
+}
+
 async function compareScenario(name, act, options = {}) {
   const baseline = await loadRuntime(baselinePath);
   const candidate = await loadRuntime(candidatePath);
@@ -36,22 +47,63 @@ async function compareScenario(name, act, options = {}) {
   disableAchievementChecks(candidate);
   await act(baseline);
   await act(candidate);
-  try {
-    assert.deepStrictEqual(
-      compatibilitySnapshot(candidate),
-      compatibilitySnapshot(baseline),
-      `${name}: candidate runtime diverged from next baseline outside approved release behavior`,
-    );
-  } catch (error) {
-    if (!options.allowApprovedBalanceDivergence) throw error;
-    console.log(`${name}: approved release balance divergence`);
-  }
+  const candidateSnapshot = withoutApprovedBalanceFields(
+    compatibilitySnapshot(candidate),
+    options.approvedBalancePaths,
+  );
+  const baselineSnapshot = withoutApprovedBalanceFields(
+    compatibilitySnapshot(baseline),
+    options.approvedBalancePaths,
+  );
+  assert.deepStrictEqual(
+    candidateSnapshot,
+    baselineSnapshot,
+    `${name}: candidate runtime diverged from next baseline outside approved release behavior`,
+  );
 }
 
 function setLogResource(state, key, log) {
   state[`${key}Log10`] = log;
   state[key] = log <= 308 ? 10 ** log : Number.MAX_VALUE;
 }
+
+const NORMAL_UPGRADE_BALANCE_PATHS = [
+  "state.speedLevel",
+  "state.vertexLevel",
+  "state.gainLevel",
+  "state.score",
+  "state.scoreLog10",
+  "state.totalScore",
+  "state.totalScoreLog10",
+  "state.generationScore",
+  "state.generationScoreLog10",
+  "state.currentGain",
+  "state.currentGainLog10",
+  "state.pointProgress",
+  "state.totalVertexProgress",
+  "state.lastVertexIndex",
+  "view.score",
+  "view.scoreLog10",
+  "view.currentGain",
+  "view.currentGainLog10",
+  "view.vertexGainIncrease",
+  "view.rawLapSpeed",
+  "view.rawLapSpeedMultiplier",
+  "view.achievements.vertexGainIncrease",
+  "view.upgrades.speedLevel",
+  "view.upgrades.vertexLevel",
+  "view.upgrades.gainLevel",
+  "view.upgrades.costs.speed",
+  "view.upgrades.costs.speedLog10",
+  "view.upgrades.costs.vertex",
+  "view.upgrades.costs.vertexLog10",
+  "view.upgrades.costs.gain",
+  "view.upgrades.costs.gainLog10",
+];
+
+const NORMAL_UPGRADE_VIEW_BALANCE_PATHS = NORMAL_UPGRADE_BALANCE_PATHS
+  .filter((path) => path.startsWith("view."))
+  .map((path) => path.slice("view.".length));
 
 function seedLateGameState(instance) {
   const { state } = instance.debug;
@@ -97,7 +149,7 @@ async function runDifferentialTests() {
     state.totalVertexProgress = 0;
     state.lastVertexIndex = 0;
     debug.update(0.5);
-  }, { allowApprovedBalanceDivergence: true });
+  }, { approvedBalancePaths: NORMAL_UPGRADE_BALANCE_PATHS });
 
   await compareScenario("Generation and Core Boost reset sequence", async ({ debug }) => {
     const { state } = debug;
@@ -107,7 +159,18 @@ async function runDifferentialTests() {
     debug.runGeneration();
     setLogResource(state, "score", 120);
     debug.runCoreBoost();
-  }, { allowApprovedBalanceDivergence: true });
+  }, {
+    approvedBalancePaths: [
+      "state.generationScoreMultiplier",
+      "state.generationScoreMultiplierLog10",
+      "state.generationCostReduction",
+      "state.generationCostFactor",
+      "view.generation.scoreMultiplier",
+      "view.generation.scoreMultiplierLog10",
+      "view.generation.costFactor",
+      "view.generation.costReduction",
+    ],
+  });
 
   await compareScenario("IU5-2 reset start score and IU6-2 floor", async ({ debug }) => {
     const { state } = debug;
@@ -120,7 +183,18 @@ async function runDifferentialTests() {
     debug.runGeneration();
     setLogResource(state, "score", 120);
     debug.runCoreBoost();
-  }, { allowApprovedBalanceDivergence: true });
+  }, {
+    approvedBalancePaths: [
+      "state.generationScoreMultiplier",
+      "state.generationScoreMultiplierLog10",
+      "state.generationCostReduction",
+      "state.generationCostFactor",
+      "view.generation.scoreMultiplier",
+      "view.generation.scoreMultiplierLog10",
+      "view.generation.costFactor",
+      "view.generation.costReduction",
+    ],
+  });
 
   await compareScenario("Infinity Challenge 6 reward", async ({ debug }) => {
     const { state } = debug;
@@ -166,7 +240,16 @@ async function runDifferentialTests() {
     state.currentGain = 1e25;
     debug.update(0.08);
     debug.update(0.08);
-  }, { allowApprovedBalanceDivergence: true });
+  }, {
+    approvedBalancePaths: [
+      "view.upgrades.costs.speed",
+      "view.upgrades.costs.speedLog10",
+      "view.upgrades.costs.vertex",
+      "view.upgrades.costs.vertexLog10",
+      "view.upgrades.costs.gain",
+      "view.upgrades.costs.gainLog10",
+    ],
+  });
 
   {
     const baselineSave = await makeStoredSave(baselinePath);
@@ -181,15 +264,11 @@ async function runDifferentialTests() {
       baselineSnapshot.state,
       "legacy local save state must load identically outside approved release behavior",
     );
-    try {
-      assert.deepStrictEqual(
-        candidateSnapshot.view,
-        baselineSnapshot.view,
-        "legacy local save view must load identically outside approved release behavior",
-      );
-    } catch (error) {
-      console.log("legacy local save view: approved release balance divergence");
-    }
+    assert.deepStrictEqual(
+      withoutApprovedBalanceFields(candidateSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
+      withoutApprovedBalanceFields(baselineSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
+      "legacy local save view must load identically outside approved release behavior",
+    );
   }
 
   {
@@ -210,15 +289,11 @@ async function runDifferentialTests() {
       baselineImportedSnapshot.state,
       "candidate must restore a next save code state identically outside approved release behavior",
     );
-    try {
-      assert.deepStrictEqual(
-        candidateImportedSnapshot.view,
-        baselineImportedSnapshot.view,
-        "candidate must restore a next save code view identically outside approved release behavior",
-      );
-    } catch (error) {
-      console.log("next save code import view: approved release balance divergence");
-    }
+    assert.deepStrictEqual(
+      withoutApprovedBalanceFields(candidateImportedSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
+      withoutApprovedBalanceFields(baselineImportedSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
+      "candidate must restore a next save code view identically outside approved release behavior",
+    );
 
     const candidateCode = await candidateImported.debug.exportSaveCode();
     const baselineReloaded = await loadRuntime(baselinePath);
@@ -230,15 +305,11 @@ async function runDifferentialTests() {
       candidateImportedSnapshot.state,
       "candidate save code state must remain backward-compatible outside approved release behavior",
     );
-    try {
-      assert.deepStrictEqual(
-        baselineReloadedSnapshot.view,
-        candidateImportedSnapshot.view,
-        "candidate save code view must remain backward-compatible outside approved release behavior",
-      );
-    } catch (error) {
-      console.log("candidate save code view: approved release balance divergence");
-    }
+    assert.deepStrictEqual(
+      withoutApprovedBalanceFields(baselineReloadedSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
+      withoutApprovedBalanceFields(candidateImportedSnapshot.view, NORMAL_UPGRADE_VIEW_BALANCE_PATHS),
+      "candidate save code view must remain backward-compatible outside approved release behavior",
+    );
   }
 
   console.log("ESM differential runtime tests passed");
