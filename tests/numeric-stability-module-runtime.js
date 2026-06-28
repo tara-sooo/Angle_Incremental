@@ -59,11 +59,19 @@ async function simulateVertexSteps({ targetVertexSteps, batch, scoreLog10, curre
     batchUsed = true;
     return baseProcessManyVertices(...args);
   };
+  let passVertexCalls = 0;
+  const basePassVertex = runtime.passVertex;
+  runtime.passVertex = (...args) => {
+    passVertexCalls += 1;
+    return basePassVertex(...args);
+  };
 
   const dt = runtime.lapDuration() * targetVertexSteps / state.vertices;
   update(dt);
   return {
     batchUsed,
+    passVertexCalls,
+    maxCoreHitsPerFrame: runtime.MAX_CORE_HITS_PER_FRAME,
     scoreLog10: runtime.currentScoreLog10(),
     totalScoreLog10: runtime.currentTotalScoreLog10(),
     generationScoreLog10: runtime.currentGenerationScoreLog10(),
@@ -182,6 +190,10 @@ async function runNumericStabilityModuleRuntimeTest() {
     });
 
     assert.equal(batched.batchUsed, true, "first Infinity scenario must exercise the batch path");
+    assert.ok(
+      batched.passVertexCalls <= batched.maxCoreHitsPerFrame,
+      `batched first Infinity replay must stay bounded; got ${batched.passVertexCalls} passVertex calls`,
+    );
     assert.equal(batched.infinityCount, exact.infinityCount, "batched first Infinity should reset at the same point as exact processing");
     assert.equal(batched.lastInfinityRun.ipGain, exact.lastInfinityRun.ipGain, "batched first Infinity must not include post-threshold IP gain");
     assertClose(
