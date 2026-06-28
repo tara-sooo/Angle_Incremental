@@ -35,8 +35,9 @@ function nextCoreBoostValues() {
   const currentCoreBoostCount = runtime.state.coreBoostCount;
   const nextCoreBoostCount = canCoreBoost() ? currentCoreBoostCount + 1 : currentCoreBoostCount;
   const power = coreBoostBonusPower();
+  const increasePerCoreBoost = runtime.hasInfinityUpgrade("7-1") ? 1 : 0.5;
   return {
-    gainMultiplier: Math.pow(1 + nextCoreBoostCount * 0.5, power),
+    gainMultiplier: Math.pow(1 + nextCoreBoostCount * increasePerCoreBoost, power),
     gainExponent: Math.pow(1 + nextCoreBoostCount * 0.02, power),
   };
 }
@@ -94,4 +95,3 @@ expose("shouldPreserveVerticesThroughEarlyReset", () => shouldPreserveVerticesTh
 expose("resetBelowCoreBoost", () => resetBelowCoreBoost, (value) => { resetBelowCoreBoost = value; });
 expose("runCoreBoost", () => runCoreBoost, (value) => { runCoreBoost = value; });
 expose("balanceCoreBoostGainIncreaseMultiplier", () => balanceCoreBoostGainIncreaseMultiplier, (value) => { balanceCoreBoostGainIncreaseMultiplier = value; });
-

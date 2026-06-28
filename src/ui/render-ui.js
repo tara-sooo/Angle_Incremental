@@ -224,9 +224,9 @@ function updateAchievementRows() {
     row.querySelector(".achievement-number").textContent = String(id);
     row.querySelector(".achievement-title").textContent = achievement.title[language];
     row.querySelector(".achievement-condition").textContent = achievement.condition[language];
-    row.querySelector(".achievement-reward").textContent = extraReward
-      ? `${runtime.t("achievementReward")}: ${extraReward}`
-      : runtime.t("achievementRewardText");
+    const reward = row.querySelector(".achievement-reward");
+    reward.hidden = !extraReward;
+    reward.textContent = extraReward ? `${runtime.t("achievementReward")}: ${extraReward}` : "";
     row.querySelector(".achievement-status").textContent = unlocked ? runtime.t("achievementUnlocked") : runtime.t("achievementLocked");
   });
 }
@@ -500,4 +500,3 @@ expose("formatMultiplierLog", () => formatMultiplierLog, (value) => { formatMult
 expose("formatMultiplierLogPreview", () => formatMultiplierLogPreview, (value) => { formatMultiplierLogPreview = value; });
 expose("formatExponentPreview", () => formatExponentPreview, (value) => { formatExponentPreview = value; });
 expose("balanceCreateInfinityUpgradeRows", () => balanceCreateInfinityUpgradeRows, (value) => { balanceCreateInfinityUpgradeRows = value; });
-

@@ -124,6 +124,95 @@ function coreBatchScoreLog10(firstCoreStep, coreHits, increase) {
   return totalLog;
 }
 
+function totalCoreHitsInBatches(batches) {
+  return batches.reduce((total, batch) => total + batch.coreHits, 0);
+}
+
+function coreHitsThroughStep(batch, step, vertices) {
+  if (step < batch.firstCoreStep) return 0;
+  return Math.min(batch.coreHits, Math.floor((step - batch.firstCoreStep) / vertices) + 1);
+}
+
+function countCoreHitsThroughStep(batches, step, vertices) {
+  return batches.reduce((total, batch) => total + coreHitsThroughStep(batch, step, vertices), 0);
+}
+
+function coreStepForChronologicalHit(batches, hitIndex) {
+  if (hitIndex <= 0 || hitIndex > totalCoreHitsInBatches(batches)) return null;
+  const vertices = Math.max(3, runtime.state.vertices);
+  let low = Math.min(...batches.map((batch) => batch.firstCoreStep));
+  let high = Math.max(...batches.map((batch) => batch.firstCoreStep + (batch.coreHits - 1) * vertices));
+  let step = null;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (countCoreHitsThroughStep(batches, mid, vertices) >= hitIndex) {
+      step = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  return step;
+}
+
+function coreScoreLogForFirstHits(batches, hitLimit, increase) {
+  const cutoffStep = coreStepForChronologicalHit(batches, hitLimit);
+  if (cutoffStep === null) return -Infinity;
+  const vertices = Math.max(3, runtime.state.vertices);
+
+  return batches.reduce((totalLog, batch) => {
+    const hits = coreHitsThroughStep(batch, cutoffStep, vertices);
+    if (hits <= 0) return totalLog;
+    return runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, hits, increase));
+  }, -Infinity);
+}
+
+function projectedScoreLogAfterCoreHits(batches, hitLimit, increase) {
+  const scoreLog = coreScoreLogForFirstHits(batches, hitLimit, increase);
+  return runtime.clampLog10(
+    runtime.applyInfinitySoftcap(runtime.combineLog10(runtime.currentScoreLog10(), scoreLog)),
+  );
+}
+
+function firstInfinityCrossingCoreHit(batches, increase) {
+  let low = 1;
+  let high = totalCoreHitsInBatches(batches);
+  let crossingHit = null;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (projectedScoreLogAfterCoreHits(batches, mid, increase) >= runtime.INFINITY_REQUIREMENT_LOG10) {
+      crossingHit = mid;
+      high = mid - 1;
+    } else {
+      low = mid + 1;
+    }
+  }
+
+  if (crossingHit === null) return null;
+  return {
+    hit: crossingHit,
+    step: coreStepForChronologicalHit(batches, crossingHit),
+  };
+}
+
+function processFirstInfinityCrossingBatch(batches, increase) {
+  const crossing = firstInfinityCrossingCoreHit(batches, increase);
+  if (!crossing || crossing.step === null) return false;
+
+  const previousCoreScoreLog = coreScoreLogForFirstHits(batches, crossing.hit - 1, increase);
+  if (previousCoreScoreLog > -Infinity) {
+    const resetBeforeCrossing = runtime.addScore(runtime.valueFromLog10(previousCoreScoreLog), previousCoreScoreLog);
+    if (resetBeforeCrossing) return true;
+  }
+
+  addCurrentGainForVertexSteps(crossing.step);
+  const crossingScoreLog = runtime.finalScoreGainFromBaseLog10(runtime.currentGainLog10());
+  return runtime.addScore(runtime.valueFromLog10(crossingScoreLog), crossingScoreLog);
+}
+
 function processManyVerticesExactly(start, end) {
   const count = end - start + 1;
   if (count <= 0) return false;
@@ -137,6 +226,13 @@ function processManyVerticesExactly(start, end) {
       (totalLog, batch) => runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, batch.coreHits, increase)),
       -Infinity,
     );
+    const projectedScoreLog = runtime.clampLog10(
+      runtime.applyInfinitySoftcap(runtime.combineLog10(runtime.currentScoreLog10(), scoreLog)),
+    );
+    if (runtime.state.infinityCount === 0 && projectedScoreLog >= runtime.INFINITY_REQUIREMENT_LOG10) {
+      return processFirstInfinityCrossingBatch(batches, increase);
+    }
+
     const scoreValue = runtime.valueFromLog10(scoreLog);
     const resetByInfinity = runtime.addScore(scoreValue, scoreLog);
     if (resetByInfinity) return true;

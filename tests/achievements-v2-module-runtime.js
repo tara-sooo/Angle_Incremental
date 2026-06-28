@@ -106,6 +106,40 @@ async function runAchievementV2ModuleRuntimeTest() {
     });
   }
 
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
+    state.coreBoostCount = 2;
+    setLogResource(state, "score", 100);
+    state.infinityUpgradeMask = 0;
+    assertNearlyEqual(runtime.nextCoreBoostValues().gainMultiplier, 2.5, "next Core Boost preview should use the base gain increase without 7-1");
+
+    state.infinityUpgradeMask = 1 << 10;
+    assertNearlyEqual(runtime.coreBoostGainIncreaseMultiplier(), 3, "7-1 should affect the current Core Boost gain multiplier");
+    assertNearlyEqual(runtime.nextCoreBoostValues().gainMultiplier, 4, "7-1 should affect the next Core Boost gain multiplier preview");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+
+    runtime.createAchievementRows();
+    runtime.updateAchievementRows();
+
+    const rows = runtime.elements.achievementList.querySelectorAll(".achievement-row");
+    assert.equal(rows.length, 25, "achievement rows should be rendered in the module runtime");
+
+    const firstReward = rows[0].querySelector(".achievement-reward");
+    assert.equal(firstReward.textContent, "", "achievements without individual rewards should not repeat the shared reward");
+    assert.equal(firstReward.hidden, true, "empty individual achievement rewards should be hidden");
+
+    const ic3Reward = rows[16].querySelector(".achievement-reward");
+    assert.equal(ic3Reward.textContent, "報酬: IP獲得量が×2", "individual achievement rewards should use the generic reward label");
+    assert.equal(ic3Reward.hidden, false, "individual achievement rewards should remain visible");
+  }
+
   console.log("Achievement v2 module runtime tests passed");
 }
 

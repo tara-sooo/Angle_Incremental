@@ -52,6 +52,18 @@ class FakeElement {
     this.parentNode = null;
   }
 
+  get className() {
+    return Array.from(this.classList.values).join(" ");
+  }
+
+  set className(value) {
+    this.classList.values = new Set(String(value).split(/\s+/).filter(Boolean));
+  }
+
+  get firstChild() {
+    return this.children[0] || null;
+  }
+
   addEventListener() {}
   removeEventListener() {}
   setAttribute(name, value) {
@@ -75,11 +87,27 @@ class FakeElement {
     this.append(child);
     return child;
   }
-  querySelector() {
-    return new FakeElement();
+  removeChild(child) {
+    this.children = this.children.filter((entry) => entry !== child);
+    child.parentElement = null;
+    child.parentNode = null;
+    return child;
   }
-  querySelectorAll() {
-    return [];
+  querySelector(selector) {
+    return this.querySelectorAll(selector)[0] || new FakeElement();
+  }
+  querySelectorAll(selector) {
+    if (!selector.startsWith(".")) return [];
+    const className = selector.slice(1);
+    const matches = [];
+    const visit = (node) => {
+      node.children.forEach((child) => {
+        if (child.classList.contains(className)) matches.push(child);
+        visit(child);
+      });
+    };
+    visit(this);
+    return matches;
   }
   getBoundingClientRect() {
     return { width: 900, height: 620 };
