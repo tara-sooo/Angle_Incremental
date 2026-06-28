@@ -189,6 +189,8 @@ function resetBelowInfinity() {
   runtime.state.infiniteScore = 0;
   runtime.state.infiniteScoreLog10 = -Infinity;
   runtime.state.ic8VertexDecayElapsed = 0;
+  runtime.state.currentInfinityRunHadGeneration = false;
+  runtime.state.currentInfinityRunHadCoreBoost = false;
   runtime.state.floatingTexts = [];
 }
 
@@ -223,7 +225,8 @@ function runInfinity(forced = false) {
 
   const scoreLogBeforeReset = runtime.currentScoreLog10();
   const completedChallenge = runtime.state.activeChallenge;
-  const noGenerationOrCoreBoost = runtime.state.generationCount === 0 && runtime.state.coreBoostCount === 0;
+  const noGenerationOrCoreBoost = !runtime.state.currentInfinityRunHadGeneration
+    && !runtime.state.currentInfinityRunHadCoreBoost;
   if (completedChallenge > 0) {
     runtime.state.completedChallenges |= 1 << (completedChallenge - 1);
     runtime.state.activeChallenge = 0;

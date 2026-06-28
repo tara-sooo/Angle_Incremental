@@ -118,6 +118,14 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.autoInfinityPointThreshold = Math.max(1, runtime.sanitizeNumber(data.autoInfinityPointThreshold, 10));
   runtime.state.ic8VertexDecayElapsed = runtime.sanitizeNumber(data.ic8VertexDecayElapsed, 0);
   runtime.state.noGenerationCoreBoostReached = Boolean(data.noGenerationCoreBoostReached);
+  runtime.state.currentInfinityRunHadGeneration = runtime.sanitizeBoolean(
+    data.currentInfinityRunHadGeneration,
+    runtime.state.generationCount > 0,
+  );
+  runtime.state.currentInfinityRunHadCoreBoost = runtime.sanitizeBoolean(
+    data.currentInfinityRunHadCoreBoost,
+    runtime.state.coreBoostCount > (runtime.hasInfinityUpgrade("10-1") ? 2 : 0),
+  );
   if (runtime.state.activeChallenge > 0 && !runtime.infinityChallengesUnlocked()) {
     runtime.resetBelowInfinity();
     runtime.state.activeChallenge = 0;
@@ -379,6 +387,8 @@ function resetSave() {
     autoInfinityPointThreshold: 10,
     ic8VertexDecayElapsed: 0,
     noGenerationCoreBoostReached: false,
+    currentInfinityRunHadGeneration: false,
+    currentInfinityRunHadCoreBoost: false,
     showFloatingText: true,
     lightEffects: false,
     showFps: false,

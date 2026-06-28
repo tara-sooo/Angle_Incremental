@@ -32,6 +32,8 @@ function compatibilitySnapshot(instance) {
     "autoRunCoreBoost",
     "autoRunInfinity",
     "autoInfinityPointThreshold",
+    "currentInfinityRunHadGeneration",
+    "currentInfinityRunHadCoreBoost",
   ].forEach((field) => delete value.state[field]);
   [
     "layerUnlocked",
