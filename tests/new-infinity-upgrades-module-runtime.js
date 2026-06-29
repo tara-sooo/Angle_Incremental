@@ -131,6 +131,7 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     const { runtime, debug } = await loadRuntime(candidatePath);
     const { state } = debug;
     runtime.applySaveData({
+      autoGenerationMode: "or",
       autoGenerationScoreThreshold: 10,
       autoGenerationCostThreshold: 1,
     }, 7);
@@ -140,8 +141,27 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       "old percent score threshold saves must migrate to the equivalent multiplier threshold",
     );
     assert.ok(
+      state.autoGenerationCostMultiplierThreshold === 0,
+      "old OR automation saves must not migrate into an AND cost gate",
+    );
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    runtime.applySaveData({
+      autoGenerationMode: "and",
+      autoGenerationScoreThreshold: 10,
+      autoGenerationCostThreshold: 1,
+    }, 7);
+    assert.equal(
+      state.autoGenerationScoreMultiplierThreshold,
+      1.1,
+      "old AND percent score threshold saves must migrate to the equivalent multiplier threshold",
+    );
+    assert.ok(
       Math.abs(state.autoGenerationCostMultiplierThreshold - (1 / 0.99)) < 1e-12,
-      "old percent cost threshold saves must migrate to the equivalent cost improvement multiplier",
+      "old AND percent cost threshold saves must migrate to the equivalent cost improvement multiplier",
     );
   }
 

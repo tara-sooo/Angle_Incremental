@@ -113,15 +113,30 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   const legacyScoreThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationScoreThreshold, 10));
   const legacyCostThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationCostThreshold, 1));
   const legacyCostDenominator = 1 - legacyCostThreshold / 100;
+  const hasGenerationScoreMultiplierThreshold = Object.prototype.hasOwnProperty.call(
+    data,
+    "autoGenerationScoreMultiplierThreshold",
+  );
+  const hasGenerationCostMultiplierThreshold = Object.prototype.hasOwnProperty.call(
+    data,
+    "autoGenerationCostMultiplierThreshold",
+  );
+  const legacyGenerationMode = runtime.normalizeChoice(data.autoGenerationMode, ["or", "and"], "or");
+  const migratedGenerationCostMultiplierThreshold = legacyGenerationMode === "or"
+    ? 0
+    : (legacyCostDenominator > 0 ? 1 / legacyCostDenominator : 1e12);
   runtime.state.autoGenerationScoreMultiplierThreshold = Math.max(
     0,
-    runtime.sanitizeNumber(data.autoGenerationScoreMultiplierThreshold, 1 + legacyScoreThreshold / 100),
+    runtime.sanitizeNumber(
+      data.autoGenerationScoreMultiplierThreshold,
+      hasGenerationScoreMultiplierThreshold ? 1.1 : 1 + legacyScoreThreshold / 100,
+    ),
   );
   runtime.state.autoGenerationCostMultiplierThreshold = Math.max(
     0,
     runtime.sanitizeNumber(
       data.autoGenerationCostMultiplierThreshold,
-      legacyCostDenominator > 0 ? 1 / legacyCostDenominator : 1e12,
+      hasGenerationCostMultiplierThreshold ? 1.01 : migratedGenerationCostMultiplierThreshold,
     ),
   );
   runtime.state.autoGenerationMinimumSeconds = Math.max(0, runtime.sanitizeNumber(data.autoGenerationMinimumSeconds, 0));
