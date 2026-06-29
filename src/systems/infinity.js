@@ -196,6 +196,10 @@ function resetBelowInfinity() {
 }
 
 function applyStartingCoreBoosts() {
+  if (runtime.state.activeChallenge === 5) {
+    runtime.state.coreBoostCount = 0;
+    return;
+  }
   if (hasInfinityUpgrade("10-1") && runtime.state.coreBoostCount < 2) {
     runtime.state.coreBoostCount = 2;
   }

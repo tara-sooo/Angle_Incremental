@@ -356,6 +356,49 @@ async function runNumericStabilityModuleRuntimeTest() {
     );
   }
 
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    const { state } = instance.debug;
+    prepareVertexScenario(instance, {
+      scoreLog10: -Infinity,
+      currentGainLog10: 0,
+      infiniteCapBroken: false,
+    });
+    state.infinityCount = 0;
+    state.vertices = 3;
+    runtime.vertexGainIncrease = () => 1e275;
+
+    const coreHitsPastSafeSearch = 1e18;
+    const endStep = coreHitsPastSafeSearch * state.vertices;
+    const usedBatch = runtime.processManyVertices(1, endStep);
+
+    assert.equal(usedBatch, true, "first-Infinity batch must report the reset even when crossing is past the safe hit count");
+    assert.equal(state.infinityCount, 1, "first-Infinity crossing past the safe hit count must still complete Infinity");
+    assert.ok(state.lastInfinityRuns[0], "first-Infinity crossing past the safe hit count must record the Infinity run");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    const { state } = instance.debug;
+    prepareVertexScenario(instance, {
+      scoreLog10: -Infinity,
+      currentGainLog10: 0,
+      infiniteCapBroken: false,
+    });
+    state.infinityCount = 0;
+    state.vertices = 6;
+    runtime.coreVertexIndices = () => [0, 3];
+    runtime.vertexGainIncrease = () => 1e275;
+
+    const usedBatch = runtime.processManyVertices(1, 6e18);
+
+    assert.equal(usedBatch, true, "multi-core huge first-Infinity batch must report the reset");
+    assert.equal(state.infinityCount, 1, "multi-core huge first-Infinity batch must complete Infinity");
+    assert.equal(state.lastInfinityRuns[0].ipGain, 1, "multi-core huge first-Infinity batch must stop at the threshold crossing");
+  }
+
   console.log("Numeric stability module runtime tests passed");
 }
 
