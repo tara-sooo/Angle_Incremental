@@ -239,7 +239,7 @@ function runInfinity(forced = false) {
   }
 
   const gained = runtime.infinityPointGain();
-  runtime.state.infinityCount += infinityCountGain();
+  runtime.state.infinityCount = Math.min(runtime.MAX_HOTFIX_INFINITY_COUNT, runtime.state.infinityCount + infinityCountGain());
   addInfinityPoints(gained);
   recordInfinityRun(scoreLogBeforeReset, gained, completedChallenge, noGenerationOrCoreBoost);
   runtime.checkAchievements(true);

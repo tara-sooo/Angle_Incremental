@@ -62,7 +62,10 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     Math.min(1, runtime.sanitizeNumber(data.generationCostFactor, 1, runtime.GENERATION_MIN_NEW_COST_FACTOR)),
   );
   runtime.state.coreBoostCount = Math.floor(runtime.sanitizeNumber(data.coreBoostCount, 0));
-  runtime.state.infinityCount = Math.floor(runtime.sanitizeNumber(data.infinityCount, 0));
+  runtime.state.infinityCount = Math.min(
+    runtime.MAX_HOTFIX_INFINITY_COUNT,
+    Math.floor(runtime.sanitizeNumber(data.infinityCount, 0)),
+  );
   const infinityPoints = runtime.hydrateLogResource(data.infinityPoints, data.infinityPointsLog10, -Infinity, true);
   runtime.state.infinityPoints = infinityPoints.value;
   runtime.state.infinityPointsLog10 = infinityPoints.log;
@@ -186,6 +189,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
 
 function serializeSaveData() {
   runtime.normalizeInfinityPointState();
+  runtime.state.infinityCount = Math.min(runtime.MAX_HOTFIX_INFINITY_COUNT, Math.max(0, Math.floor(runtime.state.infinityCount)));
   const data = {};
   runtime.SAVE_FIELDS.forEach((field) => {
     data[field] = runtime.state[field];
