@@ -5,6 +5,7 @@ const MAX_NATIVE_VALUE_LOG10 = Math.log10(Number.MAX_VALUE);
 const MAX_GAME_VERTICES = 1_000_000_000_000;
 const MAX_EXACT_BATCH_CORE_HITS = 2048;
 const CORE_HIT_BATCH_APPROX_SEGMENTS = 256;
+const MAX_SAFE_CORE_HIT_SEARCH = Number.MAX_SAFE_INTEGER;
 let installed = false;
 
 function clampGameLog10(value) {
@@ -211,7 +212,21 @@ function firstInfinityCrossingCoreHit(batches, increase) {
   };
 }
 
+function firstInfinityCrossingExceedsSafeHitCount(batches) {
+  if (batches.length <= 1) return false;
+  return totalCoreHitsInBatches(batches) > MAX_SAFE_CORE_HIT_SEARCH;
+}
+
+function addFirstInfinityThresholdScore() {
+  const requiredScoreLog = runtime.subtractLog10(runtime.INFINITY_REQUIREMENT_LOG10, runtime.currentScoreLog10());
+  return runtime.addScore(runtime.valueFromLog10(requiredScoreLog), requiredScoreLog);
+}
+
 function processFirstInfinityCrossingBatch(batches, increase) {
+  if (firstInfinityCrossingExceedsSafeHitCount(batches)) {
+    return addFirstInfinityThresholdScore();
+  }
+
   const crossing = firstInfinityCrossingCoreHit(batches, increase);
   if (!crossing || crossing.step === null) return false;
 
