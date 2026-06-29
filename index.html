@@ -7,28 +7,28 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=0.2.3" />
+    <link rel="stylesheet" href="styles.css?v=0.2.4" />
     <!-- Keep this version aligned with version.json and APP_VERSION. -->
     <script type="importmap">
       {
         "imports": {
-          "./src/runtime/shared.js": "./src/runtime/shared.js?v=0.2.3",
-          "./src/ui/dom.js": "./src/ui/dom.js?v=0.2.3",
-          "./src/core/constants.js": "./src/core/constants.js?v=0.2.3",
-          "./src/data/i18n.js": "./src/data/i18n.js?v=0.2.3",
-          "./src/data/infinity-data.js": "./src/data/infinity-data.js?v=0.2.3",
-          "./src/core/state.js": "./src/core/state.js?v=0.2.3",
-          "./src/core/numbers.js": "./src/core/numbers.js?v=0.2.3",
-          "./src/core/save.js": "./src/core/save.js?v=0.2.3",
-          "./src/systems/achievements.js": "./src/systems/achievements.js?v=0.2.3",
-          "./src/ui/render-canvas.js": "./src/ui/render-canvas.js?v=0.2.3",
-          "./src/ui/render-ui.js": "./src/ui/render-ui.js?v=0.2.3",
-          "./src/systems/angle.js": "./src/systems/angle.js?v=0.2.3",
-          "./src/systems/generation.js": "./src/systems/generation.js?v=0.2.3",
-          "./src/systems/core-boost.js": "./src/systems/core-boost.js?v=0.2.3",
-          "./src/systems/infinity.js": "./src/systems/infinity.js?v=0.2.3",
-          "./src/systems/infinity-point-normalization.js": "./src/systems/infinity-point-normalization.js?v=0.2.3",
-          "./src/ui/events.js": "./src/ui/events.js?v=0.2.3"
+          "./src/runtime/shared.js": "./src/runtime/shared.js?v=0.2.4",
+          "./src/ui/dom.js": "./src/ui/dom.js?v=0.2.4",
+          "./src/core/constants.js": "./src/core/constants.js?v=0.2.4",
+          "./src/data/i18n.js": "./src/data/i18n.js?v=0.2.4",
+          "./src/data/infinity-data.js": "./src/data/infinity-data.js?v=0.2.4",
+          "./src/core/state.js": "./src/core/state.js?v=0.2.4",
+          "./src/core/numbers.js": "./src/core/numbers.js?v=0.2.4",
+          "./src/core/save.js": "./src/core/save.js?v=0.2.4",
+          "./src/systems/achievements.js": "./src/systems/achievements.js?v=0.2.4",
+          "./src/ui/render-canvas.js": "./src/ui/render-canvas.js?v=0.2.4",
+          "./src/ui/render-ui.js": "./src/ui/render-ui.js?v=0.2.4",
+          "./src/systems/angle.js": "./src/systems/angle.js?v=0.2.4",
+          "./src/systems/generation.js": "./src/systems/generation.js?v=0.2.4",
+          "./src/systems/core-boost.js": "./src/systems/core-boost.js?v=0.2.4",
+          "./src/systems/infinity.js": "./src/systems/infinity.js?v=0.2.4",
+          "./src/systems/infinity-point-normalization.js": "./src/systems/infinity-point-normalization.js?v=0.2.4",
+          "./src/ui/events.js": "./src/ui/events.js?v=0.2.4"
         }
       }
     </script>
@@ -500,17 +500,17 @@
     <div id="updateModal" class="update-modal" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle" hidden>
       <div class="update-modal-card">
         <p class="eyebrow">Update</p>
-        <h2 id="updateModalTitle" data-i18n="updateTitle">0.2.3 アップデート</h2>
-        <p data-i18n="updateSummary">IC5と初回Infinity直前の安定性を修正しました。</p>
+        <h2 id="updateModalTitle" data-i18n="updateTitle">0.2.4 アップデート</h2>
+        <p data-i18n="updateSummary">核増幅の獲得指数プレビューを修正しました。</p>
         <ul>
-          <li data-i18n="updateResetDock">IC5中はIU 10-1の開始時CB2つが無効になります。</li>
-          <li data-i18n="updateCanvas">巨大な初回Infinity直前の処理で進行が止まらないようにしました。</li>
-          <li data-i18n="updateModalNote">初回Infinity到達時に余分なIPを得ない挙動を保ちました。</li>
+          <li data-i18n="updateResetDock">IC5報酬を、次の核増幅プレビューにも反映するようにしました。</li>
+          <li data-i18n="updateCanvas">獲得指数のプレビューが現在値より低く見えることがなくなりました。</li>
+          <li data-i18n="updateModalNote">実際の効果とセーブデータ形式は変更していません。</li>
         </ul>
         <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
       </div>
     </div>
 
-    <script type="module" src="src/main.js?v=0.2.3"></script>
+    <script type="module" src="src/main.js?v=0.2.4"></script>
   </body>
 </html>
