@@ -5,7 +5,6 @@ const MAX_NATIVE_VALUE_LOG10 = Math.log10(Number.MAX_VALUE);
 const MAX_GAME_VERTICES = 1_000_000_000_000;
 const MAX_EXACT_BATCH_CORE_HITS = 2048;
 const CORE_HIT_BATCH_APPROX_SEGMENTS = 256;
-const MAX_SAFE_CORE_HIT_SEARCH = Number.MAX_SAFE_INTEGER;
 let installed = false;
 
 function clampGameLog10(value) {
@@ -129,10 +128,6 @@ function totalCoreHitsInBatches(batches) {
   return batches.reduce((total, batch) => total + batch.coreHits, 0);
 }
 
-function cappedCoreHitsInBatches(batches) {
-  return Math.min(MAX_SAFE_CORE_HIT_SEARCH, totalCoreHitsInBatches(batches));
-}
-
 function coreHitsThroughStep(batch, step, vertices) {
   if (step < batch.firstCoreStep) return 0;
   return Math.min(batch.coreHits, Math.floor((step - batch.firstCoreStep) / vertices) + 1);
@@ -185,7 +180,7 @@ function projectedScoreLogAfterCoreHits(batches, hitLimit, increase) {
 }
 
 function firstInfinityCrossingCoreHit(batches, increase) {
-  const maxHit = cappedCoreHitsInBatches(batches);
+  const maxHit = totalCoreHitsInBatches(batches);
   let low = 1;
   let high = 1;
   while (high < maxHit && projectedScoreLogAfterCoreHits(batches, high, increase) < runtime.INFINITY_REQUIREMENT_LOG10) {
@@ -196,6 +191,11 @@ function firstInfinityCrossingCoreHit(batches, increase) {
 
   while (low <= high) {
     const mid = low + Math.floor((high - low) / 2);
+    if (mid === low || mid === high) {
+      if (projectedScoreLogAfterCoreHits(batches, low, increase) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = low;
+      else if (projectedScoreLogAfterCoreHits(batches, high, increase) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = high;
+      break;
+    }
     if (projectedScoreLogAfterCoreHits(batches, mid, increase) >= runtime.INFINITY_REQUIREMENT_LOG10) {
       crossingHit = mid;
       high = mid - 1;
