@@ -310,6 +310,52 @@ async function runNumericStabilityModuleRuntimeTest() {
     assert.equal(batchUsed, true, "high-speed low-vertex updates must use the batch path");
   }
 
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    const { state, update } = instance.debug;
+    prepareVertexScenario(instance, {
+      scoreLog10: 307.99,
+      currentGainLog10: 306.5,
+      infiniteCapBroken: false,
+    });
+    state.infinityCount = 0;
+    state.speedLevel = 1000;
+    state.vertices = 3;
+
+    let passVertexCalls = 0;
+    const basePassVertex = runtime.passVertex;
+    runtime.passVertex = (...args) => {
+      passVertexCalls += 1;
+      return basePassVertex(...args);
+    };
+    let batchUsed = false;
+    const baseProcessManyVertices = runtime.processManyVertices;
+    runtime.processManyVertices = (...args) => {
+      batchUsed = true;
+      return baseProcessManyVertices(...args);
+    };
+    let gainProjectionCalls = 0;
+    const baseGainAfterIncreaseLog10 = runtime.gainAfterIncreaseLog10;
+    runtime.gainAfterIncreaseLog10 = (...args) => {
+      gainProjectionCalls += 1;
+      return baseGainAfterIncreaseLog10(...args);
+    };
+
+    update(1 / 30);
+    assert.equal(batchUsed, true, "e308 first-Infinity high-speed update must use the batch path");
+    assert.equal(state.infinityCount, 1, "e308 first-Infinity high-speed update must complete the first Infinity");
+    assert.equal(state.lastInfinityRuns[0].ipGain, 1, "e308 first-Infinity high-speed update must not include post-threshold IP gain");
+    assert.ok(
+      passVertexCalls <= runtime.MAX_CORE_HITS_PER_FRAME,
+      `e308 first-Infinity high-speed update must stay bounded; got ${passVertexCalls} passVertex calls`,
+    );
+    assert.ok(
+      gainProjectionCalls <= 2000,
+      `e308 first-Infinity crossing search must stay bounded; got ${gainProjectionCalls} gain projections`,
+    );
+  }
+
   console.log("Numeric stability module runtime tests passed");
 }
 
