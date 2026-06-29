@@ -90,6 +90,20 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
   {
     const { runtime, debug } = await loadRuntime(candidatePath);
     const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(14);
+    state.infinityCount = 1;
+    state.coreBoostCount = 2;
+    runtime.toggleInfinityChallenge(5);
+    assert.equal(state.activeChallenge, 5, "IC5 must start when Infinity Challenges and IU 10-1 are unlocked");
+    assert.equal(state.coreBoostCount, 0, "IC5 must suppress IU 10-1 starting Core Boosts");
+    runtime.toggleInfinityChallenge(5);
+    assert.equal(state.activeChallenge, 0, "toggling IC5 again must leave the challenge");
+    assert.equal(state.coreBoostCount, 2, "leaving IC5 must restore the IU 10-1 starting Core Boost floor");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
     setLogResource(state, "score", 10);
     state.infinityUpgradeMask = purchasedMaskThrough(15);
     assert.equal(runtime.currentScoreLog10(), 12, "IU 10-2 must expose current score as score^1.2");
