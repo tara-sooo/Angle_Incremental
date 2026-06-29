@@ -136,6 +136,7 @@ function runGeneration() {
   runtime.state.totalVertexProgress = 0;
   runtime.state.lastVertexIndex = 0;
   runtime.state.floatingTexts = [];
+  runtime.state.currentGenerationRunTime = 0;
   runtime.updateUi();
   runtime.saveGame("manual");
 }
@@ -220,6 +221,7 @@ function balanceRunGeneration() {
   runtime.state.totalVertexProgress = 0;
   runtime.state.lastVertexIndex = 0;
   runtime.state.floatingTexts = [];
+  runtime.state.currentGenerationRunTime = 0;
   balanceApplyResetStartScore();
   runtime.updateUi();
   runtime.saveGame("manual");

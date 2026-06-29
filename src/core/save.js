@@ -110,12 +110,46 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.autoBuyGain = runtime.sanitizeBoolean(data.autoBuyGain, true);
   runtime.state.autoCompleteChallenges = runtime.sanitizeBoolean(data.autoCompleteChallenges, false);
   runtime.state.autoRunGeneration = runtime.sanitizeBoolean(data.autoRunGeneration, false);
-  runtime.state.autoGenerationMode = runtime.normalizeChoice(data.autoGenerationMode, ["or", "and"], "or");
-  runtime.state.autoGenerationScoreThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationScoreThreshold, 10));
-  runtime.state.autoGenerationCostThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationCostThreshold, 1));
+  const legacyScoreThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationScoreThreshold, 10));
+  const legacyCostThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationCostThreshold, 1));
+  const legacyCostDenominator = 1 - legacyCostThreshold / 100;
+  const hasGenerationScoreMultiplierThreshold = Object.prototype.hasOwnProperty.call(
+    data,
+    "autoGenerationScoreMultiplierThreshold",
+  );
+  const hasGenerationCostMultiplierThreshold = Object.prototype.hasOwnProperty.call(
+    data,
+    "autoGenerationCostMultiplierThreshold",
+  );
+  const legacyGenerationMode = runtime.normalizeChoice(data.autoGenerationMode, ["or", "and"], "or");
+  const isLegacyGenerationAutomationSave = !hasGenerationScoreMultiplierThreshold
+    && !hasGenerationCostMultiplierThreshold;
+  const migratedGenerationCostMultiplierThreshold = legacyCostDenominator > 0
+    ? 1 / legacyCostDenominator
+    : 1e12;
+  runtime.state.autoGenerationScoreMultiplierThreshold = Math.max(
+    0,
+    runtime.sanitizeNumber(
+      data.autoGenerationScoreMultiplierThreshold,
+      hasGenerationScoreMultiplierThreshold ? 1.1 : 1 + legacyScoreThreshold / 100,
+    ),
+  );
+  runtime.state.autoGenerationCostMultiplierThreshold = Math.max(
+    0,
+    runtime.sanitizeNumber(
+      data.autoGenerationCostMultiplierThreshold,
+      hasGenerationCostMultiplierThreshold ? 1.01 : migratedGenerationCostMultiplierThreshold,
+    ),
+  );
+  runtime.state.autoGenerationMinimumSeconds = Math.max(0, runtime.sanitizeNumber(data.autoGenerationMinimumSeconds, 0));
+  runtime.state.autoGenerationLegacyOrMode = runtime.sanitizeBoolean(
+    data.autoGenerationLegacyOrMode,
+    isLegacyGenerationAutomationSave && legacyGenerationMode === "or",
+  );
   runtime.state.autoRunCoreBoost = runtime.sanitizeBoolean(data.autoRunCoreBoost, false);
   runtime.state.autoRunInfinity = runtime.sanitizeBoolean(data.autoRunInfinity, false);
   runtime.state.autoInfinityPointThreshold = Math.max(1, runtime.sanitizeNumber(data.autoInfinityPointThreshold, 10));
+  runtime.state.currentGenerationRunTime = Math.max(0, runtime.sanitizeNumber(data.currentGenerationRunTime, 0));
   runtime.state.ic8VertexDecayElapsed = runtime.sanitizeNumber(data.ic8VertexDecayElapsed, 0);
   runtime.state.noGenerationCoreBoostReached = Boolean(data.noGenerationCoreBoostReached);
   runtime.state.currentInfinityRunHadGeneration = runtime.sanitizeBoolean(
@@ -379,12 +413,14 @@ function resetSave() {
     autoBuyGain: true,
     autoCompleteChallenges: false,
     autoRunGeneration: false,
-    autoGenerationMode: "or",
-    autoGenerationScoreThreshold: 10,
-    autoGenerationCostThreshold: 1,
+    autoGenerationScoreMultiplierThreshold: 1.1,
+    autoGenerationCostMultiplierThreshold: 1.01,
+    autoGenerationMinimumSeconds: 0,
+    autoGenerationLegacyOrMode: false,
     autoRunCoreBoost: false,
     autoRunInfinity: false,
     autoInfinityPointThreshold: 10,
+    currentGenerationRunTime: 0,
     ic8VertexDecayElapsed: 0,
     noGenerationCoreBoostReached: false,
     currentInfinityRunHadGeneration: false,

@@ -13,6 +13,21 @@ function purchasedMaskThrough(bit) {
   return (1 << (bit + 1)) - 1;
 }
 
+function prepareGenerationAutomationScenario(instance, { generationScoreLog10 = 20, runSeconds = 0 } = {}) {
+  const { state } = instance.debug;
+  state.infinityUpgradeMask = purchasedMaskThrough(12);
+  state.automationEnabled = true;
+  state.autoRunGeneration = true;
+  state.generationCount = 1;
+  state.previousGenerationScoreLog10 = 6;
+  state.previousGenerationScore = 1e6;
+  setLogResource(state, "generationScore", generationScoreLog10);
+  state.generationScoreMultiplierLog10 = 0;
+  state.generationScoreMultiplier = 1;
+  state.generationCostFactor = 1;
+  state.currentGenerationRunTime = runSeconds;
+}
+
 async function runNewInfinityUpgradesModuleRuntimeTest() {
   {
     const { runtime } = await loadRuntime(candidatePath);
@@ -110,6 +125,143 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     setLogResource(state, "score", 320);
     assert.equal(runtime.runLayerAutomation(), true, "IU 8-1 must expose and run layer automation");
     assert.equal(state.infinityCount > 1, true, "layer automation must run Infinity when the IP threshold is met");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    runtime.applySaveData({
+      autoGenerationMode: "or",
+      autoGenerationScoreThreshold: 10,
+      autoGenerationCostThreshold: 1,
+    }, 7);
+    assert.equal(
+      state.autoGenerationScoreMultiplierThreshold,
+      1.1,
+      "old percent score threshold saves must migrate to the equivalent multiplier threshold",
+    );
+    assert.ok(
+      Math.abs(state.autoGenerationCostMultiplierThreshold - (1 / 0.99)) < 1e-12,
+      "old OR percent cost threshold saves must keep the equivalent cost improvement multiplier",
+    );
+    assert.equal(state.autoGenerationLegacyOrMode, true, "old OR automation saves must preserve OR trigger semantics");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    runtime.applySaveData({
+      autoGenerationMode: "and",
+      autoGenerationScoreThreshold: 10,
+      autoGenerationCostThreshold: 1,
+    }, 7);
+    assert.equal(
+      state.autoGenerationScoreMultiplierThreshold,
+      1.1,
+      "old AND percent score threshold saves must migrate to the equivalent multiplier threshold",
+    );
+    assert.ok(
+      Math.abs(state.autoGenerationCostMultiplierThreshold - (1 / 0.99)) < 1e-12,
+      "old AND percent cost threshold saves must migrate to the equivalent cost improvement multiplier",
+    );
+    assert.equal(state.autoGenerationLegacyOrMode, false, "old AND automation saves must use the new all-active-gates behavior");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    runtime.applySaveData({
+      autoGenerationMode: "or",
+      autoGenerationScoreThreshold: 100000000000,
+      autoGenerationCostThreshold: 1,
+    }, 7);
+    prepareGenerationAutomationScenario(instance);
+    assert.equal(runtime.shouldAutoRunGeneration(), true, "legacy OR automation must still trigger from cost improvement alone");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    runtime.applySaveData({
+      autoGenerationMode: "or",
+      autoGenerationScoreThreshold: 10,
+      autoGenerationCostThreshold: 90,
+    }, 7);
+    prepareGenerationAutomationScenario(instance);
+    assert.equal(runtime.shouldAutoRunGeneration(), true, "legacy OR automation must still trigger from score improvement alone");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    runtime.applySaveData({
+      autoGenerationMode: "or",
+      autoGenerationScoreThreshold: 10,
+      autoGenerationCostThreshold: 1,
+    }, 7);
+    runtime.applySetting("autoGenerationScoreMultiplierThreshold", 2);
+    assert.equal(state.autoGenerationLegacyOrMode, false, "editing a new GR automation threshold must leave legacy OR mode");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    prepareGenerationAutomationScenario(instance);
+
+    runtime.state.autoGenerationScoreMultiplierThreshold = 10;
+    runtime.state.autoGenerationCostMultiplierThreshold = 0;
+    runtime.state.autoGenerationMinimumSeconds = 0;
+    assert.equal(runtime.shouldAutoRunGeneration(), true, "a score multiplier threshold alone should trigger GR when met");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    prepareGenerationAutomationScenario(instance, { runSeconds: 29 });
+
+    runtime.state.autoGenerationScoreMultiplierThreshold = 0;
+    runtime.state.autoGenerationCostMultiplierThreshold = 0;
+    runtime.state.autoGenerationMinimumSeconds = 30;
+    assert.equal(runtime.shouldAutoRunGeneration(), false, "time-only GR automation must wait for the configured seconds");
+    runtime.state.currentGenerationRunTime = 30;
+    assert.equal(runtime.shouldAutoRunGeneration(), true, "time-only GR automation must trigger once the configured seconds pass");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    prepareGenerationAutomationScenario(instance, { runSeconds: 59 });
+
+    runtime.state.autoGenerationScoreMultiplierThreshold = 10;
+    runtime.state.autoGenerationCostMultiplierThreshold = 0;
+    runtime.state.autoGenerationMinimumSeconds = 60;
+    assert.equal(runtime.shouldAutoRunGeneration(), false, "active GR automation conditions must all be met");
+    runtime.state.currentGenerationRunTime = 60;
+    assert.equal(runtime.shouldAutoRunGeneration(), true, "GR automation must trigger after all active conditions are met");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    prepareGenerationAutomationScenario(instance);
+
+    runtime.state.autoGenerationScoreMultiplierThreshold = 0;
+    runtime.state.autoGenerationCostMultiplierThreshold = 0;
+    runtime.state.autoGenerationMinimumSeconds = 0;
+    assert.equal(runtime.shouldAutoRunGeneration(), true, "zero GR automation thresholds must disable all threshold gates");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug } = instance;
+    const { state } = debug;
+    prepareGenerationAutomationScenario(instance, { runSeconds: 42 });
+    state.autoRunGeneration = false;
+
+    debug.update(1.5);
+    assert.ok(state.currentGenerationRunTime > 43, "current Generation run time must advance with game time");
+    debug.runGeneration();
+    assert.equal(state.currentGenerationRunTime, 0, "running Generation must reset the Generation automation timer");
   }
 }
 

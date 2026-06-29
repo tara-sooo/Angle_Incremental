@@ -189,6 +189,7 @@ function resetBelowInfinity() {
   runtime.state.infiniteScore = 0;
   runtime.state.infiniteScoreLog10 = -Infinity;
   runtime.state.ic8VertexDecayElapsed = 0;
+  runtime.state.currentGenerationRunTime = 0;
   runtime.state.currentInfinityRunHadGeneration = false;
   runtime.state.currentInfinityRunHadCoreBoost = false;
   runtime.state.floatingTexts = [];

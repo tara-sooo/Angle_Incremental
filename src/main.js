@@ -381,15 +381,25 @@ function shouldAutoRunGeneration() {
   const currentScoreLog = runtime.generationScoreMultiplierEffectLog10();
   const currentCostFactor = runtime.generationCostFactorEffect();
   const next = runtime.nextGenerationValues();
-  const scoreThresholdLog = runtime.log10Value(1 + Math.max(0, runtime.state.autoGenerationScoreThreshold) / 100);
-  const costThreshold = Math.max(0, runtime.state.autoGenerationCostThreshold) / 100;
-  const scoreImproved = next.scoreMultiplierLog10 - currentScoreLog >= scoreThresholdLog;
-  const costImproved = currentCostFactor > 0
-    && (currentCostFactor - next.costFactor) / currentCostFactor >= costThreshold;
+  const checks = [];
+  const scoreThreshold = Math.max(0, runtime.state.autoGenerationScoreMultiplierThreshold);
+  const costThreshold = Math.max(0, runtime.state.autoGenerationCostMultiplierThreshold);
+  const secondsThreshold = Math.max(0, runtime.state.autoGenerationMinimumSeconds);
 
-  return runtime.state.autoGenerationMode === "and"
-    ? scoreImproved && costImproved
-    : scoreImproved || costImproved;
+  if (scoreThreshold > 0) {
+    checks.push(next.scoreMultiplierLog10 - currentScoreLog >= runtime.log10Value(scoreThreshold));
+  }
+  if (costThreshold > 0) {
+    checks.push(currentCostFactor > 0 && next.costFactor > 0 && currentCostFactor / next.costFactor >= costThreshold);
+  }
+  if (secondsThreshold > 0) {
+    checks.push(runtime.state.currentGenerationRunTime >= secondsThreshold);
+  }
+
+  if (checks.length === 0) return true;
+  return runtime.state.autoGenerationLegacyOrMode
+    ? checks.some(Boolean)
+    : checks.every(Boolean);
 }
 
 function runLayerAutomation() {
@@ -425,6 +435,7 @@ function runLayerAutomation() {
 function update(dt) {
   runtime.state.totalPlayTime += dt;
   runtime.state.currentInfinityRunTime += dt;
+  runtime.state.currentGenerationRunTime += dt;
   runtime.updateChallengeTimers(dt);
 
   if (runtime.hasInfinityUpgrade("1-2") && runtime.state.automationEnabled) {
@@ -688,9 +699,10 @@ function renderGameToText() {
       vertex: runtime.state.autoBuyVertex,
       gain: runtime.state.autoBuyGain,
       generation: runtime.state.autoRunGeneration,
-      generationMode: runtime.state.autoGenerationMode,
-      generationScoreThreshold: runtime.state.autoGenerationScoreThreshold,
-      generationCostThreshold: runtime.state.autoGenerationCostThreshold,
+      generationScoreMultiplierThreshold: runtime.state.autoGenerationScoreMultiplierThreshold,
+      generationCostMultiplierThreshold: runtime.state.autoGenerationCostMultiplierThreshold,
+      generationMinimumSeconds: runtime.state.autoGenerationMinimumSeconds,
+      currentGenerationRunTime: Number(runtime.state.currentGenerationRunTime.toFixed(1)),
       coreBoost: runtime.state.autoRunCoreBoost,
       infinity: runtime.state.autoRunInfinity,
       infinityPointThreshold: runtime.state.autoInfinityPointThreshold,

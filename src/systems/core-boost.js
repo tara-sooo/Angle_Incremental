@@ -68,6 +68,7 @@ function resetBelowCoreBoost() {
   runtime.state.generationScoreMultiplier = 1;
   runtime.state.generationScoreMultiplierLog10 = 0;
   runtime.state.generationCostFactor = 1;
+  runtime.state.currentGenerationRunTime = 0;
   runtime.state.floatingTexts = [];
 }
 
