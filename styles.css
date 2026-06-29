@@ -478,6 +478,29 @@ canvas {
   padding: 10px 12px;
 }
 
+.break-cap-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.break-cap-row span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.break-cap-row strong {
+  display: block;
+  margin-top: 3px;
+}
+
 .generation-button {
   background: linear-gradient(180deg, #3d9a61, #226d42);
 }
@@ -702,7 +725,9 @@ canvas {
 }
 
 .infinity-upgrade-tier[data-tier="2"] .infinity-upgrade-node,
-.infinity-upgrade-tier[data-tier="4"] .infinity-upgrade-node {
+.infinity-upgrade-tier[data-tier="4"] .infinity-upgrade-node,
+.infinity-upgrade-tier[data-tier="8"] .infinity-upgrade-node,
+.infinity-upgrade-tier[data-tier="9"] .infinity-upgrade-node {
   grid-column: 1 / -1;
   justify-self: center;
   width: min(360px, 100%);
@@ -1350,7 +1375,9 @@ canvas {
   }
 
   .infinity-upgrade-tier[data-tier="2"] .infinity-upgrade-node,
-  .infinity-upgrade-tier[data-tier="4"] .infinity-upgrade-node {
+  .infinity-upgrade-tier[data-tier="4"] .infinity-upgrade-node,
+  .infinity-upgrade-tier[data-tier="8"] .infinity-upgrade-node,
+  .infinity-upgrade-tier[data-tier="9"] .infinity-upgrade-node {
     width: 100%;
   }
 

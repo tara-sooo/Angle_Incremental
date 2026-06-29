@@ -3,7 +3,7 @@ import { runtime, expose } from "../runtime/shared.js";
 // Extracted mechanically from the next-runtime baseline.
 // Runtime dependencies remain unchanged during the classic-script migration phase.
 
-function vertexPoint(index, total = runtime.state.vertices) {
+function vertexPoint(index, total = runtime.effectiveVertexCount()) {
   const size = Math.min(runtime.canvas.width, runtime.canvas.height);
   const radius = size * 0.31;
   const cx = runtime.canvas.width / 2;
@@ -17,14 +17,16 @@ function vertexPoint(index, total = runtime.state.vertices) {
 }
 
 function polygonPoints() {
-  const drawCount = Math.min(runtime.state.vertices, runtime.MAX_DRAW_VERTICES);
-  return Array.from({ length: drawCount }, (_, index) => vertexPoint((index / drawCount) * runtime.state.vertices));
+  const vertices = runtime.effectiveVertexCount();
+  const drawCount = Math.min(vertices, runtime.MAX_DRAW_VERTICES);
+  return Array.from({ length: drawCount }, (_, index) => vertexPoint((index / drawCount) * vertices));
 }
 
 function pointPosition() {
-  const edgeProgress = runtime.state.pointProgress * runtime.state.vertices;
-  const fromIndex = Math.floor(edgeProgress) % runtime.state.vertices;
-  const toIndex = (fromIndex + 1) % runtime.state.vertices;
+  const vertices = runtime.effectiveVertexCount();
+  const edgeProgress = runtime.state.pointProgress * vertices;
+  const fromIndex = Math.floor(edgeProgress) % vertices;
+  const toIndex = (fromIndex + 1) % vertices;
   const local = edgeProgress - Math.floor(edgeProgress);
   const from = vertexPoint(fromIndex);
   const to = vertexPoint(toIndex);
@@ -73,7 +75,7 @@ function draw() {
   runtime.ctx.stroke();
 
   points.forEach((p, index) => {
-    if (runtime.state.vertices > runtime.MAX_DRAW_VERTICES && index % 12 !== 0) return;
+    if (runtime.effectiveVertexCount() > runtime.MAX_DRAW_VERTICES && index % 12 !== 0) return;
     runtime.ctx.beginPath();
     runtime.ctx.arc(p.x, p.y, 5, 0, runtime.TAU);
     runtime.ctx.fillStyle = "#55d5ee";
@@ -149,4 +151,3 @@ expose("pointPosition", () => pointPosition, (value) => { pointPosition = value;
 expose("drawBackground", () => drawBackground, (value) => { drawBackground = value; });
 expose("draw", () => draw, (value) => { draw = value; });
 expose("resizeCanvas", () => resizeCanvas, (value) => { resizeCanvas = value; });
-

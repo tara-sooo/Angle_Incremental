@@ -449,31 +449,32 @@ function update(dt) {
   }
 
   const previousAbsolute = runtime.state.totalVertexProgress;
-  runtime.state.totalVertexProgress += (dt / runtime.lapDuration()) * runtime.state.vertices;
+  const vertices = runtime.effectiveVertexCount();
+  runtime.state.totalVertexProgress += (dt / runtime.lapDuration()) * vertices;
   const nearestVertex = Math.round(runtime.state.totalVertexProgress);
   if (Math.abs(runtime.state.totalVertexProgress - nearestVertex) < runtime.VERTEX_EPSILON) {
     runtime.state.totalVertexProgress = nearestVertex;
   }
-  runtime.state.pointProgress = (runtime.state.totalVertexProgress / runtime.state.vertices) % 1;
+  runtime.state.pointProgress = (runtime.state.totalVertexProgress / vertices) % 1;
 
   const start = Math.floor(previousAbsolute + runtime.VERTEX_EPSILON) + 1;
   const end = Math.floor(runtime.state.totalVertexProgress + runtime.VERTEX_EPSILON);
   const vertexSteps = end - start + 1;
   const estimatedCoreHits = vertexSteps > 0
-    ? Math.ceil(vertexSteps / Math.max(3, runtime.state.vertices)) * runtime.coreVertexIndices().length
+    ? Math.ceil(vertexSteps / Math.max(3, vertices)) * runtime.coreVertexIndices().length
     : 0;
   if (vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME || estimatedCoreHits > runtime.MAX_CORE_HITS_PER_FRAME) {
     if (runtime.processManyVertices(start, end)) return;
   } else {
     for (let vertex = start; vertex <= end; vertex += 1) {
-      if (runtime.passVertex(vertex % runtime.state.vertices)) return;
+      if (runtime.passVertex(vertex % vertices)) return;
     }
   }
   if (runtime.completeChallengeIfReady()) return;
   if (runLayerAutomation()) return;
 
   runtime.normalizeVertexProgress();
-  runtime.state.lastVertexIndex = Math.floor(runtime.state.pointProgress * runtime.state.vertices) % runtime.state.vertices;
+  runtime.state.lastVertexIndex = Math.floor(runtime.state.pointProgress * vertices) % vertices;
   runtime.state.floatingTexts = runtime.state.floatingTexts
     .map((item) => ({ ...item, life: item.life - dt, y: item.y - dt * 26 }))
     .filter((item) => item.life > 0);
@@ -595,7 +596,7 @@ function renderGameToText() {
     baseGainExpression: runtime.formatGainExpressionSummary(),
     baseGainExpressionDivisor: gainExpression.divisor,
     baseGainExpressionParts: gainExpression.parts,
-    vertices: runtime.state.vertices,
+    vertices: runtime.effectiveVertexCount(),
     lapSeconds: Number(runtime.lapDuration().toPrecision(6)),
     lapSpeedMultiplier: Number(runtime.lapSpeedMultiplier().toPrecision(6)),
     lapSpeedLog10: Number(runtime.effectiveLapSpeedLog10().toPrecision(6)),

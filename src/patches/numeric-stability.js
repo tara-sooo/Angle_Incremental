@@ -88,7 +88,7 @@ function addCurrentGainForVertexSteps(stepCount) {
 function coreBatchesBetween(start, end) {
   const count = end - start + 1;
   if (count <= 0) return [];
-  const vertices = Math.max(3, runtime.state.vertices);
+  const vertices = Math.max(3, runtime.effectiveVertexCount());
   return runtime.coreVertexIndices()
     .map((coreIndex) => {
       const coreOffset = ((coreIndex - (start % vertices)) + vertices) % vertices;
@@ -99,7 +99,7 @@ function coreBatchesBetween(start, end) {
 }
 
 function coreBatchScoreLog10(firstCoreStep, coreHits, increase) {
-  const vertices = Math.max(3, runtime.state.vertices);
+  const vertices = Math.max(3, runtime.effectiveVertexCount());
   let totalLog = -Infinity;
 
   if (coreHits <= MAX_EXACT_BATCH_CORE_HITS) {
@@ -140,7 +140,7 @@ function countCoreHitsThroughStep(batches, step, vertices) {
 
 function coreStepForChronologicalHit(batches, hitIndex) {
   if (hitIndex <= 0 || hitIndex > totalCoreHitsInBatches(batches)) return null;
-  const vertices = Math.max(3, runtime.state.vertices);
+  const vertices = Math.max(3, runtime.effectiveVertexCount());
   if (batches.length === 1) {
     return batches[0].firstCoreStep + (hitIndex - 1) * vertices;
   }
@@ -164,7 +164,7 @@ function coreStepForChronologicalHit(batches, hitIndex) {
 function coreScoreLogForFirstHits(batches, hitLimit, increase) {
   const cutoffStep = coreStepForChronologicalHit(batches, hitLimit);
   if (cutoffStep === null) return -Infinity;
-  const vertices = Math.max(3, runtime.state.vertices);
+  const vertices = Math.max(3, runtime.effectiveVertexCount());
 
   return batches.reduce((totalLog, batch) => {
     const hits = coreHitsThroughStep(batch, cutoffStep, vertices);

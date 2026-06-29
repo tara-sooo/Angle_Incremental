@@ -92,7 +92,19 @@ function updateChallengeRows() {
 
 function createInfinityUpgradeRows() {
   clearElement(runtime.elements.infinityUpgradeTree);
-  const upgradeRows = [["1-1", "1-2"], ["2-1"], ["3-1", "3-2"], ["4-1"]];
+  const upgradeRows = [
+    ["1-1", "1-2"],
+    ["2-1"],
+    ["3-1", "3-2"],
+    ["4-1"],
+    ["5-1", "5-2"],
+    ["6-1", "6-2"],
+    ["7-1", "7-2"],
+    ["8-1"],
+    ["9-1"],
+    ["10-1", "10-2"],
+    ["11-1", "11-2"],
+  ];
 
   upgradeRows.forEach((rowIds, rowIndex) => {
     const tier = document.createElement("div");
@@ -311,9 +323,16 @@ function updateUi() {
   runtime.elements.lapSpeedValue.textContent = runtime.isLapSpeedSoftcapped()
     ? `${formatMultiplierLog(runtime.effectiveLapSpeedLog10())} ${runtime.t("lapSpeedSoftcapped")} / raw ${formatMultiplierLog(runtime.rawLapSpeedLog10())}`
     : formatMultiplierLog(runtime.effectiveLapSpeedLog10());
-  runtime.elements.speedLevel.textContent = `${runtime.t("level")} ${runtime.state.speedLevel}`;
-  runtime.elements.vertexCount.textContent = `${runtime.state.vertices} ${runtime.t("vertices")}`;
-  runtime.elements.gainLevel.textContent = `${runtime.t("level")} ${runtime.state.gainLevel}`;
+  const sponsorBonus = runtime.sponsoredNormalUpgradeBonusLevel();
+  runtime.elements.speedLevel.textContent = sponsorBonus > 0
+    ? `${runtime.t("level")} ${runtime.state.speedLevel} + ${sponsorBonus}`
+    : `${runtime.t("level")} ${runtime.state.speedLevel}`;
+  runtime.elements.vertexCount.textContent = runtime.effectiveVertexCount() === runtime.state.vertices
+    ? `${runtime.state.vertices} ${runtime.t("vertices")}`
+    : `${runtime.effectiveVertexCount()} ${runtime.t("vertices")} (${runtime.state.vertices} + ${runtime.effectiveVertexCount() - runtime.state.vertices})`;
+  runtime.elements.gainLevel.textContent = sponsorBonus > 0
+    ? `${runtime.t("level")} ${runtime.state.gainLevel} + ${sponsorBonus}`
+    : `${runtime.t("level")} ${runtime.state.gainLevel}`;
   runtime.elements.speedCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.speed)}`;
   runtime.elements.vertexCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.vertex)}`;
   runtime.elements.gainCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.gain)}`;
@@ -371,6 +390,9 @@ function updateUi() {
       ? runtime.t("locked")
       : `${completed}/${runtime.INFINITY_CHALLENGE_COUNT} ${runtime.t("completed")}`;
   updateChallengeRows();
+  runtime.elements.breakCapRequirement.textContent = runtime.state.infiniteCapBroken
+    ? "Break済み"
+    : `条件: ${runtime.formatPowerOfTen(runtime.BREAK_CAP_REQUIREMENT_LOG10)} score`;
   runtime.elements.breakCapButton.disabled = !runtime.canBreakInfiniteCap();
   runtime.elements.breakCapButton.textContent = runtime.state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 
@@ -416,7 +438,7 @@ function formatGainExpression(valueLog10) {
 }
 
 function gainExpressionParts() {
-  return Math.min(Math.floor(Math.sqrt(runtime.state.vertices)), 10);
+  return Math.min(Math.floor(Math.sqrt(runtime.effectiveVertexCount())), 10);
 }
 
 function hasMultiplicativeGainExpression() {
@@ -468,6 +490,7 @@ function balanceCreateInfinityUpgradeRows() {
     ["8-1"],
     ["9-1"],
     ["10-1", "10-2"],
+    ["11-1", "11-2"],
   ];
   tiers.forEach((rowIds, rowIndex) => {
     const tier = document.createElement("div");

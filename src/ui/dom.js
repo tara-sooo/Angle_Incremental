@@ -45,6 +45,7 @@ const elements = {
   convertIpGain: document.getElementById("convertIpGain"),
   challengeList: document.getElementById("challengeList"),
   challengeStatus: document.getElementById("challengeStatus"),
+  breakCapRequirement: document.getElementById("breakCapRequirement"),
   breakCapButton: document.getElementById("breakCapButton"),
   achievementList: document.getElementById("achievementList"),
   achievementSummary: document.getElementById("achievementSummary"),
