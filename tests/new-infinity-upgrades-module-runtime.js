@@ -154,14 +154,19 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     setLogResource(state, "infinityPoints", Math.log10(100000));
     assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1000, "IU 11-1 bonus should reach 1000 levels at 100000 IP");
     setLogResource(state, "infinityPoints", Math.log10(1000000));
-    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1094, "IU 11-1 bonus should use square-root scaling after 100000 IP");
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1010, "IU 11-1 bonus should use strong log scaling after 100000 IP");
+    setLogResource(state, "infinityPoints", Math.log10(20000000));
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1023, "IU 11-1 bonus should stay tightly capped at the hotfix IP limit");
+    setLogResource(state, "infinityPoints", Math.log10(100000000));
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1023, "IU 11-1 bonus should use the hotfix IP cap before calculating bonus levels");
+    setLogResource(state, "infinityPoints", Math.log10(1000000));
 
     state.speedLevel = 10;
     state.vertices = 20;
     state.gainLevel = 30;
-    assert.equal(runtime.effectiveSpeedLevel(), 1104, "IU 11-1 should add bonus levels to lap-speed upgrades");
-    assert.equal(runtime.effectiveVertexCount(), 1114, "IU 11-1 should add bonus levels to effective vertices");
-    assert.equal(runtime.effectiveGainLevel(), 1124, "IU 11-1 should add bonus levels to gain upgrades");
+    assert.equal(runtime.effectiveSpeedLevel(), 1020, "IU 11-1 should add bonus levels to lap-speed upgrades");
+    assert.equal(runtime.effectiveVertexCount(), 1030, "IU 11-1 should add bonus levels to effective vertices");
+    assert.equal(runtime.effectiveGainLevel(), 1040, "IU 11-1 should add bonus levels to gain upgrades");
 
     const speedCost = runtime.costLog10("speed", 5, state.speedLevel, 1.55);
     const vertexCost = runtime.costLog10("vertex", 12, state.vertices - 3, 1.72);
@@ -170,6 +175,52 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(costs.speed, speedCost, "IU 11-1 bonus levels must not increase speed upgrade costs");
     assert.equal(costs.vertex, vertexCost, "IU 11-1 bonus levels must not increase vertex upgrade costs");
     assert.equal(costs.gain, gainCost, "IU 11-1 bonus levels must not increase gain upgrade costs");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug, storage } = instance;
+    const { state } = debug;
+    const capLog = Math.log10(20000000);
+
+    runtime.applySaveData({
+      infinityPoints: 17000000,
+      infinityPointsLog10: Math.log10(17000000),
+    }, 7);
+    assert.equal(state.infinityPoints, 17000000, "legitimate reported IP below the hotfix cap must not be reduced");
+    assert.equal(state.infinityPointsLog10, Math.log10(17000000), "legitimate reported IP log below the hotfix cap must not be reduced");
+
+    runtime.applySaveData({
+      infinityPoints: 20000000,
+      infinityPointsLog10: capLog,
+    }, 7);
+    assert.equal(state.infinityPoints, 20000000, "the hotfix IP cap itself must be preserved exactly");
+    assert.equal(state.infinityPointsLog10, capLog, "the hotfix IP cap log must be preserved exactly");
+
+    runtime.applySaveData({
+      infinityPoints: Number.MAX_VALUE,
+      infinityPointsLog10: 30,
+    }, 7);
+    assert.equal(state.infinityPoints, 20000000, "excessive finite IP saves must be capped at 20000000 IP");
+    assert.equal(state.infinityPointsLog10, capLog, "excessive finite IP logs must be capped at 20000000 IP");
+
+    runtime.applySaveData({
+      infinityPoints: Number.MAX_VALUE,
+      infinityPointsLog10: Infinity,
+      infinityCount: 1000000,
+    }, 7);
+    assert.equal(state.infinityPoints, 20000000, "overflow IP saves must recover to the hotfix IP cap");
+    assert.equal(state.infinityPointsLog10, capLog, "overflow IP logs must recover to the hotfix IP cap");
+    assert.equal(state.infinityCount, 30000, "overflow Infinity count saves must recover to the hotfix Infinity cap");
+
+    state.infinityPoints = Number.MAX_VALUE;
+    state.infinityPointsLog10 = 30;
+    state.infinityCount = 1000000;
+    assert.equal(debug.saveGame("manual"), true, "saving an excessive IP balance should succeed");
+    const saved = JSON.parse(storage.get(runtime.SAVE_KEY));
+    assert.equal(saved.state.infinityPoints, 20000000, "saved excessive IP balances must be persisted at the hotfix cap");
+    assert.equal(saved.state.infinityPointsLog10, capLog, "saved excessive IP logs must be persisted at the hotfix cap");
+    assert.equal(saved.state.infinityCount, 30000, "saved excessive Infinity counts must be persisted at the hotfix cap");
   }
 
   {
@@ -189,8 +240,8 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(state.activeChallenge, 8, "IC8 should start for the effective vertex lock scenario");
     assert.equal(runtime.effectiveVertexCount(), 3, "IC8 must ignore IU 11-1 vertex bonuses and keep 3 effective vertices");
     assert.equal(runtime.canBuyNormalUpgrade("vertex"), false, "IC8 must keep vertex purchases disabled");
-    assert.equal(runtime.effectiveSpeedLevel(), state.speedLevel + 1094, "IC8 should still keep IU 11-1 speed bonus levels");
-    assert.equal(runtime.effectiveGainLevel(), state.gainLevel + 1094, "IC8 should still keep IU 11-1 gain bonus levels");
+    assert.equal(runtime.effectiveSpeedLevel(), state.speedLevel + 1010, "IC8 should still keep IU 11-1 speed bonus levels");
+    assert.equal(runtime.effectiveGainLevel(), state.gainLevel + 1010, "IC8 should still keep IU 11-1 gain bonus levels");
   }
 
   {
@@ -206,6 +257,18 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       Math.abs(revised / legacy - (Math.pow(1.005, 1000) / 1001)) < 1e-10,
       "IU 11-2 should change IU 1-1 from Infinity+1 to 1.005^Infinity",
     );
+    state.infinityCount = 10000;
+    assert.equal(runtime.iu11_2EffectiveInfinityCount(), 10000, "IU 11-2 should not softcap before 10000 Infinity");
+    const atSoftcapStart = runtime.vertexGainIncrease();
+    state.infinityCount = 1000000;
+    assert.ok(
+      Math.abs(runtime.iu11_2EffectiveInfinityCount() - (10000 + Math.log10(20001))) < 1e-12,
+      "IU 11-2 should strongly softcap Infinity counts above 10000 after the hotfix Infinity cap",
+    );
+    const farAfterSoftcap = runtime.vertexGainIncrease();
+    assert.ok(farAfterSoftcap > atSoftcapStart, "IU 11-2 softcap should remain monotonic");
+    assert.ok(farAfterSoftcap / atSoftcapStart < 1.03, "IU 11-2 should barely grow after the 10000 Infinity softcap");
+    assert.equal(Number.isFinite(farAfterSoftcap), true, "IU 11-2 softcapped multiplier must stay finite");
   }
 
   {

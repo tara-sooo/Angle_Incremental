@@ -5,7 +5,11 @@ const INFINITY_POINT_INTEGER_NORMALIZATION_TOLERANCE = 1e-12;
 // Infinity Points are an integer resource. Any residual that is only floating-
 // point noise is converted to its canonical integer value and canonical log.
 function normalizeInfinityPointState() {
-  const balanceLog10 = runtime.state.infinityPointsLog10;
+  const savedLog = runtime.sanitizeLog10(runtime.state.infinityPointsLog10, null);
+  const balanceLog10 = Math.min(
+    savedLog === null ? runtime.log10Value(runtime.state.infinityPoints) : savedLog,
+    runtime.MAX_HOTFIX_INFINITY_POINTS_LOG10,
+  );
   const balance = runtime.valueFromLog10(balanceLog10);
   const nearestInteger = Math.round(balance);
   const tolerance = Math.max(

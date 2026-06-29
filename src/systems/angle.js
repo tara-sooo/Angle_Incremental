@@ -126,15 +126,18 @@ function currentInfiniteScoreLog10() {
 
 function sponsoredNormalUpgradeBonusLevel() {
   if (!runtime.hasInfinityUpgrade("11-1")) return 0;
-  const ipLog = currentInfinityPointsLog10();
+  const ipLog = Math.min(currentInfinityPointsLog10(), runtime.MAX_HOTFIX_INFINITY_POINTS_LOG10);
   if (ipLog < 2) return 0;
   const rawLog = ipLog - 2;
-  const raw = rawLog <= 15 ? Math.floor(10 ** rawLog) : Infinity;
-  if (raw <= 1000) return Math.max(0, raw);
-  if (Number.isFinite(raw)) return Math.floor(1000 + Math.sqrt(raw - 1000));
-  const postSoftcapLog = rawLog / 2;
-  if (postSoftcapLog > 15) return Number.MAX_SAFE_INTEGER;
-  return Math.floor(1000 + 10 ** postSoftcapLog);
+  if (rawLog <= 3) return Math.max(0, Math.floor(10 ** rawLog));
+  return Math.floor(1000 + 10 * (rawLog - 3));
+}
+
+function iu11_2EffectiveInfinityCount() {
+  const count = Math.min(runtime.MAX_HOTFIX_INFINITY_COUNT, Math.max(0, runtime.state.infinityCount));
+  if (count <= 10000) return count;
+  if (!Number.isFinite(count)) return 10000 + Math.log10(Number.MAX_VALUE);
+  return 10000 + Math.log10(count - 10000 + 1);
 }
 
 function effectiveSpeedLevel() {
@@ -166,7 +169,7 @@ function applyInfinitySoftcap(rawLog10) {
 
 function vertexGainIncrease() {
   const infinityResetBoost = runtime.hasInfinityUpgrade("1-1")
-    ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, runtime.state.infinityCount) : runtime.state.infinityCount + 1)
+    ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, iu11_2EffectiveInfinityCount()) : runtime.state.infinityCount + 1)
     : 1;
   let gain = (0.01 + effectiveGainLevel() * 0.01)
     * runtime.coreBoostGainIncreaseMultiplier()
@@ -568,7 +571,7 @@ function balanceRawLapSpeedLog10() {
 
 function balanceVertexGainIncrease() {
   const infinityResetBoost = runtime.hasInfinityUpgrade("1-1")
-    ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, runtime.state.infinityCount) : runtime.state.infinityCount + 1)
+    ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, runtime.iu11_2EffectiveInfinityCount()) : runtime.state.infinityCount + 1)
     : 1;
   let gain = (0.01 + runtime.effectiveGainLevel() * 0.01)
     * runtime.coreBoostGainIncreaseMultiplier()
@@ -604,6 +607,7 @@ expose("currentPreviousGenerationScoreLog10", () => currentPreviousGenerationSco
 expose("currentInfinityPointsLog10", () => currentInfinityPointsLog10, (value) => { currentInfinityPointsLog10 = value; });
 expose("currentInfiniteScoreLog10", () => currentInfiniteScoreLog10, (value) => { currentInfiniteScoreLog10 = value; });
 expose("sponsoredNormalUpgradeBonusLevel", () => sponsoredNormalUpgradeBonusLevel, (value) => { sponsoredNormalUpgradeBonusLevel = value; });
+expose("iu11_2EffectiveInfinityCount", () => iu11_2EffectiveInfinityCount, (value) => { iu11_2EffectiveInfinityCount = value; });
 expose("effectiveSpeedLevel", () => effectiveSpeedLevel, (value) => { effectiveSpeedLevel = value; });
 expose("effectiveGainLevel", () => effectiveGainLevel, (value) => { effectiveGainLevel = value; });
 expose("effectiveVertexCount", () => effectiveVertexCount, (value) => { effectiveVertexCount = value; });

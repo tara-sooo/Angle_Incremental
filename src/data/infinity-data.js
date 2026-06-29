@@ -253,8 +253,8 @@ const BALANCE_INFINITY_UPGRADES = [
     requires: ["10-1", "10-2"],
     name: { ja: "11-1 スポンサーが付く", en: "11-1 Gets a Sponsor" },
     effect: {
-      ja: "所持IPに応じて通常強化3種の効果用レベルを追加する",
-      en: "Adds effective levels to all three normal upgrades based on held IP.",
+      ja: "所持IPに応じて通常強化3種の効果用レベルを追加する（100000 IP以降は強くソフトキャップ）",
+      en: "Adds effective levels to all three normal upgrades based on held IP, with a strong softcap after 100000 IP.",
     },
   },
   {
@@ -264,8 +264,8 @@ const BALANCE_INFINITY_UPGRADES = [
     requires: ["10-1", "10-2"],
     name: { ja: "11-2 分かりづらいよ", en: "11-2 Too Hard to Understand" },
     effect: {
-      ja: "IU1-1の倍率が1.005^(Infinity回数)になる",
-      en: "Changes the IU 1-1 multiplier to 1.005^(Infinity count).",
+      ja: "IU1-1の倍率が1.005^(Infinity回数)になる（Infinity 10000以降は強くソフトキャップ）",
+      en: "Changes the IU 1-1 multiplier to 1.005^(Infinity count), with a strong softcap after 10000 Infinity.",
     },
   },
 ];
