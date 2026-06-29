@@ -164,6 +164,30 @@ async function runAchievementV2ModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
+    state.completedChallenges = 1 << (5 - 1);
+    state.coreBoostCount = 0;
+    setLogResource(state, "score", 0);
+    assertNearlyEqual(runtime.coreBoostGainExponent(), 1.01, "IC5 reward should affect the current Core Boost gain exponent");
+    assertNearlyEqual(
+      runtime.nextCoreBoostValues().gainExponent,
+      runtime.coreBoostGainExponent(),
+      "Core Boost exponent preview should not decrease when no Core Boost is available",
+    );
+
+    setLogResource(state, "score", 20);
+    assert.equal(runtime.canCoreBoost(), true, "test setup should make the next Core Boost available");
+    assertNearlyEqual(
+      runtime.nextCoreBoostValues().gainExponent,
+      1.03,
+      "Core Boost exponent preview should include the IC5 reward after the next Core Boost",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { runtime } = instance;
 
     runtime.createAchievementRows();
