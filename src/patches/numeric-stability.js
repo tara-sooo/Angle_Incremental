@@ -5,6 +5,7 @@ const MAX_NATIVE_VALUE_LOG10 = Math.log10(Number.MAX_VALUE);
 const MAX_GAME_VERTICES = 1_000_000_000_000;
 const MAX_EXACT_BATCH_CORE_HITS = 2048;
 const CORE_HIT_BATCH_APPROX_SEGMENTS = 256;
+const MAX_SAFE_CORE_HIT_SEARCH = Number.MAX_SAFE_INTEGER;
 let installed = false;
 
 function clampGameLog10(value) {
@@ -128,6 +129,10 @@ function totalCoreHitsInBatches(batches) {
   return batches.reduce((total, batch) => total + batch.coreHits, 0);
 }
 
+function cappedCoreHitsInBatches(batches) {
+  return Math.min(MAX_SAFE_CORE_HIT_SEARCH, totalCoreHitsInBatches(batches));
+}
+
 function coreHitsThroughStep(batch, step, vertices) {
   if (step < batch.firstCoreStep) return 0;
   return Math.min(batch.coreHits, Math.floor((step - batch.firstCoreStep) / vertices) + 1);
@@ -140,12 +145,15 @@ function countCoreHitsThroughStep(batches, step, vertices) {
 function coreStepForChronologicalHit(batches, hitIndex) {
   if (hitIndex <= 0 || hitIndex > totalCoreHitsInBatches(batches)) return null;
   const vertices = Math.max(3, runtime.state.vertices);
+  if (batches.length === 1) {
+    return batches[0].firstCoreStep + (hitIndex - 1) * vertices;
+  }
   let low = Math.min(...batches.map((batch) => batch.firstCoreStep));
   let high = Math.max(...batches.map((batch) => batch.firstCoreStep + (batch.coreHits - 1) * vertices));
   let step = null;
 
   while (low <= high) {
-    const mid = Math.floor((low + high) / 2);
+    const mid = low + Math.floor((high - low) / 2);
     if (countCoreHitsThroughStep(batches, mid, vertices) >= hitIndex) {
       step = mid;
       high = mid - 1;
@@ -177,12 +185,17 @@ function projectedScoreLogAfterCoreHits(batches, hitLimit, increase) {
 }
 
 function firstInfinityCrossingCoreHit(batches, increase) {
+  const maxHit = cappedCoreHitsInBatches(batches);
   let low = 1;
-  let high = totalCoreHitsInBatches(batches);
+  let high = 1;
+  while (high < maxHit && projectedScoreLogAfterCoreHits(batches, high, increase) < runtime.INFINITY_REQUIREMENT_LOG10) {
+    low = high + 1;
+    high = Math.min(maxHit, high * 2);
+  }
   let crossingHit = null;
 
   while (low <= high) {
-    const mid = Math.floor((low + high) / 2);
+    const mid = low + Math.floor((high - low) / 2);
     if (projectedScoreLogAfterCoreHits(batches, mid, increase) >= runtime.INFINITY_REQUIREMENT_LOG10) {
       crossingHit = mid;
       high = mid - 1;
