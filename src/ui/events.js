@@ -42,9 +42,9 @@ function applySetting(key, value) {
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
   if (key === "showFps") runtime.state.showFps = Boolean(value);
   if (key === "autoCompleteChallenges") runtime.state.autoCompleteChallenges = Boolean(value);
-  if (key === "autoGenerationMode") runtime.state.autoGenerationMode = runtime.normalizeChoice(value, ["or", "and"], "or");
-  if (key === "autoGenerationScoreThreshold") runtime.state.autoGenerationScoreThreshold = Math.max(0, Number(value) || 0);
-  if (key === "autoGenerationCostThreshold") runtime.state.autoGenerationCostThreshold = Math.max(0, Number(value) || 0);
+  if (key === "autoGenerationScoreMultiplierThreshold") runtime.state.autoGenerationScoreMultiplierThreshold = Math.max(0, Number(value) || 0);
+  if (key === "autoGenerationCostMultiplierThreshold") runtime.state.autoGenerationCostMultiplierThreshold = Math.max(0, Number(value) || 0);
+  if (key === "autoGenerationMinimumSeconds") runtime.state.autoGenerationMinimumSeconds = Math.max(0, Number(value) || 0);
   if (key === "autoInfinityPointThreshold") runtime.state.autoInfinityPointThreshold = Math.max(1, Number(value) || 1);
   runtime.updateUi();
   runtime.draw();
@@ -93,9 +93,9 @@ function bindEvents() {
   runtime.elements.autoBuyGainToggle.addEventListener("change", () => applySetting("autoBuyGain", runtime.elements.autoBuyGainToggle.checked));
   if (runtime.elements.autoCompleteChallengesToggle) runtime.elements.autoCompleteChallengesToggle.addEventListener("change", () => applySetting("autoCompleteChallenges", runtime.elements.autoCompleteChallengesToggle.checked));
   if (runtime.elements.autoRunGenerationToggle) runtime.elements.autoRunGenerationToggle.addEventListener("change", () => applySetting("autoRunGeneration", runtime.elements.autoRunGenerationToggle.checked));
-  if (runtime.elements.autoGenerationModeSelect) runtime.elements.autoGenerationModeSelect.addEventListener("change", () => applySetting("autoGenerationMode", runtime.elements.autoGenerationModeSelect.value));
-  if (runtime.elements.autoGenerationScoreThresholdInput) runtime.elements.autoGenerationScoreThresholdInput.addEventListener("change", () => applySetting("autoGenerationScoreThreshold", runtime.elements.autoGenerationScoreThresholdInput.value));
-  if (runtime.elements.autoGenerationCostThresholdInput) runtime.elements.autoGenerationCostThresholdInput.addEventListener("change", () => applySetting("autoGenerationCostThreshold", runtime.elements.autoGenerationCostThresholdInput.value));
+  if (runtime.elements.autoGenerationScoreThresholdInput) runtime.elements.autoGenerationScoreThresholdInput.addEventListener("change", () => applySetting("autoGenerationScoreMultiplierThreshold", runtime.elements.autoGenerationScoreThresholdInput.value));
+  if (runtime.elements.autoGenerationCostThresholdInput) runtime.elements.autoGenerationCostThresholdInput.addEventListener("change", () => applySetting("autoGenerationCostMultiplierThreshold", runtime.elements.autoGenerationCostThresholdInput.value));
+  if (runtime.elements.autoGenerationMinimumSecondsInput) runtime.elements.autoGenerationMinimumSecondsInput.addEventListener("change", () => applySetting("autoGenerationMinimumSeconds", runtime.elements.autoGenerationMinimumSecondsInput.value));
   if (runtime.elements.autoRunCoreBoostToggle) runtime.elements.autoRunCoreBoostToggle.addEventListener("change", () => applySetting("autoRunCoreBoost", runtime.elements.autoRunCoreBoostToggle.checked));
   if (runtime.elements.autoRunInfinityToggle) runtime.elements.autoRunInfinityToggle.addEventListener("change", () => applySetting("autoRunInfinity", runtime.elements.autoRunInfinityToggle.checked));
   if (runtime.elements.autoInfinityPointThresholdInput) runtime.elements.autoInfinityPointThresholdInput.addEventListener("change", () => applySetting("autoInfinityPointThreshold", runtime.elements.autoInfinityPointThresholdInput.value));

@@ -251,9 +251,9 @@ function updateAutomationUi() {
   if (runtime.elements.autoCompleteChallengesToggle) runtime.elements.autoCompleteChallengesToggle.disabled = !runtime.infinityChallengesUnlocked();
   [
     runtime.elements.autoRunGenerationToggle,
-    runtime.elements.autoGenerationModeSelect,
     runtime.elements.autoGenerationScoreThresholdInput,
     runtime.elements.autoGenerationCostThresholdInput,
+    runtime.elements.autoGenerationMinimumSecondsInput,
     runtime.elements.autoRunCoreBoostToggle,
     runtime.elements.autoRunInfinityToggle,
     runtime.elements.autoInfinityPointThresholdInput,
@@ -266,9 +266,9 @@ function updateAutomationUi() {
   syncFormControl(runtime.elements.autoBuyGainToggle, runtime.state.autoBuyGain);
   if (runtime.elements.autoCompleteChallengesToggle) syncFormControl(runtime.elements.autoCompleteChallengesToggle, runtime.state.autoCompleteChallenges);
   if (runtime.elements.autoRunGenerationToggle) syncFormControl(runtime.elements.autoRunGenerationToggle, runtime.state.autoRunGeneration);
-  if (runtime.elements.autoGenerationModeSelect) syncFormControl(runtime.elements.autoGenerationModeSelect, runtime.state.autoGenerationMode);
-  if (runtime.elements.autoGenerationScoreThresholdInput) syncFormControl(runtime.elements.autoGenerationScoreThresholdInput, runtime.state.autoGenerationScoreThreshold);
-  if (runtime.elements.autoGenerationCostThresholdInput) syncFormControl(runtime.elements.autoGenerationCostThresholdInput, runtime.state.autoGenerationCostThreshold);
+  if (runtime.elements.autoGenerationScoreThresholdInput) syncFormControl(runtime.elements.autoGenerationScoreThresholdInput, runtime.state.autoGenerationScoreMultiplierThreshold);
+  if (runtime.elements.autoGenerationCostThresholdInput) syncFormControl(runtime.elements.autoGenerationCostThresholdInput, runtime.state.autoGenerationCostMultiplierThreshold);
+  if (runtime.elements.autoGenerationMinimumSecondsInput) syncFormControl(runtime.elements.autoGenerationMinimumSecondsInput, runtime.state.autoGenerationMinimumSeconds);
   if (runtime.elements.autoRunCoreBoostToggle) syncFormControl(runtime.elements.autoRunCoreBoostToggle, runtime.state.autoRunCoreBoost);
   if (runtime.elements.autoRunInfinityToggle) syncFormControl(runtime.elements.autoRunInfinityToggle, runtime.state.autoRunInfinity);
   if (runtime.elements.autoInfinityPointThresholdInput) syncFormControl(runtime.elements.autoInfinityPointThresholdInput, runtime.state.autoInfinityPointThreshold);

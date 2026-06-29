@@ -326,19 +326,16 @@
                 <input id="autoRunGenerationToggle" type="checkbox" />
               </div>
               <div class="setting-row">
-                <label for="autoGenerationModeSelect" data-i18n="autoGenerationMode">GR条件</label>
-                <select id="autoGenerationModeSelect">
-                  <option value="or" data-i18n="autoGenerationModeOr">どちらか</option>
-                  <option value="and" data-i18n="autoGenerationModeAnd">両方</option>
-                </select>
+                <label for="autoGenerationScoreThresholdInput" data-i18n="autoGenerationScoreThreshold">最小スコア倍率増加(×)</label>
+                <input id="autoGenerationScoreThresholdInput" type="number" min="0" step="0.01" value="1.1" />
               </div>
               <div class="setting-row">
-                <label for="autoGenerationScoreThresholdInput" data-i18n="autoGenerationScoreThreshold">GRスコア改善(%)</label>
-                <input id="autoGenerationScoreThresholdInput" type="number" min="0" step="0.1" value="10" />
+                <label for="autoGenerationCostThresholdInput" data-i18n="autoGenerationCostThreshold">最小コスト倍率改善(×)</label>
+                <input id="autoGenerationCostThresholdInput" type="number" min="0" step="0.01" value="1.01" />
               </div>
               <div class="setting-row">
-                <label for="autoGenerationCostThresholdInput" data-i18n="autoGenerationCostThreshold">GRコスト改善(%)</label>
-                <input id="autoGenerationCostThresholdInput" type="number" min="0" step="0.1" value="1" />
+                <label for="autoGenerationMinimumSecondsInput" data-i18n="autoGenerationMinimumSeconds">最小経過秒数</label>
+                <input id="autoGenerationMinimumSecondsInput" type="number" min="0" step="1" value="0" />
               </div>
               <div class="setting-row">
                 <label for="autoRunCoreBoostToggle" data-i18n="autoRunCoreBoost">CB自動実行</label>

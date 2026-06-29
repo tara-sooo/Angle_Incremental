@@ -32,6 +32,10 @@ function compatibilitySnapshot(instance) {
     "autoRunCoreBoost",
     "autoRunInfinity",
     "autoInfinityPointThreshold",
+    "autoGenerationScoreMultiplierThreshold",
+    "autoGenerationCostMultiplierThreshold",
+    "autoGenerationMinimumSeconds",
+    "currentGenerationRunTime",
     "currentInfinityRunHadGeneration",
     "currentInfinityRunHadCoreBoost",
   ].forEach((field) => delete value.state[field]);
@@ -44,6 +48,10 @@ function compatibilitySnapshot(instance) {
     "coreBoost",
     "infinity",
     "infinityPointThreshold",
+    "generationScoreMultiplierThreshold",
+    "generationCostMultiplierThreshold",
+    "generationMinimumSeconds",
+    "currentGenerationRunTime",
   ].forEach((field) => delete value.view.automation[field]);
   value.view.infinity.upgrades = value.view.infinity.upgrades.filter((upgrade) => {
     const tier = Number(String(upgrade.id).split("-", 1)[0]);
