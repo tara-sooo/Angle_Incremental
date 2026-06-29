@@ -257,6 +257,17 @@ async function runDifferentialTests() {
     state.vertices = 9;
     setLogResource(state, "score", 25);
     debug.runCoreBoost();
+  }, {
+    approvedBalancePaths: [
+      "view.vertices",
+      "view.currentGain",
+      "view.currentGainLog10",
+      "view.finalGainOnCore",
+      "view.finalGainOnCoreLog10",
+      "view.baseGainExpression",
+      "view.baseGainExpressionDivisor",
+      "view.baseGainExpressionParts",
+    ],
   });
 
   await compareScenario("bounded vertex processing", async ({ debug }) => {

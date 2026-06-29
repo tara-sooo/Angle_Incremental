@@ -41,6 +41,10 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.deepEqual(Array.from(byId.get("10-1")?.requires || []), ["9-1"], "IU 10-1 must require IU 9-1");
     assert.equal(byId.get("10-2")?.cost, 7000, "IU 10-2 must cost 7000 IP");
     assert.deepEqual(Array.from(byId.get("10-2")?.requires || []), ["9-1"], "IU 10-2 must require IU 9-1");
+    assert.equal(byId.get("11-1")?.cost, 50000, "IU 11-1 must cost 50000 IP");
+    assert.deepEqual(Array.from(byId.get("11-1")?.requires || []), ["10-1", "10-2"], "IU 11-1 must require both tier 10 upgrades");
+    assert.equal(byId.get("11-2")?.cost, 100000, "IU 11-2 must cost 100000 IP");
+    assert.deepEqual(Array.from(byId.get("11-2")?.requires || []), ["10-1", "10-2"], "IU 11-2 must require both tier 10 upgrades");
   }
 
   {
@@ -125,6 +129,82 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       runtime.scoreDisplay(),
       runtime.formatNumber(runtime.valueFromLog10(2.4)),
       "IU 10-2 small score display must use the exponentiated effective score",
+    );
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(15);
+    state.infinityPoints = 50000;
+    state.infinityPointsLog10 = Math.log10(50000);
+    assert.equal(debug.buyInfinityUpgrade("11-1"), true, "IU 11-1 must be purchasable after both tier 10 upgrades");
+    state.infinityPoints = 100000;
+    state.infinityPointsLog10 = Math.log10(100000);
+    assert.equal(debug.buyInfinityUpgrade("11-2"), true, "IU 11-2 must be purchasable after both tier 10 upgrades");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(16);
+
+    setLogResource(state, "infinityPoints", Math.log10(99999));
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 999, "IU 11-1 bonus should grant one level per 100 IP before the softcap");
+    setLogResource(state, "infinityPoints", Math.log10(100000));
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1000, "IU 11-1 bonus should reach 1000 levels at 100000 IP");
+    setLogResource(state, "infinityPoints", Math.log10(1000000));
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1094, "IU 11-1 bonus should use square-root scaling after 100000 IP");
+
+    state.speedLevel = 10;
+    state.vertices = 20;
+    state.gainLevel = 30;
+    assert.equal(runtime.effectiveSpeedLevel(), 1104, "IU 11-1 should add bonus levels to lap-speed upgrades");
+    assert.equal(runtime.effectiveVertexCount(), 1114, "IU 11-1 should add bonus levels to effective vertices");
+    assert.equal(runtime.effectiveGainLevel(), 1124, "IU 11-1 should add bonus levels to gain upgrades");
+
+    const speedCost = runtime.costLog10("speed", 5, state.speedLevel, 1.55);
+    const vertexCost = runtime.costLog10("vertex", 12, state.vertices - 3, 1.72);
+    const gainCost = runtime.costLog10("gain", 18, state.gainLevel, 1.68);
+    const costs = runtime.costLogs();
+    assert.equal(costs.speed, speedCost, "IU 11-1 bonus levels must not increase speed upgrade costs");
+    assert.equal(costs.vertex, vertexCost, "IU 11-1 bonus levels must not increase vertex upgrade costs");
+    assert.equal(costs.gain, gainCost, "IU 11-1 bonus levels must not increase gain upgrade costs");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(16);
+    state.infinityCount = 1;
+    setLogResource(state, "infinityPoints", Math.log10(1000000));
+    state.vertices = 20;
+    runtime.toggleInfinityChallenge(2);
+    assert.equal(state.activeChallenge, 2, "IC2 should start for the effective vertex cap scenario");
+    assert.equal(runtime.effectiveVertexCount(), 200, "IC2 must cap IU 11-1 effective vertices at 200");
+    assert.equal(runtime.canBuyNormalUpgrade("vertex"), false, "IC2 must prevent vertex purchases once effective vertices are capped at 200");
+
+    runtime.toggleInfinityChallenge(2);
+    runtime.toggleInfinityChallenge(8);
+    assert.equal(state.activeChallenge, 8, "IC8 should start for the effective vertex lock scenario");
+    assert.equal(runtime.effectiveVertexCount(), 3, "IC8 must ignore IU 11-1 vertex bonuses and keep 3 effective vertices");
+    assert.equal(runtime.canBuyNormalUpgrade("vertex"), false, "IC8 must keep vertex purchases disabled");
+    assert.equal(runtime.effectiveSpeedLevel(), state.speedLevel + 1094, "IC8 should still keep IU 11-1 speed bonus levels");
+    assert.equal(runtime.effectiveGainLevel(), state.gainLevel + 1094, "IC8 should still keep IU 11-1 gain bonus levels");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = 1 << 0;
+    state.infinityCount = 1000;
+    const legacy = runtime.vertexGainIncrease();
+    state.infinityUpgradeMask = (1 << 0) | (1 << 17);
+    const revised = runtime.vertexGainIncrease();
+    assert.ok(legacy > revised, "IU 11-2 should replace the old IU 1-1 formula instead of multiplying on top of it");
+    assert.ok(
+      Math.abs(revised / legacy - (Math.pow(1.005, 1000) / 1001)) < 1e-10,
+      "IU 11-2 should change IU 1-1 from Infinity+1 to 1.005^Infinity",
     );
   }
 

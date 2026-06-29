@@ -246,6 +246,28 @@ const BALANCE_INFINITY_UPGRADES = [
     name: { ja: "10-2 面白くないアップグレードだと思ったでしょうね", en: "10-2 You Thought This Was Boring" },
     effect: { ja: "スコアが^1.2される", en: "Raises held score to ^1.2." },
   },
+  {
+    id: "11-1",
+    bit: 16,
+    cost: 50000,
+    requires: ["10-1", "10-2"],
+    name: { ja: "11-1 スポンサーが付く", en: "11-1 Gets a Sponsor" },
+    effect: {
+      ja: "所持IPに応じて通常強化3種の効果用レベルを追加する",
+      en: "Adds effective levels to all three normal upgrades based on held IP.",
+    },
+  },
+  {
+    id: "11-2",
+    bit: 17,
+    cost: 100000,
+    requires: ["10-1", "10-2"],
+    name: { ja: "11-2 分かりづらいよ", en: "11-2 Too Hard to Understand" },
+    effect: {
+      ja: "IU1-1の倍率が1.005^(Infinity回数)になる",
+      en: "Changes the IU 1-1 multiplier to 1.005^(Infinity count).",
+    },
+  },
 ];
 
 expose("INFINITY_CHALLENGES", () => INFINITY_CHALLENGES);

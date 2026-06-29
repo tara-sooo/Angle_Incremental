@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.2.4";
+const EXPECTED_ASSET_VERSION = "0.3.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -101,6 +101,21 @@ try {
   assert.equal(snapshot.vertices, 3);
   assert.equal(snapshot.infinity.count, 0);
   assert.equal(typeof snapshot.score, "string");
+  const breakCapPlacement = await page.evaluate(() => {
+    const breakCap = document.querySelector("#breakCapButton");
+    const subtabs = document.querySelector(".infinity-subtabs");
+    const challengePanel = document.querySelector('[data-infinity-panel="challenges"]');
+    return {
+      exists: Boolean(breakCap),
+      beforeSubtabs: Boolean(breakCap && subtabs && (breakCap.compareDocumentPosition(subtabs) & Node.DOCUMENT_POSITION_FOLLOWING)),
+      inChallengePanel: Boolean(breakCap && challengePanel?.contains(breakCap)),
+      conditionText: document.querySelector("#breakCapRequirement")?.textContent ?? "",
+    };
+  });
+  assert.equal(breakCapPlacement.exists, true, "Break Infinite Cap control must exist");
+  assert.equal(breakCapPlacement.beforeSubtabs, true, "Break Infinite Cap control must sit above the Infinity subtabs");
+  assert.equal(breakCapPlacement.inChallengePanel, false, "Break Infinite Cap control must not be inside the IC panel");
+  assert.match(breakCapPlacement.conditionText, /1e350|1.00e350/, "Break Infinite Cap requirement should be visible");
 
   const requestedModulePaths = new Set(moduleRequests.map((url) => url.pathname));
   EXPECTED_MODULE_PATHS.forEach((modulePath) => {

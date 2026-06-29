@@ -4,7 +4,7 @@ import { runtime, expose } from "../runtime/shared.js";
 // Functions retain their original global runtime dependencies during the classic-script migration phase.
 
 function rawLapSpeedLog10() {
-  let multiplierLog = runtime.state.speedLevel * runtime.log10Value(1.22);
+  let multiplierLog = effectiveSpeedLevel() * runtime.log10Value(1.22);
   if (runtime.hasInfinityUpgrade("2-1")) multiplierLog += runtime.log10Value(runtime.applyInfinityUpgradePower(1.5));
   if (runtime.isChallengeCompleted(3)) multiplierLog += runtime.log10Value(1.1);
   if (runtime.state.activeChallenge === 3) multiplierLog *= 0.8;
@@ -124,6 +124,34 @@ function currentInfiniteScoreLog10() {
   return currentLog10ForValue(runtime.state.infiniteScore, runtime.state.infiniteScoreLog10);
 }
 
+function sponsoredNormalUpgradeBonusLevel() {
+  if (!runtime.hasInfinityUpgrade("11-1")) return 0;
+  const ipLog = currentInfinityPointsLog10();
+  if (ipLog < 2) return 0;
+  const rawLog = ipLog - 2;
+  const raw = rawLog <= 15 ? Math.floor(10 ** rawLog) : Infinity;
+  if (raw <= 1000) return Math.max(0, raw);
+  if (Number.isFinite(raw)) return Math.floor(1000 + Math.sqrt(raw - 1000));
+  const postSoftcapLog = rawLog / 2;
+  if (postSoftcapLog > 15) return Number.MAX_SAFE_INTEGER;
+  return Math.floor(1000 + 10 ** postSoftcapLog);
+}
+
+function effectiveSpeedLevel() {
+  return runtime.state.speedLevel + sponsoredNormalUpgradeBonusLevel();
+}
+
+function effectiveGainLevel() {
+  return runtime.state.gainLevel + sponsoredNormalUpgradeBonusLevel();
+}
+
+function effectiveVertexCount() {
+  if (runtime.state.activeChallenge === 8) return 3;
+  const count = runtime.state.vertices + sponsoredNormalUpgradeBonusLevel();
+  if (runtime.state.activeChallenge === 2) return Math.min(200, count);
+  return count;
+}
+
 function scoreDisplay() {
   const scoreLog = currentScoreLog10();
   if (runtime.state.numberFormat === "scientific" && scoreLog > -Infinity) return runtime.formatScientificLog(scoreLog);
@@ -137,8 +165,10 @@ function applyInfinitySoftcap(rawLog10) {
 }
 
 function vertexGainIncrease() {
-  const infinityResetBoost = runtime.hasInfinityUpgrade("1-1") ? runtime.applyInfinityUpgradePower(Math.max(1, runtime.state.infinityCount)) : 1;
-  let gain = (0.01 + runtime.state.gainLevel * 0.01)
+  const infinityResetBoost = runtime.hasInfinityUpgrade("1-1")
+    ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, runtime.state.infinityCount) : runtime.state.infinityCount + 1)
+    : 1;
+  let gain = (0.01 + effectiveGainLevel() * 0.01)
     * runtime.coreBoostGainIncreaseMultiplier()
     * runtime.infiniteAngleBoost()
     * runtime.achievementGainMultiplier()
@@ -196,7 +226,7 @@ function isCoreVertex(index) {
 }
 
 function sumCoreHitGains(firstCoreStep, coreHits, increase) {
-  const stride = runtime.state.vertices;
+  const stride = runtime.effectiveVertexCount();
 
   if (coreHits > runtime.MAX_EXACT_CORE_HITS) {
     let earned = 0;
@@ -340,10 +370,11 @@ function processManyVertices(start, end) {
   if (count <= 0) return;
 
   const increase = vertexGainIncrease();
+  const vertices = runtime.effectiveVertexCount();
   const coreBatches = coreVertexIndices()
     .map((coreIndex) => {
-      const coreOffset = ((coreIndex - (start % runtime.state.vertices)) + runtime.state.vertices) % runtime.state.vertices;
-      const coreHits = coreOffset >= count ? 0 : Math.floor((count - 1 - coreOffset) / runtime.state.vertices) + 1;
+      const coreOffset = ((coreIndex - (start % vertices)) + vertices) % vertices;
+      const coreHits = coreOffset >= count ? 0 : Math.floor((count - 1 - coreOffset) / vertices) + 1;
       return {
         coreHits,
         firstCoreStep: coreOffset + 1,
@@ -357,7 +388,7 @@ function processManyVertices(start, end) {
     let lastCoreStep = 0;
     coreBatches.forEach((batch) => {
       earned += sumCoreHitGains(batch.firstCoreStep, batch.coreHits, increase);
-      lastCoreStep = Math.max(lastCoreStep, batch.firstCoreStep + (batch.coreHits - 1) * runtime.state.vertices);
+      lastCoreStep = Math.max(lastCoreStep, batch.firstCoreStep + (batch.coreHits - 1) * vertices);
     });
     const batchLog = runtime.log10Value(Math.max(coreHits, 1)) + finalScoreGainFromBaseLog10(gainAfterIncreaseLog10(increase, lastCoreStep));
     const resetByInfinity = addScore(earned, Number.isFinite(earned) ? runtime.log10Value(earned) : batchLog);
@@ -378,10 +409,11 @@ function processManyVertices(start, end) {
 
 function normalizeVertexProgress() {
   if (runtime.state.totalVertexProgress <= runtime.MAX_VERTEX_PROGRESS_TRACKED) return;
-  const wrapped = ((runtime.state.totalVertexProgress % runtime.state.vertices) + runtime.state.vertices) % runtime.state.vertices;
+  const vertices = runtime.effectiveVertexCount();
+  const wrapped = ((runtime.state.totalVertexProgress % vertices) + vertices) % vertices;
   runtime.state.totalVertexProgress = wrapped;
-  runtime.state.pointProgress = wrapped / runtime.state.vertices;
-  runtime.state.lastVertexIndex = Math.floor(wrapped) % runtime.state.vertices;
+  runtime.state.pointProgress = wrapped / vertices;
+  runtime.state.lastVertexIndex = Math.floor(wrapped) % vertices;
 }
 
 function spendLog(amountLog) {
@@ -412,7 +444,7 @@ function canBuyNormalUpgrade(kind) {
   if (runtime.state.activeChallenge === 7 && currentScoreLog10() > 30) return false;
   if (kind === "vertex") {
     if (runtime.state.activeChallenge === 8) return false;
-    if (runtime.state.activeChallenge === 2 && runtime.state.vertices >= 200) return false;
+    if (runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;
   }
   return runtime.canSpendLog(upgradeCostLog(kind));
 }
@@ -507,7 +539,7 @@ function balanceCanBuyNormalUpgrade(kind) {
   if (runtime.state.activeChallenge === 7 && costLog > 30) return false;
   if (kind === "vertex") {
     if (runtime.state.activeChallenge === 8) return false;
-    if (runtime.state.activeChallenge === 2 && runtime.state.vertices >= 200) return false;
+    if (runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;
   }
   return runtime.canSpendLog(costLog);
 }
@@ -526,7 +558,7 @@ function balanceCostLog10(kind, base, level, growth) {
 }
 
 function balanceRawLapSpeedLog10() {
-  let multiplierLog = runtime.state.speedLevel * runtime.log10Value(1.22);
+  let multiplierLog = runtime.effectiveSpeedLevel() * runtime.log10Value(1.22);
   if (runtime.hasInfinityUpgrade("2-1")) multiplierLog += runtime.log10Value(runtime.applyInfinityUpgradePower(1.5));
   if (runtime.hasInfinityUpgrade("5-1")) multiplierLog += runtime.log10Value(runtime.applyInfinityUpgradePower(3));
   if (runtime.isChallengeCompleted(3)) multiplierLog += runtime.log10Value(1.1);
@@ -536,9 +568,9 @@ function balanceRawLapSpeedLog10() {
 
 function balanceVertexGainIncrease() {
   const infinityResetBoost = runtime.hasInfinityUpgrade("1-1")
-    ? runtime.applyInfinityUpgradePower(runtime.state.infinityCount + 1)
+    ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, runtime.state.infinityCount) : runtime.state.infinityCount + 1)
     : 1;
-  let gain = (0.01 + runtime.state.gainLevel * 0.01)
+  let gain = (0.01 + runtime.effectiveGainLevel() * 0.01)
     * runtime.coreBoostGainIncreaseMultiplier()
     * runtime.infiniteAngleBoost()
     * runtime.achievementGainMultiplier()
@@ -571,6 +603,10 @@ expose("gainAfterIncreaseLog10", () => gainAfterIncreaseLog10, (value) => { gain
 expose("currentPreviousGenerationScoreLog10", () => currentPreviousGenerationScoreLog10, (value) => { currentPreviousGenerationScoreLog10 = value; });
 expose("currentInfinityPointsLog10", () => currentInfinityPointsLog10, (value) => { currentInfinityPointsLog10 = value; });
 expose("currentInfiniteScoreLog10", () => currentInfiniteScoreLog10, (value) => { currentInfiniteScoreLog10 = value; });
+expose("sponsoredNormalUpgradeBonusLevel", () => sponsoredNormalUpgradeBonusLevel, (value) => { sponsoredNormalUpgradeBonusLevel = value; });
+expose("effectiveSpeedLevel", () => effectiveSpeedLevel, (value) => { effectiveSpeedLevel = value; });
+expose("effectiveGainLevel", () => effectiveGainLevel, (value) => { effectiveGainLevel = value; });
+expose("effectiveVertexCount", () => effectiveVertexCount, (value) => { effectiveVertexCount = value; });
 expose("scoreDisplay", () => scoreDisplay, (value) => { scoreDisplay = value; });
 expose("applyInfinitySoftcap", () => applyInfinitySoftcap, (value) => { applyInfinitySoftcap = value; });
 expose("vertexGainIncrease", () => vertexGainIncrease, (value) => { vertexGainIncrease = value; });
