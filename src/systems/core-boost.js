@@ -27,8 +27,12 @@ function coreBoostGainIncreaseMultiplier() {
   return Math.pow(1 + runtime.state.coreBoostCount * 0.5, coreBoostBonusPower());
 }
 
+function coreBoostGainExponentForCount(coreBoostCount) {
+  return Math.pow(1 + coreBoostCount * 0.02, coreBoostBonusPower()) + (runtime.isChallengeCompleted(5) ? 0.01 : 0);
+}
+
 function coreBoostGainExponent() {
-  return Math.pow(1 + runtime.state.coreBoostCount * 0.02, coreBoostBonusPower()) + (runtime.isChallengeCompleted(5) ? 0.01 : 0);
+  return coreBoostGainExponentForCount(runtime.state.coreBoostCount);
 }
 
 function nextCoreBoostValues() {
@@ -38,7 +42,7 @@ function nextCoreBoostValues() {
   const increasePerCoreBoost = runtime.hasInfinityUpgrade("7-1") ? 1 : 0.5;
   return {
     gainMultiplier: Math.pow(1 + nextCoreBoostCount * increasePerCoreBoost, power),
-    gainExponent: Math.pow(1 + nextCoreBoostCount * 0.02, power),
+    gainExponent: coreBoostGainExponentForCount(nextCoreBoostCount),
   };
 }
 
