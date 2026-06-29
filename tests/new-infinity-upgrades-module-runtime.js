@@ -141,9 +141,10 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       "old percent score threshold saves must migrate to the equivalent multiplier threshold",
     );
     assert.ok(
-      state.autoGenerationCostMultiplierThreshold === 0,
-      "old OR automation saves must not migrate into an AND cost gate",
+      Math.abs(state.autoGenerationCostMultiplierThreshold - (1 / 0.99)) < 1e-12,
+      "old OR percent cost threshold saves must keep the equivalent cost improvement multiplier",
     );
+    assert.equal(state.autoGenerationLegacyOrMode, true, "old OR automation saves must preserve OR trigger semantics");
   }
 
   {
@@ -163,6 +164,43 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       Math.abs(state.autoGenerationCostMultiplierThreshold - (1 / 0.99)) < 1e-12,
       "old AND percent cost threshold saves must migrate to the equivalent cost improvement multiplier",
     );
+    assert.equal(state.autoGenerationLegacyOrMode, false, "old AND automation saves must use the new all-active-gates behavior");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    runtime.applySaveData({
+      autoGenerationMode: "or",
+      autoGenerationScoreThreshold: 100000000000,
+      autoGenerationCostThreshold: 1,
+    }, 7);
+    prepareGenerationAutomationScenario(instance);
+    assert.equal(runtime.shouldAutoRunGeneration(), true, "legacy OR automation must still trigger from cost improvement alone");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    runtime.applySaveData({
+      autoGenerationMode: "or",
+      autoGenerationScoreThreshold: 10,
+      autoGenerationCostThreshold: 90,
+    }, 7);
+    prepareGenerationAutomationScenario(instance);
+    assert.equal(runtime.shouldAutoRunGeneration(), true, "legacy OR automation must still trigger from score improvement alone");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    runtime.applySaveData({
+      autoGenerationMode: "or",
+      autoGenerationScoreThreshold: 10,
+      autoGenerationCostThreshold: 1,
+    }, 7);
+    runtime.applySetting("autoGenerationScoreMultiplierThreshold", 2);
+    assert.equal(state.autoGenerationLegacyOrMode, false, "editing a new GR automation threshold must leave legacy OR mode");
   }
 
   {

@@ -122,9 +122,11 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     "autoGenerationCostMultiplierThreshold",
   );
   const legacyGenerationMode = runtime.normalizeChoice(data.autoGenerationMode, ["or", "and"], "or");
-  const migratedGenerationCostMultiplierThreshold = legacyGenerationMode === "or"
-    ? 0
-    : (legacyCostDenominator > 0 ? 1 / legacyCostDenominator : 1e12);
+  const isLegacyGenerationAutomationSave = !hasGenerationScoreMultiplierThreshold
+    && !hasGenerationCostMultiplierThreshold;
+  const migratedGenerationCostMultiplierThreshold = legacyCostDenominator > 0
+    ? 1 / legacyCostDenominator
+    : 1e12;
   runtime.state.autoGenerationScoreMultiplierThreshold = Math.max(
     0,
     runtime.sanitizeNumber(
@@ -140,6 +142,10 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     ),
   );
   runtime.state.autoGenerationMinimumSeconds = Math.max(0, runtime.sanitizeNumber(data.autoGenerationMinimumSeconds, 0));
+  runtime.state.autoGenerationLegacyOrMode = runtime.sanitizeBoolean(
+    data.autoGenerationLegacyOrMode,
+    isLegacyGenerationAutomationSave && legacyGenerationMode === "or",
+  );
   runtime.state.autoRunCoreBoost = runtime.sanitizeBoolean(data.autoRunCoreBoost, false);
   runtime.state.autoRunInfinity = runtime.sanitizeBoolean(data.autoRunInfinity, false);
   runtime.state.autoInfinityPointThreshold = Math.max(1, runtime.sanitizeNumber(data.autoInfinityPointThreshold, 10));
@@ -410,6 +416,7 @@ function resetSave() {
     autoGenerationScoreMultiplierThreshold: 1.1,
     autoGenerationCostMultiplierThreshold: 1.01,
     autoGenerationMinimumSeconds: 0,
+    autoGenerationLegacyOrMode: false,
     autoRunCoreBoost: false,
     autoRunInfinity: false,
     autoInfinityPointThreshold: 10,

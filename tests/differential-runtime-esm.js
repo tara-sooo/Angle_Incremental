@@ -35,6 +35,7 @@ function compatibilitySnapshot(instance) {
     "autoGenerationScoreMultiplierThreshold",
     "autoGenerationCostMultiplierThreshold",
     "autoGenerationMinimumSeconds",
+    "autoGenerationLegacyOrMode",
     "currentGenerationRunTime",
     "currentInfinityRunHadGeneration",
     "currentInfinityRunHadCoreBoost",

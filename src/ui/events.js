@@ -42,9 +42,18 @@ function applySetting(key, value) {
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
   if (key === "showFps") runtime.state.showFps = Boolean(value);
   if (key === "autoCompleteChallenges") runtime.state.autoCompleteChallenges = Boolean(value);
-  if (key === "autoGenerationScoreMultiplierThreshold") runtime.state.autoGenerationScoreMultiplierThreshold = Math.max(0, Number(value) || 0);
-  if (key === "autoGenerationCostMultiplierThreshold") runtime.state.autoGenerationCostMultiplierThreshold = Math.max(0, Number(value) || 0);
-  if (key === "autoGenerationMinimumSeconds") runtime.state.autoGenerationMinimumSeconds = Math.max(0, Number(value) || 0);
+  if (key === "autoGenerationScoreMultiplierThreshold") {
+    runtime.state.autoGenerationScoreMultiplierThreshold = Math.max(0, Number(value) || 0);
+    runtime.state.autoGenerationLegacyOrMode = false;
+  }
+  if (key === "autoGenerationCostMultiplierThreshold") {
+    runtime.state.autoGenerationCostMultiplierThreshold = Math.max(0, Number(value) || 0);
+    runtime.state.autoGenerationLegacyOrMode = false;
+  }
+  if (key === "autoGenerationMinimumSeconds") {
+    runtime.state.autoGenerationMinimumSeconds = Math.max(0, Number(value) || 0);
+    runtime.state.autoGenerationLegacyOrMode = false;
+  }
   if (key === "autoInfinityPointThreshold") runtime.state.autoInfinityPointThreshold = Math.max(1, Number(value) || 1);
   runtime.updateUi();
   runtime.draw();

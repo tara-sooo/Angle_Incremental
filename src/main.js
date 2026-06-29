@@ -396,7 +396,10 @@ function shouldAutoRunGeneration() {
     checks.push(runtime.state.currentGenerationRunTime >= secondsThreshold);
   }
 
-  return checks.length === 0 || checks.every(Boolean);
+  if (checks.length === 0) return true;
+  return runtime.state.autoGenerationLegacyOrMode
+    ? checks.some(Boolean)
+    : checks.every(Boolean);
 }
 
 function runLayerAutomation() {
