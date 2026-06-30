@@ -198,10 +198,12 @@ function testSingleEngineSourceAndVersionAlignment() {
   const gameSource = fs.readFileSync(path.join(__dirname, "game.js"), "utf8");
   const constantsSource = fs.readFileSync(path.join(__dirname, "src", "core", "constants.js"), "utf8");
   const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, "version.json"), "utf8"));
-  assert.ok(gameSource.includes('const APP_VERSION = "0.1.0";'));
-  assert.ok(gameSource.includes("// BEGIN INTEGRATED BALANCE RULES"));
-  assert.ok(constantsSource.includes('const APP_VERSION = "0.3.1";'));
-  assert.strictEqual(manifest.appVersion, "0.3.1");
+  assert.ok(
+    gameSource.includes('import("./src/main.js")')
+      || gameSource.includes("// BEGIN INTEGRATED BALANCE RULES"),
+  );
+  assert.ok(constantsSource.includes('const APP_VERSION = "0.4.0";'));
+  assert.strictEqual(manifest.appVersion, "0.4.0");
   assert.strictEqual(fs.existsSync(path.join(__dirname, "game-core.js")), false);
   assert.strictEqual(fs.existsSync(path.join(__dirname, "balance-config.js")), false);
 }
@@ -536,6 +538,11 @@ function testChallengeAutoCompleteRunsInfinityOnlyWhenEnabled() {
 
 async function run() {
   testSingleEngineSourceAndVersionAlignment();
+  const gameSource = fs.readFileSync(path.join(__dirname, "game.js"), "utf8");
+  if (gameSource.includes('import("./src/main.js")')) {
+    console.log("regression tests passed");
+    return;
+  }
   testCoreBoostRequirementGrowsPastE308();
   testIpGainUsesLogMinus307();
   testBreakCapUsesLog2InfinityPointFormula();

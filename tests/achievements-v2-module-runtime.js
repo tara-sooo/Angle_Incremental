@@ -36,6 +36,23 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { runtime } = instance;
 
     state.infinityCount = 1;
+    setLogResource(state, "score", 310);
+    state.achievementMask = 0;
+    assert.equal(runtime.infinityPointGain(), 3, "base post-break IP gain should use the raw formula without achievement rewards");
+    state.achievementMask = 1 << (17 - 1);
+    assert.equal(runtime.infinityPointGain(), 6, "achievement 17 should double IP gain");
+    state.achievementMask = 1 << (21 - 1);
+    assert.equal(runtime.infinityPointGain(), 6, "achievement 21 should also double IP gain");
+    state.achievementMask = (1 << (17 - 1)) | (1 << (21 - 1));
+    assert.equal(runtime.infinityPointGain(), 12, "achievements 17 and 21 should stack to quadruple IP gain");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
+    state.infinityCount = 1;
     state.activeChallenge = 3;
     setLogResource(state, "score", 309);
     runtime.runInfinity(false);
@@ -203,6 +220,14 @@ async function runAchievementV2ModuleRuntimeTest() {
     const ic3Reward = rows[16].querySelector(".achievement-reward");
     assert.equal(ic3Reward.textContent, "報酬: IP獲得量が×2", "individual achievement rewards should use the generic reward label");
     assert.equal(ic3Reward.hidden, false, "individual achievement rewards should remain visible");
+
+    const achievement19Reward = rows[18].querySelector(".achievement-reward");
+    assert.equal(achievement19Reward.textContent, "報酬: GRとCBの自動化を解放", "achievement 19 should advertise GR/CB automation");
+    assert.equal(achievement19Reward.hidden, false, "achievement 19 reward should be visible");
+
+    const achievement21Reward = rows[20].querySelector(".achievement-reward");
+    assert.equal(achievement21Reward.textContent, "報酬: IP獲得量がさらに×2", "achievement 21 should advertise the extra IP multiplier");
+    assert.equal(achievement21Reward.hidden, false, "achievement 21 reward should be visible");
   }
 
   console.log("Achievement v2 module runtime tests passed");

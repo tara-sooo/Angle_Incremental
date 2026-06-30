@@ -219,8 +219,8 @@ const BALANCE_INFINITY_UPGRADES = [
     bit: 12,
     cost: 200,
     requires: ["7-1", "7-2"],
-    name: { ja: "8-1 遅すぎたので一気に", en: "8-1 Too Slow, All At Once" },
-    effect: { ja: "GR、CB、Infinityの自動化を解放する", en: "Unlocks Generation, Core Boost, and Infinity automation." },
+    name: { ja: "8-1 無限に無限周回", en: "8-1 Infinite Infinity Loops" },
+    effect: { ja: "Infinityの自動化を解放する", en: "Unlocks Infinity automation." },
   },
   {
     id: "9-1",
@@ -233,7 +233,7 @@ const BALANCE_INFINITY_UPGRADES = [
   {
     id: "10-1",
     bit: 14,
-    cost: 3000,
+    cost: 12000,
     requires: ["9-1"],
     name: { ja: "10-1 親が政治家", en: "10-1 Politician Parents" },
     effect: { ja: "最初からCBを2つ獲得する", en: "Start with 2 Core Boosts." },
@@ -241,7 +241,7 @@ const BALANCE_INFINITY_UPGRADES = [
   {
     id: "10-2",
     bit: 15,
-    cost: 7000,
+    cost: 28000,
     requires: ["9-1"],
     name: { ja: "10-2 面白くないアップグレードだと思ったでしょうね", en: "10-2 You Thought This Was Boring" },
     effect: { ja: "スコアが^1.2される", en: "Raises held score to ^1.2." },
@@ -249,23 +249,23 @@ const BALANCE_INFINITY_UPGRADES = [
   {
     id: "11-1",
     bit: 16,
-    cost: 50000,
+    cost: 200000,
     requires: ["10-1", "10-2"],
     name: { ja: "11-1 スポンサーが付く", en: "11-1 Gets a Sponsor" },
     effect: {
-      ja: "所持IPに応じて通常強化3種の効果用レベルを追加する（100000 IP以降は強くソフトキャップ）",
-      en: "Adds effective levels to all three normal upgrades based on held IP, with a strong softcap after 100000 IP.",
+      ja: "所持IP2000ごとに通常強化3種の効果用レベルを追加する（100000 IP以降は効果なし）",
+      en: "Adds effective levels to all three normal upgrades per 2000 held IP, with no effect after 100000 IP.",
     },
   },
   {
     id: "11-2",
     bit: 17,
-    cost: 100000,
+    cost: 400000,
     requires: ["10-1", "10-2"],
     name: { ja: "11-2 分かりづらいよ", en: "11-2 Too Hard to Understand" },
     effect: {
-      ja: "IU1-1の倍率が1.005^(Infinity回数)になる（Infinity 10000以降は強くソフトキャップ）",
-      en: "Changes the IU 1-1 multiplier to 1.005^(Infinity count), with a strong softcap after 10000 Infinity.",
+      ja: "IU1-1の倍率が1.005^(Infinity回数)になる（Infinity 10000以降は効果なし）",
+      en: "Changes the IU 1-1 multiplier to 1.005^(Infinity count), with no effect after 10000 Infinity.",
     },
   },
 ];

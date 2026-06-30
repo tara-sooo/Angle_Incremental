@@ -115,7 +115,7 @@ const ACHIEVEMENTS = [
   {
     title: { ja: "固めのカップ麺", en: "Firm Cup Noodles" },
     condition: { ja: "最速Infinity時間が2分を切る", en: "Get a fastest Infinity time below 2 minutes." },
-    reward: { ja: "", en: "" },
+    reward: { ja: "GRとCBの自動化を解放", en: "Unlocks Generation and Core Boost automation." },
     isUnlocked: () => runtime.state.fastestInfinityTime > 0 && runtime.state.fastestInfinityTime < 120,
   },
   {
@@ -127,7 +127,7 @@ const ACHIEVEMENTS = [
   {
     title: { ja: "昔はこれが最難関でした", en: "This Used to Be the Hardest" },
     condition: { ja: "IC5をクリア", en: "Complete IC5." },
-    reward: { ja: "", en: "" },
+    reward: { ja: "IP獲得量がさらに×2", en: "Infinity Point gain is doubled again." },
     isUnlocked: () => runtime.isChallengeCompleted(5),
   },
   {

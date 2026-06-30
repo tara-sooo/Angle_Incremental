@@ -403,10 +403,13 @@ function shouldAutoRunGeneration() {
 }
 
 function runLayerAutomation() {
-  if (!runtime.hasInfinityUpgrade("8-1") || !runtime.state.automationEnabled) return false;
+  if (!runtime.state.automationEnabled) return false;
+  const infinityAutomationUnlocked = runtime.hasInfinityUpgrade("8-1");
+  const generationCoreAutomationUnlocked = runtime.isAchievementUnlocked(19);
 
   if (
-    runtime.state.autoRunInfinity
+    infinityAutomationUnlocked
+    && runtime.state.autoRunInfinity
     && runtime.state.infinityCount > 0
     && runtime.canInfinity()
     && runtime.infinityPointGain() >= Math.max(1, runtime.state.autoInfinityPointThreshold)
@@ -415,12 +418,12 @@ function runLayerAutomation() {
     return true;
   }
 
-  if (runtime.state.autoRunCoreBoost && runtime.canCoreBoost()) {
+  if (generationCoreAutomationUnlocked && runtime.state.autoRunCoreBoost && runtime.canCoreBoost()) {
     runtime.runCoreBoost();
     return true;
   }
 
-  if (runtime.state.autoRunGeneration && shouldAutoRunGeneration()) {
+  if (generationCoreAutomationUnlocked && runtime.state.autoRunGeneration && shouldAutoRunGeneration()) {
     runtime.runGeneration();
     return true;
   }

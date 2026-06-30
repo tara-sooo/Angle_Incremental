@@ -62,13 +62,11 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     Math.min(1, runtime.sanitizeNumber(data.generationCostFactor, 1, runtime.GENERATION_MIN_NEW_COST_FACTOR)),
   );
   runtime.state.coreBoostCount = Math.floor(runtime.sanitizeNumber(data.coreBoostCount, 0));
-  runtime.state.infinityCount = Math.min(
-    runtime.MAX_HOTFIX_INFINITY_COUNT,
-    Math.floor(runtime.sanitizeNumber(data.infinityCount, 0)),
-  );
+  runtime.state.infinityCount = Math.floor(runtime.sanitizeNumber(data.infinityCount, 0));
   const infinityPoints = runtime.hydrateLogResource(data.infinityPoints, data.infinityPointsLog10, -Infinity, true);
   runtime.state.infinityPoints = infinityPoints.value;
   runtime.state.infinityPointsLog10 = infinityPoints.log;
+  runtime.state.infinityPointsExact = typeof data.infinityPointsExact === "string" ? data.infinityPointsExact : "";
   const infiniteScore = runtime.hydrateLogResource(data.infiniteScore, data.infiniteScoreLog10);
   runtime.state.infiniteScore = infiniteScore.value;
   runtime.state.infiniteScoreLog10 = infiniteScore.log;
@@ -76,8 +74,10 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   if (saveVersion < 3) {
     const refundLog = legacyInfinityUpgradeRefundLog10(data);
     if (refundLog > -Infinity) {
-      runtime.state.infinityPointsLog10 = runtime.combineLog10(runtime.currentInfinityPointsLog10(), refundLog);
-      runtime.state.infinityPoints = runtime.valueFromLog10(runtime.state.infinityPointsLog10);
+      runtime.normalizeInfinityPointState();
+      runtime.syncInfinityPointCachesFromExact(
+        runtime.currentExactInfinityPoints() + runtime.exactInfinityPointsFromLog10(refundLog),
+      );
     }
     runtime.state.infinityUpgradeMask = 0;
   }
@@ -189,7 +189,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
 
 function serializeSaveData() {
   runtime.normalizeInfinityPointState();
-  runtime.state.infinityCount = Math.min(runtime.MAX_HOTFIX_INFINITY_COUNT, Math.max(0, Math.floor(runtime.state.infinityCount)));
+  runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
   const data = {};
   runtime.SAVE_FIELDS.forEach((field) => {
     data[field] = runtime.state[field];
@@ -397,6 +397,7 @@ function resetSave() {
     infinityCount: 0,
     infinityPoints: 0,
     infinityPointsLog10: -Infinity,
+    infinityPointsExact: "0",
     infiniteScore: 0,
     infiniteScoreLog10: -Infinity,
     infinityUpgradeMask: 0,

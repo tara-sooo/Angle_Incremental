@@ -253,7 +253,8 @@ function canSpend(amount) {
 
 function updateAutomationUi() {
   const unlocked = runtime.hasInfinityUpgrade("1-2");
-  const layerUnlocked = runtime.hasInfinityUpgrade("8-1");
+  const generationCoreUnlocked = runtime.isAchievementUnlocked(19);
+  const infinityUnlocked = runtime.hasInfinityUpgrade("8-1");
   if (!runtime.elements.automationMasterToggle) return;
   runtime.elements.automationLockNote.textContent = unlocked ? runtime.t("infinityUpgradeAvailable") : runtime.t("automationLocked");
   runtime.elements.automationMasterToggle.disabled = !unlocked;
@@ -267,10 +268,14 @@ function updateAutomationUi() {
     runtime.elements.autoGenerationCostThresholdInput,
     runtime.elements.autoGenerationMinimumSecondsInput,
     runtime.elements.autoRunCoreBoostToggle,
+  ].forEach((element) => {
+    if (element) element.disabled = !generationCoreUnlocked;
+  });
+  [
     runtime.elements.autoRunInfinityToggle,
     runtime.elements.autoInfinityPointThresholdInput,
   ].forEach((element) => {
-    if (element) element.disabled = !layerUnlocked;
+    if (element) element.disabled = !infinityUnlocked;
   });
   syncFormControl(runtime.elements.automationMasterToggle, unlocked && runtime.state.automationEnabled);
   syncFormControl(runtime.elements.autoBuySpeedToggle, runtime.state.autoBuySpeed);

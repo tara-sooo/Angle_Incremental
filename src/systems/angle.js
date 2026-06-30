@@ -126,18 +126,12 @@ function currentInfiniteScoreLog10() {
 
 function sponsoredNormalUpgradeBonusLevel() {
   if (!runtime.hasInfinityUpgrade("11-1")) return 0;
-  const ipLog = Math.min(currentInfinityPointsLog10(), runtime.MAX_HOTFIX_INFINITY_POINTS_LOG10);
-  if (ipLog < 2) return 0;
-  const rawLog = ipLog - 2;
-  if (rawLog <= 3) return Math.max(0, Math.floor(10 ** rawLog));
-  return Math.floor(1000 + 10 * (rawLog - 3));
+  const effectiveIp = Math.min(100000, runtime.valueFromLog10(currentInfinityPointsLog10()));
+  return Math.max(0, Math.floor(effectiveIp / 2000));
 }
 
 function iu11_2EffectiveInfinityCount() {
-  const count = Math.min(runtime.MAX_HOTFIX_INFINITY_COUNT, Math.max(0, runtime.state.infinityCount));
-  if (count <= 10000) return count;
-  if (!Number.isFinite(count)) return 10000 + Math.log10(Number.MAX_VALUE);
-  return 10000 + Math.log10(count - 10000 + 1);
+  return Math.min(10000, Math.max(0, runtime.state.infinityCount));
 }
 
 function effectiveSpeedLevel() {
