@@ -116,6 +116,71 @@ function assertSameSimulation(exact, batched, label) {
 
 async function runNumericStabilityModuleRuntimeTest() {
   {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug } = instance;
+    const { state } = debug;
+    runtime.applySaveData({
+      infinityPointsExact: "100000000000000000000",
+      infinityPoints: 100000000000000000000,
+      infinityPointsLog10: 20,
+    }, 7);
+    runtime.addInfinityPoints(3570);
+    assert.equal(
+      state.infinityPointsExact,
+      "100000000000000003570",
+      "IP gains must be exact when adding small amounts to 1e20 IP",
+    );
+    assert.equal(
+      runtime.canSpendInfinityPoints(20),
+      true,
+      "exact IP gains above 1e20 should still allow exact 1e20 IP spending",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug } = instance;
+    const { state } = debug;
+    runtime.applySaveData({
+      infinityPointsExact: "100000000000000000000",
+      infinityPoints: 100000000000000000000,
+      infinityPointsLog10: 20,
+    }, 7);
+    debug.convertIpToInfiniteScore();
+    assert.equal(state.infinityPointsExact, "0", "spending 1e20 IP should exactly consume a 1e20 IP balance");
+    assert.equal(state.infinityPoints, 0, "spending all exact IP should update the numeric cache");
+    assert.equal(state.infinityPointsLog10, -Infinity, "spending all exact IP should update the log cache");
+  }
+
+  {
+    const source = await loadRuntime(candidatePath);
+    const { runtime, debug } = source;
+    runtime.applySaveData({
+      infinityPointsExact: "1000000000000000000000000000000",
+      infinityPoints: 1e30,
+      infinityPointsLog10: 30,
+      infinityCount: 1234567,
+    }, 7);
+    debug.saveGame("manual");
+    const localReload = await loadRuntime(candidatePath, source.storage);
+    assert.equal(
+      localReload.debug.state.infinityPointsExact,
+      "1000000000000000000000000000000",
+      "local saves must preserve exact high IP balances",
+    );
+    assert.equal(localReload.debug.state.infinityCount, 1234567, "local saves must preserve uncapped Infinity counts");
+
+    const saveCode = await debug.exportSaveCode();
+    const imported = await loadRuntime(candidatePath);
+    assert.equal(await imported.debug.importSaveCode(saveCode), true, "exact-IP save code must import");
+    assert.equal(
+      imported.debug.state.infinityPointsExact,
+      "1000000000000000000000000000000",
+      "save codes must preserve exact high IP balances",
+    );
+  }
+
+  {
     const storedSave = {
       version: 7,
       state: { vertices: 1_000_000 },

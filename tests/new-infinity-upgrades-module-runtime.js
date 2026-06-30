@@ -7,6 +7,7 @@ const candidatePath = path.join(__dirname, "..", "src", "main.js");
 function setLogResource(state, key, log) {
   state[`${key}Log10`] = log;
   state[key] = log <= 308 ? 10 ** log : Number.MAX_VALUE;
+  if (key === "infinityPoints") state.infinityPointsExact = state[key].toFixed(0);
 }
 
 function purchasedMaskThrough(bit) {
@@ -15,9 +16,9 @@ function purchasedMaskThrough(bit) {
 
 function prepareGenerationAutomationScenario(instance, { generationScoreLog10 = 20, runSeconds = 0 } = {}) {
   const { state } = instance.debug;
-  state.infinityUpgradeMask = purchasedMaskThrough(12);
   state.automationEnabled = true;
   state.autoRunGeneration = true;
+  state.achievementMask = 1 << (19 - 1);
   state.generationCount = 1;
   state.previousGenerationScoreLog10 = 6;
   state.previousGenerationScore = 1e6;
@@ -35,15 +36,17 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
 
     assert.equal(byId.get("8-1")?.cost, 200, "IU 8-1 must cost 200 IP");
     assert.deepEqual(Array.from(byId.get("8-1")?.requires || []), ["7-1", "7-2"], "IU 8-1 must require both tier 7 upgrades");
+    assert.equal(byId.get("8-1")?.name.ja, "8-1 無限に無限周回", "IU 8-1 Japanese name must describe Infinity automation");
+    assert.equal(byId.get("8-1")?.effect.ja, "Infinityの自動化を解放する", "IU 8-1 Japanese effect must only mention Infinity automation");
     assert.equal(byId.get("9-1")?.cost, 200, "IU 9-1 must cost 200 IP");
     assert.deepEqual(Array.from(byId.get("9-1")?.requires || []), ["8-1"], "IU 9-1 must require IU 8-1");
-    assert.equal(byId.get("10-1")?.cost, 3000, "IU 10-1 must cost 3000 IP");
+    assert.equal(byId.get("10-1")?.cost, 12000, "IU 10-1 must cost 12000 IP");
     assert.deepEqual(Array.from(byId.get("10-1")?.requires || []), ["9-1"], "IU 10-1 must require IU 9-1");
-    assert.equal(byId.get("10-2")?.cost, 7000, "IU 10-2 must cost 7000 IP");
+    assert.equal(byId.get("10-2")?.cost, 28000, "IU 10-2 must cost 28000 IP");
     assert.deepEqual(Array.from(byId.get("10-2")?.requires || []), ["9-1"], "IU 10-2 must require IU 9-1");
-    assert.equal(byId.get("11-1")?.cost, 50000, "IU 11-1 must cost 50000 IP");
+    assert.equal(byId.get("11-1")?.cost, 200000, "IU 11-1 must cost 200000 IP");
     assert.deepEqual(Array.from(byId.get("11-1")?.requires || []), ["10-1", "10-2"], "IU 11-1 must require both tier 10 upgrades");
-    assert.equal(byId.get("11-2")?.cost, 100000, "IU 11-2 must cost 100000 IP");
+    assert.equal(byId.get("11-2")?.cost, 400000, "IU 11-2 must cost 400000 IP");
     assert.deepEqual(Array.from(byId.get("11-2")?.requires || []), ["10-1", "10-2"], "IU 11-2 must require both tier 10 upgrades");
   }
 
@@ -82,10 +85,9 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     const { runtime, debug } = await loadRuntime(candidatePath);
     const { state } = debug;
     state.infinityUpgradeMask = purchasedMaskThrough(13);
-    state.infinityPoints = 3000;
-    state.infinityPointsLog10 = Math.log10(3000);
+    setLogResource(state, "infinityPoints", Math.log10(12000));
     state.coreBoostCount = 0;
-    assert.equal(debug.buyInfinityUpgrade("10-1"), true, "IU 10-1 must be purchasable with 3000 IP and IU 9-1");
+    assert.equal(debug.buyInfinityUpgrade("10-1"), true, "IU 10-1 must be purchasable with 12000 IP and IU 9-1");
     assert.equal(state.coreBoostCount, 2, "buying IU 10-1 must grant the two starting Core Boosts immediately");
     runtime.resetBelowInfinity();
     assert.equal(state.coreBoostCount, 2, "Infinity resets must preserve the IU 10-1 Core Boost floor");
@@ -136,11 +138,9 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     const { runtime, debug } = await loadRuntime(candidatePath);
     const { state } = debug;
     state.infinityUpgradeMask = purchasedMaskThrough(15);
-    state.infinityPoints = 50000;
-    state.infinityPointsLog10 = Math.log10(50000);
+    setLogResource(state, "infinityPoints", Math.log10(200000));
     assert.equal(debug.buyInfinityUpgrade("11-1"), true, "IU 11-1 must be purchasable after both tier 10 upgrades");
-    state.infinityPoints = 100000;
-    state.infinityPointsLog10 = Math.log10(100000);
+    setLogResource(state, "infinityPoints", Math.log10(400000));
     assert.equal(debug.buyInfinityUpgrade("11-2"), true, "IU 11-2 must be purchasable after both tier 10 upgrades");
   }
 
@@ -149,24 +149,28 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     const { state } = debug;
     state.infinityUpgradeMask = purchasedMaskThrough(16);
 
+    setLogResource(state, "infinityPoints", Math.log10(1999));
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 0, "IU 11-1 bonus should not grant levels before 2000 IP");
+    setLogResource(state, "infinityPoints", Math.log10(2000));
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1, "IU 11-1 bonus should grant one level per 2000 IP");
     setLogResource(state, "infinityPoints", Math.log10(99999));
-    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 999, "IU 11-1 bonus should grant one level per 100 IP before the softcap");
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 49, "IU 11-1 bonus should floor one level per 2000 IP before the cap");
     setLogResource(state, "infinityPoints", Math.log10(100000));
-    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1000, "IU 11-1 bonus should reach 1000 levels at 100000 IP");
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 50, "IU 11-1 bonus should reach 50 levels at 100000 IP");
     setLogResource(state, "infinityPoints", Math.log10(1000000));
-    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1010, "IU 11-1 bonus should use strong log scaling after 100000 IP");
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 50, "IU 11-1 bonus should stop growing after 100000 IP");
     setLogResource(state, "infinityPoints", Math.log10(20000000));
-    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1023, "IU 11-1 bonus should stay tightly capped at the hotfix IP limit");
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 50, "IU 11-1 bonus should ignore IP past 100000");
     setLogResource(state, "infinityPoints", Math.log10(100000000));
-    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 1023, "IU 11-1 bonus should use the hotfix IP cap before calculating bonus levels");
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 50, "IU 11-1 bonus should not use the hotfix IP cap");
     setLogResource(state, "infinityPoints", Math.log10(1000000));
 
     state.speedLevel = 10;
     state.vertices = 20;
     state.gainLevel = 30;
-    assert.equal(runtime.effectiveSpeedLevel(), 1020, "IU 11-1 should add bonus levels to lap-speed upgrades");
-    assert.equal(runtime.effectiveVertexCount(), 1030, "IU 11-1 should add bonus levels to effective vertices");
-    assert.equal(runtime.effectiveGainLevel(), 1040, "IU 11-1 should add bonus levels to gain upgrades");
+    assert.equal(runtime.effectiveSpeedLevel(), 60, "IU 11-1 should add bonus levels to lap-speed upgrades");
+    assert.equal(runtime.effectiveVertexCount(), 70, "IU 11-1 should add bonus levels to effective vertices");
+    assert.equal(runtime.effectiveGainLevel(), 80, "IU 11-1 should add bonus levels to gain upgrades");
 
     const speedCost = runtime.costLog10("speed", 5, state.speedLevel, 1.55);
     const vertexCost = runtime.costLog10("vertex", 12, state.vertices - 3, 1.72);
@@ -181,8 +185,6 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     const instance = await loadRuntime(candidatePath);
     const { runtime, debug, storage } = instance;
     const { state } = debug;
-    const capLog = Math.log10(20000000);
-
     runtime.applySaveData({
       infinityPoints: 17000000,
       infinityPointsLog10: Math.log10(17000000),
@@ -192,35 +194,38 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
 
     runtime.applySaveData({
       infinityPoints: 20000000,
-      infinityPointsLog10: capLog,
+      infinityPointsLog10: Math.log10(20000000),
     }, 7);
     assert.equal(state.infinityPoints, 20000000, "the hotfix IP cap itself must be preserved exactly");
-    assert.equal(state.infinityPointsLog10, capLog, "the hotfix IP cap log must be preserved exactly");
+    assert.equal(state.infinityPointsLog10, Math.log10(20000000), "the former hotfix IP cap log must be preserved exactly");
 
     runtime.applySaveData({
       infinityPoints: Number.MAX_VALUE,
       infinityPointsLog10: 30,
     }, 7);
-    assert.equal(state.infinityPoints, 20000000, "excessive finite IP saves must be capped at 20000000 IP");
-    assert.equal(state.infinityPointsLog10, capLog, "excessive finite IP logs must be capped at 20000000 IP");
+    assert.equal(state.infinityPoints, 1e30, "large finite IP saves must no longer be capped at 20000000 IP");
+    assert.equal(state.infinityPointsLog10, 30, "large finite IP logs must no longer be capped at 20000000 IP");
+    assert.equal(state.infinityPointsExact, "1000000000000000000000000000000", "large finite IP saves must hydrate exact integer IP");
 
     runtime.applySaveData({
       infinityPoints: Number.MAX_VALUE,
       infinityPointsLog10: Infinity,
       infinityCount: 1000000,
     }, 7);
-    assert.equal(state.infinityPoints, 20000000, "overflow IP saves must recover to the hotfix IP cap");
-    assert.equal(state.infinityPointsLog10, capLog, "overflow IP logs must recover to the hotfix IP cap");
-    assert.equal(state.infinityCount, 30000, "overflow Infinity count saves must recover to the hotfix Infinity cap");
+    assert.equal(state.infinityPoints, Number.MAX_VALUE, "overflow IP saves must recover to Number.MAX_VALUE");
+    assert.equal(state.infinityPointsLog10, Math.log10(Number.MAX_VALUE), "overflow IP logs must recover to the maximum finite IP log");
+    assert.equal(state.infinityCount, 1000000, "overflow Infinity count saves must no longer recover to the hotfix Infinity cap");
 
     state.infinityPoints = Number.MAX_VALUE;
     state.infinityPointsLog10 = 30;
+    state.infinityPointsExact = "1000000000000000000000000000000";
     state.infinityCount = 1000000;
     assert.equal(debug.saveGame("manual"), true, "saving an excessive IP balance should succeed");
     const saved = JSON.parse(storage.get(runtime.SAVE_KEY));
-    assert.equal(saved.state.infinityPoints, 20000000, "saved excessive IP balances must be persisted at the hotfix cap");
-    assert.equal(saved.state.infinityPointsLog10, capLog, "saved excessive IP logs must be persisted at the hotfix cap");
-    assert.equal(saved.state.infinityCount, 30000, "saved excessive Infinity counts must be persisted at the hotfix cap");
+    assert.equal(saved.state.infinityPoints, 1e30, "saved large IP balances must not be persisted at the hotfix cap");
+    assert.equal(saved.state.infinityPointsLog10, 30, "saved large IP logs must not be persisted at the hotfix cap");
+    assert.equal(saved.state.infinityPointsExact, "1000000000000000000000000000000", "saved large IP balances must preserve exact IP");
+    assert.equal(saved.state.infinityCount, 1000000, "saved Infinity counts must not be persisted at the hotfix cap");
   }
 
   {
@@ -229,8 +234,8 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     state.infinityUpgradeMask = purchasedMaskThrough(16);
     state.infinityCount = 1;
     setLogResource(state, "infinityPoints", Math.log10(1000000));
-    state.vertices = 20;
     runtime.toggleInfinityChallenge(2);
+    state.vertices = 180;
     assert.equal(state.activeChallenge, 2, "IC2 should start for the effective vertex cap scenario");
     assert.equal(runtime.effectiveVertexCount(), 200, "IC2 must cap IU 11-1 effective vertices at 200");
     assert.equal(runtime.canBuyNormalUpgrade("vertex"), false, "IC2 must prevent vertex purchases once effective vertices are capped at 200");
@@ -240,8 +245,8 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(state.activeChallenge, 8, "IC8 should start for the effective vertex lock scenario");
     assert.equal(runtime.effectiveVertexCount(), 3, "IC8 must ignore IU 11-1 vertex bonuses and keep 3 effective vertices");
     assert.equal(runtime.canBuyNormalUpgrade("vertex"), false, "IC8 must keep vertex purchases disabled");
-    assert.equal(runtime.effectiveSpeedLevel(), state.speedLevel + 1010, "IC8 should still keep IU 11-1 speed bonus levels");
-    assert.equal(runtime.effectiveGainLevel(), state.gainLevel + 1010, "IC8 should still keep IU 11-1 gain bonus levels");
+    assert.equal(runtime.effectiveSpeedLevel(), state.speedLevel + 50, "IC8 should still keep IU 11-1 speed bonus levels");
+    assert.equal(runtime.effectiveGainLevel(), state.gainLevel + 50, "IC8 should still keep IU 11-1 gain bonus levels");
   }
 
   {
@@ -261,13 +266,9 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(runtime.iu11_2EffectiveInfinityCount(), 10000, "IU 11-2 should not softcap before 10000 Infinity");
     const atSoftcapStart = runtime.vertexGainIncrease();
     state.infinityCount = 1000000;
-    assert.ok(
-      Math.abs(runtime.iu11_2EffectiveInfinityCount() - (10000 + Math.log10(20001))) < 1e-12,
-      "IU 11-2 should strongly softcap Infinity counts above 10000 after the hotfix Infinity cap",
-    );
+    assert.equal(runtime.iu11_2EffectiveInfinityCount(), 10000, "IU 11-2 should stop growing after 10000 Infinity");
     const farAfterSoftcap = runtime.vertexGainIncrease();
-    assert.ok(farAfterSoftcap > atSoftcapStart, "IU 11-2 softcap should remain monotonic");
-    assert.ok(farAfterSoftcap / atSoftcapStart < 1.03, "IU 11-2 should barely grow after the 10000 Infinity softcap");
+    assert.equal(farAfterSoftcap, atSoftcapStart, "IU 11-2 should be flat after the 10000 Infinity cap");
     assert.equal(Number.isFinite(farAfterSoftcap), true, "IU 11-2 softcapped multiplier must stay finite");
   }
 
@@ -277,11 +278,30 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     state.infinityUpgradeMask = purchasedMaskThrough(12);
     state.automationEnabled = true;
     state.autoRunInfinity = true;
+    state.autoRunGeneration = true;
+    state.autoRunCoreBoost = true;
     state.autoInfinityPointThreshold = 10;
     state.infinityCount = 1;
     setLogResource(state, "score", 320);
     assert.equal(runtime.runLayerAutomation(), true, "IU 8-1 must expose and run layer automation");
     assert.equal(state.infinityCount > 1, true, "layer automation must run Infinity when the IP threshold is met");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(12);
+    state.automationEnabled = true;
+    state.autoRunGeneration = true;
+    state.autoRunCoreBoost = true;
+    state.infinityCount = 1;
+    state.generationCount = 1;
+    setLogResource(state, "score", 90);
+    assert.equal(runtime.runLayerAutomation(), false, "IU 8-1 must not unlock GR or CB automation by itself");
+
+    state.achievementMask = 1 << (19 - 1);
+    assert.equal(runtime.runLayerAutomation(), true, "achievement 19 must unlock Core Boost automation");
+    assert.equal(state.coreBoostCount, 1, "Core Boost automation should run once achievement 19 is unlocked");
   }
 
   {

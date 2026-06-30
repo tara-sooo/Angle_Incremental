@@ -113,7 +113,10 @@ function infinityPointGain() {
   const scoreLog = runtime.currentScoreLog10();
   const base = Math.max(1, Math.floor(scoreLog - 307));
   const gained = Math.max(1, Math.floor(base));
-  return gained * (runtime.isAchievementUnlocked(17) ? 2 : 1);
+  let multiplier = 1;
+  if (runtime.isAchievementUnlocked(17)) multiplier *= 2;
+  if (runtime.isAchievementUnlocked(21)) multiplier *= 2;
+  return gained * multiplier;
 }
 
 function infiniteScoreGainPerIp() {
@@ -131,17 +134,21 @@ function setInfinityPointBalanceFromLog10(balanceLog10) {
 
 function canSpendInfinityPoints(costLog10) {
   runtime.normalizeInfinityPointState();
-  return runtime.currentInfinityPointsLog10() >= costLog10;
+  return runtime.currentExactInfinityPoints() >= runtime.exactInfinityPointsFromCostLog10(costLog10);
 }
 
 function addInfinityPoints(amount) {
-  const amountLog10 = runtime.log10Value(amount);
-  setInfinityPointBalanceFromLog10(runtime.combineLog10(runtime.currentInfinityPointsLog10(), amountLog10));
+  if (amount <= 0) return;
+  const current = runtime.currentExactInfinityPoints();
+  const added = BigInt(Math.max(0, Math.floor(amount)));
+  runtime.syncInfinityPointCachesFromExact(current + added);
 }
 
 function spendInfinityPoints(costLog10) {
   if (!canSpendInfinityPoints(costLog10)) return false;
-  setInfinityPointBalanceFromLog10(runtime.subtractLog10(runtime.currentInfinityPointsLog10(), costLog10));
+  const current = runtime.currentExactInfinityPoints();
+  const cost = runtime.exactInfinityPointsFromCostLog10(costLog10);
+  runtime.syncInfinityPointCachesFromExact(current - cost);
   return true;
 }
 
@@ -239,7 +246,7 @@ function runInfinity(forced = false) {
   }
 
   const gained = runtime.infinityPointGain();
-  runtime.state.infinityCount = Math.min(runtime.MAX_HOTFIX_INFINITY_COUNT, runtime.state.infinityCount + infinityCountGain());
+  runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + infinityCountGain());
   addInfinityPoints(gained);
   recordInfinityRun(scoreLogBeforeReset, gained, completedChallenge, noGenerationOrCoreBoost);
   runtime.checkAchievements(true);
@@ -304,7 +311,10 @@ function balanceInfinityPointGain() {
   else if (hasInfinityUpgrade("9-1")) base = Math.floor(scoreLog10 / Math.log10(7) - 307);
   else base = Math.floor(scoreLog10 - 307);
   const gained = Math.max(1, base);
-  return gained * (runtime.isAchievementUnlocked(17) ? 2 : 1);
+  let multiplier = 1;
+  if (runtime.isAchievementUnlocked(17)) multiplier *= 2;
+  if (runtime.isAchievementUnlocked(21)) multiplier *= 2;
+  return gained * multiplier;
 }
 
 function balanceInfinityUpgradeCostExponent() {
