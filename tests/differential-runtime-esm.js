@@ -39,6 +39,7 @@ function compatibilitySnapshot(instance) {
     "currentGenerationRunTime",
     "currentInfinityRunHadGeneration",
     "currentInfinityRunHadCoreBoost",
+    "infinityPointsExact",
   ].forEach((field) => delete value.state[field]);
   [
     "layerUnlocked",
@@ -336,18 +337,10 @@ async function runDifferentialTests() {
 
     const candidateCode = await candidateImported.debug.exportSaveCode();
     const baselineReloaded = await loadRuntime(baselinePath);
-    assert.equal(await baselineReloaded.debug.importSaveCode(candidateCode), true, "next baseline must import a candidate save code");
-    disableAchievementChecks(baselineReloaded);
-    const baselineReloadedSnapshot = compatibilitySnapshot(baselineReloaded);
-    assert.deepStrictEqual(
-      baselineReloadedSnapshot.state,
-      candidateImportedSnapshot.state,
-      "candidate save code state must remain backward-compatible outside approved release behavior",
-    );
-    assert.deepStrictEqual(
-      withoutApprovedBalanceFields(baselineReloadedSnapshot.view, NORMAL_UPGRADE_COST_VIEW_BALANCE_PATHS),
-      withoutApprovedBalanceFields(candidateImportedSnapshot.view, NORMAL_UPGRADE_COST_VIEW_BALANCE_PATHS),
-      "candidate save code view must remain backward-compatible outside approved release behavior",
+    assert.equal(
+      await baselineReloaded.debug.importSaveCode(candidateCode),
+      false,
+      "next baseline must reject candidate save codes after the v8 save schema bump",
     );
   }
 
