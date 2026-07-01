@@ -43,9 +43,61 @@ select {
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 86px;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
   padding: 9px 0;
+}
+
+.news-ticker {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 5px 10px;
+  border: 2px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(13, 24, 48, 0.98), rgba(5, 9, 19, 0.98));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.24);
+}
+
+.news-label {
+  color: #101726;
+  background: var(--gold);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 5px 7px;
+}
+
+.news-track {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.news-text {
+  display: inline-block;
+  min-width: max-content;
+  padding-left: 100%;
+  color: #d8e2ff;
+  font-size: 0.8rem;
+  font-weight: 850;
+  line-height: 1.3;
+  white-space: nowrap;
+  animation: news-scroll 24s linear infinite;
+}
+
+@keyframes news-scroll {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-100%);
+  }
 }
 
 .main-tabs,
@@ -64,8 +116,10 @@ select {
 }
 
 .main-tabs {
+  grid-column: 2;
+  grid-row: 2;
   order: 2;
-  height: calc(100svh - 18px);
+  height: 100%;
   min-height: 0;
   padding: 10px 8px;
   display: grid;
@@ -138,9 +192,11 @@ select {
 }
 
 .main-panels {
+  grid-column: 1;
+  grid-row: 2;
   order: 1;
   min-width: 0;
-  height: calc(100svh - 18px);
+  height: 100%;
   min-height: 0;
   display: grid;
 }
@@ -1308,13 +1364,32 @@ canvas {
     height: 100svh;
     min-height: 0;
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 6px;
     overflow: hidden;
     padding: 7px 0;
   }
 
+  .news-ticker {
+    grid-column: 1;
+    grid-row: 1;
+    min-height: 30px;
+    padding: 4px 7px;
+  }
+
+  .news-label {
+    font-size: 0.62rem;
+    padding: 4px 6px;
+  }
+
+  .news-text {
+    font-size: 0.72rem;
+    animation-duration: 19s;
+  }
+
   .main-tabs {
+    grid-column: 1;
+    grid-row: 3;
     order: 2;
     position: relative;
     z-index: 10;
@@ -1337,6 +1412,8 @@ canvas {
   }
 
   .main-panels {
+    grid-column: 1;
+    grid-row: 2;
     order: 1;
     height: auto;
     min-height: 0;

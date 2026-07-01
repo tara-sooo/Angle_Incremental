@@ -243,6 +243,18 @@ function updateAchievementRows() {
   });
 }
 
+function updateNewsTicker() {
+  if (!runtime.elements.newsTickerText) return;
+  const language = runtime.TEXT[runtime.state.language] ? runtime.state.language : "ja";
+  const messages = runtime.TEXT[language].newsMessages || runtime.TEXT.ja.newsMessages || [];
+  if (messages.length === 0) return;
+  const index = Math.floor(runtime.state.totalPlayTime / 18) % messages.length;
+  const message = messages[index];
+  if (runtime.elements.newsTickerText.textContent !== message) {
+    runtime.elements.newsTickerText.textContent = message;
+  }
+}
+
 function canSpendLog(amountLog) {
   return runtime.currentScoreLog10() >= amountLog;
 }
@@ -321,6 +333,7 @@ function updateUi() {
   if (unlockedAchievementsNow.length > 0) runtime.saveGame("manual");
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
   applyLanguage();
+  updateNewsTicker();
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());
   runtime.elements.vertexGainValue.textContent = `+${runtime.formatSmallDecimal(runtime.vertexGainIncrease())}`;
@@ -532,6 +545,7 @@ expose("updateInfinityUpgradeRows", () => updateInfinityUpgradeRows, (value) => 
 expose("buySelectedInfinityUpgrade", () => buySelectedInfinityUpgrade, (value) => { buySelectedInfinityUpgrade = value; });
 expose("createAchievementRows", () => createAchievementRows, (value) => { createAchievementRows = value; });
 expose("updateAchievementRows", () => updateAchievementRows, (value) => { updateAchievementRows = value; });
+expose("updateNewsTicker", () => updateNewsTicker, (value) => { updateNewsTicker = value; });
 expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
 expose("updateAutomationUi", () => updateAutomationUi, (value) => { updateAutomationUi = value; });

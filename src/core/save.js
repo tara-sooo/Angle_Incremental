@@ -100,6 +100,11 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     const preservedMask = (1 << 0) | (1 << 1) | (1 << 2) | (1 << 3) | (1 << 5);
     runtime.state.achievementMask = loadedAchievementMask & preservedMask;
     if ((loadedAchievementMask & (1 << 7)) !== 0) runtime.state.achievementMask |= 1 << 6;
+  } else if (saveVersion < 9) {
+    const through23Mask = (1 << 23) - 1;
+    runtime.state.achievementMask = loadedAchievementMask & through23Mask;
+    if ((loadedAchievementMask & (1 << (25 - 1))) !== 0) runtime.state.achievementMask |= 1 << (25 - 1);
+    if ((loadedAchievementMask & (1 << (24 - 1))) !== 0) runtime.state.achievementMask |= 1 << (30 - 1);
   } else {
     runtime.state.achievementMask = loadedAchievementMask;
   }

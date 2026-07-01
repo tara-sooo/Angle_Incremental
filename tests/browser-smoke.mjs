@@ -101,6 +101,38 @@ try {
   assert.equal(snapshot.vertices, 3);
   assert.equal(snapshot.infinity.count, 0);
   assert.equal(typeof snapshot.score, "string");
+  const newsTicker = await page.evaluate(() => {
+    const ticker = document.querySelector("#newsTicker");
+    const item = document.querySelector("#newsTickerText");
+    return {
+      exists: Boolean(ticker),
+      text: item?.textContent?.trim() ?? "",
+      animated: Boolean(item && getComputedStyle(item).animationName !== "none"),
+    };
+  });
+  assert.equal(newsTicker.exists, true, "news ticker must exist above the main tabs");
+  assert.notEqual(newsTicker.text, "", "news ticker must display a news message");
+  assert.equal(newsTicker.animated, true, "news ticker text must use a scrolling animation");
+  const addedJapaneseNews = await page.evaluate(() => {
+    window.__angleDebug.state.totalPlayTime = 14 * 18;
+    window.advanceTime(0);
+    return document.querySelector("#newsTickerText")?.textContent?.trim() ?? "";
+  });
+  assert.equal(addedJapaneseNews, "誰かInfinityに落ち着くよう伝えてください。", "news ticker should include game-local community-style Japanese messages");
+  const addedEnglishNews = await page.evaluate(() => {
+    window.__angleDebug.applySetting("language", "en");
+    window.__angleDebug.state.totalPlayTime = 14 * 18;
+    window.advanceTime(0);
+    return document.querySelector("#newsTickerText")?.textContent?.trim() ?? "";
+  });
+  assert.equal(addedEnglishNews, "Someone tell Infinity to calm down.", "news ticker should include game-local community-style English messages");
+  const addedProgressionNews = await page.evaluate(() => {
+    window.__angleDebug.applySetting("language", "ja");
+    window.__angleDebug.state.totalPlayTime = 18 * 18;
+    window.advanceTime(0);
+    return document.querySelector("#newsTickerText")?.textContent?.trim() ?? "";
+  });
+  assert.equal(addedProgressionNews, "Infinite Capの壁には、もう少し分かりやすいドアが必要です。", "news ticker should include game-specific UI/progression jokes");
   const breakCapPlacement = await page.evaluate(() => {
     const breakCap = document.querySelector("#breakCapButton");
     const subtabs = document.querySelector(".infinity-subtabs");

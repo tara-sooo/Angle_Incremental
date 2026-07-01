@@ -7,6 +7,8 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 const elements = {
+  newsTicker: document.getElementById("newsTicker"),
+  newsTickerText: document.getElementById("newsTickerText"),
   mainTabs: Array.from(document.querySelectorAll(".main-tab")),
   mainPanels: Array.from(document.querySelectorAll(".main-panel")),
   infinitySubtabs: Array.from(document.querySelectorAll(".infinity-subtab")),
