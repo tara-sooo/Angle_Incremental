@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.5.0";
+const EXPECTED_ASSET_VERSION = "0.5.1";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -115,6 +115,18 @@ try {
   assert.equal(newsTicker.live, null, "auto-rotating top bar must not be announced as a live region");
   assert.notEqual(newsTicker.text, "", "news ticker must display a news message");
   assert.equal(newsTicker.animated, true, "news ticker text must use a scrolling animation");
+  const newsTiming = await page.evaluate(() => {
+    const item = document.querySelector("#newsTickerText");
+    const before = item?.textContent?.trim() ?? "";
+    window.__angleDebug.state.totalPlayTime = 14 * 18;
+    window.advanceTime(0);
+    const afterTimeJump = item?.textContent?.trim() ?? "";
+    item?.dispatchEvent(new AnimationEvent("animationiteration", { animationName: "news-scroll" }));
+    const afterIteration = item?.textContent?.trim() ?? "";
+    return { before, afterTimeJump, afterIteration };
+  });
+  assert.equal(newsTiming.afterTimeJump, newsTiming.before, "news text should not change from total play time alone");
+  assert.notEqual(newsTiming.afterIteration, newsTiming.before, "news text should advance after one scroll animation iteration");
   const topBarModes = await page.evaluate(() => {
     const select = document.querySelector("#topBarModeSelect");
     return {
@@ -125,21 +137,28 @@ try {
   assert.equal(topBarModes.value, "news", "top bar mode should default to news");
   assert.deepEqual(topBarModes.options, ["news", "resources", "progress", "blank", "hidden"], "top bar mode select should expose all display modes");
   const addedJapaneseNews = await page.evaluate(() => {
-    window.__angleDebug.state.totalPlayTime = 14 * 18;
+    const item = document.querySelector("#newsTickerText");
+    window.__angleDebug.applySetting("language", "ja");
+    window.__angleDebug.applySetting("topBarMode", "news");
+    for (let index = 0; index < 13; index += 1) {
+      item?.dispatchEvent(new AnimationEvent("animationiteration", { animationName: "news-scroll" }));
+    }
     window.advanceTime(0);
     return document.querySelector("#newsTickerText")?.textContent?.trim() ?? "";
   });
   assert.equal(addedJapaneseNews, "誰かInfinityに落ち着くよう伝えてください。", "news ticker should include game-local community-style Japanese messages");
   const addedEnglishNews = await page.evaluate(() => {
     window.__angleDebug.applySetting("language", "en");
-    window.__angleDebug.state.totalPlayTime = 14 * 18;
     window.advanceTime(0);
     return document.querySelector("#newsTickerText")?.textContent?.trim() ?? "";
   });
   assert.equal(addedEnglishNews, "Someone tell Infinity to calm down.", "news ticker should include game-local community-style English messages");
   const addedProgressionNews = await page.evaluate(() => {
+    const item = document.querySelector("#newsTickerText");
     window.__angleDebug.applySetting("language", "ja");
-    window.__angleDebug.state.totalPlayTime = 18 * 18;
+    for (let index = 0; index < 4; index += 1) {
+      item?.dispatchEvent(new AnimationEvent("animationiteration", { animationName: "news-scroll" }));
+    }
     window.advanceTime(0);
     return document.querySelector("#newsTickerText")?.textContent?.trim() ?? "";
   });
@@ -158,6 +177,13 @@ try {
   assert.match(resourceTopBar.text, /Score .* IP .* IA/, "resources top bar should summarize score, IP, and IA");
   assert.equal(resourceTopBar.animated, false, "resources top bar should be static");
   assert.equal(resourceTopBar.hidden, false, "resources top bar should remain visible");
+  const nonNewsIteration = await page.evaluate(() => {
+    const item = document.querySelector("#newsTickerText");
+    const before = item?.textContent?.trim() ?? "";
+    item?.dispatchEvent(new AnimationEvent("animationiteration", { animationName: "news-scroll" }));
+    return item?.textContent?.trim() ?? "";
+  });
+  assert.equal(nonNewsIteration, resourceTopBar.text, "animation iterations should not advance text outside news mode");
   const progressTopBar = await page.evaluate(() => {
     window.__angleDebug.applySetting("topBarMode", "progress");
     return {
@@ -202,6 +228,23 @@ try {
   });
   assert.notEqual(restoredNewsTopBar.text, "", "news mode should restore news text");
   assert.equal(restoredNewsTopBar.animated, true, "news mode should restore scrolling animation");
+  const fpsPlacement = await page.evaluate(() => {
+    window.__angleDebug.applySetting("topBarMode", "news");
+    window.__angleDebug.applySetting("showFps", true);
+    const ticker = document.querySelector("#newsTicker")?.getBoundingClientRect();
+    const track = document.querySelector(".news-track")?.getBoundingClientRect();
+    const fps = document.querySelector("#fpsCounter")?.getBoundingClientRect();
+    window.__angleDebug.applySetting("topBarMode", "hidden");
+    const hiddenTop = document.querySelector("#fpsCounter")?.getBoundingClientRect().top ?? 999;
+    return {
+      insideTopBar: Boolean(ticker && fps && fps.top >= ticker.top && fps.bottom <= ticker.bottom),
+      clearOfNewsText: Boolean(track && fps && track.right <= fps.left),
+      hiddenTop,
+    };
+  });
+  assert.equal(fpsPlacement.insideTopBar, true, "FPS counter should fit inside the visible top bar");
+  assert.equal(fpsPlacement.clearOfNewsText, true, "FPS counter should not overlap the news text track");
+  assert.ok(fpsPlacement.hiddenTop < 30, "FPS counter should return to the top when the top bar is hidden");
   const breakCapPlacement = await page.evaluate(() => {
     const breakCap = document.querySelector("#breakCapButton");
     const subtabs = document.querySelector(".infinity-subtabs");

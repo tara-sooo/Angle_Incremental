@@ -3,6 +3,9 @@ import { runtime, expose } from "../runtime/shared.js";
 // Extracted mechanically from the next-runtime baseline.
 // Runtime dependencies remain unchanged during the classic-script migration phase.
 
+let newsTickerIndex = 0;
+let newsTickerIterationBound = false;
+
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
   runtime.appliedLanguage = runtime.state.language;
@@ -250,12 +253,43 @@ function updateAchievementRows() {
   });
 }
 
+function currentNewsMessages() {
+  const language = runtime.TEXT[runtime.state.language] ? runtime.state.language : "ja";
+  return runtime.TEXT[language].newsMessages || runtime.TEXT.ja.newsMessages || [];
+}
+
+function setNewsTickerMessage() {
+  const messages = currentNewsMessages();
+  if (messages.length === 0) return;
+  newsTickerIndex %= messages.length;
+  runtime.elements.newsTickerText.textContent = messages[newsTickerIndex];
+}
+
+function advanceNewsTickerMessage() {
+  if (runtime.state.topBarMode !== "news") return;
+  const messages = currentNewsMessages();
+  if (messages.length === 0) return;
+  newsTickerIndex = (newsTickerIndex + 1) % messages.length;
+  setNewsTickerMessage();
+}
+
+function bindNewsTickerIteration() {
+  if (newsTickerIterationBound || !runtime.elements.newsTickerText) return;
+  newsTickerIterationBound = true;
+  runtime.elements.newsTickerText.addEventListener("animationiteration", (event) => {
+    if (event.animationName && event.animationName !== "news-scroll") return;
+    advanceNewsTickerMessage();
+  });
+}
+
 function updateTopBar() {
   if (!runtime.elements.newsTicker || !runtime.elements.newsTickerText) return;
+  bindNewsTickerIteration();
   const mode = runtime.normalizeChoice(runtime.state.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
   const label = runtime.elements.newsTicker.querySelector(".news-label");
   runtime.state.topBarMode = mode;
   if (runtime.elements.shell) runtime.elements.shell.classList.toggle("is-top-bar-hidden", mode === "hidden");
+  document.documentElement.classList.toggle("top-bar-hidden", mode === "hidden");
   runtime.elements.newsTicker.hidden = mode === "hidden";
   runtime.elements.newsTicker.classList.toggle("is-static", mode !== "news");
   runtime.elements.newsTicker.classList.toggle("is-blank", mode === "blank");
@@ -294,14 +328,7 @@ function updateTopBar() {
     return;
   }
   if (label) label.textContent = runtime.t("topBarNews");
-  const language = runtime.TEXT[runtime.state.language] ? runtime.state.language : "ja";
-  const messages = runtime.TEXT[language].newsMessages || runtime.TEXT.ja.newsMessages || [];
-  if (messages.length === 0) return;
-  const index = Math.floor(runtime.state.totalPlayTime / 18) % messages.length;
-  const message = messages[index];
-  if (runtime.elements.newsTickerText.textContent !== message) {
-    runtime.elements.newsTickerText.textContent = message;
-  }
+  setNewsTickerMessage();
 }
 
 function canSpendLog(amountLog) {
@@ -479,6 +506,7 @@ function updateUi() {
   syncFormControl(runtime.elements.numberFormatSelect, runtime.state.numberFormat);
   syncFormControl(runtime.elements.timeUnitSelect, runtime.state.timeUnit);
   syncFormControl(runtime.elements.topBarModeSelect, runtime.state.topBarMode);
+  document.documentElement.classList.toggle("show-fps", runtime.state.showFps);
   runtime.elements.fpsCounter.hidden = !runtime.state.showFps;
   if (runtime.state.showFps) runtime.elements.fpsCounter.textContent = `FPS ${Math.round(runtime.smoothedFps)}`;
 }

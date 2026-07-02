@@ -1239,8 +1239,8 @@ canvas {
 
 .fps-counter {
   position: fixed;
-  top: 18px;
-  right: 112px;
+  top: 17px;
+  right: 24px;
   z-index: 100;
   min-width: 72px;
   padding: 5px 8px;
@@ -1252,6 +1252,15 @@ canvas {
   border: 1px solid var(--line-strong);
   background: rgba(7, 16, 31, 0.82);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.32);
+}
+
+.show-fps:not(.top-bar-hidden) .news-track {
+  margin-right: 88px;
+}
+
+.top-bar-hidden .fps-counter {
+  top: 18px;
+  right: 112px;
 }
 
 .fps-counter[hidden] {
@@ -1361,6 +1370,15 @@ canvas {
 
 @media (max-width: 820px) {
   .fps-counter {
+    top: 12px;
+    right: 14px;
+  }
+
+  .show-fps:not(.top-bar-hidden) .news-track {
+    margin-right: 84px;
+  }
+
+  .top-bar-hidden .fps-counter {
     top: 12px;
     right: 12px;
   }
