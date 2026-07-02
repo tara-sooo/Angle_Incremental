@@ -66,6 +66,7 @@ const state = {
   language: "ja",
   numberFormat: "compact",
   timeUnit: "auto",
+  topBarMode: "news",
   floatingTexts: [],
   lastEarned: 0,
   lastEarnedLog10: -Infinity,
@@ -135,6 +136,7 @@ const SAVE_FIELDS = [
   "language",
   "numberFormat",
   "timeUnit",
+  "topBarMode",
   "lastEarned",
   "lastEarnedLog10",
 ];

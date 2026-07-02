@@ -19,8 +19,8 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { state } = instance.debug;
     const { runtime } = instance;
 
-    assert.equal(runtime.ACHIEVEMENT_COUNT, 25, "achievement total should be derived from the 25 definitions");
-    assert.equal(runtime.ACHIEVEMENTS.length, 25, "achievement definition array should contain 25 entries");
+    assert.equal(runtime.ACHIEVEMENT_COUNT, 30, "achievement total should be derived from the 30 definitions");
+    assert.equal(runtime.ACHIEVEMENTS.length, 30, "achievement definition array should contain 30 entries");
 
     state.achievementMask = 0;
     state.gainLevel = 10;
@@ -159,9 +159,28 @@ async function runAchievementV2ModuleRuntimeTest() {
     setLogResource(state, "score", 314);
     runtime.checkAchievements(false);
 
-    [15, 16, 17, 18, 19, 20, 21, 23, 24, 25].forEach((id) => {
+    state.infinityCount = 5001;
+    state.infinityPoints = 100000;
+    state.infinityPointsLog10 = 5;
+    state.infinityUpgradeMask |= 1 << 13;
+    setLogResource(state, "score", 628.1);
+    runtime.checkAchievements(false);
+
+    [15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 29, 30].forEach((id) => {
       assert.equal(runtime.isAchievementUnlocked(id), true, `achievement ${id} should unlock from its condition`);
     });
+    assert.equal(runtime.ACHIEVEMENTS[23].title.ja, "以前はlog10(score)-307でした", "achievement 24 should be the IU9-1 achievement");
+    assert.equal(runtime.ACHIEVEMENTS[29].title.ja, "SDGsよりは簡単な課題", "achievement 30 should be the all-IC achievement");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    runtime.applySaveData({
+      achievementMask: (1 << (24 - 1)) | (1 << (25 - 1)),
+    }, 8);
+    assert.equal(debug.state.achievementMask & (1 << (30 - 1)), 1 << (30 - 1), "old achievement 24 should migrate to new achievement 30");
+    assert.equal(debug.state.achievementMask & (1 << (25 - 1)), 1 << (25 - 1), "old achievement 25 should remain achievement 25");
+    assert.equal(debug.state.achievementMask & (1 << (24 - 1)), 0, "new achievement 24 should not inherit the old all-IC achievement bit");
   }
 
   {
@@ -211,7 +230,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     runtime.updateAchievementRows();
 
     const rows = runtime.elements.achievementList.querySelectorAll(".achievement-row");
-    assert.equal(rows.length, 25, "achievement rows should be rendered in the module runtime");
+    assert.equal(rows.length, 30, "achievement rows should be rendered in the module runtime");
 
     const firstReward = rows[0].querySelector(".achievement-reward");
     assert.equal(firstReward.textContent, "", "achievements without individual rewards should not repeat the shared reward");
@@ -228,6 +247,9 @@ async function runAchievementV2ModuleRuntimeTest() {
     const achievement21Reward = rows[20].querySelector(".achievement-reward");
     assert.equal(achievement21Reward.textContent, "報酬: IP獲得量がさらに×2", "achievement 21 should advertise the extra IP multiplier");
     assert.equal(achievement21Reward.hidden, false, "achievement 21 reward should be visible");
+
+    assert.equal(rows[23].querySelector(".achievement-title").textContent, "以前はlog10(score)-307でした", "achievement 24 row should use the new order");
+    assert.equal(rows[29].querySelector(".achievement-title").textContent, "SDGsよりは簡単な課題", "achievement 30 row should use the new order");
   }
 
   console.log("Achievement v2 module runtime tests passed");

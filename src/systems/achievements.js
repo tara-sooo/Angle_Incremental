@@ -143,16 +143,46 @@ const ACHIEVEMENTS = [
     isUnlocked: () => runtime.hasInfinityUpgrade("7-1") && runtime.hasInfinityUpgrade("7-2"),
   },
   {
-    title: { ja: "SDGsよりは簡単な課題", en: "An Easier Goal Than the SDGs" },
-    condition: { ja: "ICを8つクリア", en: "Complete all 8 ICs." },
+    title: { ja: "以前はlog10(score)-307でした", en: "It Used to Be log10(score)-307" },
+    condition: { ja: "IU9-1を購入", en: "Buy IU 9-1." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.completedChallengeCount() >= 8,
+    isUnlocked: () => runtime.hasInfinityUpgrade("9-1"),
   },
   {
     title: { ja: "大きな壁でも問題なし", en: "No Problem, Even With a Big Wall" },
     condition: { ja: "Break Infinite Capを実行する", en: "Break the Infinite Cap." },
     reward: { ja: "", en: "" },
     isUnlocked: () => runtime.state.infiniteCapBroken,
+  },
+  {
+    title: { ja: "昔の自分に分けてやりたい", en: "I Wish I Could Share This With My Past Self" },
+    condition: { ja: "100000IPを所持", en: "Hold 100000 IP." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.currentInfinityPointsLog10() >= 5,
+  },
+  {
+    title: { ja: "ランクスコアは存在しないけど", en: "There Is No Rank Score, Though" },
+    condition: { ja: "Infinity量が5000を超える", en: "Have more than 5000 Infinity." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.state.infinityCount > 5000,
+  },
+  {
+    title: { ja: "勝つまで欲しがらなかった", en: "Did Not Want It Until Winning" },
+    condition: { ja: "IC7をクリアする", en: "Complete IC7." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.isChallengeCompleted(7),
+  },
+  {
+    title: { ja: "これでもいい", en: "This Is Fine Too" },
+    condition: { ja: "スコアが1e628を超える", en: "Reach more than 1e628 score." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.currentScoreLog10() > 628,
+  },
+  {
+    title: { ja: "SDGsよりは簡単な課題", en: "An Easier Goal Than the SDGs" },
+    condition: { ja: "ICを8つクリア", en: "Complete all 8 ICs." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.completedChallengeCount() >= 8,
   },
 ];
 

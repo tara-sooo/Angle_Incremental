@@ -77,6 +77,7 @@ Original prompt: では、中核ループを完成させてください
 - Rebalanced IC1-IC8 to the latest spec, fixed IC7's no-spend reward to still require affordability, changed IC6 to double Infinity count gain instead of IP, moved GR score multipliers to log tracking, strengthened the post-e22 lap-speed softcap, and increased autobuy to 10 checks per second.
 - Added Infinity Upgrades 8-1, 9-1, 10-1, and 10-2 with tier prerequisites, layer automation controls, the pre-Break log7 IP formula, starting 2 Core Boosts, and held-score ^1.2 handling.
 - Verified the new IU pass with ESM regression tests and Firefox/Playwright desktop/mobile Automation screenshots; no console errors were reported.
+- Prepared the 0.5.0 release with 30 achievements, achievement save migration, a non-live news ticker, configurable top bar display modes, and refreshed versioned asset URLs.
 
 ## TODO
 

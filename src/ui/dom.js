@@ -7,6 +7,9 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 const elements = {
+  shell: document.getElementById("shell"),
+  newsTicker: document.getElementById("newsTicker"),
+  newsTickerText: document.getElementById("newsTickerText"),
   mainTabs: Array.from(document.querySelectorAll(".main-tab")),
   mainPanels: Array.from(document.querySelectorAll(".main-panel")),
   infinitySubtabs: Array.from(document.querySelectorAll(".infinity-subtab")),
@@ -71,6 +74,7 @@ const elements = {
   languageSelect: document.getElementById("languageSelect"),
   numberFormatSelect: document.getElementById("numberFormatSelect"),
   timeUnitSelect: document.getElementById("timeUnitSelect"),
+  topBarModeSelect: document.getElementById("topBarModeSelect"),
   updateModal: document.getElementById("updateModal"),
   updateModalClose: document.getElementById("updateModalClose"),
   i18nNodes: Array.from(document.querySelectorAll("[data-i18n]")),

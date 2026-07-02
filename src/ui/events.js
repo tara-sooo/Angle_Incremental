@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.4.0";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.5.0";
 
 // Extracted mechanically from the next-runtime baseline.
 // bindEvents is called by src/main.js at the original initialization point.
@@ -38,6 +38,7 @@ function applySetting(key, value) {
   }
   if (key === "numberFormat") runtime.state.numberFormat = runtime.normalizeChoice(value, ["compact", "scientific", "detailed"], "compact");
   if (key === "timeUnit") runtime.state.timeUnit = runtime.normalizeChoice(value, ["auto", "seconds", "milliseconds"], "auto");
+  if (key === "topBarMode") runtime.state.topBarMode = runtime.normalizeChoice(value, ["news", "resources", "progress", "blank", "hidden"], "news");
   if (key === "showFloatingText" && !value) runtime.state.floatingTexts = [];
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
   if (key === "showFps") runtime.state.showFps = Boolean(value);
@@ -111,6 +112,7 @@ function bindEvents() {
   runtime.elements.languageSelect.addEventListener("change", () => applySetting("language", runtime.elements.languageSelect.value));
   runtime.elements.numberFormatSelect.addEventListener("change", () => applySetting("numberFormat", runtime.elements.numberFormatSelect.value));
   runtime.elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", runtime.elements.timeUnitSelect.value));
+  runtime.elements.topBarModeSelect.addEventListener("change", () => applySetting("topBarMode", runtime.elements.topBarModeSelect.value));
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
