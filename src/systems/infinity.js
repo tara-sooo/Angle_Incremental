@@ -213,8 +213,12 @@ function applyStartingCoreBoosts() {
 }
 
 function recordInfinityRun(scoreLog, gained, challenge, noGenerationCoreBoost = false) {
+  const elapsed = runtime.state.currentInfinityRunTime;
+  const recordedTime = elapsed > 0
+    ? Math.max(elapsed, runtime.MIN_RECORDED_INFINITY_SECONDS)
+    : 0;
   const record = {
-    time: runtime.state.currentInfinityRunTime,
+    time: recordedTime,
     scoreLog10: scoreLog,
     ipGain: gained,
     challenge,
