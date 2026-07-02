@@ -108,11 +108,22 @@ try {
       exists: Boolean(ticker),
       text: item?.textContent?.trim() ?? "",
       animated: Boolean(item && getComputedStyle(item).animationName !== "none"),
+      live: ticker?.getAttribute("aria-live") ?? null,
     };
   });
   assert.equal(newsTicker.exists, true, "news ticker must exist above the main tabs");
+  assert.equal(newsTicker.live, null, "auto-rotating top bar must not be announced as a live region");
   assert.notEqual(newsTicker.text, "", "news ticker must display a news message");
   assert.equal(newsTicker.animated, true, "news ticker text must use a scrolling animation");
+  const topBarModes = await page.evaluate(() => {
+    const select = document.querySelector("#topBarModeSelect");
+    return {
+      value: select?.value ?? "",
+      options: Array.from(select?.querySelectorAll("option") ?? []).map((option) => option.value),
+    };
+  });
+  assert.equal(topBarModes.value, "news", "top bar mode should default to news");
+  assert.deepEqual(topBarModes.options, ["news", "resources", "progress", "blank", "hidden"], "top bar mode select should expose all display modes");
   const addedJapaneseNews = await page.evaluate(() => {
     window.__angleDebug.state.totalPlayTime = 14 * 18;
     window.advanceTime(0);
@@ -133,6 +144,64 @@ try {
     return document.querySelector("#newsTickerText")?.textContent?.trim() ?? "";
   });
   assert.equal(addedProgressionNews, "Infinite Capの壁には、もう少し分かりやすいドアが必要です。", "news ticker should include game-specific UI/progression jokes");
+  const resourceTopBar = await page.evaluate(() => {
+    window.__angleDebug.applySetting("topBarMode", "resources");
+    const item = document.querySelector("#newsTickerText");
+    return {
+      label: document.querySelector(".news-label")?.textContent?.trim() ?? "",
+      text: item?.textContent?.trim() ?? "",
+      animated: Boolean(item && getComputedStyle(item).animationName !== "none"),
+      hidden: Boolean(document.querySelector("#newsTicker")?.hidden),
+    };
+  });
+  assert.equal(resourceTopBar.label, "資源量", "resources top bar should use the localized resource label");
+  assert.match(resourceTopBar.text, /Score .* IP .* IA/, "resources top bar should summarize score, IP, and IA");
+  assert.equal(resourceTopBar.animated, false, "resources top bar should be static");
+  assert.equal(resourceTopBar.hidden, false, "resources top bar should remain visible");
+  const progressTopBar = await page.evaluate(() => {
+    window.__angleDebug.applySetting("topBarMode", "progress");
+    return {
+      label: document.querySelector(".news-label")?.textContent?.trim() ?? "",
+      text: document.querySelector("#newsTickerText")?.textContent?.trim() ?? "",
+    };
+  });
+  assert.equal(progressTopBar.label, "進捗状況", "progress top bar should use the localized progress label");
+  assert.match(progressTopBar.text, /GR .* CB .* INF .* ACH/, "progress top bar should summarize GR, CB, Infinity, and achievements");
+  const blankTopBar = await page.evaluate(() => {
+    window.__angleDebug.applySetting("topBarMode", "blank");
+    const ticker = document.querySelector("#newsTicker");
+    return {
+      label: document.querySelector(".news-label")?.textContent?.trim() ?? "",
+      text: document.querySelector("#newsTickerText")?.textContent?.trim() ?? "",
+      hidden: Boolean(ticker?.hidden),
+      height: ticker?.getBoundingClientRect().height ?? 0,
+    };
+  });
+  assert.equal(blankTopBar.label, "", "blank top bar should clear the label");
+  assert.equal(blankTopBar.text, "", "blank top bar should clear the text");
+  assert.equal(blankTopBar.hidden, false, "blank top bar should preserve the bar");
+  assert.ok(blankTopBar.height > 0, "blank top bar should keep its layout height");
+  const hiddenTopBar = await page.evaluate(() => {
+    window.__angleDebug.applySetting("topBarMode", "hidden");
+    const ticker = document.querySelector("#newsTicker");
+    const panels = document.querySelector(".main-panels");
+    return {
+      hidden: Boolean(ticker?.hidden),
+      panelTop: panels?.getBoundingClientRect().top ?? 0,
+    };
+  });
+  assert.equal(hiddenTopBar.hidden, true, "hidden top bar should hide the bar");
+  assert.ok(hiddenTopBar.panelTop < 20, "hidden top bar should let the main panels move upward");
+  const restoredNewsTopBar = await page.evaluate(() => {
+    window.__angleDebug.applySetting("topBarMode", "news");
+    const item = document.querySelector("#newsTickerText");
+    return {
+      text: item?.textContent?.trim() ?? "",
+      animated: Boolean(item && getComputedStyle(item).animationName !== "none"),
+    };
+  });
+  assert.notEqual(restoredNewsTopBar.text, "", "news mode should restore news text");
+  assert.equal(restoredNewsTopBar.animated, true, "news mode should restore scrolling animation");
   const breakCapPlacement = await page.evaluate(() => {
     const breakCap = document.querySelector("#breakCapButton");
     const subtabs = document.querySelector(".infinity-subtabs");

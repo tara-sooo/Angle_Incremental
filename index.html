@@ -34,8 +34,8 @@
     </script>
   </head>
   <body>
-    <main class="shell">
-      <section id="newsTicker" class="news-ticker" aria-live="polite">
+    <main id="shell" class="shell">
+      <section id="newsTicker" class="news-ticker">
         <span class="news-label">NEWS</span>
         <div class="news-track">
           <span id="newsTickerText" class="news-text">Angle Incremental news loading...</span>
@@ -472,6 +472,16 @@
                   <option value="auto">自動</option>
                   <option value="seconds">秒</option>
                   <option value="milliseconds">ミリ秒</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <label for="topBarModeSelect" data-i18n="topBarMode">上部バー</label>
+                <select id="topBarModeSelect">
+                  <option value="news">ニュース</option>
+                  <option value="resources">資源量</option>
+                  <option value="progress">進捗状況</option>
+                  <option value="blank">ブランク</option>
+                  <option value="hidden">隠す</option>
                 </select>
               </div>
               <div class="setting-row">

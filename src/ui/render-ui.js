@@ -21,6 +21,13 @@ function applyLanguage() {
     runtime.elements.timeUnitSelect.querySelector('[value="seconds"]').textContent = runtime.t("timeSeconds");
     runtime.elements.timeUnitSelect.querySelector('[value="milliseconds"]').textContent = runtime.t("timeMilliseconds");
   }
+  if (runtime.elements.topBarModeSelect) {
+    runtime.elements.topBarModeSelect.querySelector('[value="news"]').textContent = runtime.t("topBarNewsOption");
+    runtime.elements.topBarModeSelect.querySelector('[value="resources"]').textContent = runtime.t("topBarResourcesOption");
+    runtime.elements.topBarModeSelect.querySelector('[value="progress"]').textContent = runtime.t("topBarProgressOption");
+    runtime.elements.topBarModeSelect.querySelector('[value="blank"]').textContent = runtime.t("topBarBlankOption");
+    runtime.elements.topBarModeSelect.querySelector('[value="hidden"]').textContent = runtime.t("topBarHiddenOption");
+  }
 }
 
 function syncFormControl(control, value) {
@@ -243,8 +250,50 @@ function updateAchievementRows() {
   });
 }
 
-function updateNewsTicker() {
-  if (!runtime.elements.newsTickerText) return;
+function updateTopBar() {
+  if (!runtime.elements.newsTicker || !runtime.elements.newsTickerText) return;
+  const mode = runtime.normalizeChoice(runtime.state.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
+  const label = runtime.elements.newsTicker.querySelector(".news-label");
+  runtime.state.topBarMode = mode;
+  if (runtime.elements.shell) runtime.elements.shell.classList.toggle("is-top-bar-hidden", mode === "hidden");
+  runtime.elements.newsTicker.hidden = mode === "hidden";
+  runtime.elements.newsTicker.classList.toggle("is-static", mode !== "news");
+  runtime.elements.newsTicker.classList.toggle("is-blank", mode === "blank");
+  if (mode === "hidden") return;
+  if (mode === "blank") {
+    if (label) label.textContent = "";
+    runtime.elements.newsTickerText.textContent = "";
+    return;
+  }
+  if (mode === "resources") {
+    if (label) label.textContent = runtime.t("topBarResources");
+    const score = runtime.scoreDisplay();
+    const ip = runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10());
+    const ia = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
+    runtime.elements.newsTickerText.textContent = `Score ${score} / IP ${ip} / IA ${ia}`;
+    return;
+  }
+  if (mode === "progress") {
+    if (label) label.textContent = runtime.t("topBarProgress");
+    const infinityReady = runtime.canInfinity();
+    const infinityState = infinityReady ? "READY" : runtime.state.infinityCount > 0 ? "OPEN" : "LOCKED";
+    const generationUnlocked = runtime.currentTotalScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE);
+    const generationReady = runtime.canRunGeneration();
+    const waitingPrevious = generationUnlocked
+      && runtime.state.generationCount > 0
+      && runtime.currentGenerationScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE)
+      && !generationReady;
+    const generationState = generationReady
+      ? runtime.t("generationReady")
+      : waitingPrevious
+        ? runtime.t("generationWaitingPrevious")
+        : generationUnlocked
+          ? runtime.t("generationUnlocked")
+          : runtime.t("generationLocked");
+    runtime.elements.newsTickerText.textContent = `GR ${runtime.state.generationCount} ${generationState} / CB ${runtime.state.coreBoostCount} next ${runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10())} / INF ${infinityState} / ACH ${runtime.achievementCount()}/${runtime.ACHIEVEMENT_COUNT}`;
+    return;
+  }
+  if (label) label.textContent = runtime.t("topBarNews");
   const language = runtime.TEXT[runtime.state.language] ? runtime.state.language : "ja";
   const messages = runtime.TEXT[language].newsMessages || runtime.TEXT.ja.newsMessages || [];
   if (messages.length === 0) return;
@@ -333,7 +382,7 @@ function updateUi() {
   if (unlockedAchievementsNow.length > 0) runtime.saveGame("manual");
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
   applyLanguage();
-  updateNewsTicker();
+  updateTopBar();
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());
   runtime.elements.vertexGainValue.textContent = `+${runtime.formatSmallDecimal(runtime.vertexGainIncrease())}`;
@@ -429,6 +478,7 @@ function updateUi() {
   syncFormControl(runtime.elements.languageSelect, runtime.state.language);
   syncFormControl(runtime.elements.numberFormatSelect, runtime.state.numberFormat);
   syncFormControl(runtime.elements.timeUnitSelect, runtime.state.timeUnit);
+  syncFormControl(runtime.elements.topBarModeSelect, runtime.state.topBarMode);
   runtime.elements.fpsCounter.hidden = !runtime.state.showFps;
   if (runtime.state.showFps) runtime.elements.fpsCounter.textContent = `FPS ${Math.round(runtime.smoothedFps)}`;
 }
@@ -545,7 +595,7 @@ expose("updateInfinityUpgradeRows", () => updateInfinityUpgradeRows, (value) => 
 expose("buySelectedInfinityUpgrade", () => buySelectedInfinityUpgrade, (value) => { buySelectedInfinityUpgrade = value; });
 expose("createAchievementRows", () => createAchievementRows, (value) => { createAchievementRows = value; });
 expose("updateAchievementRows", () => updateAchievementRows, (value) => { updateAchievementRows = value; });
-expose("updateNewsTicker", () => updateNewsTicker, (value) => { updateNewsTicker = value; });
+expose("updateTopBar", () => updateTopBar, (value) => { updateTopBar = value; });
 expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
 expose("updateAutomationUi", () => updateAutomationUi, (value) => { updateAutomationUi = value; });

@@ -40,6 +40,7 @@ function compatibilitySnapshot(instance) {
     "currentInfinityRunHadGeneration",
     "currentInfinityRunHadCoreBoost",
     "infinityPointsExact",
+    "topBarMode",
   ].forEach((field) => delete value.state[field]);
   [
     "layerUnlocked",
