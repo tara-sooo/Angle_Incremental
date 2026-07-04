@@ -78,6 +78,11 @@ Original prompt: では、中核ループを完成させてください
 - Added Infinity Upgrades 8-1, 9-1, 10-1, and 10-2 with tier prerequisites, layer automation controls, the pre-Break log7 IP formula, starting 2 Core Boosts, and held-score ^1.2 handling.
 - Verified the new IU pass with ESM regression tests and Firefox/Playwright desktop/mobile Automation screenshots; no console errors were reported.
 - Prepared the 0.5.1 hotfix so the FPS counter avoids the top bar and news changes only after each scroll cycle completes.
+- Compressed the Infinity tab header/subtabs, kept IU upgrades two-column on normal mobile widths, and made the IU detail/purchase panel sticky at the bottom; verified Firefox screenshots for IU/IC/IA mobile and IU desktop with no console errors.
+- Redesigned IC8 around fixed 3 effective vertices: IC8 vertex upgrades now buy replacement boosts to gain per vertex and score exponent, IC8 squares Core Boost requirements, and completed IC8 no longer preserves vertices through normal GR/CB resets.
+- Added IU 12-1 Golden Hell so Core Boost gain multiplier/exponent effects scale multiplicatively, documented the formulas, and verified the new IC8/IU behavior with ESM regression tests plus a Playwright smoke run.
+- Fixed IC8 replacement levels so they are stored separately from real vertices, avoiding incorrect vertex UI text and unintended vertex-count achievement unlocks during IC8.
+- Changed IC8 replacement levels to reset on Generation/Core Boost instead of carrying through those resets.
 
 ## TODO
 

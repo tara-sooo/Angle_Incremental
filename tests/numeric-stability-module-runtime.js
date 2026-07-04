@@ -232,6 +232,59 @@ async function runNumericStabilityModuleRuntimeTest() {
   }
 
   {
+    const instance = await loadRuntime(candidatePath);
+    const { debug } = instance;
+    const { state, runInfinity } = debug;
+    state.infinityCount = 1;
+    state.scoreLog10 = 309;
+    state.score = Number.MAX_VALUE;
+    state.currentInfinityRunTime = 0.00033;
+
+    runInfinity(false);
+
+    assert.equal(
+      state.lastInfinityRuns[0].time,
+      1 / 60,
+      "sub-frame Infinity runs must be recorded as at least one frame",
+    );
+    assert.equal(
+      state.fastestInfinityTime,
+      1 / 60,
+      "fastest Infinity time must use the one-frame recording floor",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug } = instance;
+    const { state, runInfinity } = debug;
+    state.infinityCount = 1;
+    state.scoreLog10 = 309;
+    state.score = Number.MAX_VALUE;
+    state.currentInfinityRunTime = 0.2;
+
+    runInfinity(false);
+
+    assert.equal(state.lastInfinityRuns[0].time, 0.2, "normal Infinity run times must be preserved");
+    assert.equal(state.fastestInfinityTime, 0.2, "normal fastest Infinity times must be preserved");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug } = instance;
+    const { state, runInfinity } = debug;
+    state.infinityCount = 1;
+    state.scoreLog10 = 309;
+    state.score = Number.MAX_VALUE;
+    state.currentInfinityRunTime = 0;
+
+    runInfinity(false);
+
+    assert.equal(state.lastInfinityRuns[0].time, 0, "zero-time Infinity records must remain zero-time records");
+    assert.equal(state.fastestInfinityTime, 0, "zero-time Infinity records must not update fastest Infinity");
+  }
+
+  {
     const exact = await simulateVertexSteps({
       targetVertexSteps: 6_006,
       batch: false,

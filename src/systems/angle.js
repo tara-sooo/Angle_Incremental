@@ -149,6 +149,10 @@ function effectiveVertexCount() {
   return count;
 }
 
+function ic8VertexGainMultiplier() {
+  return Math.pow(runtime.IC8_VERTEX_GAIN_MULTIPLIER, runtime.ic8VertexUpgradeCount());
+}
+
 function scoreDisplay() {
   const scoreLog = currentScoreLog10();
   if (runtime.state.numberFormat === "scientific" && scoreLog > -Infinity) return runtime.formatScientificLog(scoreLog);
@@ -167,6 +171,7 @@ function vertexGainIncrease() {
     : 1;
   let gain = (0.01 + effectiveGainLevel() * 0.01)
     * runtime.coreBoostGainIncreaseMultiplier()
+    * ic8VertexGainMultiplier()
     * runtime.infiniteAngleBoost()
     * runtime.achievementGainMultiplier()
     * infinityResetBoost;
@@ -306,17 +311,19 @@ function cost(kind, base, level, growth) {
 }
 
 function costLogs() {
+  const vertexLevel = runtime.state.activeChallenge === 8 ? runtime.state.ic8VertexUpgradeLevel : runtime.state.vertices - 3;
   return {
     speed: costLog10("speed", 5, runtime.state.speedLevel, 1.55),
-    vertex: costLog10("vertex", 12, runtime.state.vertices - 3, 1.72),
+    vertex: costLog10("vertex", 12, vertexLevel, 1.72),
     gain: costLog10("gain", 18, runtime.state.gainLevel, 1.68),
   };
 }
 
 function costs() {
+  const vertexLevel = runtime.state.activeChallenge === 8 ? runtime.state.ic8VertexUpgradeLevel : runtime.state.vertices - 3;
   return {
     speed: cost("speed", 5, runtime.state.speedLevel, 1.55),
-    vertex: cost("vertex", 12, runtime.state.vertices - 3, 1.72),
+    vertex: cost("vertex", 12, vertexLevel, 1.72),
     gain: cost("gain", 18, runtime.state.gainLevel, 1.68),
   };
 }
@@ -440,7 +447,6 @@ function upgradeCostLog(kind) {
 function canBuyNormalUpgrade(kind) {
   if (runtime.state.activeChallenge === 7 && currentScoreLog10() > 30) return false;
   if (kind === "vertex") {
-    if (runtime.state.activeChallenge === 8) return false;
     if (runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;
   }
   return runtime.canSpendLog(upgradeCostLog(kind));
@@ -467,7 +473,8 @@ function buySpeed() {
 
 function buyVertex() {
   if (!spendNormalUpgrade("vertex")) return;
-  runtime.state.vertices += 1;
+  if (runtime.state.activeChallenge === 8) runtime.state.ic8VertexUpgradeLevel += 1;
+  else runtime.state.vertices += 1;
   resetVertexProgress();
   runtime.updateUi();
   runtime.saveGame("manual");
@@ -499,7 +506,8 @@ function buyAllUpgrades(options = {}) {
     }
 
     if (allowVertex && spendNormalUpgrade("vertex")) {
-      runtime.state.vertices += 1;
+      if (runtime.state.activeChallenge === 8) runtime.state.ic8VertexUpgradeLevel += 1;
+      else runtime.state.vertices += 1;
       resetVertexProgress();
       purchases += 1;
       bought = true;
@@ -535,7 +543,6 @@ function balanceCanBuyNormalUpgrade(kind) {
   const costLog = upgradeCostLog(kind);
   if (runtime.state.activeChallenge === 7 && costLog > 30) return false;
   if (kind === "vertex") {
-    if (runtime.state.activeChallenge === 8) return false;
     if (runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;
   }
   return runtime.canSpendLog(costLog);
@@ -569,6 +576,7 @@ function balanceVertexGainIncrease() {
     : 1;
   let gain = (0.01 + runtime.effectiveGainLevel() * 0.01)
     * runtime.coreBoostGainIncreaseMultiplier()
+    * ic8VertexGainMultiplier()
     * runtime.infiniteAngleBoost()
     * runtime.achievementGainMultiplier()
     * infinityResetBoost;
@@ -605,6 +613,7 @@ expose("iu11_2EffectiveInfinityCount", () => iu11_2EffectiveInfinityCount, (valu
 expose("effectiveSpeedLevel", () => effectiveSpeedLevel, (value) => { effectiveSpeedLevel = value; });
 expose("effectiveGainLevel", () => effectiveGainLevel, (value) => { effectiveGainLevel = value; });
 expose("effectiveVertexCount", () => effectiveVertexCount, (value) => { effectiveVertexCount = value; });
+expose("ic8VertexGainMultiplier", () => ic8VertexGainMultiplier, (value) => { ic8VertexGainMultiplier = value; });
 expose("scoreDisplay", () => scoreDisplay, (value) => { scoreDisplay = value; });
 expose("applyInfinitySoftcap", () => applyInfinitySoftcap, (value) => { applyInfinitySoftcap = value; });
 expose("vertexGainIncrease", () => vertexGainIncrease, (value) => { vertexGainIncrease = value; });

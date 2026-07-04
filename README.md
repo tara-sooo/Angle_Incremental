@@ -38,7 +38,8 @@ UI またはゲームプレイに影響する変更では、ブラウザでの�
 - `index.html` — UI とタブ・パネルのマークアップ
 - `styles.css` — レスポンシブなレイアウトとスタイル
 - `game.js` — ゲーム状態、進行ロジック、描画、セーブ／ロード
-- `angle-incremental-spec.md` — ゲーム仕様と数式
+- `angle-incremental-spec.md` — 開発者向けのゲーム仕様と数式
+- `angle-incremental-guide.md` — 初心者向けのプレイガイド
 - `CONTRIBUTING.md` — 開発・検証・ブランチ運用の手順
 - `progress.md` — 開発メモと今後の TODO
 

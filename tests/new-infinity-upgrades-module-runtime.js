@@ -14,6 +14,10 @@ function purchasedMaskThrough(bit) {
   return (1 << (bit + 1)) - 1;
 }
 
+function assertNearlyEqual(actual, expected, message, tolerance = 1e-9) {
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${message}: expected ${expected}, got ${actual}`);
+}
+
 function prepareGenerationAutomationScenario(instance, { generationScoreLog10 = 20, runSeconds = 0 } = {}) {
   const { state } = instance.debug;
   state.automationEnabled = true;
@@ -27,6 +31,11 @@ function prepareGenerationAutomationScenario(instance, { generationScoreLog10 = 
   state.generationScoreMultiplier = 1;
   state.generationCostFactor = 1;
   state.currentGenerationRunTime = runSeconds;
+}
+
+function shallowGenerationScoreBonus(generationScoreLog10) {
+  const depth = Math.max(0, generationScoreLog10 - Math.log10(1_000_000));
+  return 0.60 * (1 - Math.exp(-depth / 4));
 }
 
 async function runNewInfinityUpgradesModuleRuntimeTest() {
@@ -48,6 +57,11 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.deepEqual(Array.from(byId.get("11-1")?.requires || []), ["10-1", "10-2"], "IU 11-1 must require both tier 10 upgrades");
     assert.equal(byId.get("11-2")?.cost, 400000, "IU 11-2 must cost 400000 IP");
     assert.deepEqual(Array.from(byId.get("11-2")?.requires || []), ["10-1", "10-2"], "IU 11-2 must require both tier 10 upgrades");
+    assert.equal(byId.get("12-1")?.bit, 18, "IU 12-1 must use bit 18");
+    assert.equal(byId.get("12-1")?.cost, 6660000, "IU 12-1 must cost 6.66e6 IP");
+    assert.deepEqual(Array.from(byId.get("12-1")?.requires || []), ["11-1", "11-2"], "IU 12-1 must require both tier 11 upgrades");
+    assert.equal(byId.get("12-1")?.name.ja, "12-1 ゴールデンヘル", "IU 12-1 Japanese name must match the new upgrade");
+    assert.match(byId.get("12-1")?.effect.en || "", /multiplicatively/, "IU 12-1 English effect must describe multiplicative Core Boost effects");
   }
 
   {
@@ -78,6 +92,72 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       runtime.infinityPointGain(),
       Math.max(1, Math.floor(310 / Math.log10(2) - 307)),
       "IU 9-1 must not replace the post-break log2 formula",
+    );
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.language = "en";
+    state.infiniteCapBroken = true;
+
+    runtime.updateUi();
+
+    assert.equal(runtime.elements.breakCapRequirement.textContent, "Cap broken", "Break Infinite Cap status must use English text when English is selected");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    const scoreLog10 = 20;
+
+    assert.notEqual(
+      runtime.generationRewardForLog(scoreLog10).scoreMultiplierLog10,
+      scoreLog10 * 0.014 + shallowGenerationScoreBonus(scoreLog10),
+      "IC8's revised GR formula must not apply before IC8 is completed",
+    );
+
+    state.completedChallenges = 1 << (8 - 1);
+    assert.equal(
+      runtime.generationRewardForLog(scoreLog10).scoreMultiplierLog10,
+      scoreLog10 * 0.014 + shallowGenerationScoreBonus(scoreLog10),
+      "IC8 completion must switch the GR score multiplier formula",
+    );
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityCount = 1;
+    state.completedChallenges = 1 << (8 - 1);
+    setLogResource(state, "score", 400);
+
+    state.generationScoreMultiplierLog10 = 1;
+    state.generationScoreMultiplier = 10;
+    assert.equal(
+      runtime.infinityPointGain(),
+      Math.max(1, Math.floor(400 - 307)),
+      "IC8 GR-derived IP multiplier must not reduce IP below the base gain",
+    );
+
+    state.generationScoreMultiplierLog10 = 3;
+    state.generationScoreMultiplier = 1000;
+    assert.equal(
+      runtime.infinityPointGain(),
+      Math.floor(Math.max(1, Math.floor(400 - 307)) * 10000),
+      "IC8 GR-derived IP multiplier must apply the effective score multiplier divided by 100",
+    );
+
+    state.generationScoreMultiplierLog10 = 310;
+    state.generationScoreMultiplier = Number.MAX_VALUE;
+    assert.equal(
+      runtime.infinityPointGain(),
+      Number.MAX_VALUE,
+      "IC8 GR-derived IP multiplier must clamp huge IP gains to a finite value",
+    );
+    assert.doesNotThrow(
+      () => debug.runInfinity(),
+      "huge finite IC8 IP gains must not crash Infinity reward payout",
     );
   }
 
@@ -142,6 +222,9 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(debug.buyInfinityUpgrade("11-1"), true, "IU 11-1 must be purchasable after both tier 10 upgrades");
     setLogResource(state, "infinityPoints", Math.log10(400000));
     assert.equal(debug.buyInfinityUpgrade("11-2"), true, "IU 11-2 must be purchasable after both tier 10 upgrades");
+    setLogResource(state, "infinityPoints", Math.log10(6660000));
+    assert.equal(debug.buyInfinityUpgrade("12-1"), true, "IU 12-1 must be purchasable after both tier 11 upgrades");
+    assert.equal((state.infinityUpgradeMask & (1 << 18)) !== 0, true, "IU 12-1 purchase bit must be set");
   }
 
   {
@@ -231,6 +314,15 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
   {
     const { runtime, debug } = await loadRuntime(candidatePath);
     const { state } = debug;
+    state.infinityCount = 1234567;
+    state.numberFormat = "scientific";
+    runtime.updateUi();
+    assert.equal(runtime.elements.infinityCount.textContent, "1.23e6", "Infinity count display must respect scientific number formatting");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
     state.infinityUpgradeMask = purchasedMaskThrough(16);
     state.infinityCount = 1;
     setLogResource(state, "infinityPoints", Math.log10(1000000));
@@ -244,9 +336,107 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     runtime.toggleInfinityChallenge(8);
     assert.equal(state.activeChallenge, 8, "IC8 should start for the effective vertex lock scenario");
     assert.equal(runtime.effectiveVertexCount(), 3, "IC8 must ignore IU 11-1 vertex bonuses and keep 3 effective vertices");
-    assert.equal(runtime.canBuyNormalUpgrade("vertex"), false, "IC8 must keep vertex purchases disabled");
+    assert.equal(runtime.canBuyNormalUpgrade("vertex"), true, "IC8 must let vertex purchases buy IC8-only replacement effects");
+    const baseVertexGain = runtime.vertexGainIncrease();
+    const baseExponent = runtime.coreBoostGainExponent();
+    assert.equal(debug.buyAllUpgrades({ allowSpeed: false, allowVertex: true, allowGain: false, refresh: false, save: false }) > 0, true, "IC8 vertex purchases should be buyable through Buy All");
+    assert.equal(runtime.effectiveVertexCount(), 3, "IC8 vertex purchases must still keep 3 effective vertices");
+    assert.equal(state.vertices, 3, "IC8 vertex purchases must not change the real vertex count");
+    assert.ok(state.ic8VertexUpgradeLevel > 0, "IC8 vertex purchases must increase the IC8 replacement level");
+    assert.equal(runtime.checkAchievements(true).length, 0, "IC8 replacement levels must not unlock vertex-count achievements");
+    runtime.updateUi();
+    assert.doesNotMatch(runtime.elements.vertexCount.textContent, /\+ -/, "IC8 vertex display must not show a negative sponsored-vertex difference");
+    assert.ok(runtime.vertexGainIncrease() > baseVertexGain, "IC8 vertex purchases must increase gain per vertex");
+    assert.ok(runtime.coreBoostGainExponent() > baseExponent, "IC8 vertex purchases must increase score gain exponent");
     assert.equal(runtime.effectiveSpeedLevel(), state.speedLevel + 50, "IC8 should still keep IU 11-1 speed bonus levels");
     assert.equal(runtime.effectiveGainLevel(), state.gainLevel + 50, "IC8 should still keep IU 11-1 gain bonus levels");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(17);
+    state.completedChallenges = 1 << (8 - 1);
+    state.vertices = 20;
+    setLogResource(state, "generationScore", 7);
+    runtime.runGeneration();
+    assert.equal(state.vertices, 3, "completed IC8 must not preserve vertices through normal Generation resets");
+    state.vertices = 20;
+    runtime.resetBelowCoreBoost();
+    assert.equal(state.vertices, 3, "completed IC8 must not preserve vertices through normal Core Boost resets");
+
+    state.activeChallenge = 8;
+    state.vertices = 3;
+    state.ic8VertexUpgradeLevel = 17;
+    setLogResource(state, "generationScore", 7);
+    runtime.runGeneration();
+    assert.equal(state.vertices, 3, "active IC8 must keep real vertices fixed through Generation");
+    assert.equal(state.ic8VertexUpgradeLevel, 0, "active IC8 must reset replacement levels through Generation");
+    state.ic8VertexUpgradeLevel = 17;
+    runtime.resetBelowCoreBoost();
+    assert.equal(state.vertices, 3, "active IC8 must keep real vertices fixed through Core Boost");
+    assert.equal(state.ic8VertexUpgradeLevel, 0, "active IC8 must reset replacement levels through Core Boost");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    runtime.applySaveData({
+      infinityCount: 1,
+      infinityUpgradeMask: 1 << 5,
+      activeChallenge: 8,
+      vertices: 20,
+    }, runtime.SAVE_VERSION);
+    assert.equal(state.activeChallenge, 8, "active IC8 saves must remain in IC8 when ICs are unlocked");
+    assert.equal(state.vertices, 3, "active IC8 saves must keep real vertices fixed at 3");
+    assert.equal(state.ic8VertexUpgradeLevel, 17, "old active IC8 saves must migrate extra vertices to replacement levels");
+    runtime.applySaveData({
+      infinityCount: 1,
+      infinityUpgradeMask: 1 << 5,
+      activeChallenge: 8,
+      vertices: 3,
+      ic8VertexUpgradeLevel: 20000,
+    }, runtime.SAVE_VERSION);
+    assert.equal(state.vertices, 3, "new active IC8 saves must keep real vertices fixed at 3");
+    assert.equal(state.ic8VertexUpgradeLevel, 20000, "new active IC8 saves must preserve replacement levels above the render cap");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(17);
+    state.coreBoostCount = 2;
+    assert.equal(runtime.coreBoostRequirementLog10(), 80, "normal Core Boost requirement must remain unchanged before IC8");
+    state.activeChallenge = 8;
+    assert.equal(runtime.coreBoostRequirementLog10(), 160, "IC8 must square Core Boost score requirements");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(18);
+    state.coreBoostCount = 3;
+    assertNearlyEqual(runtime.coreBoostGainIncreaseMultiplier(), 8, "IU 12-1 must make CB gain multiplier multiplicative with IU 7-1");
+    assertNearlyEqual(runtime.coreBoostGainExponent(), 1.02 ** 3, "IU 12-1 must make CB exponent multiplicative");
+    state.completedChallenges = 1 << (5 - 1);
+    assertNearlyEqual(runtime.coreBoostGainExponent(), 1.02 ** 3 + 0.01, "IC5 reward must still add after IU 12-1's multiplicative exponent");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.activeChallenge = 8;
+    state.coreBoostCount = 2;
+    state.ic8VertexUpgradeLevel = 10;
+    setLogResource(state, "score", 10);
+    assertNearlyEqual(
+      runtime.nextCoreBoostValues().gainExponent,
+      runtime.coreBoostGainExponent(),
+      "active IC8 Core Boost preview must keep replacement levels while Core Boost is unavailable",
+    );
+    setLogResource(state, "score", 1000);
+    assertNearlyEqual(runtime.coreBoostGainExponent(), 1.04 + 10 * runtime.IC8_VERTEX_EXPONENT_BONUS, "active IC8 current exponent must include replacement levels");
+    assertNearlyEqual(runtime.nextCoreBoostValues().gainExponent, 1.06, "active IC8 Core Boost preview must omit replacement levels cleared by the reset");
   }
 
   {

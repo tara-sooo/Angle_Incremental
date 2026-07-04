@@ -115,7 +115,6 @@ function runGeneration() {
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
-  const preservedVertices = runtime.shouldPreserveVerticesThroughEarlyReset() ? runtime.state.vertices : 3;
   runtime.state.generationCount += 1;
   runtime.state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
@@ -127,7 +126,8 @@ function runGeneration() {
   runtime.state.scoreLog10 = -Infinity;
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
-  runtime.state.vertices = preservedVertices;
+  runtime.state.vertices = 3;
+  runtime.state.ic8VertexUpgradeLevel = 0;
   runtime.state.speedLevel = 0;
   runtime.state.gainLevel = 0;
   runtime.state.currentGain = 1;
@@ -145,10 +145,16 @@ function balanceGenerationRewardForLog(generationScoreLog) {
   const depth = Math.max(0, generationScoreLog - runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE));
   const shallowScoreLift = 0.60 * (1 - Math.exp(-depth / 4));
   const shallowCostLift = 0.13 * (1 - Math.exp(-depth / 5));
-  const scoreMultiplierLog10 = Math.min(
+  const baseScoreMultiplierLog10 = Math.min(
     8,
     Math.log10(1 + depth) * runtime.BALANCE_PROFILE.generationRewardLogCoefficient + shallowScoreLift,
   );
+  const ic8ScoreMultiplierLog10 = Number.isFinite(generationScoreLog)
+    ? runtime.clampLog10(generationScoreLog * 0.014 + shallowScoreLift)
+    : baseScoreMultiplierLog10;
+  const scoreMultiplierLog10 = runtime.isChallengeCompleted(8)
+    ? ic8ScoreMultiplierLog10
+    : baseScoreMultiplierLog10;
   return {
     scoreMultiplierLog10,
     scoreMultiplierGain: runtime.valueFromLog10(scoreMultiplierLog10),
@@ -201,7 +207,6 @@ function balanceRunGeneration() {
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
-  const preservedVertices = runtime.shouldPreserveVerticesThroughEarlyReset() ? runtime.state.vertices : 3;
   runtime.state.generationCount += 1;
   runtime.state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
@@ -212,7 +217,8 @@ function balanceRunGeneration() {
   runtime.state.scoreLog10 = -Infinity;
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
-  runtime.state.vertices = preservedVertices;
+  runtime.state.vertices = 3;
+  runtime.state.ic8VertexUpgradeLevel = 0;
   runtime.state.speedLevel = 0;
   runtime.state.gainLevel = 0;
   runtime.state.currentGain = 1;

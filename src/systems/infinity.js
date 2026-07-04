@@ -179,6 +179,7 @@ function resetBelowInfinity() {
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
   runtime.state.vertices = 3;
+  runtime.state.ic8VertexUpgradeLevel = 0;
   runtime.state.speedLevel = 0;
   runtime.state.gainLevel = 0;
   runtime.state.currentGain = 1;
@@ -213,8 +214,12 @@ function applyStartingCoreBoosts() {
 }
 
 function recordInfinityRun(scoreLog, gained, challenge, noGenerationCoreBoost = false) {
+  const elapsed = runtime.state.currentInfinityRunTime;
+  const recordedTime = elapsed > 0
+    ? Math.max(elapsed, runtime.MIN_RECORDED_INFINITY_SECONDS)
+    : 0;
   const record = {
-    time: runtime.state.currentInfinityRunTime,
+    time: recordedTime,
     scoreLog10: scoreLog,
     ipGain: gained,
     challenge,
@@ -289,6 +294,7 @@ function toggleInfinityChallenge(index = nextChallengeIndex()) {
       runtime.resetVertexProgress();
     } else if (runtime.state.activeChallenge === 8) {
       runtime.state.vertices = 3;
+      runtime.state.ic8VertexUpgradeLevel = 0;
       runtime.resetVertexProgress();
     }
   }
@@ -303,6 +309,19 @@ function breakInfiniteCap() {
   runtime.saveGame("manual");
 }
 
+function generationIpMultiplierLog10() {
+  if (!isChallengeCompleted(8)) return 0;
+  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - 2);
+}
+
+function floorWithFloatingPointTolerance(value) {
+  return Math.floor(value + Math.max(1, Math.abs(value)) * Number.EPSILON * 8);
+}
+
+function doubleIpGainExactly(gain) {
+  return gain > Number.MAX_VALUE / 2 ? Number.MAX_VALUE : gain * 2;
+}
+
 function balanceInfinityPointGain() {
   if (!canInfinity()) return 0;
   const scoreLog10 = runtime.currentScoreLog10();
@@ -311,10 +330,14 @@ function balanceInfinityPointGain() {
   else if (hasInfinityUpgrade("9-1")) base = Math.floor(scoreLog10 / Math.log10(7) - 307);
   else base = Math.floor(scoreLog10 - 307);
   const gained = Math.max(1, base);
-  let multiplier = 1;
-  if (runtime.isAchievementUnlocked(17)) multiplier *= 2;
-  if (runtime.isAchievementUnlocked(21)) multiplier *= 2;
-  return gained * multiplier;
+  let gainedWithExactMultipliers = gained;
+  if (runtime.isAchievementUnlocked(17)) gainedWithExactMultipliers = doubleIpGainExactly(gainedWithExactMultipliers);
+  if (runtime.isAchievementUnlocked(21)) gainedWithExactMultipliers = doubleIpGainExactly(gainedWithExactMultipliers);
+  const ic8MultiplierLog10 = generationIpMultiplierLog10();
+  if (ic8MultiplierLog10 === 0) return gainedWithExactMultipliers;
+  const gainValue = runtime.valueFromLog10(runtime.log10Value(gainedWithExactMultipliers) + ic8MultiplierLog10);
+  if (gainValue === Number.MAX_VALUE) return Number.MAX_VALUE;
+  return Math.max(1, floorWithFloatingPointTolerance(gainValue));
 }
 
 function balanceInfinityUpgradeCostExponent() {

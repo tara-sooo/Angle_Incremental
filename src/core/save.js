@@ -25,6 +25,10 @@ function legacyInfinityUpgradeRefundLog10(data) {
   return refundLog;
 }
 
+function ic8VertexUpgradeLevelLimit() {
+  return runtime.MAX_GAME_VERTICES || 1_000_000_000_000;
+}
+
 function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   const score = runtime.hydrateLogResource(data.score, data.scoreLog10);
   runtime.state.score = score.value;
@@ -36,6 +40,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.generationScore = generationScore.value;
   runtime.state.generationScoreLog10 = generationScore.log;
   runtime.state.vertices = Math.min(runtime.MAX_RENDERED_VERTICES, Math.max(3, Math.floor(runtime.sanitizeNumber(data.vertices, 3, 3))));
+  runtime.state.ic8VertexUpgradeLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.ic8VertexUpgradeLevel, 0)));
   runtime.state.speedLevel = Math.floor(runtime.sanitizeNumber(data.speedLevel, 0));
   runtime.state.gainLevel = Math.floor(runtime.sanitizeNumber(data.gainLevel, 0));
   const currentGain = runtime.hydrateLogResource(data.currentGain, data.currentGainLog10, 0);
@@ -176,9 +181,17 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.state.vertices = 200;
     runtime.resetVertexProgress();
   }
-  if (runtime.state.activeChallenge === 8 && runtime.state.vertices !== 3) {
-    runtime.state.vertices = 3;
+  if (runtime.state.activeChallenge === 8) {
+    if (!Object.hasOwn(data, "ic8VertexUpgradeLevel") && runtime.state.vertices > 3) {
+      runtime.state.ic8VertexUpgradeLevel = runtime.state.vertices - 3;
+    }
+    if (runtime.state.vertices !== 3) runtime.state.vertices = 3;
+    if (runtime.state.ic8VertexUpgradeLevel > ic8VertexUpgradeLevelLimit()) {
+      runtime.state.ic8VertexUpgradeLevel = ic8VertexUpgradeLevelLimit();
+    }
     runtime.resetVertexProgress();
+  } else if (runtime.state.ic8VertexUpgradeLevel !== 0) {
+    runtime.state.ic8VertexUpgradeLevel = 0;
   }
   runtime.state.showFloatingText = data.showFloatingText !== false;
   runtime.state.lightEffects = Boolean(data.lightEffects);
@@ -386,6 +399,7 @@ function resetSave() {
     generationScore: 0,
     generationScoreLog10: -Infinity,
     vertices: 3,
+    ic8VertexUpgradeLevel: 0,
     speedLevel: 0,
     gainLevel: 0,
     currentGain: 1,

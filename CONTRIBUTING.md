@@ -6,7 +6,7 @@ Angle Incremental ships bundled milestone updates rather than exposing every com
 
 - `main` represents the currently released, stable, playable version.
 - `next` integrates the work planned for the next numbered update.
-- A numbered release such as `0.1.0` is a coherent milestone containing multiple related improvements, not a single small feature.
+- A numbered release such as `0.5.0` is a coherent milestone containing multiple related improvements, not a single small feature.
 - Before work begins, classify planned items as **required**, **optional**, or **deferred to the following release**. Do not keep expanding a release indefinitely.
 
 ## Branch Strategy
@@ -23,8 +23,8 @@ Angle Incremental ships bundled milestone updates rather than exposing every com
 - `balance/<topic>` — progression, formula, economy, or tuning changes.
 - `docs/<topic>` — specifications, release notes, README, or development documentation.
 - `chore/<topic>` — tooling, test harnesses, CI, repository maintenance, or non-player-facing cleanup.
-- `release/<version>` — release stabilization only, for example `release/0.1.0`.
-- `hotfix/<version>-<topic>` — urgent fix for an already released version, for example `hotfix/0.1.1-save-load`.
+- `release/<version>` — release stabilization only, for example `release/0.5.0`.
+- `hotfix/<version>-<topic>` — urgent fix for an already released version, for example `hotfix/0.5.1-save-load`.
 
 Use lowercase ASCII names with hyphens. Keep branches focused on one concern.
 
@@ -56,12 +56,12 @@ For UI, gameplay, save, or balance changes, also test the affected flow in a bro
 
 When the planned release scope is complete:
 
-1. Create `release/<version>` from `next`, for example `release/0.1.0`.
+1. Create `release/<version>` from `next`, for example `release/0.5.0`.
 2. Stop adding new features to that release branch.
 3. Allow only release-blocking bug fixes, save migration work, final balance adjustments, version metadata, changelog entries, and release notes.
 4. Test the release candidate from a new save and representative existing saves.
 5. Merge the release branch into `main` through a pull request.
-6. Create an annotated Git tag such as `v0.1.0` and publish the GitHub Release.
+6. Create an annotated Git tag such as `v0.5.0` and publish the GitHub Release.
 7. Merge the finalized release fixes back into `next`, then continue work toward the following milestone.
 
 During release stabilization, work for a later update may continue on `next`. It must not be merged into `release/<version>` unless explicitly approved for that release.
@@ -73,7 +73,7 @@ Use a hotfix branch only for a serious problem in a released version, especially
 1. Create `hotfix/<version>-<topic>` from the released tag or the corresponding `main` commit.
 2. Make the smallest safe correction.
 3. Verify the fix and open a pull request into `main`.
-4. Tag the patch release, for example `v0.1.1`.
+4. Tag the patch release, for example `v0.5.1`.
 5. Merge the hotfix into `next` so the correction is not lost in ongoing development.
 
 ## Pull Request Requirements
@@ -92,8 +92,8 @@ Do not combine unrelated feature work, large refactors, balance experiments, and
 
 Use `0.x.y` until the game reaches a stable public contract.
 
-- Patch: `0.1.0` -> `0.1.1` for bug fixes and low-risk adjustments.
-- Minor milestone: `0.1.x` -> `0.2.0` for a bundled content or systems update.
+- Patch: `0.5.0` -> `0.5.1` for bug fixes and low-risk adjustments.
+- Minor milestone: `0.5.x` -> `0.6.0` for a bundled content or systems update.
 - `1.0.0` when the core design, expected save compatibility, and baseline quality are considered stable.
 
 Keep the application version separate from the save-data schema version. A documentation or balance-only release may change the application version without changing the save schema. Increase the save schema version only when loading older data requires migration or would otherwise be unsafe.

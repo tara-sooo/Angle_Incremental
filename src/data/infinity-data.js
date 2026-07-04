@@ -40,8 +40,11 @@ const INFINITY_CHALLENGES = [
   },
   {
     name: { ja: "IC8 反出生主義", en: "IC8 Anti-Natalism" },
-    restriction: { ja: "角の数は3で始まり角増加アップグレードは購入できず、角はGRとCBでリセットされない", en: "Starts at 3 vertices, vertex upgrades cannot be bought, and vertices are not reset by Generation or Core Boost." },
-    reward: { ja: "角の数はGRとCBでリセットされなくなる", en: "Vertices are no longer reset by Generation or Core Boost." },
+    restriction: {
+      ja: "角の数は3で固定され、CB必要スコアは^2される。角追加アップグレードは角を追加せず、頂点通過ごとの増加とスコア獲得量指数を上げる",
+      en: "Vertices are fixed at 3 and Core Boost score requirements are squared. Vertex upgrades do not add vertices; they increase gain per vertex and the score gain exponent.",
+    },
+    reward: { ja: "GRスコア倍率式が変化し、GRスコア倍率/100がIP獲得倍率にも適用される", en: "Changes the GR score multiplier formula and applies GR score multiplier / 100 to IP gain." },
   },
 ];
 
@@ -266,6 +269,17 @@ const BALANCE_INFINITY_UPGRADES = [
     effect: {
       ja: "IU1-1の倍率が1.005^(Infinity回数)になる（Infinity 10000以降は効果なし）",
       en: "Changes the IU 1-1 multiplier to 1.005^(Infinity count), with no effect after 10000 Infinity.",
+    },
+  },
+  {
+    id: "12-1",
+    bit: 18,
+    cost: 6660000,
+    requires: ["11-1", "11-2"],
+    name: { ja: "12-1 ゴールデンヘル", en: "12-1 Golden Hell" },
+    effect: {
+      ja: "CBの効果は加算ではなく×(1+増加分)で計算されるようになる",
+      en: "Core Boost effects are calculated multiplicatively by x(1 + increase) instead of additively.",
     },
   },
 ];

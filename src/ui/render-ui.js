@@ -114,6 +114,7 @@ function createInfinityUpgradeRows() {
     ["9-1"],
     ["10-1", "10-2"],
     ["11-1", "11-2"],
+    ["12-1"],
   ];
 
   upgradeRows.forEach((rowIds, rowIndex) => {
@@ -461,7 +462,7 @@ function updateUi() {
   runtime.elements.coreBoostExponent.textContent = formatExponentPreview(runtime.coreBoostGainExponent(), nextCoreBoost.gainExponent);
   runtime.elements.coreBoostButton.disabled = !runtime.canCoreBoost();
 
-  runtime.elements.infinityCount.textContent = String(runtime.state.infinityCount);
+  runtime.elements.infinityCount.textContent = runtime.formatUiNumber(runtime.state.infinityCount);
   const infinityReady = runtime.canInfinity();
   const infinityUnlocked = runtime.state.infinityCount > 0;
   runtime.elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";
@@ -484,9 +485,10 @@ function updateUi() {
       ? runtime.t("locked")
       : `${completed}/${runtime.INFINITY_CHALLENGE_COUNT} ${runtime.t("completed")}`;
   updateChallengeRows();
+  const breakCapRequirement = runtime.formatPowerOfTen(runtime.BREAK_CAP_REQUIREMENT_LOG10);
   runtime.elements.breakCapRequirement.textContent = runtime.state.infiniteCapBroken
-    ? "Break済み"
-    : `条件: ${runtime.formatPowerOfTen(runtime.BREAK_CAP_REQUIREMENT_LOG10)} score`;
+    ? runtime.t("breakCapBroken")
+    : runtime.t("breakCapRequirement").replace("{score}", breakCapRequirement);
   runtime.elements.breakCapButton.disabled = !runtime.canBreakInfiniteCap();
   runtime.elements.breakCapButton.textContent = runtime.state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 
@@ -587,6 +589,7 @@ function balanceCreateInfinityUpgradeRows() {
     ["9-1"],
     ["10-1", "10-2"],
     ["11-1", "11-2"],
+    ["12-1"],
   ];
   tiers.forEach((rowIds, rowIndex) => {
     const tier = document.createElement("div");
