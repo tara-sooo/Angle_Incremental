@@ -416,6 +416,17 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
   {
     const { runtime, debug } = await loadRuntime(candidatePath);
     const { state } = debug;
+    state.activeChallenge = 8;
+    state.coreBoostCount = 2;
+    state.ic8VertexUpgradeLevel = 10;
+    setLogResource(state, "score", 1000);
+    assertNearlyEqual(runtime.coreBoostGainExponent(), 1.04 + 10 * runtime.IC8_VERTEX_EXPONENT_BONUS, "active IC8 current exponent must include replacement levels");
+    assertNearlyEqual(runtime.nextCoreBoostValues().gainExponent, 1.06, "active IC8 Core Boost preview must omit replacement levels cleared by the reset");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
     state.infinityUpgradeMask = 1 << 0;
     state.infinityCount = 1000;
     const legacy = runtime.vertexGainIncrease();

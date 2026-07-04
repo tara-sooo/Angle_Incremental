@@ -40,14 +40,15 @@ function ic8VertexUpgradeCount() {
   return runtime.state.activeChallenge === 8 ? Math.max(0, runtime.state.ic8VertexUpgradeLevel) : 0;
 }
 
-function ic8VertexScoreExponentBonus() {
-  return ic8VertexUpgradeCount() * runtime.IC8_VERTEX_EXPONENT_BONUS;
+function ic8VertexScoreExponentBonus(level = ic8VertexUpgradeCount()) {
+  return level * runtime.IC8_VERTEX_EXPONENT_BONUS;
 }
 
-function coreBoostGainExponentForCount(coreBoostCount) {
+function coreBoostGainExponentForCount(coreBoostCount, options = {}) {
+  const ic8ReplacementLevel = options.ic8ReplacementLevel ?? ic8VertexUpgradeCount();
   const baseExponent = runtime.hasInfinityUpgrade("12-1") ? Math.pow(1.02, coreBoostCount) : 1 + coreBoostCount * 0.02;
   return Math.pow(baseExponent, coreBoostBonusPower())
-    + ic8VertexScoreExponentBonus()
+    + ic8VertexScoreExponentBonus(ic8ReplacementLevel)
     + (runtime.isChallengeCompleted(5) ? 0.01 : 0);
 }
 
@@ -61,7 +62,9 @@ function nextCoreBoostValues() {
   const power = coreBoostBonusPower();
   return {
     gainMultiplier: Math.pow(coreBoostGainIncreaseBaseForCount(nextCoreBoostCount), power),
-    gainExponent: coreBoostGainExponentForCount(nextCoreBoostCount),
+    gainExponent: coreBoostGainExponentForCount(nextCoreBoostCount, {
+      ic8ReplacementLevel: runtime.state.activeChallenge === 8 ? 0 : undefined,
+    }),
   };
 }
 
