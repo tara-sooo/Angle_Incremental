@@ -41,7 +41,7 @@ const INFINITY_CHALLENGES = [
   {
     name: { ja: "IC8 反出生主義", en: "IC8 Anti-Natalism" },
     restriction: { ja: "角の数は3で始まり角増加アップグレードは購入できず、角はGRとCBでリセットされない", en: "Starts at 3 vertices, vertex upgrades cannot be bought, and vertices are not reset by Generation or Core Boost." },
-    reward: { ja: "角の数はGRとCBでリセットされなくなる", en: "Vertices are no longer reset by Generation or Core Boost." },
+    reward: { ja: "GRスコア倍率式が変化し、GRスコア倍率/100がIP獲得倍率にも適用される", en: "Changes the GR score multiplier formula and applies GR score multiplier / 100 to IP gain." },
   },
 ];
 

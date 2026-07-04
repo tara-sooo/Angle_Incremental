@@ -484,9 +484,10 @@ function updateUi() {
       ? runtime.t("locked")
       : `${completed}/${runtime.INFINITY_CHALLENGE_COUNT} ${runtime.t("completed")}`;
   updateChallengeRows();
+  const breakCapRequirement = runtime.formatPowerOfTen(runtime.BREAK_CAP_REQUIREMENT_LOG10);
   runtime.elements.breakCapRequirement.textContent = runtime.state.infiniteCapBroken
-    ? "Break済み"
-    : `条件: ${runtime.formatPowerOfTen(runtime.BREAK_CAP_REQUIREMENT_LOG10)} score`;
+    ? runtime.t("breakCapBroken")
+    : runtime.t("breakCapRequirement").replace("{score}", breakCapRequirement);
   runtime.elements.breakCapButton.disabled = !runtime.canBreakInfiniteCap();
   runtime.elements.breakCapButton.textContent = runtime.state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 

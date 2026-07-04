@@ -307,6 +307,11 @@ function breakInfiniteCap() {
   runtime.saveGame("manual");
 }
 
+function generationIpMultiplierLog10() {
+  if (!isChallengeCompleted(8)) return 0;
+  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - 2);
+}
+
 function balanceInfinityPointGain() {
   if (!canInfinity()) return 0;
   const scoreLog10 = runtime.currentScoreLog10();
@@ -315,10 +320,11 @@ function balanceInfinityPointGain() {
   else if (hasInfinityUpgrade("9-1")) base = Math.floor(scoreLog10 / Math.log10(7) - 307);
   else base = Math.floor(scoreLog10 - 307);
   const gained = Math.max(1, base);
-  let multiplier = 1;
-  if (runtime.isAchievementUnlocked(17)) multiplier *= 2;
-  if (runtime.isAchievementUnlocked(21)) multiplier *= 2;
-  return gained * multiplier;
+  let multiplierLog10 = generationIpMultiplierLog10();
+  if (runtime.isAchievementUnlocked(17)) multiplierLog10 += Math.log10(2);
+  if (runtime.isAchievementUnlocked(21)) multiplierLog10 += Math.log10(2);
+  if (multiplierLog10 === 0) return gained;
+  return Math.max(1, Math.floor(runtime.valueFromLog10(runtime.log10Value(gained) + multiplierLog10)));
 }
 
 function balanceInfinityUpgradeCostExponent() {

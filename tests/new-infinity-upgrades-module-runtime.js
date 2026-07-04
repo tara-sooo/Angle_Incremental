@@ -29,6 +29,11 @@ function prepareGenerationAutomationScenario(instance, { generationScoreLog10 = 
   state.currentGenerationRunTime = runSeconds;
 }
 
+function shallowGenerationScoreBonus(generationScoreLog10) {
+  const depth = Math.max(0, generationScoreLog10 - Math.log10(1_000_000));
+  return 0.60 * (1 - Math.exp(-depth / 4));
+}
+
 async function runNewInfinityUpgradesModuleRuntimeTest() {
   {
     const { runtime } = await loadRuntime(candidatePath);
@@ -78,6 +83,60 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       runtime.infinityPointGain(),
       Math.max(1, Math.floor(310 / Math.log10(2) - 307)),
       "IU 9-1 must not replace the post-break log2 formula",
+    );
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.language = "en";
+    state.infiniteCapBroken = true;
+
+    runtime.updateUi();
+
+    assert.equal(runtime.elements.breakCapRequirement.textContent, "Cap broken", "Break Infinite Cap status must use English text when English is selected");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    const scoreLog10 = 20;
+
+    assert.notEqual(
+      runtime.generationRewardForLog(scoreLog10).scoreMultiplierLog10,
+      scoreLog10 * 0.014 + shallowGenerationScoreBonus(scoreLog10),
+      "IC8's revised GR formula must not apply before IC8 is completed",
+    );
+
+    state.completedChallenges = 1 << (8 - 1);
+    assert.equal(
+      runtime.generationRewardForLog(scoreLog10).scoreMultiplierLog10,
+      scoreLog10 * 0.014 + shallowGenerationScoreBonus(scoreLog10),
+      "IC8 completion must switch the GR score multiplier formula",
+    );
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityCount = 1;
+    state.completedChallenges = 1 << (8 - 1);
+    setLogResource(state, "score", 400);
+
+    state.generationScoreMultiplierLog10 = 1;
+    state.generationScoreMultiplier = 10;
+    assert.equal(
+      runtime.infinityPointGain(),
+      Math.max(1, Math.floor(400 - 307)),
+      "IC8 GR-derived IP multiplier must not reduce IP below the base gain",
+    );
+
+    state.generationScoreMultiplierLog10 = 3;
+    state.generationScoreMultiplier = 1000;
+    assert.equal(
+      runtime.infinityPointGain(),
+      Math.floor(Math.max(1, Math.floor(400 - 307)) * 10000),
+      "IC8 GR-derived IP multiplier must apply the effective score multiplier divided by 100",
     );
   }
 
