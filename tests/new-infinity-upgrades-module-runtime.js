@@ -419,6 +419,12 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     state.activeChallenge = 8;
     state.coreBoostCount = 2;
     state.ic8VertexUpgradeLevel = 10;
+    setLogResource(state, "score", 10);
+    assertNearlyEqual(
+      runtime.nextCoreBoostValues().gainExponent,
+      runtime.coreBoostGainExponent(),
+      "active IC8 Core Boost preview must keep replacement levels while Core Boost is unavailable",
+    );
     setLogResource(state, "score", 1000);
     assertNearlyEqual(runtime.coreBoostGainExponent(), 1.04 + 10 * runtime.IC8_VERTEX_EXPONENT_BONUS, "active IC8 current exponent must include replacement levels");
     assertNearlyEqual(runtime.nextCoreBoostValues().gainExponent, 1.06, "active IC8 Core Boost preview must omit replacement levels cleared by the reset");

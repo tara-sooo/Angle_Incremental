@@ -58,12 +58,13 @@ function coreBoostGainExponent() {
 
 function nextCoreBoostValues() {
   const currentCoreBoostCount = runtime.state.coreBoostCount;
-  const nextCoreBoostCount = canCoreBoost() ? currentCoreBoostCount + 1 : currentCoreBoostCount;
+  const coreBoostReady = canCoreBoost();
+  const nextCoreBoostCount = coreBoostReady ? currentCoreBoostCount + 1 : currentCoreBoostCount;
   const power = coreBoostBonusPower();
   return {
     gainMultiplier: Math.pow(coreBoostGainIncreaseBaseForCount(nextCoreBoostCount), power),
     gainExponent: coreBoostGainExponentForCount(nextCoreBoostCount, {
-      ic8ReplacementLevel: runtime.state.activeChallenge === 8 ? 0 : undefined,
+      ic8ReplacementLevel: runtime.state.activeChallenge === 8 && coreBoostReady ? 0 : undefined,
     }),
   };
 }
