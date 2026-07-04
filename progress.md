@@ -78,6 +78,7 @@ Original prompt: では、中核ループを完成させてください
 - Added Infinity Upgrades 8-1, 9-1, 10-1, and 10-2 with tier prerequisites, layer automation controls, the pre-Break log7 IP formula, starting 2 Core Boosts, and held-score ^1.2 handling.
 - Verified the new IU pass with ESM regression tests and Firefox/Playwright desktop/mobile Automation screenshots; no console errors were reported.
 - Prepared the 0.5.1 hotfix so the FPS counter avoids the top bar and news changes only after each scroll cycle completes.
+- Compressed the Infinity tab header/subtabs, kept IU upgrades two-column on normal mobile widths, and made the IU detail/purchase panel sticky at the bottom; verified Firefox screenshots for IU/IC/IA mobile and IU desktop with no console errors.
 
 ## TODO
 
