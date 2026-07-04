@@ -58,7 +58,8 @@ function coreBoostRequirementWithoutEarlyCap() {
   const multiplier = 2 ** count;
   if (Number.isFinite(multiplier)) {
     const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
-    if (Number.isFinite(requirementLog10)) return requirementLog10;
+    const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
+    if (Number.isFinite(challengeAdjustedLog10)) return challengeAdjustedLog10;
   }
   return MAX_GAME_LOG10;
 }

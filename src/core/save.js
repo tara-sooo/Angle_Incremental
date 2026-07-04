@@ -176,7 +176,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.state.vertices = 200;
     runtime.resetVertexProgress();
   }
-  if (runtime.state.activeChallenge === 8 && runtime.state.vertices !== 3) {
+  if (runtime.state.activeChallenge === 8 && runtime.state.vertices < 3) {
     runtime.state.vertices = 3;
     runtime.resetVertexProgress();
   }

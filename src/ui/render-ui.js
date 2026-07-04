@@ -114,6 +114,7 @@ function createInfinityUpgradeRows() {
     ["9-1"],
     ["10-1", "10-2"],
     ["11-1", "11-2"],
+    ["12-1"],
   ];
 
   upgradeRows.forEach((rowIds, rowIndex) => {
@@ -588,6 +589,7 @@ function balanceCreateInfinityUpgradeRows() {
     ["9-1"],
     ["10-1", "10-2"],
     ["11-1", "11-2"],
+    ["12-1"],
   ];
   tiers.forEach((rowIds, rowIndex) => {
     const tier = document.createElement("div");

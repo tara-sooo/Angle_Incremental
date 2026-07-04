@@ -6,7 +6,9 @@ import { runtime, expose } from "../runtime/shared.js";
 function coreBoostRequirementLog10() {
   const multiplier = 2 ** runtime.state.coreBoostCount;
   if (!Number.isFinite(multiplier)) return runtime.MAX_TRACKED_LOG10;
-  return Math.min(Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier, runtime.MAX_TRACKED_LOG10);
+  const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
+  const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
+  return Math.min(challengeAdjustedLog10, runtime.MAX_TRACKED_LOG10);
 }
 
 function coreBoostRequirement() {
@@ -23,12 +25,30 @@ function coreBoostBonusPower() {
   return 1;
 }
 
+function coreBoostGainIncreaseBaseForCount(coreBoostCount) {
+  const increasePerCoreBoost = runtime.hasInfinityUpgrade("7-1") ? 1 : 0.5;
+  return runtime.hasInfinityUpgrade("12-1")
+    ? Math.pow(1 + increasePerCoreBoost, coreBoostCount)
+    : 1 + coreBoostCount * increasePerCoreBoost;
+}
+
 function coreBoostGainIncreaseMultiplier() {
-  return Math.pow(1 + runtime.state.coreBoostCount * 0.5, coreBoostBonusPower());
+  return Math.pow(coreBoostGainIncreaseBaseForCount(runtime.state.coreBoostCount), coreBoostBonusPower());
+}
+
+function ic8VertexUpgradeCount() {
+  return runtime.state.activeChallenge === 8 ? Math.max(0, runtime.state.vertices - 3) : 0;
+}
+
+function ic8VertexScoreExponentBonus() {
+  return ic8VertexUpgradeCount() * runtime.IC8_VERTEX_EXPONENT_BONUS;
 }
 
 function coreBoostGainExponentForCount(coreBoostCount) {
-  return Math.pow(1 + coreBoostCount * 0.02, coreBoostBonusPower()) + (runtime.isChallengeCompleted(5) ? 0.01 : 0);
+  const baseExponent = runtime.hasInfinityUpgrade("12-1") ? Math.pow(1.02, coreBoostCount) : 1 + coreBoostCount * 0.02;
+  return Math.pow(baseExponent, coreBoostBonusPower())
+    + ic8VertexScoreExponentBonus()
+    + (runtime.isChallengeCompleted(5) ? 0.01 : 0);
 }
 
 function coreBoostGainExponent() {
@@ -39,15 +59,14 @@ function nextCoreBoostValues() {
   const currentCoreBoostCount = runtime.state.coreBoostCount;
   const nextCoreBoostCount = canCoreBoost() ? currentCoreBoostCount + 1 : currentCoreBoostCount;
   const power = coreBoostBonusPower();
-  const increasePerCoreBoost = runtime.hasInfinityUpgrade("7-1") ? 1 : 0.5;
   return {
-    gainMultiplier: Math.pow(1 + nextCoreBoostCount * increasePerCoreBoost, power),
+    gainMultiplier: Math.pow(coreBoostGainIncreaseBaseForCount(nextCoreBoostCount), power),
     gainExponent: coreBoostGainExponentForCount(nextCoreBoostCount),
   };
 }
 
 function shouldPreserveVerticesThroughEarlyReset() {
-  return runtime.state.activeChallenge === 8 || runtime.isChallengeCompleted(8);
+  return runtime.state.activeChallenge === 8;
 }
 
 function resetBelowCoreBoost() {
@@ -87,14 +106,15 @@ function runCoreBoost() {
 }
 
 function balanceCoreBoostGainIncreaseMultiplier() {
-  const increasePerCoreBoost = runtime.hasInfinityUpgrade("7-1") ? 1 : 0.5;
-  return Math.pow(1 + runtime.state.coreBoostCount * increasePerCoreBoost, coreBoostBonusPower());
+  return Math.pow(coreBoostGainIncreaseBaseForCount(runtime.state.coreBoostCount), coreBoostBonusPower());
 }
 expose("coreBoostRequirementLog10", () => coreBoostRequirementLog10, (value) => { coreBoostRequirementLog10 = value; });
 expose("coreBoostRequirement", () => coreBoostRequirement, (value) => { coreBoostRequirement = value; });
 expose("canCoreBoost", () => canCoreBoost, (value) => { canCoreBoost = value; });
 expose("coreBoostBonusPower", () => coreBoostBonusPower, (value) => { coreBoostBonusPower = value; });
 expose("coreBoostGainIncreaseMultiplier", () => coreBoostGainIncreaseMultiplier, (value) => { coreBoostGainIncreaseMultiplier = value; });
+expose("ic8VertexUpgradeCount", () => ic8VertexUpgradeCount, (value) => { ic8VertexUpgradeCount = value; });
+expose("ic8VertexScoreExponentBonus", () => ic8VertexScoreExponentBonus, (value) => { ic8VertexScoreExponentBonus = value; });
 expose("coreBoostGainExponent", () => coreBoostGainExponent, (value) => { coreBoostGainExponent = value; });
 expose("nextCoreBoostValues", () => nextCoreBoostValues, (value) => { nextCoreBoostValues = value; });
 expose("shouldPreserveVerticesThroughEarlyReset", () => shouldPreserveVerticesThroughEarlyReset, (value) => { shouldPreserveVerticesThroughEarlyReset = value; });

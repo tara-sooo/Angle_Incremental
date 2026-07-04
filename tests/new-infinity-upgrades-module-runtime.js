@@ -14,6 +14,10 @@ function purchasedMaskThrough(bit) {
   return (1 << (bit + 1)) - 1;
 }
 
+function assertNearlyEqual(actual, expected, message, tolerance = 1e-9) {
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${message}: expected ${expected}, got ${actual}`);
+}
+
 function prepareGenerationAutomationScenario(instance, { generationScoreLog10 = 20, runSeconds = 0 } = {}) {
   const { state } = instance.debug;
   state.automationEnabled = true;
@@ -53,6 +57,11 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.deepEqual(Array.from(byId.get("11-1")?.requires || []), ["10-1", "10-2"], "IU 11-1 must require both tier 10 upgrades");
     assert.equal(byId.get("11-2")?.cost, 400000, "IU 11-2 must cost 400000 IP");
     assert.deepEqual(Array.from(byId.get("11-2")?.requires || []), ["10-1", "10-2"], "IU 11-2 must require both tier 10 upgrades");
+    assert.equal(byId.get("12-1")?.bit, 18, "IU 12-1 must use bit 18");
+    assert.equal(byId.get("12-1")?.cost, 6660000, "IU 12-1 must cost 6.66e6 IP");
+    assert.deepEqual(Array.from(byId.get("12-1")?.requires || []), ["11-1", "11-2"], "IU 12-1 must require both tier 11 upgrades");
+    assert.equal(byId.get("12-1")?.name.ja, "12-1 ゴールデンヘル", "IU 12-1 Japanese name must match the new upgrade");
+    assert.match(byId.get("12-1")?.effect.en || "", /multiplicatively/, "IU 12-1 English effect must describe multiplicative Core Boost effects");
   }
 
   {
@@ -213,6 +222,9 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(debug.buyInfinityUpgrade("11-1"), true, "IU 11-1 must be purchasable after both tier 10 upgrades");
     setLogResource(state, "infinityPoints", Math.log10(400000));
     assert.equal(debug.buyInfinityUpgrade("11-2"), true, "IU 11-2 must be purchasable after both tier 10 upgrades");
+    setLogResource(state, "infinityPoints", Math.log10(6660000));
+    assert.equal(debug.buyInfinityUpgrade("12-1"), true, "IU 12-1 must be purchasable after both tier 11 upgrades");
+    assert.equal((state.infinityUpgradeMask & (1 << 18)) !== 0, true, "IU 12-1 purchase bit must be set");
   }
 
   {
@@ -315,9 +327,71 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     runtime.toggleInfinityChallenge(8);
     assert.equal(state.activeChallenge, 8, "IC8 should start for the effective vertex lock scenario");
     assert.equal(runtime.effectiveVertexCount(), 3, "IC8 must ignore IU 11-1 vertex bonuses and keep 3 effective vertices");
-    assert.equal(runtime.canBuyNormalUpgrade("vertex"), false, "IC8 must keep vertex purchases disabled");
+    assert.equal(runtime.canBuyNormalUpgrade("vertex"), true, "IC8 must let vertex purchases buy IC8-only replacement effects");
+    const baseVertexGain = runtime.vertexGainIncrease();
+    const baseExponent = runtime.coreBoostGainExponent();
+    assert.equal(debug.buyAllUpgrades({ allowSpeed: false, allowVertex: true, allowGain: false, refresh: false, save: false }) > 0, true, "IC8 vertex purchases should be buyable through Buy All");
+    assert.equal(runtime.effectiveVertexCount(), 3, "IC8 vertex purchases must still keep 3 effective vertices");
+    assert.ok(runtime.vertexGainIncrease() > baseVertexGain, "IC8 vertex purchases must increase gain per vertex");
+    assert.ok(runtime.coreBoostGainExponent() > baseExponent, "IC8 vertex purchases must increase score gain exponent");
     assert.equal(runtime.effectiveSpeedLevel(), state.speedLevel + 50, "IC8 should still keep IU 11-1 speed bonus levels");
     assert.equal(runtime.effectiveGainLevel(), state.gainLevel + 50, "IC8 should still keep IU 11-1 gain bonus levels");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(17);
+    state.completedChallenges = 1 << (8 - 1);
+    state.vertices = 20;
+    setLogResource(state, "generationScore", 7);
+    runtime.runGeneration();
+    assert.equal(state.vertices, 3, "completed IC8 must not preserve vertices through normal Generation resets");
+    state.vertices = 20;
+    runtime.resetBelowCoreBoost();
+    assert.equal(state.vertices, 3, "completed IC8 must not preserve vertices through normal Core Boost resets");
+
+    state.activeChallenge = 8;
+    state.vertices = 20;
+    setLogResource(state, "generationScore", 7);
+    runtime.runGeneration();
+    assert.equal(state.vertices, 20, "active IC8 must preserve vertices through Generation as IC8 replacement levels");
+    runtime.resetBelowCoreBoost();
+    assert.equal(state.vertices, 20, "active IC8 must preserve vertices through Core Boost as IC8 replacement levels");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    runtime.applySaveData({
+      infinityCount: 1,
+      infinityUpgradeMask: 1 << 5,
+      activeChallenge: 8,
+      vertices: 20,
+    }, runtime.SAVE_VERSION);
+    assert.equal(state.activeChallenge, 8, "active IC8 saves must remain in IC8 when ICs are unlocked");
+    assert.equal(state.vertices, 20, "active IC8 saves must preserve vertex-upgrade replacement levels");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(17);
+    state.coreBoostCount = 2;
+    assert.equal(runtime.coreBoostRequirementLog10(), 80, "normal Core Boost requirement must remain unchanged before IC8");
+    state.activeChallenge = 8;
+    assert.equal(runtime.coreBoostRequirementLog10(), 160, "IC8 must square Core Boost score requirements");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(18);
+    state.coreBoostCount = 3;
+    assertNearlyEqual(runtime.coreBoostGainIncreaseMultiplier(), 8, "IU 12-1 must make CB gain multiplier multiplicative with IU 7-1");
+    assertNearlyEqual(runtime.coreBoostGainExponent(), 1.02 ** 3, "IU 12-1 must make CB exponent multiplicative");
+    state.completedChallenges = 1 << (5 - 1);
+    assertNearlyEqual(runtime.coreBoostGainExponent(), 1.02 ** 3 + 0.01, "IC5 reward must still add after IU 12-1's multiplicative exponent");
   }
 
   {

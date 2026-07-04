@@ -149,6 +149,10 @@ function effectiveVertexCount() {
   return count;
 }
 
+function ic8VertexGainMultiplier() {
+  return Math.pow(runtime.IC8_VERTEX_GAIN_MULTIPLIER, runtime.ic8VertexUpgradeCount());
+}
+
 function scoreDisplay() {
   const scoreLog = currentScoreLog10();
   if (runtime.state.numberFormat === "scientific" && scoreLog > -Infinity) return runtime.formatScientificLog(scoreLog);
@@ -167,6 +171,7 @@ function vertexGainIncrease() {
     : 1;
   let gain = (0.01 + effectiveGainLevel() * 0.01)
     * runtime.coreBoostGainIncreaseMultiplier()
+    * ic8VertexGainMultiplier()
     * runtime.infiniteAngleBoost()
     * runtime.achievementGainMultiplier()
     * infinityResetBoost;
@@ -440,7 +445,6 @@ function upgradeCostLog(kind) {
 function canBuyNormalUpgrade(kind) {
   if (runtime.state.activeChallenge === 7 && currentScoreLog10() > 30) return false;
   if (kind === "vertex") {
-    if (runtime.state.activeChallenge === 8) return false;
     if (runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;
   }
   return runtime.canSpendLog(upgradeCostLog(kind));
@@ -535,7 +539,6 @@ function balanceCanBuyNormalUpgrade(kind) {
   const costLog = upgradeCostLog(kind);
   if (runtime.state.activeChallenge === 7 && costLog > 30) return false;
   if (kind === "vertex") {
-    if (runtime.state.activeChallenge === 8) return false;
     if (runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;
   }
   return runtime.canSpendLog(costLog);
@@ -569,6 +572,7 @@ function balanceVertexGainIncrease() {
     : 1;
   let gain = (0.01 + runtime.effectiveGainLevel() * 0.01)
     * runtime.coreBoostGainIncreaseMultiplier()
+    * ic8VertexGainMultiplier()
     * runtime.infiniteAngleBoost()
     * runtime.achievementGainMultiplier()
     * infinityResetBoost;
@@ -605,6 +609,7 @@ expose("iu11_2EffectiveInfinityCount", () => iu11_2EffectiveInfinityCount, (valu
 expose("effectiveSpeedLevel", () => effectiveSpeedLevel, (value) => { effectiveSpeedLevel = value; });
 expose("effectiveGainLevel", () => effectiveGainLevel, (value) => { effectiveGainLevel = value; });
 expose("effectiveVertexCount", () => effectiveVertexCount, (value) => { effectiveVertexCount = value; });
+expose("ic8VertexGainMultiplier", () => ic8VertexGainMultiplier, (value) => { ic8VertexGainMultiplier = value; });
 expose("scoreDisplay", () => scoreDisplay, (value) => { scoreDisplay = value; });
 expose("applyInfinitySoftcap", () => applyInfinitySoftcap, (value) => { applyInfinitySoftcap = value; });
 expose("vertexGainIncrease", () => vertexGainIncrease, (value) => { vertexGainIncrease = value; });
