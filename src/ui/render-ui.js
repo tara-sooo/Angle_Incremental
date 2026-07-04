@@ -462,7 +462,7 @@ function updateUi() {
   runtime.elements.coreBoostExponent.textContent = formatExponentPreview(runtime.coreBoostGainExponent(), nextCoreBoost.gainExponent);
   runtime.elements.coreBoostButton.disabled = !runtime.canCoreBoost();
 
-  runtime.elements.infinityCount.textContent = String(runtime.state.infinityCount);
+  runtime.elements.infinityCount.textContent = runtime.formatUiNumber(runtime.state.infinityCount);
   const infinityReady = runtime.canInfinity();
   const infinityUnlocked = runtime.state.infinityCount > 0;
   runtime.elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";

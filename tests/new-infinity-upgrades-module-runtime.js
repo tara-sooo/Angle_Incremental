@@ -314,6 +314,15 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
   {
     const { runtime, debug } = await loadRuntime(candidatePath);
     const { state } = debug;
+    state.infinityCount = 1234567;
+    state.numberFormat = "scientific";
+    runtime.updateUi();
+    assert.equal(runtime.elements.infinityCount.textContent, "1.23e6", "Infinity count display must respect scientific number formatting");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
     state.infinityUpgradeMask = purchasedMaskThrough(16);
     state.infinityCount = 1;
     setLogResource(state, "infinityPoints", Math.log10(1000000));
