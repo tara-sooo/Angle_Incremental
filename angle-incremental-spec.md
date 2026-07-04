@@ -1,6 +1,6 @@
 # Angle Incremental 開発仕様書
 
-対象リリース: **0.5.1**
+対象リリース: **0.6.0**
 
 この文書は、現行公開版のゲーム仕様と実装基準をまとめる。プレイヤー向けの遊び方は [angle-incremental-guide.md](angle-incremental-guide.md) を参照する。
 
@@ -423,7 +423,7 @@ major.minor.patch
 - `APP_VERSION`: 公開アプリのバージョン。`version.json` の `appVersion` と一致させる。
 - `SAVE_VERSION`: セーブデータの移行が必要な場合に上げる保存形式バージョン。
 
-0.5.1時点では、`APP_VERSION = 0.5.1`、`SAVE_VERSION = 9` である。ドキュメントのみの変更では、原則としてどちらも変更しない。
+0.6.0時点では、`APP_VERSION = 0.6.0`、`SAVE_VERSION = 9` である。ドキュメントのみの変更では、原則としてどちらも変更しない。
 
 ブラウザのキャッシュ対策として、CSS/JSのURLにはアプリバージョンのクエリを付ける。起動中クライアントは `version.json` を定期確認し、新しい `appVersion` を検出したら保存してリロードを促す。
 
