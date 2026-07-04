@@ -45,6 +45,8 @@ async function runAchievementV2ModuleRuntimeTest() {
     assert.equal(runtime.infinityPointGain(), 6, "achievement 21 should also double IP gain");
     state.achievementMask = (1 << (17 - 1)) | (1 << (21 - 1));
     assert.equal(runtime.infinityPointGain(), 12, "achievements 17 and 21 should stack to quadruple IP gain");
+    setLogResource(state, "score", 309);
+    assert.equal(runtime.infinityPointGain(), 8, "achievement IP multipliers must preserve exact integer products before flooring");
   }
 
   {

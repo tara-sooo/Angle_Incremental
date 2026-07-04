@@ -312,6 +312,10 @@ function generationIpMultiplierLog10() {
   return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - 2);
 }
 
+function floorWithFloatingPointTolerance(value) {
+  return Math.floor(value + Math.max(1, Math.abs(value)) * Number.EPSILON * 8);
+}
+
 function balanceInfinityPointGain() {
   if (!canInfinity()) return 0;
   const scoreLog10 = runtime.currentScoreLog10();
@@ -320,11 +324,13 @@ function balanceInfinityPointGain() {
   else if (hasInfinityUpgrade("9-1")) base = Math.floor(scoreLog10 / Math.log10(7) - 307);
   else base = Math.floor(scoreLog10 - 307);
   const gained = Math.max(1, base);
-  let multiplierLog10 = generationIpMultiplierLog10();
-  if (runtime.isAchievementUnlocked(17)) multiplierLog10 += Math.log10(2);
-  if (runtime.isAchievementUnlocked(21)) multiplierLog10 += Math.log10(2);
-  if (multiplierLog10 === 0) return gained;
-  return Math.max(1, Math.floor(runtime.valueFromLog10(runtime.log10Value(gained) + multiplierLog10)));
+  let gainedWithExactMultipliers = gained;
+  if (runtime.isAchievementUnlocked(17)) gainedWithExactMultipliers *= 2;
+  if (runtime.isAchievementUnlocked(21)) gainedWithExactMultipliers *= 2;
+  const ic8MultiplierLog10 = generationIpMultiplierLog10();
+  if (ic8MultiplierLog10 === 0) return gainedWithExactMultipliers;
+  const rawGain = gainedWithExactMultipliers * runtime.valueFromLog10(ic8MultiplierLog10);
+  return Math.max(1, floorWithFloatingPointTolerance(rawGain));
 }
 
 function balanceInfinityUpgradeCostExponent() {
