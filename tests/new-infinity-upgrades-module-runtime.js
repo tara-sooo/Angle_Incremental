@@ -385,10 +385,10 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       infinityUpgradeMask: 1 << 5,
       activeChallenge: 8,
       vertices: 3,
-      ic8VertexUpgradeLevel: 5,
+      ic8VertexUpgradeLevel: 20000,
     }, runtime.SAVE_VERSION);
     assert.equal(state.vertices, 3, "new active IC8 saves must keep real vertices fixed at 3");
-    assert.equal(state.ic8VertexUpgradeLevel, 5, "new active IC8 saves must preserve replacement levels");
+    assert.equal(state.ic8VertexUpgradeLevel, 20000, "new active IC8 saves must preserve replacement levels above the render cap");
   }
 
   {

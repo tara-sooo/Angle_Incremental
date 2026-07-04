@@ -25,6 +25,10 @@ function legacyInfinityUpgradeRefundLog10(data) {
   return refundLog;
 }
 
+function ic8VertexUpgradeLevelLimit() {
+  return runtime.MAX_GAME_VERTICES || 1_000_000_000_000;
+}
+
 function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   const score = runtime.hydrateLogResource(data.score, data.scoreLog10);
   runtime.state.score = score.value;
@@ -182,8 +186,8 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
       runtime.state.ic8VertexUpgradeLevel = runtime.state.vertices - 3;
     }
     if (runtime.state.vertices !== 3) runtime.state.vertices = 3;
-    if (runtime.state.ic8VertexUpgradeLevel > runtime.MAX_RENDERED_VERTICES) {
-      runtime.state.ic8VertexUpgradeLevel = runtime.MAX_RENDERED_VERTICES;
+    if (runtime.state.ic8VertexUpgradeLevel > ic8VertexUpgradeLevelLimit()) {
+      runtime.state.ic8VertexUpgradeLevel = ic8VertexUpgradeLevelLimit();
     }
     runtime.resetVertexProgress();
   } else if (runtime.state.ic8VertexUpgradeLevel !== 0) {
