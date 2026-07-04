@@ -138,6 +138,18 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       Math.floor(Math.max(1, Math.floor(400 - 307)) * 10000),
       "IC8 GR-derived IP multiplier must apply the effective score multiplier divided by 100",
     );
+
+    state.generationScoreMultiplierLog10 = 310;
+    state.generationScoreMultiplier = Number.MAX_VALUE;
+    assert.equal(
+      runtime.infinityPointGain(),
+      Number.MAX_VALUE,
+      "IC8 GR-derived IP multiplier must clamp huge IP gains to a finite value",
+    );
+    assert.doesNotThrow(
+      () => debug.runInfinity(),
+      "huge finite IC8 IP gains must not crash Infinity reward payout",
+    );
   }
 
   {
