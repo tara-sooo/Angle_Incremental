@@ -179,6 +179,7 @@ function resetBelowInfinity() {
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
   runtime.state.vertices = 3;
+  runtime.state.ic8VertexUpgradeLevel = 0;
   runtime.state.speedLevel = 0;
   runtime.state.gainLevel = 0;
   runtime.state.currentGain = 1;
@@ -293,6 +294,7 @@ function toggleInfinityChallenge(index = nextChallengeIndex()) {
       runtime.resetVertexProgress();
     } else if (runtime.state.activeChallenge === 8) {
       runtime.state.vertices = 3;
+      runtime.state.ic8VertexUpgradeLevel = 0;
       runtime.resetVertexProgress();
     }
   }

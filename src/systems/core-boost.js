@@ -37,7 +37,7 @@ function coreBoostGainIncreaseMultiplier() {
 }
 
 function ic8VertexUpgradeCount() {
-  return runtime.state.activeChallenge === 8 ? Math.max(0, runtime.state.vertices - 3) : 0;
+  return runtime.state.activeChallenge === 8 ? Math.max(0, runtime.state.ic8VertexUpgradeLevel) : 0;
 }
 
 function ic8VertexScoreExponentBonus() {
@@ -70,14 +70,15 @@ function shouldPreserveVerticesThroughEarlyReset() {
 }
 
 function resetBelowCoreBoost() {
-  const preservedVertices = shouldPreserveVerticesThroughEarlyReset() ? runtime.state.vertices : 3;
+  const preservedIc8VertexUpgradeLevel = shouldPreserveVerticesThroughEarlyReset() ? runtime.state.ic8VertexUpgradeLevel : 0;
   runtime.state.score = 0;
   runtime.state.scoreLog10 = -Infinity;
   runtime.state.totalScore = 0;
   runtime.state.totalScoreLog10 = -Infinity;
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
-  runtime.state.vertices = preservedVertices;
+  runtime.state.vertices = 3;
+  runtime.state.ic8VertexUpgradeLevel = preservedIc8VertexUpgradeLevel;
   runtime.state.speedLevel = 0;
   runtime.state.gainLevel = 0;
   runtime.state.currentGain = 1;

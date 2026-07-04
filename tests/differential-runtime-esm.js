@@ -40,6 +40,7 @@ function compatibilitySnapshot(instance) {
     "currentInfinityRunHadGeneration",
     "currentInfinityRunHadCoreBoost",
     "infinityPointsExact",
+    "ic8VertexUpgradeLevel",
     "topBarMode",
   ].forEach((field) => delete value.state[field]);
   [

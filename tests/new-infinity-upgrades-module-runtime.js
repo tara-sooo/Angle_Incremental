@@ -332,6 +332,11 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     const baseExponent = runtime.coreBoostGainExponent();
     assert.equal(debug.buyAllUpgrades({ allowSpeed: false, allowVertex: true, allowGain: false, refresh: false, save: false }) > 0, true, "IC8 vertex purchases should be buyable through Buy All");
     assert.equal(runtime.effectiveVertexCount(), 3, "IC8 vertex purchases must still keep 3 effective vertices");
+    assert.equal(state.vertices, 3, "IC8 vertex purchases must not change the real vertex count");
+    assert.ok(state.ic8VertexUpgradeLevel > 0, "IC8 vertex purchases must increase the IC8 replacement level");
+    assert.equal(runtime.checkAchievements(true).length, 0, "IC8 replacement levels must not unlock vertex-count achievements");
+    runtime.updateUi();
+    assert.doesNotMatch(runtime.elements.vertexCount.textContent, /\+ -/, "IC8 vertex display must not show a negative sponsored-vertex difference");
     assert.ok(runtime.vertexGainIncrease() > baseVertexGain, "IC8 vertex purchases must increase gain per vertex");
     assert.ok(runtime.coreBoostGainExponent() > baseExponent, "IC8 vertex purchases must increase score gain exponent");
     assert.equal(runtime.effectiveSpeedLevel(), state.speedLevel + 50, "IC8 should still keep IU 11-1 speed bonus levels");
@@ -352,12 +357,15 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(state.vertices, 3, "completed IC8 must not preserve vertices through normal Core Boost resets");
 
     state.activeChallenge = 8;
-    state.vertices = 20;
+    state.vertices = 3;
+    state.ic8VertexUpgradeLevel = 17;
     setLogResource(state, "generationScore", 7);
     runtime.runGeneration();
-    assert.equal(state.vertices, 20, "active IC8 must preserve vertices through Generation as IC8 replacement levels");
+    assert.equal(state.vertices, 3, "active IC8 must keep real vertices fixed through Generation");
+    assert.equal(state.ic8VertexUpgradeLevel, 17, "active IC8 must preserve replacement levels through Generation");
     runtime.resetBelowCoreBoost();
-    assert.equal(state.vertices, 20, "active IC8 must preserve vertices through Core Boost as IC8 replacement levels");
+    assert.equal(state.vertices, 3, "active IC8 must keep real vertices fixed through Core Boost");
+    assert.equal(state.ic8VertexUpgradeLevel, 17, "active IC8 must preserve replacement levels through Core Boost");
   }
 
   {
@@ -370,7 +378,17 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       vertices: 20,
     }, runtime.SAVE_VERSION);
     assert.equal(state.activeChallenge, 8, "active IC8 saves must remain in IC8 when ICs are unlocked");
-    assert.equal(state.vertices, 20, "active IC8 saves must preserve vertex-upgrade replacement levels");
+    assert.equal(state.vertices, 3, "active IC8 saves must keep real vertices fixed at 3");
+    assert.equal(state.ic8VertexUpgradeLevel, 17, "old active IC8 saves must migrate extra vertices to replacement levels");
+    runtime.applySaveData({
+      infinityCount: 1,
+      infinityUpgradeMask: 1 << 5,
+      activeChallenge: 8,
+      vertices: 3,
+      ic8VertexUpgradeLevel: 5,
+    }, runtime.SAVE_VERSION);
+    assert.equal(state.vertices, 3, "new active IC8 saves must keep real vertices fixed at 3");
+    assert.equal(state.ic8VertexUpgradeLevel, 5, "new active IC8 saves must preserve replacement levels");
   }
 
   {

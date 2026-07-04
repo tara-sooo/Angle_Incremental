@@ -81,6 +81,7 @@ Original prompt: では、中核ループを完成させてください
 - Compressed the Infinity tab header/subtabs, kept IU upgrades two-column on normal mobile widths, and made the IU detail/purchase panel sticky at the bottom; verified Firefox screenshots for IU/IC/IA mobile and IU desktop with no console errors.
 - Redesigned IC8 around fixed 3 effective vertices: IC8 vertex upgrades now buy replacement boosts to gain per vertex and score exponent, IC8 squares Core Boost requirements, and completed IC8 no longer preserves vertices through normal GR/CB resets.
 - Added IU 12-1 Golden Hell so Core Boost gain multiplier/exponent effects scale multiplicatively, documented the formulas, and verified the new IC8/IU behavior with ESM regression tests plus a Playwright smoke run.
+- Fixed IC8 replacement levels so they are stored separately from real vertices, avoiding incorrect vertex UI text and unintended vertex-count achievement unlocks during IC8.
 
 ## TODO
 
