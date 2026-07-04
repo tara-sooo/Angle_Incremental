@@ -115,7 +115,6 @@ function runGeneration() {
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
-  const preservedIc8VertexUpgradeLevel = runtime.shouldPreserveVerticesThroughEarlyReset() ? runtime.state.ic8VertexUpgradeLevel : 0;
   runtime.state.generationCount += 1;
   runtime.state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
@@ -128,7 +127,7 @@ function runGeneration() {
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
   runtime.state.vertices = 3;
-  runtime.state.ic8VertexUpgradeLevel = preservedIc8VertexUpgradeLevel;
+  runtime.state.ic8VertexUpgradeLevel = 0;
   runtime.state.speedLevel = 0;
   runtime.state.gainLevel = 0;
   runtime.state.currentGain = 1;
@@ -208,7 +207,6 @@ function balanceRunGeneration() {
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
-  const preservedIc8VertexUpgradeLevel = runtime.shouldPreserveVerticesThroughEarlyReset() ? runtime.state.ic8VertexUpgradeLevel : 0;
   runtime.state.generationCount += 1;
   runtime.state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
@@ -220,7 +218,7 @@ function balanceRunGeneration() {
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
   runtime.state.vertices = 3;
-  runtime.state.ic8VertexUpgradeLevel = preservedIc8VertexUpgradeLevel;
+  runtime.state.ic8VertexUpgradeLevel = 0;
   runtime.state.speedLevel = 0;
   runtime.state.gainLevel = 0;
   runtime.state.currentGain = 1;

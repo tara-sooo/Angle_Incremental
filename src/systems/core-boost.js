@@ -70,7 +70,6 @@ function shouldPreserveVerticesThroughEarlyReset() {
 }
 
 function resetBelowCoreBoost() {
-  const preservedIc8VertexUpgradeLevel = shouldPreserveVerticesThroughEarlyReset() ? runtime.state.ic8VertexUpgradeLevel : 0;
   runtime.state.score = 0;
   runtime.state.scoreLog10 = -Infinity;
   runtime.state.totalScore = 0;
@@ -78,7 +77,7 @@ function resetBelowCoreBoost() {
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
   runtime.state.vertices = 3;
-  runtime.state.ic8VertexUpgradeLevel = preservedIc8VertexUpgradeLevel;
+  runtime.state.ic8VertexUpgradeLevel = 0;
   runtime.state.speedLevel = 0;
   runtime.state.gainLevel = 0;
   runtime.state.currentGain = 1;

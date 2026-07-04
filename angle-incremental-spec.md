@@ -123,7 +123,7 @@ IU 7-2購入後は、Infinity回数に応じて通常強化コストに指数軽
 
 Generation 実行時、現在スコア、Generation中スコア、通常強化、現在獲得量、頂点進行をリセットする。Generation回数、前回Generationスコア、GR由来の倍率とコスト補正は保持する。
 
-IC8中は、GenerationでIC8中専用の角追加購入レベルをリセットしない。IC8中に購入した角追加アップグレードは角を追加せず、IC8中専用の補正レベルとして保持する。
+IC8中に購入した角追加アップグレードは角を追加せず、IC8中専用の補正レベルとして扱う。この補正レベルはGenerationでリセットする。
 
 ### 5.3 報酬
 
@@ -158,7 +158,7 @@ IP倍率 = max(1, スコア倍率 / 100)
 
 ### 6.2 リセット内容
 
-Core Boost はGeneration以下の進行をリセットする。Core Boost回数とCore Boost由来の補正は保持する。IC8中は、Core BoostでIC8中専用の角追加購入レベルをリセットしない。
+Core Boost はGeneration以下の進行をリセットする。Core Boost回数とCore Boost由来の補正は保持する。IC8中専用の角追加購入レベルはCore Boostでリセットする。
 
 ### 6.3 報酬
 

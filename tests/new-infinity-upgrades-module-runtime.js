@@ -362,10 +362,11 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     setLogResource(state, "generationScore", 7);
     runtime.runGeneration();
     assert.equal(state.vertices, 3, "active IC8 must keep real vertices fixed through Generation");
-    assert.equal(state.ic8VertexUpgradeLevel, 17, "active IC8 must preserve replacement levels through Generation");
+    assert.equal(state.ic8VertexUpgradeLevel, 0, "active IC8 must reset replacement levels through Generation");
+    state.ic8VertexUpgradeLevel = 17;
     runtime.resetBelowCoreBoost();
     assert.equal(state.vertices, 3, "active IC8 must keep real vertices fixed through Core Boost");
-    assert.equal(state.ic8VertexUpgradeLevel, 17, "active IC8 must preserve replacement levels through Core Boost");
+    assert.equal(state.ic8VertexUpgradeLevel, 0, "active IC8 must reset replacement levels through Core Boost");
   }
 
   {
