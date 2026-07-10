@@ -85,6 +85,7 @@ Original prompt: では、中核ループを完成させてください
 - Changed IC8 replacement levels to reset on Generation/Core Boost instead of carrying through those resets.
 - Prepared the post-0.6.0 balance correction: IC8's GR-derived IP reward now divides by 1e21, and version 9 saves receive a one-time cap to 1e10 IP plus an Infinite Score reset.
 - Verified the IC8 balance correction with the full ESM regression suite and Firefox screenshots; the IC8 reward displays `/1e21` with no browser console errors.
+- Prepared the 0.6.1 release candidate metadata, asset versions, documentation, tests, and bilingual update modal while keeping save format 10.
 
 ## TODO
 
@@ -93,4 +94,3 @@ Original prompt: では、中核ループを完成させてください
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle conversion rates.
 - Future design pass: replace provisional IC6-IC8 if the game owner provides official designs.
-- Release task: bump APP_VERSION, version.json, asset query strings, browser-smoke expectations, and update-modal copy together when publishing the post-0.6.0 patch.
