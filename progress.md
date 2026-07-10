@@ -83,6 +83,8 @@ Original prompt: では、中核ループを完成させてください
 - Added IU 12-1 Golden Hell so Core Boost gain multiplier/exponent effects scale multiplicatively, documented the formulas, and verified the new IC8/IU behavior with ESM regression tests plus a Playwright smoke run.
 - Fixed IC8 replacement levels so they are stored separately from real vertices, avoiding incorrect vertex UI text and unintended vertex-count achievement unlocks during IC8.
 - Changed IC8 replacement levels to reset on Generation/Core Boost instead of carrying through those resets.
+- Prepared the post-0.6.0 balance correction: IC8's GR-derived IP reward now divides by 1e21, and version 9 saves receive a one-time cap to 1e10 IP plus an Infinite Score reset.
+- Verified the IC8 balance correction with the full ESM regression suite and Firefox screenshots; the IC8 reward displays `/1e21` with no browser console errors.
 
 ## TODO
 
@@ -91,3 +93,4 @@ Original prompt: では、中核ループを完成させてください
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle conversion rates.
 - Future design pass: replace provisional IC6-IC8 if the game owner provides official designs.
+- Release task: bump APP_VERSION, version.json, asset query strings, browser-smoke expectations, and update-modal copy together when publishing the post-0.6.0 patch.

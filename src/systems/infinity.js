@@ -311,7 +311,7 @@ function breakInfiniteCap() {
 
 function generationIpMultiplierLog10() {
   if (!isChallengeCompleted(8)) return 0;
-  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - 2);
+  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - 21);
 }
 
 function floorWithFloatingPointTolerance(value) {
