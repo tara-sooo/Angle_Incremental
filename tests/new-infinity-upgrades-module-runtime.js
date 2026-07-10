@@ -140,12 +140,12 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       "IC8 GR-derived IP multiplier must not reduce IP below the base gain",
     );
 
-    state.generationScoreMultiplierLog10 = 3;
-    state.generationScoreMultiplier = 1000;
+    state.generationScoreMultiplierLog10 = 11;
+    state.generationScoreMultiplier = 1e11;
     assert.equal(
       runtime.infinityPointGain(),
-      Math.floor(Math.max(1, Math.floor(400 - 307)) * 10000),
-      "IC8 GR-derived IP multiplier must apply the effective score multiplier divided by 100",
+      Math.floor(Math.max(1, Math.floor(400 - 307)) * 10),
+      "IC8 GR-derived IP multiplier must apply the effective score multiplier divided by 1e21",
     );
 
     state.generationScoreMultiplierLog10 = 310;
@@ -309,6 +309,59 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(saved.state.infinityPointsLog10, 30, "saved large IP logs must not be persisted at the hotfix cap");
     assert.equal(saved.state.infinityPointsExact, "1000000000000000000000000000000", "saved large IP balances must preserve exact IP");
     assert.equal(saved.state.infinityCount, 1000000, "saved Infinity counts must not be persisted at the hotfix cap");
+  }
+
+  {
+    const { runtime, debug, storage } = await loadRuntime(candidatePath);
+    const { state } = debug;
+
+    runtime.applySaveData({
+      infinityPoints: 1e35,
+      infinityPointsLog10: 35,
+      infinityPointsExact: "100000000000000000000000000000000000",
+      infiniteScore: 1000,
+      infiniteScoreLog10: 3,
+    }, 9);
+    assert.equal(state.infinityPoints, 1e10, "version 9 saves must receive the one-time IP balance correction");
+    assert.equal(state.infinityPointsLog10, 10, "version 9 IP correction must synchronize the IP log");
+    assert.equal(state.infinityPointsExact, "10000000000", "version 9 IP correction must synchronize exact IP");
+    assert.equal(state.infiniteScore, 0, "version 9 saves must reset Infinite Score once");
+    assert.equal(state.infiniteScoreLog10, -Infinity, "version 9 Infinite Score correction must synchronize its log");
+    assert.equal(debug.saveGame("manual"), true, "corrected version 9 state must save successfully");
+    assert.equal(JSON.parse(storage.get(runtime.SAVE_KEY)).version, 10, "corrected saves must persist as version 10");
+
+    runtime.applySaveData({
+      infinityPoints: 1e9,
+      infinityPointsLog10: 9,
+      infinityPointsExact: "1000000000",
+      infiniteScore: 10,
+      infiniteScoreLog10: 1,
+    }, 9);
+    assert.equal(state.infinityPoints, 1e9, "version 9 IP balances below the correction cap must be preserved");
+    assert.equal(state.infinityPointsExact, "1000000000", "preserved version 9 IP must remain exact");
+    assert.equal(state.infiniteScore, 0, "version 9 Infinite Score must reset even when IP is below the cap");
+
+    runtime.applySaveData({
+      infinityPoints: 1e35,
+      infinityPointsLog10: 35,
+      infinityPointsExact: "100000000000000000000000000000000000",
+      infiniteScore: 1000,
+      infiniteScoreLog10: 3,
+    }, 10);
+    assert.equal(state.infinityPointsLog10, 35, "version 10 saves must allow IP above the one-time correction cap");
+    assert.equal(state.infinityPointsExact, "100000000000000000000000000000000000", "version 10 saves must preserve exact high IP");
+    assert.equal(state.infiniteScore, 1000, "version 10 saves must preserve Infinite Score");
+    assert.equal(state.infiniteScoreLog10, 3, "version 10 saves must preserve the Infinite Score log");
+
+    runtime.applySaveData({
+      infinityPoints: 1e35,
+      infinityPointsLog10: 35,
+      infinityPointsExact: "100000000000000000000000000000000000",
+      infiniteScore: 1000,
+      infiniteScoreLog10: 3,
+    }, 8);
+    assert.equal(state.infinityPointsLog10, 35, "pre-0.6.0 saves must not receive the version 9 IP correction");
+    assert.equal(state.infiniteScore, 1000, "pre-0.6.0 saves must not receive the version 9 Infinite Score correction");
   }
 
   {

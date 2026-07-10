@@ -202,8 +202,8 @@ function testSingleEngineSourceAndVersionAlignment() {
     gameSource.includes('import("./src/main.js")')
       || gameSource.includes("// BEGIN INTEGRATED BALANCE RULES"),
   );
-  assert.ok(constantsSource.includes('const APP_VERSION = "0.6.0";'));
-  assert.strictEqual(manifest.appVersion, "0.6.0");
+  assert.ok(constantsSource.includes('const APP_VERSION = "0.6.1";'));
+  assert.strictEqual(manifest.appVersion, "0.6.1");
   assert.strictEqual(fs.existsSync(path.join(__dirname, "game-core.js")), false);
   assert.strictEqual(fs.existsSync(path.join(__dirname, "balance-config.js")), false);
 }

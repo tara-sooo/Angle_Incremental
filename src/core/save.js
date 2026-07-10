@@ -3,6 +3,8 @@ import { runtime, expose } from "../runtime/shared.js";
 // Extracted mechanically from the next-runtime baseline.
 // Numeric helpers and UI hooks remain in src/main.js during this migration phase.
 
+const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
+
 function legacyInfinityUpgradeRefundLog10(data) {
   const ipLevels = Math.floor(runtime.sanitizeNumber(data.ipGainUpgradeLevel, 0));
   const angleLevels = Math.floor(runtime.sanitizeNumber(data.infiniteAngleUpgradeLevel, 0));
@@ -87,6 +89,13 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.state.infinityUpgradeMask = 0;
   }
   runtime.normalizeInfinityPointState();
+  if (saveVersion === 9) {
+    if (runtime.currentExactInfinityPoints() > VERSION_9_INFINITY_POINT_CAP) {
+      runtime.syncInfinityPointCachesFromExact(VERSION_9_INFINITY_POINT_CAP);
+    }
+    runtime.state.infiniteScore = 0;
+    runtime.state.infiniteScoreLog10 = -Infinity;
+  }
   runtime.state.ipGainUpgradeLevel = 0;
   runtime.state.infiniteAngleUpgradeLevel = 0;
   runtime.state.softcapUpgradeLevel = 0;
