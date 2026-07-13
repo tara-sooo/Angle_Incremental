@@ -4,9 +4,9 @@ import { runtime, expose } from "../runtime/shared.js";
 // challenge, or Infinity Upgrade modifiers; its own upgrades are paid with IP.
 
 const INFINITE_ANGLE_UPGRADES = Object.freeze({
-  speed: Object.freeze({ base: 1e20, growth: 1.55 }),
-  vertex: Object.freeze({ base: 2.4e20, growth: 1.72 }),
-  gain: Object.freeze({ base: 3.6e20, growth: 1.68 }),
+  speed: Object.freeze({ base: 1e20, growth: 1.40, scalingStartsAfter: 25, scalingLogScale: 0.0005 }),
+  vertex: Object.freeze({ base: 2.4e20, growth: 1.50, scalingStartsAfter: 25, scalingLogScale: 0.0010 }),
+  gain: Object.freeze({ base: 3.6e20, growth: 1.45, scalingStartsAfter: 25, scalingLogScale: 0.0005 }),
 });
 
 function infiniteAngleVertexCount() {
@@ -95,17 +95,8 @@ function infiniteAngleUpgradeCostLog10(kind) {
   if (!definition) return Infinity;
   const level = infiniteAngleUpgradeLevel(kind);
   const rawLog = runtime.log10Value(definition.base) + level * runtime.log10Value(definition.growth);
-  const initialScaling = runtime.BALANCE_PROFILE?.initialUpgradeCostScaling?.[kind];
-  const initialExcess = initialScaling ? Math.max(0, level - initialScaling.startsAfter) : 0;
-  const initialLog = initialScaling
-    ? initialExcess * initialExcess * initialScaling.logScale
-    : 0;
-  const adjustedLog = rawLog + initialLog;
-  const stagedScaling = runtime.STAGED_UPGRADE_COST_SCALING || [];
-  return runtime.clampLog10(stagedScaling.reduce((total, stage) => {
-    const excess = Math.max(0, adjustedLog - stage.startsAfterLog10);
-    return total + excess * excess * stage.logScale;
-  }, adjustedLog));
+  const excess = Math.max(0, level - definition.scalingStartsAfter);
+  return runtime.clampLog10(rawLog + excess * excess * definition.scalingLogScale);
 }
 
 function infiniteAngleUnlockCostLog10() {

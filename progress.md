@@ -90,6 +90,7 @@ Original prompt: では、中核ループを完成させてください
 - Reworked Infinite Angle into a continuously running IA figure unlocked for 1e20 IP, with independent IP-purchased speed, vertex, and gain upgrades, Infinity Score accumulation, and the `Infinity Score^0.3` vertex-gain multiplier.
 - Infinity now resets IA Score and transient IA progress while preserving the IA unlock and its upgrade levels; the IA canvas is rendered only in the active Infinity > IA subtab.
 - Raised IA's initial upgrade costs to 1e20 / 2.4e20 / 3.6e20 IP to match the 1e20 IP unlock scale; the 1e20-to-1e50 IP progression still needs a fresh-save playtest.
+- Softened IA upgrade growth to a dedicated curve: x1.40 / x1.50 / x1.45 with weak post-level-25 scaling and no shared staged cost scaling.
 
 ## TODO
 

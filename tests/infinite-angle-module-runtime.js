@@ -61,10 +61,27 @@ async function runInfiniteAngleModuleRuntimeTest() {
     );
     state.infiniteAngleSpeedLevel = 1;
     assert.ok(
-      Math.abs(runtime.infiniteAngleUpgradeCostLog10("speed") - Math.log10(1.55e20)) < 1e-12,
-      "IA speed growth should remain x1.55",
+      Math.abs(runtime.infiniteAngleUpgradeCostLog10("speed") - Math.log10(1.4e20)) < 1e-12,
+      "IA speed growth should be x1.40",
+    );
+    state.infiniteAngleSpeedLevel = 50;
+    assert.ok(
+      Math.abs(runtime.infiniteAngleUpgradeCostLog10("speed") - 27.619) < 0.001,
+      "IA speed should use its softened high-level curve",
+    );
+    state.infiniteAngleVertexLevel = 50;
+    assert.ok(
+      Math.abs(runtime.infiniteAngleUpgradeCostLog10("vertex") - 29.810) < 0.001,
+      "IA vertex should use its softened high-level curve",
+    );
+    state.infiniteAngleGainLevel = 50;
+    assert.ok(
+      Math.abs(runtime.infiniteAngleUpgradeCostLog10("gain") - 28.937) < 0.001,
+      "IA gain should use its softened high-level curve",
     );
     state.infiniteAngleSpeedLevel = 0;
+    state.infiniteAngleVertexLevel = 0;
+    state.infiniteAngleGainLevel = 0;
     const initialIp = 1000000000000000000000n;
     const speedCost = runtime.exactInfinityPointsFromCostLog10(runtime.infiniteAngleUpgradeCostLog10("speed"));
     const vertexCost = runtime.exactInfinityPointsFromCostLog10(runtime.infiniteAngleUpgradeCostLog10("vertex"));
@@ -103,7 +120,7 @@ async function runInfiniteAngleModuleRuntimeTest() {
     const { debug, runtime } = instance;
     const { state } = debug;
     state.infiniteAngleUnlocked = true;
-    state.infiniteAngleSpeedLevel = 222;
+    state.infiniteAngleSpeedLevel = 1000000;
     setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
     const costLog10 = runtime.infiniteAngleUpgradeCostLog10("speed");
     const maximumCostLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
