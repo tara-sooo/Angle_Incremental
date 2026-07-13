@@ -86,6 +86,7 @@ Original prompt: では、中核ループを完成させてください
 - Prepared the post-0.6.0 balance correction: IC8's GR-derived IP reward now divides by 1e21, and version 9 saves receive a one-time cap to 1e10 IP plus an Infinite Score reset.
 - Verified the IC8 balance correction with the full ESM regression suite and Firefox screenshots; the IC8 reward displays `/1e21` with no browser console errors.
 - Prepared the 0.6.1 release candidate metadata, asset versions, documentation, tests, and bilingual update modal while keeping save format 10.
+- Prepared the 0.6.2 release candidate metadata, asset versions, documentation, tests, and bilingual update modal while keeping save format 10.
 
 ## TODO
 
