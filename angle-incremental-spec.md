@@ -1,6 +1,6 @@
 # Angle Incremental 開発仕様書
 
-対象リリース: **0.6.2**
+対象リリース: **0.7.0**
 
 この文書は、現行公開版のゲーム仕様と実装基準をまとめる。プレイヤー向けの遊び方は [angle-incremental-guide.md](angle-incremental-guide.md) を参照する。
 
@@ -16,7 +16,7 @@
 2. Generation で通常進行をリセットし、恒久補正を得る。
 3. Core Boost で Generation 以下をリセットし、より強い恒久補正を得る。
 4. Infinity で下位進行をリセットし、Infinity Point と Infinity Upgrade を解放する。
-5. Infinity Challenge、Infinity Angle、Break Infinite Cap でInfinity後半を進める。
+5. Infinity Challenge、Infinity Angle、Tower、Break Infinite Cap でInfinity後半を進める。
 
 ## 2. 用語
 
@@ -33,8 +33,10 @@
 | Infinity Point / IP | Infinity Upgrade購入とInfinity Angleの解放・通常強化購入に使うリソース。 |
 | Infinity Upgrade / IU | IPで購入する恒久強化。 |
 | Infinity Challenge / IC | 制約付きでInfinity到達を目指すチャレンジ。 |
+| Tower Challenge / TC | Towerの次階建設を制限する予定のチャレンジ。 |
 | Infinity Angle / IA | e20 IPで解放する、Infinity内の独立した図形進行。 |
 | Infinity Score | IAの核到達で得るInfinity内スコア。^0.3後に通常の頂点獲得量へ乗算する。 |
+| Tower | IPで建設し、階数に応じてスコア累乗を強化するInfinity後の恒久要素。 |
 | Break Infinite Cap | Infinity後の強いスコアソフトキャップを恒久的に解除する要素。 |
 
 ## 3. 基本ループ
@@ -375,7 +377,42 @@ IAのコストは、レベル25までは基礎コストと成長率だけで計�
 頂点獲得量の補正値 = 0.0005
 ```
 
-## 12. 実績
+## 12. Tower
+
+TowerはIPを消費して建設する、Infinityでリセットされない恒久要素である。階数に応じてスコア累乗が強化される。
+
+### 12.1 階数と建設コスト
+
+| 階数 | 必要IPのlog10 | 効果・解放 |
+| ---: | ---: | --- |
+| 1 | 50 | スコア累乗を解放。Tower累乗は階数ごとに `+^0.05`。 |
+| 2 | 60 | なし。 |
+| 3 | 70 | TC1を解放し、次の階数からTC1クリアが必要。 |
+| 4 | 85 | TC1クリア後に建設可能。 |
+| 5 | 100 | TC2を解放し、次の階数からTC2クリアが必要。 |
+| 6 | 125 | TC2クリア後に建設可能。 |
+| 7 | 150 | なし。 |
+| 8 | 175 | TC3を解放し、次の階数からTC3クリアが必要。 |
+| 9 | 205 | TC3クリア後に建設可能。 |
+| 10 | 235 | なし。 |
+| 11 | 265 | なし。 |
+| 12 | 295 | TC4を解放し、次の階数からTC4クリアが必要。 |
+| 13 | 345 | これより後は階数ごとに必要IPのlog10を `^1.15` 相当で増加。 |
+
+Towerのスコア累乗は次の式で計算する。
+
+```text
+Towerスコア累乗 = 1 + Tower階数 * 0.05
+実効スコアlog10 = 生スコアlog10 * The Angle側のスコア累乗 * Towerスコア累乗
+```
+
+Floor 13より後の必要IPは、必要IPのlog10を `345 * 1.15^(階数 - 13)` として扱う。必要IPが正確なIP上限を超える場合は建設できない。
+
+### 12.2 Tower Challengeの現行状態
+
+TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTCの具体的な制約、開始処理、完了条件、報酬は未実装であり、Challengesタブには将来実装予定のプレースホルダーを表示する。TCをクリアできない状態では、対応する次の階数を建設できない。
+
+## 13. 実績
 
 実績は30個あり、すべてのリセットを超えて保持される。
 
@@ -418,7 +455,7 @@ IAのコストは、レベル25までは基礎コストと成長率だけで計�
 | 29 | スコアが1e628を超える | なし |
 | 30 | ICを8つクリア | なし |
 
-## 13. 自動化と統計
+## 14. 自動化と統計
 
 ### 自動化
 
@@ -435,9 +472,9 @@ IAのコストは、レベル25までは基礎コストと成長率だけで計�
 
 統計タブでは総プレイ時間、現在のInfinity周回時間、最速Infinity時間、過去10回のInfinity履歴を表示する。Infinity履歴には時間、到達スコア、獲得IP、挑戦中ICを記録する。
 
-## 14. UI、ニュース、設定
+## 15. UI、ニュース、設定
 
-メインタブは The Angle、Infinity、Automation、Statistics、Achievements、Help、Settings で構成する。Infinityタブ内には Upgrades、Challenges、Infinite Angle のサブタブがある。
+メインタブは The Angle、Infinity、Challenges、Automation、Statistics、Achievements、Help、Settings の順で構成する。Infinityタブ内には Upgrades、Infinite Angle、Tower の順でサブタブがある。Challengesタブ内には Infinity Challenge と Tower Challenge の順でサブタブがある。
 
 上部バーは設定で次の表示を選べる。
 
@@ -453,17 +490,17 @@ IAのコストは、レベル25までは基礎コストと成長率だけで計�
 
 設定では、言語、数値表記、時間単位、軽量表示、浮遊テキスト、FPS表示、上部バー表示を保存する。
 
-## 15. セーブと更新
+## 16. セーブと更新
 
 セーブはローカルストレージへ自動保存し、手動保存とリセットも提供する。セーブコードは `ANGLE_SAVE_V2:` で始まり、AES-GCMを使って書き出し・読み込みする。
 
-主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Break Infinite Cap、Infinite Score、実績、自動化、統計、表示設定が含まれる。
+主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower階数、Break Infinite Cap、Infinite Score、実績、自動化、統計、表示設定が含まれる。
 
 IPは大きい整数を正確に扱うため `infinityPointsExact` を正本にし、表示用に通常数値とlog10値を同期する。
 
 壊れたセーブや復元できないセーブは、可能な限り隔離キーへ退避して新規状態で起動する。
 
-## 16. バージョン管理
+## 17. バージョン管理
 
 公開バージョンは Semantic Versioning 形式を使う。
 
@@ -474,11 +511,11 @@ major.minor.patch
 - `APP_VERSION`: 公開アプリのバージョン。`version.json` の `appVersion` と一致させる。
 - `SAVE_VERSION`: セーブデータの移行が必要な場合に上げる保存形式バージョン。
 
-0.6.2時点では、`APP_VERSION = 0.6.2`、`SAVE_VERSION = 10` である。ドキュメントのみの変更では、原則としてどちらも変更しない。
+0.7.0時点では、`APP_VERSION = 0.7.0`、`SAVE_VERSION = 10` である。Tower階数は既存セーブにない場合 `0` として読み込み、保存形式の変更は行わない。
 
 ブラウザのキャッシュ対策として、CSS/JSのURLにはアプリバージョンのクエリを付ける。起動中クライアントは `version.json` を定期確認し、新しい `appVersion` を検出したら保存してリロードを促す。
 
-## 17. 主要データ構造
+## 18. 主要データ構造
 
 主要な保存フィールドは `src/core/state.js` の `SAVE_FIELDS` を正本とする。代表的な項目は次の通り。
 
@@ -505,6 +542,7 @@ infiniteAngleCurrentGain / infiniteAngleCurrentGainLog10
 infiniteAnglePointProgress
 infiniteAngleTotalVertexProgress
 infiniteAngleLastVertexIndex
+towerFloor
 infinityUpgradeMask
 activeChallenge
 completedChallenges
@@ -518,10 +556,11 @@ automation settings
 display settings
 ```
 
-## 18. 今後の拡張候補
+## 19. 今後の拡張候補
 
 - IUの新しい段と分岐
 - 新しいInfinity Challenge
+- Tower Challengeの具体的な制約・報酬
 - 後半の複数Point
 - 実績の個別追加報酬
 - 後半バランス調整

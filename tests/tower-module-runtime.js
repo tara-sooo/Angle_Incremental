@@ -77,9 +77,21 @@ async function runTowerModuleRuntimeTest() {
   {
     const source = await loadRuntime(candidatePath);
     source.debug.state.towerFloor = 7;
+    source.debug.state.infiniteAngleUnlocked = true;
+    source.debug.state.infiniteAngleSpeedLevel = 7;
+    source.debug.state.infiniteScoreLog10 = 123;
     source.debug.saveGame("manual");
     const reloaded = await loadRuntime(candidatePath, source.storage);
     assert.equal(reloaded.debug.state.towerFloor, 7, "Tower floor should survive a local save");
+    assert.equal(reloaded.debug.state.infiniteAngleSpeedLevel, 7, "IA upgrades should survive a local save");
+    assert.equal(reloaded.debug.state.infiniteScoreLog10, 123, "IA log-backed score should survive a local save");
+
+    const saveCode = await source.debug.exportSaveCode();
+    const imported = await loadRuntime(candidatePath);
+    assert.equal(await imported.debug.importSaveCode(saveCode), true, "Tower and IA save code should import");
+    assert.equal(imported.debug.state.towerFloor, 7, "Tower floor should survive save-code import");
+    assert.equal(imported.debug.state.infiniteAngleUnlocked, true, "IA unlock should survive save-code import");
+    assert.equal(imported.debug.state.infiniteScoreLog10, 123, "IA score log should survive save-code import");
 
     const legacy = await loadRuntime(candidatePath);
     legacy.runtime.applySaveData({ score: 0, scoreLog10: -Infinity }, 10);

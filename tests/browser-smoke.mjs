@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.6.2";
+const EXPECTED_ASSET_VERSION = "0.7.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -111,6 +111,22 @@ try {
     && Boolean(window.__angleDebug?.state)
   ));
 
+  const updateModal = await page.evaluate(() => {
+    const modal = document.querySelector("#updateModal");
+    return {
+      visible: Boolean(modal && !modal.hidden),
+      title: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
+      summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
+    };
+  });
+  assert.equal(updateModal.visible, true, "the 0.7.0 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.7.0 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /Infinity Angle/);
+  const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
+  assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
+  await page.locator("#updateModalClose").click();
+  await page.waitForFunction(() => document.querySelector("#updateModal")?.hidden === true);
+
   const snapshot = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
   assert.equal(snapshot.vertices, 3);
   assert.equal(snapshot.infinity.count, 0);
@@ -150,6 +166,8 @@ try {
       towerState,
       challengePanelActive: Boolean(document.querySelector('[data-challenge-panel="tc"]')?.classList.contains("is-active")),
       towerChallengeRows: document.querySelectorAll("#towerChallengeList .tower-challenge-row").length,
+      towerChallengeButton: document.querySelector("#towerChallengeList .tower-challenge-row button")?.textContent?.trim() ?? "",
+      towerChallengeRestriction: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-restriction")?.textContent?.trim() ?? "",
     };
   });
   assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
@@ -158,6 +176,8 @@ try {
   assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
   assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
   assert.equal(towerInitial.towerChallengeRows, 4, "TC placeholder rows should be visible");
+  assert.match(towerInitial.towerChallengeButton, /今後のリリース/);
+  assert.match(towerInitial.towerChallengeRestriction, /今後のリリース/);
   const newsTicker = await page.evaluate(() => {
     const ticker = document.querySelector("#newsTicker");
     const item = document.querySelector("#newsTickerText");
@@ -425,7 +445,6 @@ try {
     "every game ESM module must use the current versioned URL",
   );
 
-  await page.locator("#updateModalClose").click();
   await page.evaluate(() => {
     window.__angleFullscreenRequests = 0;
     Object.defineProperty(document.documentElement, "requestFullscreen", {

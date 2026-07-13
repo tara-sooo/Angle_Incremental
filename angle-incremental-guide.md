@@ -11,7 +11,7 @@
 大まかな進行順は次の通りです。
 
 ```text
-通常強化 -> Generation -> Core Boost -> Infinity -> Infinity Challenge / Break Infinite Cap
+通常強化 -> Generation -> Core Boost -> Infinity -> IA / Tower / Infinity Challenge / Break Infinite Cap
 ```
 
 ## 2. 最初に見るところ
@@ -119,13 +119,17 @@ ICを開始すると、何かが弱くなったり禁止されたりします。
 
 挑戦中に詰まったら、ICを中止して別の強化を進めてから戻ってください。
 
-## 9. Break Infinite Cap と Infinite Angle
+## 9. Break Infinite Cap、Infinite Angle、Tower
 
 **Break Infinite Cap** は、スコアが **1.00e350** に届くと実行できます。実行すると、Infinity条件を超えた後の強いスコア制限が外れます。
 
 **Infinity Angle (IA)** は、**1.00e20 IP** を一度支払うと解放される、Infinity内の独立した図形です。IAは常に進行し、IAの核到達で **Infinity Score** を稼ぎます。Infinity Scoreの `^0.3` が通常の頂点獲得量に乗算されます。
 
 IAには周回速度、角の追加、頂点獲得量の専用強化があります。初回コストはそれぞれ **1.00e20 IP / 2.40e20 IP / 3.60e20 IP** です。これらはIPで購入し、Infinityしても残ります。InfinityするとInfinity ScoreとIAの現在の周回進行だけがリセットされます。IAにはGeneration、Core Boost、Infinity Challenge、Infinity Upgradeの補正はありません。
+
+**Tower** は **1.00e50 IP** から建設できます。TowerはInfinityでリセットされず、階数ごとにスコア累乗へ `+^0.05` の補正が加わります。Floor 3、5、8、12でそれぞれTC1〜TC4が解放され、その先の建設には対応するTCのクリアが必要です。
+
+0.7.0ではTCの具体的な制約・報酬はまだ実装していません。ChallengesタブのTCサブタブには予定を表示し、現在はTCゲートの先へ進めない状態です。
 
 ## 10. 実績
 
@@ -187,7 +191,7 @@ IU 5-2を買うと、リセット後にスコア100から始まります。さ�
 
 ### 「最速Infinity」が短すぎる
 
-0.6.2時点では、Infinityが非常に高速化すると統計上の時間が極端に小さく見えることがあります。進行自体が止まっているとは限らないため、IP、Infinity回数、過去10回のInfinity記録も合わせて確認してください。
+0.7.0時点では、Infinityが非常に高速化すると統計上の時間が極端に小さく見えることがあります。進行自体が止まっているとは限らないため、IP、Infinity回数、過去10回のInfinity記録も合わせて確認してください。
 
 ## 14. セーブ
 
