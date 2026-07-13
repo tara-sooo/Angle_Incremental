@@ -63,20 +63,11 @@ function balanceApplyResetStartScore() {
   runtime.state.scoreLog10 = 2;
 }
 
-function canonicalGenerationRewardForLog(generationScoreLog) {
-  const depth = Math.max(0, generationScoreLog - runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE));
-  return {
-    scoreMultiplierLog10: Math.min(8, Math.log10(1 + depth) * 2),
-    scoreMultiplierGain: runtime.valueFromLog10(Math.min(8, Math.log10(1 + depth) * 2)),
-    costReduction: Math.min(0.22, Math.log10(1 + depth) * 0.04),
-  };
-}
-
 function balanceRunGeneration() {
   if (!runtime.canRunGeneration()) return;
   runtime.state.currentInfinityRunHadGeneration = true;
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
-  const reward = canonicalGenerationRewardForLog(generationScoreBeforeResetLog);
+  const reward = runtime.generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
   runtime.state.generationCount += 1;
   runtime.state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
@@ -112,7 +103,7 @@ function balanceNextGenerationValues() {
       costFactor: runtime.generationCostFactorEffect(),
     };
   }
-  const reward = canonicalGenerationRewardForLog(runtime.currentGenerationScoreLog10());
+  const reward = runtime.generationRewardForLog(runtime.currentGenerationScoreLog10());
   const nextRawScoreMultiplierLog = reward.scoreMultiplierLog10;
   const nextRawCostFactor = Math.max(
     balanceGenerationMinCostFactor(),

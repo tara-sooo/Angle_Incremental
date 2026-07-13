@@ -11,28 +11,6 @@ function balancePreGenerationCostScalingLog10(kind, level) {
   return excess * excess * scaling.logScale * generationRelief;
 }
 
-function canonicalPreGenerationCostScalingLog10(kind, level) {
-  let generationFactor;
-  if (runtime.state.generationCount <= 0) generationFactor = 1;
-  else if (runtime.state.generationCount === 1) generationFactor = 0.9;
-  else if (runtime.state.generationCount === 2) generationFactor = 0.45;
-  else if (runtime.state.generationCount === 3) generationFactor = 0.2;
-  else generationFactor = 0.08;
-
-  let coreRelief;
-  if (runtime.state.coreBoostCount <= 0) coreRelief = 1;
-  else if (runtime.state.coreBoostCount === 1) coreRelief = 0.35;
-  else if (runtime.state.coreBoostCount === 2) coreRelief = 0.1;
-  else coreRelief = 0;
-
-  const scalingFactor = generationFactor * coreRelief;
-  if (scalingFactor <= 0) return 0;
-  const scaling = runtime.PRE_GENERATION_COST_SCALING[kind];
-  if (!scaling) return 0;
-  const excess = Math.max(0, level - scaling.startsAfter);
-  return excess * excess * scaling.logScale * scalingFactor;
-}
-
 function balanceCanBuyNormalUpgrade(kind) {
   const costLog = runtime.costLogs()[kind];
   if (runtime.state.activeChallenge === 7 && costLog > 30) return false;
@@ -47,7 +25,7 @@ function balanceCostLog10(kind, base, level, growth) {
   const adjustedLog = rawLog <= 300
     ? runtime.log10Value(Math.ceil(base + (10 ** rawLog - base) * costFactor))
     : rawLog + runtime.log10Value(costFactor);
-  const earlyAdjustedLog = adjustedLog + canonicalPreGenerationCostScalingLog10(kind, level);
+  const earlyAdjustedLog = adjustedLog + runtime.preGenerationCostScalingLog10(kind, level);
   const scaledLog = earlyAdjustedLog + runtime.stagedUpgradeCostScalingLog10(earlyAdjustedLog);
   const challengeAdjustedLog = runtime.isChallengeCompleted(2) ? scaledLog * 0.95 : scaledLog;
   return challengeAdjustedLog * runtime.balanceInfinityUpgradeCostExponent();
