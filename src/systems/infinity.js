@@ -2,8 +2,15 @@ import { runtime, expose } from "../runtime/shared.js";
 
 // Infinity progression, IP, upgrades, challenges, and Infinite Angle.
 
+let infinityUpgradeLookup = null;
+let infinityUpgradeSource = null;
+
 function infinityUpgradeById(id) {
-  return runtime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === id);
+  if (infinityUpgradeSource !== runtime.INFINITY_UPGRADES) {
+    infinityUpgradeSource = runtime.INFINITY_UPGRADES;
+    infinityUpgradeLookup = new Map(runtime.INFINITY_UPGRADES.map((upgrade) => [upgrade.id, upgrade]));
+  }
+  return infinityUpgradeLookup.get(id);
 }
 
 function hasInfinityUpgrade(id) {

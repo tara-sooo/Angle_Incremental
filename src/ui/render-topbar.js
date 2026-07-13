@@ -2,6 +2,7 @@ import { runtime, expose } from "../runtime/shared.js";
 
 let newsTickerIndex = 0;
 let newsTickerIterationBound = false;
+let lastTopBarSignature = "";
 
 function currentNewsMessages() {
   const language = runtime.TEXT[runtime.state.language] ? runtime.state.language : "ja";
@@ -32,12 +33,45 @@ function bindNewsTickerIteration() {
   });
 }
 
+function topBarSignature(mode) {
+  const language = runtime.state.language;
+  const numberFormat = runtime.state.numberFormat;
+  if (mode === "news" || mode === "blank" || mode === "hidden") return `${mode}|${language}`;
+  if (mode === "resources") {
+    return [
+      mode,
+      language,
+      numberFormat,
+      runtime.currentScoreLog10(),
+      runtime.currentInfinityPointsLog10(),
+      runtime.currentInfiniteScoreLog10(),
+    ].join("|");
+  }
+  return [
+    mode,
+    language,
+    numberFormat,
+    runtime.state.generationCount,
+    runtime.currentTotalScoreLog10(),
+    runtime.currentGenerationScoreLog10(),
+    runtime.currentPreviousGenerationScoreLog10(),
+    runtime.state.coreBoostCount,
+    runtime.state.infinityCount,
+    runtime.state.activeChallenge,
+    runtime.state.completedChallenges,
+    runtime.state.achievementMask,
+  ].join("|");
+}
+
 function updateTopBar() {
   if (!runtime.elements.newsTicker || !runtime.elements.newsTickerText) return;
   bindNewsTickerIteration();
   const mode = runtime.normalizeChoice(runtime.state.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
   const label = runtime.elements.newsTicker.querySelector(".news-label");
   runtime.state.topBarMode = mode;
+  const signature = topBarSignature(mode);
+  if (signature === lastTopBarSignature) return;
+  lastTopBarSignature = signature;
   if (runtime.elements.shell) runtime.elements.shell.classList.toggle("is-top-bar-hidden", mode === "hidden");
   document.documentElement.classList.toggle("top-bar-hidden", mode === "hidden");
   runtime.elements.newsTicker.hidden = mode === "hidden";

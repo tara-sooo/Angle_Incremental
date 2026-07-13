@@ -1,6 +1,9 @@
 import { runtime, expose } from "../runtime/shared.js";
 
+let lastChallengeSignature = null;
+
 function createChallengeRows() {
+  lastChallengeSignature = null;
   runtime.clearElement(runtime.elements.challengeList);
   for (let index = 1; index <= runtime.INFINITY_CHALLENGE_COUNT; index += 1) {
     const row = document.createElement("div");
@@ -29,6 +32,15 @@ function createChallengeRows() {
 }
 
 function updateChallengeRows() {
+  const signature = [
+    runtime.state.activeChallenge,
+    runtime.state.completedChallenges,
+    runtime.state.infinityCount,
+    runtime.state.infinityUpgradeMask,
+    runtime.state.language,
+  ].join("|");
+  if (signature === lastChallengeSignature) return;
+  lastChallengeSignature = signature;
   runtime.elements.challengeList.querySelectorAll(".challenge-row").forEach((row) => {
     const index = Number(row.dataset.challenge);
     const active = runtime.state.activeChallenge === index;

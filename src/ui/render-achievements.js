@@ -1,6 +1,9 @@
 import { runtime, expose } from "../runtime/shared.js";
 
+let lastAchievementSignature = null;
+
 function createAchievementRows() {
+  lastAchievementSignature = null;
   runtime.clearElement(runtime.elements.achievementList);
   runtime.ACHIEVEMENTS.forEach((achievement, index) => {
     const row = document.createElement("article");
@@ -25,6 +28,9 @@ function createAchievementRows() {
 }
 
 function updateAchievementRows() {
+  const signature = `${runtime.state.achievementMask}|${runtime.state.language}`;
+  if (signature === lastAchievementSignature) return;
+  lastAchievementSignature = signature;
   const language = runtime.TEXT[runtime.state.language] ? runtime.state.language : "ja";
   runtime.elements.achievementList.querySelectorAll(".achievement-row").forEach((row) => {
     const id = Number(row.dataset.achievement);

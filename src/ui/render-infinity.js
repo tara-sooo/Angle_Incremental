@@ -1,6 +1,9 @@
 import { runtime, expose } from "../runtime/shared.js";
 
+let lastInfinityUpgradeSignature = null;
+
 function createInfinityUpgradeRows() {
+  lastInfinityUpgradeSignature = null;
   runtime.clearElement(runtime.elements.infinityUpgradeTree);
   const upgradeRows = [
     ["1-1", "1-2"],
@@ -74,6 +77,16 @@ function updateInfinityUpgradeDetail() {
 }
 
 function updateInfinityUpgradeRows() {
+  const signature = [
+    runtime.state.infinityUpgradeMask,
+    runtime.state.infinityPointsExact,
+    runtime.state.infinityPointsLog10,
+    runtime.state.infinityCount,
+    runtime.state.language,
+    runtime.selectedInfinityUpgradeId,
+  ].join("|");
+  if (signature === lastInfinityUpgradeSignature) return;
+  lastInfinityUpgradeSignature = signature;
   runtime.elements.infinityUpgradeTree.querySelectorAll(".infinity-upgrade-node").forEach((node) => {
     const upgrade = runtime.infinityUpgradeById(node.dataset.upgrade);
     if (!upgrade) return;

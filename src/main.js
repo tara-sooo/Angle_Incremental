@@ -251,6 +251,10 @@ function currentFrameTime() {
   return window.performance && performance.now ? performance.now() : Date.now();
 }
 
+function drawActiveView() {
+  if (runtime.activeMainTab === "angle") runtime.draw();
+}
+
 let lastTime = currentFrameTime();
 function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.08);
@@ -270,7 +274,7 @@ function frame(now) {
     uiUpdateElapsed %= runtime.UI_UPDATE_INTERVAL_SECONDS;
     runtime.updateUi();
   }
-  runtime.draw();
+  drawActiveView();
   requestNextFrame(frame);
 }
 
@@ -456,7 +460,7 @@ window.advanceTime = (ms) => {
   for (let i = 0; i < steps; i += 1) update(1 / 60);
   uiUpdateElapsed = 0;
   runtime.updateUi();
-  runtime.draw();
+  drawActiveView();
 };
 window.__angleDebug = {
   state: runtime.state,

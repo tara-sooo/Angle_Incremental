@@ -1,5 +1,7 @@
 import { runtime, expose } from "../runtime/shared.js";
 
+let lastInfinityRunListSignature = null;
+
 function infinityRunRecordText(record, index) {
   const challenge = record.challenge > 0 ? ` IC${record.challenge}` : "";
   return `#${index + 1}${challenge} ${runtime.formatLongDuration(record.time)} / ${runtime.formatPowerOfTen(record.scoreLog10)} / +${runtime.formatUiNumber(record.ipGain)} IP`;
@@ -42,11 +44,24 @@ function updateAutomationUi() {
   if (runtime.elements.autoInfinityPointThresholdInput) runtime.syncFormControl(runtime.elements.autoInfinityPointThresholdInput, runtime.state.autoInfinityPointThreshold);
 }
 
+function infinityRunListSignature() {
+  const records = runtime.state.lastInfinityRuns;
+  return [
+    runtime.state.language,
+    runtime.state.numberFormat,
+    runtime.state.timeUnit,
+    records.map((record) => `${record.time}:${record.scoreLog10}:${record.ipGain}:${record.challenge}`).join(";"),
+  ].join("|");
+}
+
 function updateStatisticsUi() {
   if (!runtime.elements.totalPlayTime) return;
   runtime.elements.totalPlayTime.textContent = runtime.formatLongDuration(runtime.state.totalPlayTime);
   runtime.elements.currentInfinityRunTime.textContent = runtime.formatLongDuration(runtime.state.currentInfinityRunTime);
   runtime.elements.fastestInfinityTime.textContent = runtime.state.fastestInfinityTime > 0 ? runtime.formatLongDuration(runtime.state.fastestInfinityTime) : runtime.t("noInfinityRuns");
+  const signature = infinityRunListSignature();
+  if (signature === lastInfinityRunListSignature) return;
+  lastInfinityRunListSignature = signature;
   runtime.elements.lastInfinityRuns.innerHTML = "";
   if (runtime.state.lastInfinityRuns.length === 0) {
     const row = document.createElement("li");
