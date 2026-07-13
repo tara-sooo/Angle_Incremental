@@ -168,6 +168,8 @@ async function runInfiniteAngleModuleRuntimeTest() {
     state.currentGainLog10 = 0;
     runtime.processManyVertices(1, 2);
     assert.ok(state.currentGainLog10 > 308, "late-game IA boosts must keep batched normal vertex gain in log space");
+    runtime.updateUi();
+    assert.match(runtime.elements.vertexGainValue.textContent, /e598/, "late-game vertex gain UI should use the log-backed value");
 
     state.infiniteAngleSpeedLevel = 1_000_000_000_000;
     debug.updateInfiniteAngle(1 / 60);

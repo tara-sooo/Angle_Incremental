@@ -61,7 +61,11 @@ function updateUi() {
   runtime.updateTopBar();
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());
-  runtime.elements.vertexGainValue.textContent = `+${runtime.formatSmallDecimal(runtime.vertexGainIncrease())}`;
+  const vertexGainIncreaseLog10 = runtime.vertexGainIncreaseLog10();
+  const vertexGainIncreaseText = vertexGainIncreaseLog10 > 308
+    ? runtime.formatUiLogNumber(vertexGainIncreaseLog10)
+    : runtime.formatSmallDecimal(runtime.valueFromLog10(vertexGainIncreaseLog10));
+  runtime.elements.vertexGainValue.textContent = `+${vertexGainIncreaseText}`;
   runtime.elements.lapValue.textContent = runtime.formatDuration(runtime.lapDuration());
   runtime.elements.lapSpeedValue.textContent = runtime.isLapSpeedSoftcapped()
     ? `${formatMultiplierLog(runtime.effectiveLapSpeedLog10())} ${runtime.t("lapSpeedSoftcapped")} / raw ${formatMultiplierLog(runtime.rawLapSpeedLog10())}`
