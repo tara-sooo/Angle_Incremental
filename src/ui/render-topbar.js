@@ -53,6 +53,7 @@ function topBarSignature(mode) {
     numberFormat,
     runtime.state.generationCount,
     runtime.currentTotalScoreLog10(),
+    runtime.currentScoreLog10(),
     runtime.currentGenerationScoreLog10(),
     runtime.currentPreviousGenerationScoreLog10(),
     runtime.state.coreBoostCount,

@@ -83,6 +83,7 @@ function updateInfinityUpgradeRows() {
     runtime.state.infinityPointsLog10,
     runtime.state.infinityCount,
     runtime.state.language,
+    runtime.state.numberFormat,
     runtime.selectedInfinityUpgradeId,
   ].join("|");
   if (signature === lastInfinityUpgradeSignature) return;
