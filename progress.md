@@ -87,11 +87,16 @@ Original prompt: では、中核ループを完成させてください
 - Verified the IC8 balance correction with the full ESM regression suite and Firefox screenshots; the IC8 reward displays `/1e21` with no browser console errors.
 - Prepared the 0.6.1 release candidate metadata, asset versions, documentation, tests, and bilingual update modal while keeping save format 10.
 - Prepared the 0.6.2 release candidate metadata, asset versions, documentation, tests, and bilingual update modal while keeping save format 10.
+- Reworked Infinite Angle into a continuously running IA figure unlocked for 1e20 IP, with independent IP-purchased speed, vertex, and gain upgrades, Infinity Score accumulation, and the `Infinity Score^0.3` vertex-gain multiplier.
+- Infinity now resets IA Score and transient IA progress while preserving the IA unlock and its upgrade levels; the IA canvas is rendered only in the active Infinity > IA subtab.
+- Raised IA's initial upgrade costs to 1e20 / 2.4e20 / 3.6e20 IP to match the 1e20 IP unlock scale; the 1e20-to-1e50 IP progression still needs a fresh-save playtest.
+- Softened IA upgrade growth to a dedicated curve: x1.40 / x1.50 / x1.45 with weak post-level-25 scaling and no shared staged cost scaling.
+- Prepared the 0.7.0 release pass for Infinite Angle and Tower, keeping Tower Challenge content deferred and SAVE_VERSION 10 unchanged.
 
 ## TODO
 
 - Verify the new save-code controls, IC auto-complete toggle, and updated IC formula display in Firefox/Playwright on desktop and mobile before release.
 - Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
-- Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle conversion rates.
+- Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinity Angle upgrade curves.
 - Future design pass: replace provisional IC6-IC8 if the game owner provides official designs.

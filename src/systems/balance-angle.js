@@ -40,24 +40,29 @@ function balanceRawLapSpeedLog10() {
   return runtime.clampLog10(multiplierLog);
 }
 
-function balanceVertexGainIncrease() {
+function balanceVertexGainIncreaseLog10() {
   const infinityResetBoost = runtime.hasInfinityUpgrade("1-1")
     ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, runtime.iu11_2EffectiveInfinityCount()) : runtime.state.infinityCount + 1)
     : 1;
-  let gain = (0.01 + runtime.effectiveGainLevel() * 0.01)
-    * runtime.coreBoostGainIncreaseMultiplier()
-    * runtime.ic8VertexGainMultiplier()
-    * runtime.infiniteAngleBoost()
-    * runtime.achievementGainMultiplier()
-    * infinityResetBoost;
-  if (runtime.state.activeChallenge === 6) return 0.001;
-  if (runtime.state.activeChallenge === 4) gain = Math.pow(gain, 0.5);
-  if (runtime.isChallengeCompleted(4)) gain = Math.pow(gain, 1.1);
-  return gain;
+  let gainLog10 = runtime.log10Value(0.01 + runtime.effectiveGainLevel() * 0.01)
+    + runtime.log10Value(runtime.coreBoostGainIncreaseMultiplier())
+    + runtime.log10Value(runtime.ic8VertexGainMultiplier())
+    + runtime.infiniteAngleBoostLog10()
+    + runtime.log10Value(runtime.achievementGainMultiplier())
+    + runtime.log10Value(infinityResetBoost);
+  if (runtime.state.activeChallenge === 6) return runtime.log10Value(0.001);
+  if (runtime.state.activeChallenge === 4) gainLog10 *= 0.5;
+  if (runtime.isChallengeCompleted(4)) gainLog10 *= 1.1;
+  return runtime.clampLog10(gainLog10);
+}
+
+function balanceVertexGainIncrease() {
+  return runtime.valueFromLog10(balanceVertexGainIncreaseLog10());
 }
 
 expose("balancePreGenerationCostScalingLog10", () => balancePreGenerationCostScalingLog10);
 expose("balanceCanBuyNormalUpgrade", () => balanceCanBuyNormalUpgrade);
 expose("balanceCostLog10", () => balanceCostLog10);
 expose("balanceRawLapSpeedLog10", () => balanceRawLapSpeedLog10);
+expose("balanceVertexGainIncreaseLog10", () => balanceVertexGainIncreaseLog10);
 expose("balanceVertexGainIncrease", () => balanceVertexGainIncrease);

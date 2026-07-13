@@ -135,6 +135,8 @@ async function runNumericStabilityModuleRuntimeTest() {
       true,
       "exact IP gains above 1e20 should still allow exact 1e20 IP spending",
     );
+    assert.equal(runtime.spendInfinityPoints(20), true, "exact IP spending should succeed at the 1e20 boundary");
+    assert.equal(state.infinityPointsExact, "3570", "spending 1e20 IP should preserve the exact remainder");
   }
 
   {
@@ -146,8 +148,9 @@ async function runNumericStabilityModuleRuntimeTest() {
       infinityPoints: 100000000000000000000,
       infinityPointsLog10: 20,
     }, 7);
-    debug.convertIpToInfiniteScore();
-    assert.equal(state.infinityPointsExact, "0", "spending 1e20 IP should exactly consume a 1e20 IP balance");
+    assert.equal(debug.unlockInfiniteAngle(), true, "1e20 IP should unlock Infinite Angle");
+    assert.equal(state.infiniteAngleUnlocked, true, "Infinite Angle should remain unlocked after purchase");
+    assert.equal(state.infinityPointsExact, "0", "unlocking IA should exactly consume a 1e20 IP balance");
     assert.equal(state.infinityPoints, 0, "spending all exact IP should update the numeric cache");
     assert.equal(state.infinityPointsLog10, -Infinity, "spending all exact IP should update the log cache");
   }
@@ -485,7 +488,7 @@ async function runNumericStabilityModuleRuntimeTest() {
     });
     state.infinityCount = 0;
     state.vertices = 3;
-    runtime.vertexGainIncrease = () => 1e275;
+    runtime.vertexGainIncreaseLog10 = () => 275;
 
     const coreHitsPastSafeSearch = 1e18;
     const endStep = coreHitsPastSafeSearch * state.vertices;
@@ -508,7 +511,7 @@ async function runNumericStabilityModuleRuntimeTest() {
     state.infinityCount = 0;
     state.vertices = 6;
     runtime.coreVertexIndices = () => [0, 3];
-    runtime.vertexGainIncrease = () => 1e275;
+    runtime.vertexGainIncreaseLog10 = () => 275;
 
     const usedBatch = runtime.processManyVertices(1, 6e18);
 

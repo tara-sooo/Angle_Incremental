@@ -16,6 +16,7 @@ const expectedOrder = [
   "src/core/save.js",
   "src/core/save-code.js",
   "src/systems/achievements.js",
+  "src/systems/tower.js",
   "src/ui/render-canvas.js",
   "src/ui/render-topbar.js",
   "src/ui/render-challenges.js",
@@ -27,6 +28,7 @@ const expectedOrder = [
   "src/systems/generation.js",
   "src/systems/core-boost.js",
   "src/systems/infinity.js",
+  "src/systems/infinite-angle.js",
   "src/ui/events.js",
   "src/systems/balance.js",
 ];

@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.6.2";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.7.0";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
@@ -15,6 +15,7 @@ function switchMainTab(tab) {
     panel.classList.toggle("is-active", panel.dataset.panel === runtime.activeMainTab);
   });
   runtime.resizeCanvas();
+  runtime.resizeInfiniteAngleCanvas();
 }
 
 function switchInfinitySubtab(tab) {
@@ -26,6 +27,19 @@ function switchInfinitySubtab(tab) {
   });
   runtime.elements.infinitySubpanels.forEach((panel) => {
     panel.classList.toggle("is-active", panel.dataset.infinityPanel === runtime.activeInfinitySubtab);
+  });
+  if (runtime.activeInfinitySubtab === "angle") runtime.resizeInfiniteAngleCanvas();
+}
+
+function switchChallengeSubtab(tab) {
+  runtime.activeChallengeSubtab = tab;
+  runtime.elements.challengeSubtabs.forEach((button) => {
+    const active = button.dataset.challengeTab === runtime.activeChallengeSubtab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  runtime.elements.challengeSubpanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.challengePanel === runtime.activeChallengeSubtab);
   });
 }
 
@@ -84,7 +98,11 @@ function bindEvents() {
   runtime.elements.coreBoostButton.addEventListener("click", runtime.runCoreBoost);
   runtime.elements.infinityButton.addEventListener("click", () => runtime.runInfinity(false));
   runtime.elements.infinityUpgradeDetailBuy.addEventListener("click", runtime.buySelectedInfinityUpgrade);
-  runtime.elements.convertIpButton.addEventListener("click", runtime.convertIpToInfiniteScore);
+  runtime.elements.infiniteAngleUnlockButton.addEventListener("click", runtime.unlockInfiniteAngle);
+  runtime.elements.infiniteAngleSpeedUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("speed"));
+  runtime.elements.infiniteAngleVertexUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("vertex"));
+  runtime.elements.infiniteAngleGainUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("gain"));
+  runtime.elements.towerBuildButton.addEventListener("click", runtime.buildTower);
   runtime.elements.breakCapButton.addEventListener("click", runtime.breakInfiniteCap);
   runtime.elements.resetSaveButton.addEventListener("click", runtime.resetSave);
   runtime.elements.mainTabs.forEach((button) => {
@@ -92,6 +110,9 @@ function bindEvents() {
   });
   runtime.elements.infinitySubtabs.forEach((button) => {
     button.addEventListener("click", () => switchInfinitySubtab(button.dataset.infinityTab));
+  });
+  runtime.elements.challengeSubtabs.forEach((button) => {
+    button.addEventListener("click", () => switchChallengeSubtab(button.dataset.challengeTab));
   });
   runtime.elements.floatingTextToggle.addEventListener("change", () => applySetting("showFloatingText", runtime.elements.floatingTextToggle.checked));
   runtime.elements.lightEffectsToggle.addEventListener("change", () => applySetting("lightEffects", runtime.elements.lightEffectsToggle.checked));
@@ -118,10 +139,15 @@ function bindEvents() {
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
   window.addEventListener("resize", runtime.resizeCanvas);
+  window.addEventListener("resize", runtime.resizeInfiniteAngleCanvas);
   const canvasResizeObserver = window.ResizeObserver && runtime.canvas.parentElement
     ? new ResizeObserver(runtime.resizeCanvas)
     : null;
   if (canvasResizeObserver) canvasResizeObserver.observe(runtime.canvas.parentElement);
+  const infiniteAngleResizeObserver = window.ResizeObserver && runtime.infiniteAngleCanvas?.parentElement
+    ? new ResizeObserver(runtime.resizeInfiniteAngleCanvas)
+    : null;
+  if (infiniteAngleResizeObserver) infiniteAngleResizeObserver.observe(runtime.infiniteAngleCanvas.parentElement);
   window.addEventListener("keydown", (event) => {
     const updateModalVisible = runtime.elements.updateModal && !runtime.elements.updateModal.hidden;
     if (updateModalVisible && event.key === "Escape") {
@@ -147,6 +173,7 @@ function bindEvents() {
 }
 expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
+expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
 expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
 expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });

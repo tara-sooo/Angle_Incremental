@@ -41,6 +41,7 @@ function installBalanceProfile() {
   runtime.rawLapSpeedLog10 = runtime.balanceRawLapSpeedLog10;
   runtime.generationScorePower = runtime.balanceGenerationScorePower;
   runtime.coreBoostGainIncreaseMultiplier = runtime.balanceCoreBoostGainIncreaseMultiplier;
+  runtime.vertexGainIncreaseLog10 = runtime.balanceVertexGainIncreaseLog10;
   runtime.vertexGainIncrease = runtime.balanceVertexGainIncrease;
   runtime.runGeneration = runtime.balanceRunGeneration;
   runtime.nextGenerationValues = runtime.balanceNextGenerationValues;

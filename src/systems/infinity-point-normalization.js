@@ -63,13 +63,24 @@ function syncInfinityPointCachesFromExact(exact) {
     : runtime.valueFromLog10(log);
 }
 
+function exactLogCacheTolerance(exact) {
+  if (exact <= 0n) return 0n;
+  return 10n ** BigInt(Math.max(0, exact.toString().length - 15));
+}
+
 function currentExactInfinityPoints() {
   const parsedExact = parseExactInfinityPoints(runtime.state.infinityPointsExact);
   const savedLog = runtime.sanitizeLog10(runtime.state.infinityPointsLog10, null);
   const cachedExact = savedLog === null
     ? parseExactInfinityPoints(runtime.state.infinityPoints) || 0n
     : exactInfinityPointsFromLog10(savedLog);
-  const exact = parsedExact === null || cachedExact > parsedExact ? cachedExact : parsedExact;
+  // The serialized integer is authoritative when the log cache differs only
+  // in the final reconstructed digits; keep larger meaningful legacy values.
+  const exact = parsedExact === null
+    ? cachedExact
+    : cachedExact > parsedExact && cachedExact - parsedExact > exactLogCacheTolerance(parsedExact)
+      ? cachedExact
+      : parsedExact;
   syncInfinityPointCachesFromExact(exact);
   return exact;
 }

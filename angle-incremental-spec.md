@@ -1,6 +1,6 @@
 # Angle Incremental 開発仕様書
 
-対象リリース: **0.6.2**
+対象リリース: **0.7.0**
 
 この文書は、現行公開版のゲーム仕様と実装基準をまとめる。プレイヤー向けの遊び方は [angle-incremental-guide.md](angle-incremental-guide.md) を参照する。
 
@@ -16,7 +16,7 @@
 2. Generation で通常進行をリセットし、恒久補正を得る。
 3. Core Boost で Generation 以下をリセットし、より強い恒久補正を得る。
 4. Infinity で下位進行をリセットし、Infinity Point と Infinity Upgrade を解放する。
-5. Infinity Challenge、Infinite Angle、Break Infinite Cap でInfinity後半を進める。
+5. Infinity Challenge、Infinity Angle、Tower、Break Infinite Cap でInfinity後半を進める。
 
 ## 2. 用語
 
@@ -30,10 +30,13 @@
 | Generation / GR | 累計スコア 1,000,000 で解放される第1リセット層。 |
 | Core Boost / CB | 所持スコア 1.00e20 で実行できる第2リセット層。 |
 | Infinity | 所持スコア 1.80e308 で実行できる第3リセット層。 |
-| Infinity Point / IP | Infinity Upgrade購入とInfinite Angle変換に使うリソース。 |
+| Infinity Point / IP | Infinity Upgrade購入とInfinity Angleの解放・通常強化購入に使うリソース。 |
 | Infinity Upgrade / IU | IPで購入する恒久強化。 |
 | Infinity Challenge / IC | 制約付きでInfinity到達を目指すチャレンジ。 |
-| Infinite Score / IA | IP変換で得るInfinity内リソース。頂点通過ごとの増加を強化する。 |
+| Tower Challenge / TC | Towerの次階建設を制限する予定のチャレンジ。 |
+| Infinity Angle / IA | e20 IPで解放する、Infinity内の独立した図形進行。 |
+| Infinity Score | IAの核到達で得るInfinity内スコア。^0.3後に通常の頂点獲得量へ乗算する。 |
+| Tower | IPで建設し、階数に応じてスコア累乗を強化するInfinity後の恒久要素。 |
 | Break Infinite Cap | Infinity後の強いスコアソフトキャップを恒久的に解除する要素。 |
 
 ## 3. 基本ループ
@@ -58,6 +61,8 @@
 | Core Boost | 0 |
 | Infinity | 0 |
 | IP | 0 |
+| Infinity Angle | 未解放 |
+| Infinity Score | 0 |
 
 ### 3.2 The Angle の獲得式
 
@@ -69,7 +74,7 @@ divisor = parts
 基礎獲得log10 = (baseLog10 - log10(divisor)) * parts
 ```
 
-`parts <= 1` の場合は分割式を適用しない。IC1中、またはIC1クリア報酬の有無により、式の表示と除数が変わる。GR、CB、実績、IU、IAなどの補正は、この基礎獲得式の後に適用する。
+`parts <= 1` の場合は分割式を適用しない。IC1中、またはIC1クリア報酬の有無により、式の表示と除数が変わる。GR、CB、実績、IU、IAなどの補正は、この基礎獲得式の後に適用する。IA側はIC、GR、CB、実績、IUの補正を持たず、IA専用の頂点数と現在獲得量だけで同じ基礎式を計算する。
 
 ### 3.3 log値管理
 
@@ -220,7 +225,8 @@ Infinity実行時、Infinity未満の進行をリセットする。
 | 通常強化 | 初期化 |
 | Generation | 初期化 |
 | Core Boost | 初期化。ただしIU 10-1購入後は最低2から開始。 |
-| Infinite Score | 0 |
+| Infinity Angle | 解放状態とIA通常強化レベルを保持 |
+| Infinity Score | 0 |
 | Infinity run time | 0 |
 
 Infinity回数、IP、IU、ICクリア状況、Break Infinite Cap、実績、設定、統計履歴は保持する。
@@ -311,20 +317,102 @@ Break Infinite Capは恒久状態であり、Infinityを含む通常のリセッ
 
 Break Infinite Cap後は、`1.80e308` 以降の強いスコアソフトキャップを無効化する。Infinity到達条件は引き続き `1.80e308` である。IP獲得式は `log2(score)-307` 系へ変わる。
 
-## 11. Infinite Angle
+## 11. Infinity Angle
 
-Infinite AngleはIPをInfinite Scoreへ変換するInfinity内進行である。
+Infinity Angle (IA) は、Infinityタブ内で動き続ける独立した図形である。解放後はIAサブタブを開いていなくても進行し、IAサブタブを開いた時だけ専用キャンバスを描画する。
+
+### 11.1 解放とリセット
 
 | 項目 | 値 |
 | --- | --- |
-| 変換コスト | `1.00e20 IP` |
-| 変換量 | `+10 Infinite Score` |
-| 効果 | Infinite Scoreに応じて頂点通過ごとの増加を強化する。 |
-| リセット | Infinity実行時に0へ戻る。 |
+| 解放コスト | `1.00e20 IP` の一回払い |
+| 解放後 | Infinity Angleが常時進行する |
+| Infinity Score | IAの核到達で増加し、Infinity実行時に0へ戻る |
+| IA通常強化 | Infinity実行後も保持する |
+| IA用GR/CB | 存在しない |
 
-Infinite Scoreの効果は `1 + log10(1 + Infinite Score) * 0.25` を基準にする。
+Infinity実行時は、IAの現在獲得量、Point位置、頂点進行も初期化する。解放状態とIA通常強化レベルは保持する。旧版のInfinite Scoreが保存されている場合は、IA解放済みのInfinity Scoreとして読み込む。
 
-## 12. 実績
+### 11.2 IAの基本ループ
+
+IAのPointはIA専用の頂点上を周回する。通常のThe Angleと同じく、頂点通過ごとに現在獲得量が増え、核到達時にスコアを得る。ただし、スコア計算にはIA専用の通常強化だけを使う。
+
+```text
+IA頂点数 = 3 + IA角追加レベル
+IA頂点通過ごとの増加 = 0.01 + IA頂点獲得量レベル * 0.01
+IA生ラップ速度log10 = IA周回速度レベル * log10(1.22)
+IA有効ラップ速度 = The AngleのGeneration前ソフトキャップと強いソフトキャップを適用した速度
+```
+
+核到達時のIAスコア獲得量は、The Angleと同じ `(x / y)^y` 型の基礎式を使う。ただし、IA頂点数から求めた式の部品数とIA現在獲得量以外の補正は適用しない。
+
+```text
+parts = min(floor(sqrt(IA頂点数)), 10)
+IAスコア獲得log10 = IA現在獲得log10                         (parts <= 1)
+IAスコア獲得log10 = (IA現在獲得log10 - log10(parts)) * parts (parts > 1)
+```
+
+Infinity Scoreはlog空間で加算する。通常の頂点獲得量に適用するIA倍率は次の通りで、Score 0では倍率1になる。
+
+```text
+IA倍率 = max(1, Infinity Score ^ 0.3)
+```
+
+### 11.3 IA通常強化
+
+IA通常強化はIPで購入し、IA側のレベルだけで独立に計算する。IAの初回価格は解放コストと同じIP帯へ移し、高レベルでもIA Scoreによる加速が機能するよう専用の緩やかなコスト曲線を使う。
+
+| 強化 | 基礎コスト | 成長率 | 効果 |
+| --- | ---: | ---: | --- |
+| 周回速度 | `1.00e20 IP` | `x1.40` | IAの周回速度レベル +1 |
+| 角の追加 | `2.40e20 IP` | `x1.50` | IAの頂点数 +1 |
+| 頂点獲得量 | `3.60e20 IP` | `x1.45` | IAの頂点通過ごとの増加レベル +1 |
+
+IAのコストは、レベル25までは基礎コストと成長率だけで計算し、レベル25を超えた分にだけ次の初期追加スケーリングを適用する。The Angle側のGeneration、Core Boost、Infinity Challenge、Infinity Upgradeによるコスト補正や段階スケーリングは適用しない。
+
+```text
+追加コストlog10 = max(0, IAレベル - 25)^2 * IAごとの補正値
+周回速度の補正値 = 0.0005
+角の追加の補正値 = 0.0010
+頂点獲得量の補正値 = 0.0005
+```
+
+## 12. Tower
+
+TowerはIPを消費して建設する、Infinityでリセットされない恒久要素である。階数に応じてスコア累乗が強化される。
+
+### 12.1 階数と建設コスト
+
+| 階数 | 必要IPのlog10 | 効果・解放 |
+| ---: | ---: | --- |
+| 1 | 50 | スコア累乗を解放。Tower累乗は階数ごとに `+^0.05`。 |
+| 2 | 60 | なし。 |
+| 3 | 70 | TC1を解放し、次の階数からTC1クリアが必要。 |
+| 4 | 85 | TC1クリア後に建設可能。 |
+| 5 | 100 | TC2を解放し、次の階数からTC2クリアが必要。 |
+| 6 | 125 | TC2クリア後に建設可能。 |
+| 7 | 150 | なし。 |
+| 8 | 175 | TC3を解放し、次の階数からTC3クリアが必要。 |
+| 9 | 205 | TC3クリア後に建設可能。 |
+| 10 | 235 | なし。 |
+| 11 | 265 | なし。 |
+| 12 | 295 | TC4を解放し、次の階数からTC4クリアが必要。 |
+| 13 | 345 | これより後は階数ごとに必要IPのlog10を `^1.15` 相当で増加。 |
+
+Towerのスコア累乗は次の式で計算する。
+
+```text
+Towerスコア累乗 = 1 + Tower階数 * 0.05
+実効スコアlog10 = 生スコアlog10 * The Angle側のスコア累乗 * Towerスコア累乗
+```
+
+Floor 13より後の必要IPは、必要IPのlog10を `345 * 1.15^(階数 - 13)` として扱う。必要IPが正確なIP上限を超える場合は建設できない。
+
+### 12.2 Tower Challengeの現行状態
+
+TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTCの具体的な制約、開始処理、完了条件、報酬は未実装であり、Challengesタブには将来実装予定のプレースホルダーを表示する。TCをクリアできない状態では、対応する次の階数を建設できない。
+
+## 13. 実績
 
 実績は30個あり、すべてのリセットを超えて保持される。
 
@@ -367,7 +455,7 @@ Infinite Scoreの効果は `1 + log10(1 + Infinite Score) * 0.25` を基準に�
 | 29 | スコアが1e628を超える | なし |
 | 30 | ICを8つクリア | なし |
 
-## 13. 自動化と統計
+## 14. 自動化と統計
 
 ### 自動化
 
@@ -384,9 +472,9 @@ Infinite Scoreの効果は `1 + log10(1 + Infinite Score) * 0.25` を基準に�
 
 統計タブでは総プレイ時間、現在のInfinity周回時間、最速Infinity時間、過去10回のInfinity履歴を表示する。Infinity履歴には時間、到達スコア、獲得IP、挑戦中ICを記録する。
 
-## 14. UI、ニュース、設定
+## 15. UI、ニュース、設定
 
-メインタブは The Angle、Infinity、Automation、Statistics、Achievements、Help、Settings で構成する。Infinityタブ内には Upgrades、Challenges、Infinite Angle のサブタブがある。
+メインタブは The Angle、Infinity、Challenges、Automation、Statistics、Achievements、Help、Settings の順で構成する。Infinityタブ内には Upgrades、Infinite Angle、Tower の順でサブタブがある。Challengesタブ内には Infinity Challenge と Tower Challenge の順でサブタブがある。
 
 上部バーは設定で次の表示を選べる。
 
@@ -402,17 +490,17 @@ Infinite Scoreの効果は `1 + log10(1 + Infinite Score) * 0.25` を基準に�
 
 設定では、言語、数値表記、時間単位、軽量表示、浮遊テキスト、FPS表示、上部バー表示を保存する。
 
-## 15. セーブと更新
+## 16. セーブと更新
 
 セーブはローカルストレージへ自動保存し、手動保存とリセットも提供する。セーブコードは `ANGLE_SAVE_V2:` で始まり、AES-GCMを使って書き出し・読み込みする。
 
-主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Break Infinite Cap、Infinite Score、実績、自動化、統計、表示設定が含まれる。
+主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower階数、Break Infinite Cap、Infinite Score、実績、自動化、統計、表示設定が含まれる。
 
 IPは大きい整数を正確に扱うため `infinityPointsExact` を正本にし、表示用に通常数値とlog10値を同期する。
 
 壊れたセーブや復元できないセーブは、可能な限り隔離キーへ退避して新規状態で起動する。
 
-## 16. バージョン管理
+## 17. バージョン管理
 
 公開バージョンは Semantic Versioning 形式を使う。
 
@@ -423,11 +511,11 @@ major.minor.patch
 - `APP_VERSION`: 公開アプリのバージョン。`version.json` の `appVersion` と一致させる。
 - `SAVE_VERSION`: セーブデータの移行が必要な場合に上げる保存形式バージョン。
 
-0.6.2時点では、`APP_VERSION = 0.6.2`、`SAVE_VERSION = 10` である。ドキュメントのみの変更では、原則としてどちらも変更しない。
+0.7.0時点では、`APP_VERSION = 0.7.0`、`SAVE_VERSION = 10` である。Tower階数は既存セーブにない場合 `0` として読み込み、保存形式の変更は行わない。
 
 ブラウザのキャッシュ対策として、CSS/JSのURLにはアプリバージョンのクエリを付ける。起動中クライアントは `version.json` を定期確認し、新しい `appVersion` を検出したら保存してリロードを促す。
 
-## 17. 主要データ構造
+## 18. 主要データ構造
 
 主要な保存フィールドは `src/core/state.js` の `SAVE_FIELDS` を正本とする。代表的な項目は次の通り。
 
@@ -446,6 +534,15 @@ coreBoostCount
 infinityCount
 infinityPoints / infinityPointsLog10 / infinityPointsExact
 infiniteScore / infiniteScoreLog10
+infiniteAngleUnlocked
+infiniteAngleSpeedLevel
+infiniteAngleVertexLevel
+infiniteAngleGainLevel
+infiniteAngleCurrentGain / infiniteAngleCurrentGainLog10
+infiniteAnglePointProgress
+infiniteAngleTotalVertexProgress
+infiniteAngleLastVertexIndex
+towerFloor
 infinityUpgradeMask
 activeChallenge
 completedChallenges
@@ -459,11 +556,11 @@ automation settings
 display settings
 ```
 
-## 18. 今後の拡張候補
+## 19. 今後の拡張候補
 
 - IUの新しい段と分岐
 - 新しいInfinity Challenge
-- Infinite Angleの独立した図形表示
+- Tower Challengeの具体的な制約・報酬
 - 後半の複数Point
 - 実績の個別追加報酬
 - 後半バランス調整

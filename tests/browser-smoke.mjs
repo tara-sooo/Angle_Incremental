@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.6.2";
+const EXPECTED_ASSET_VERSION = "0.7.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -27,6 +27,7 @@ const EXPECTED_MODULE_PATHS = [
   "/src/core/save.js",
   "/src/core/save-code.js",
   "/src/systems/achievements.js",
+  "/src/systems/tower.js",
   "/src/ui/render-canvas.js",
   "/src/ui/render-topbar.js",
   "/src/ui/render-challenges.js",
@@ -38,6 +39,7 @@ const EXPECTED_MODULE_PATHS = [
   "/src/systems/generation.js",
   "/src/systems/core-boost.js",
   "/src/systems/infinity.js",
+  "/src/systems/infinite-angle.js",
   "/src/systems/balance.js",
   "/src/systems/balance-angle.js",
   "/src/systems/balance-generation.js",
@@ -109,10 +111,73 @@ try {
     && Boolean(window.__angleDebug?.state)
   ));
 
+  const updateModal = await page.evaluate(() => {
+    const modal = document.querySelector("#updateModal");
+    return {
+      visible: Boolean(modal && !modal.hidden),
+      title: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
+      summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
+    };
+  });
+  assert.equal(updateModal.visible, true, "the 0.7.0 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.7.0 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /Infinity Angle/);
+  const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
+  assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
+  await page.locator("#updateModalClose").click();
+  await page.waitForFunction(() => document.querySelector("#updateModal")?.hidden === true);
+
   const snapshot = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
   assert.equal(snapshot.vertices, 3);
   assert.equal(snapshot.infinity.count, 0);
   assert.equal(typeof snapshot.score, "string");
+  const tabStructure = await page.evaluate(() => {
+    const mainTabs = Array.from(document.querySelectorAll(".main-tab"), (button) => button.dataset.tab);
+    const infinityTabs = Array.from(document.querySelectorAll(".infinity-subtab"), (button) => button.dataset.infinityTab);
+    const challengeTabs = Array.from(document.querySelectorAll(".challenge-subtab"), (button) => button.dataset.challengeTab);
+    return { mainTabs, infinityTabs, challengeTabs };
+  });
+  assert.deepEqual(
+    tabStructure.mainTabs,
+    ["angle", "infinity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
+    "main tabs should place Challenges after Infinity",
+  );
+  assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
+  assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
+  const towerInitial = await page.evaluate(() => {
+    const { state, switchMainTab, switchInfinitySubtab, switchChallengeSubtab } = window.__angleDebug;
+    state.towerFloor = 0;
+    state.infinityPointsExact = "0";
+    state.infinityPoints = 0;
+    state.infinityPointsLog10 = -Infinity;
+    switchMainTab("infinity");
+    switchInfinitySubtab("tower");
+    window.advanceTime(0);
+    const towerPanel = document.querySelector('[data-infinity-panel="tower"]');
+    const towerState = {
+      panelActive: Boolean(towerPanel?.classList.contains("is-active")),
+      floor: document.querySelector("#towerFloorValue")?.textContent?.trim() ?? "",
+      cost: document.querySelector("#towerNextCost")?.textContent?.trim() ?? "",
+      buildDisabled: Boolean(document.querySelector("#towerBuildButton")?.disabled),
+    };
+    switchMainTab("challenges");
+    switchChallengeSubtab("tc");
+    return {
+      towerState,
+      challengePanelActive: Boolean(document.querySelector('[data-challenge-panel="tc"]')?.classList.contains("is-active")),
+      towerChallengeRows: document.querySelectorAll("#towerChallengeList .tower-challenge-row").length,
+      towerChallengeButton: document.querySelector("#towerChallengeList .tower-challenge-row button")?.textContent?.trim() ?? "",
+      towerChallengeRestriction: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-restriction")?.textContent?.trim() ?? "",
+    };
+  });
+  assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
+  assert.equal(towerInitial.towerState.floor, "0", "Tower should start at Floor 0");
+  assert.match(towerInitial.towerState.cost, /1\.00e50/, "Floor 1 should display an e50 IP cost");
+  assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
+  assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
+  assert.equal(towerInitial.towerChallengeRows, 4, "TC placeholder rows should be visible");
+  assert.match(towerInitial.towerChallengeButton, /今後のリリース/);
+  assert.match(towerInitial.towerChallengeRestriction, /今後のリリース/);
   const newsTicker = await page.evaluate(() => {
     const ticker = document.querySelector("#newsTicker");
     const item = document.querySelector("#newsTickerText");
@@ -260,7 +325,7 @@ try {
   const breakCapPlacement = await page.evaluate(() => {
     const breakCap = document.querySelector("#breakCapButton");
     const subtabs = document.querySelector(".infinity-subtabs");
-    const challengePanel = document.querySelector('[data-infinity-panel="challenges"]');
+    const challengePanel = document.querySelector('[data-panel="challenges"]');
     return {
       exists: Boolean(breakCap),
       beforeSubtabs: Boolean(breakCap && subtabs && (breakCap.compareDocumentPosition(subtabs) & Node.DOCUMENT_POSITION_FOLLOWING)),
@@ -273,6 +338,104 @@ try {
   assert.equal(breakCapPlacement.inChallengePanel, false, "Break Infinite Cap control must not be inside the IC panel");
   assert.match(breakCapPlacement.conditionText, /1e350|1.00e350/, "Break Infinite Cap requirement should be visible");
 
+  const infiniteAngleUnlock = await page.evaluate(() => {
+    const { state, unlockInfiniteAngle, switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+    state.infinityPointsExact = "100000000000000000000";
+    state.infinityPoints = 1e20;
+    state.infinityPointsLog10 = 20;
+    state.infiniteAngleUnlocked = false;
+    state.infiniteScore = 0;
+    state.infiniteScoreLog10 = -Infinity;
+    const unlocked = unlockInfiniteAngle();
+    switchMainTab("angle");
+    switchInfinitySubtab("upgrades");
+    const before = state.infiniteScoreLog10;
+    window.advanceTime(6000);
+    return {
+      unlocked,
+      unlockedState: state.infiniteAngleUnlocked,
+      ipExact: state.infinityPointsExact,
+      scoreBefore: before,
+      scoreAfter: state.infiniteScoreLog10,
+      angleScore: state.scoreLog10,
+    };
+  });
+  assert.equal(infiniteAngleUnlock.unlocked, true, "IA should unlock through the runtime hook");
+  assert.equal(infiniteAngleUnlock.unlockedState, true, "IA should remain unlocked after purchase");
+  assert.equal(infiniteAngleUnlock.ipExact, "0", "IA unlock should spend 1e20 IP exactly");
+  assert.ok(infiniteAngleUnlock.scoreAfter > infiniteAngleUnlock.scoreBefore, "IA should progress while its subtab is hidden");
+
+  const infiniteAnglePanel = await page.evaluate(() => {
+    const { state, switchMainTab, switchInfinitySubtab, buyInfiniteAngleUpgrade } = window.__angleDebug;
+    state.infinityPointsExact = "100000000000000000100";
+    state.infinityPoints = 1e20;
+    state.infinityPointsLog10 = 20;
+    switchMainTab("infinity");
+    switchInfinitySubtab("angle");
+    window.advanceTime(0);
+    const canvas = document.querySelector("#infiniteAngleCanvas");
+    const panel = document.querySelector('[data-infinity-panel="angle"]');
+    const beforeLevel = state.infiniteAngleSpeedLevel;
+    const upgradeCosts = [
+      document.querySelector("#infiniteAngleSpeedCost")?.textContent?.trim() ?? "",
+      document.querySelector("#infiniteAngleVertexCost")?.textContent?.trim() ?? "",
+      document.querySelector("#infiniteAngleGainCost")?.textContent?.trim() ?? "",
+    ];
+    const bought = buyInfiniteAngleUpgrade("speed");
+    window.advanceTime(0);
+    return {
+      panelActive: Boolean(panel?.classList.contains("is-active")),
+      canvasWidth: canvas?.getBoundingClientRect().width ?? 0,
+      canvasHeight: canvas?.getBoundingClientRect().height ?? 0,
+      canvasPixel: canvas?.getContext("2d")?.getImageData(1, 1, 1, 1).data?.[0] ?? 0,
+      scoreText: document.querySelector("#infiniteScorePanel")?.textContent?.trim() ?? "",
+      unlockHidden: Boolean(document.querySelector("#infiniteAngleUnlockButton")?.hidden),
+      unlockNoteDisplay: getComputedStyle(document.querySelector("#infiniteAngleUnlockNote")).display,
+      bought,
+      speedLevel: state.infiniteAngleSpeedLevel,
+      expectedSpeedLevel: beforeLevel + 1,
+      ipExact: state.infinityPointsExact,
+      upgradeWidths: Array.from(document.querySelectorAll(".infinite-angle-upgrades .upgrade-button"), (button) => button.getBoundingClientRect().width),
+      upgradeCosts,
+    };
+  });
+  assert.equal(infiniteAnglePanel.panelActive, true, "Infinity > IA should activate the IA panel");
+  assert.ok(infiniteAnglePanel.canvasWidth > 0 && infiniteAnglePanel.canvasHeight > 0, "IA canvas should have a rendered size");
+  assert.notEqual(infiniteAnglePanel.canvasPixel, 0, "IA canvas should render nonblank pixels");
+  assert.notEqual(infiniteAnglePanel.scoreText, "", "IA panel should display Infinity Score");
+  assert.equal(infiniteAnglePanel.unlockHidden, true, "IA unlock control should hide after unlocking");
+  assert.equal(infiniteAnglePanel.unlockNoteDisplay, "none", "IA unlock note should hide after unlocking");
+  assert.ok(infiniteAnglePanel.upgradeWidths.every((width) => width > 0), "IA upgrade controls should remain visible");
+  assert.equal(infiniteAnglePanel.bought, true, "IA speed upgrade should be purchasable with IP");
+  assert.equal(infiniteAnglePanel.speedLevel, infiniteAnglePanel.expectedSpeedLevel, "IA speed upgrade should increase its own level");
+  assert.equal(infiniteAnglePanel.ipExact, "100", "IA speed upgrade should spend 1e20 IP");
+  assert.match(infiniteAnglePanel.upgradeCosts[0], /1\.00e20/, "IA speed cost should match the unlock scale");
+  assert.match(infiniteAnglePanel.upgradeCosts[1], /2\.40e20/, "IA vertex cost should preserve the TA price ratio");
+  assert.match(infiniteAnglePanel.upgradeCosts[2], /3\.60e20/, "IA gain cost should preserve the TA price ratio");
+
+  const infiniteAngleDrawMode = await page.evaluate(() => {
+    const { switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+    const context = document.querySelector("#infiniteAngleCanvas")?.getContext("2d");
+    let fillCalls = 0;
+    const originalFillRect = context?.fillRect;
+    if (context && originalFillRect) {
+      context.fillRect = (...args) => {
+        fillCalls += 1;
+        return originalFillRect.apply(context, args);
+      };
+    }
+    switchMainTab("angle");
+    switchInfinitySubtab("upgrades");
+    window.advanceTime(1000);
+    const hiddenFillCalls = fillCalls;
+    switchMainTab("infinity");
+    switchInfinitySubtab("angle");
+    window.advanceTime(0);
+    return { hiddenFillCalls, visibleFillCalls: fillCalls - hiddenFillCalls };
+  });
+  assert.equal(infiniteAngleDrawMode.hiddenFillCalls, 0, "hidden IA should not draw its canvas");
+  assert.ok(infiniteAngleDrawMode.visibleFillCalls > 0, "visible IA should draw its canvas");
+
   const requestedModulePaths = new Set(moduleRequests.map((url) => url.pathname));
   EXPECTED_MODULE_PATHS.forEach((modulePath) => {
     assert.ok(requestedModulePaths.has(modulePath), `expected ${modulePath} to be requested`);
@@ -282,7 +445,6 @@ try {
     "every game ESM module must use the current versioned URL",
   );
 
-  await page.locator("#updateModalClose").click();
   await page.evaluate(() => {
     window.__angleFullscreenRequests = 0;
     Object.defineProperty(document.documentElement, "requestFullscreen", {

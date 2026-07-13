@@ -4,15 +4,21 @@ import { runtime, expose } from "../runtime/shared.js";
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+const infiniteAngleCanvas = document.getElementById("infiniteAngleCanvas");
+const infiniteAngleCtx = infiniteAngleCanvas ? infiniteAngleCanvas.getContext("2d") : null;
 
 const elements = {
   shell: document.getElementById("shell"),
+  infiniteAngleCanvas,
+  infiniteAngleCtx,
   newsTicker: document.getElementById("newsTicker"),
   newsTickerText: document.getElementById("newsTickerText"),
   mainTabs: Array.from(document.querySelectorAll(".main-tab")),
   mainPanels: Array.from(document.querySelectorAll(".main-panel")),
   infinitySubtabs: Array.from(document.querySelectorAll(".infinity-subtab")),
   infinitySubpanels: Array.from(document.querySelectorAll(".infinity-subpanel")),
+  challengeSubtabs: Array.from(document.querySelectorAll(".challenge-subtab")),
+  challengeSubpanels: Array.from(document.querySelectorAll(".challenge-subpanel")),
   scoreValue: document.getElementById("scoreValue"),
   gainValue: document.getElementById("gainValue"),
   vertexGainValue: document.getElementById("vertexGainValue"),
@@ -34,6 +40,21 @@ const elements = {
   infiniteScorePanel: document.getElementById("infiniteScorePanel"),
   infiniteAngleBoost: document.getElementById("infiniteAngleBoost"),
   infiniteAngleBoostPanel: document.getElementById("infiniteAngleBoostPanel"),
+  infiniteAngleUnlockNote: document.getElementById("infiniteAngleUnlockNote"),
+  infiniteAngleUnlockButton: document.getElementById("infiniteAngleUnlockButton"),
+  infiniteAngleUnlockCost: document.getElementById("infiniteAngleUnlockCost"),
+  infiniteAngleVertexCount: document.getElementById("infiniteAngleVertexCount"),
+  infiniteAngleCurrentGain: document.getElementById("infiniteAngleCurrentGain"),
+  infiniteAngleLap: document.getElementById("infiniteAngleLap"),
+  infiniteAngleSpeedUpgrade: document.getElementById("infiniteAngleSpeedUpgrade"),
+  infiniteAngleVertexUpgrade: document.getElementById("infiniteAngleVertexUpgrade"),
+  infiniteAngleGainUpgrade: document.getElementById("infiniteAngleGainUpgrade"),
+  infiniteAngleSpeedLevel: document.getElementById("infiniteAngleSpeedLevel"),
+  infiniteAngleVertexLevel: document.getElementById("infiniteAngleVertexLevel"),
+  infiniteAngleGainLevel: document.getElementById("infiniteAngleGainLevel"),
+  infiniteAngleSpeedCost: document.getElementById("infiniteAngleSpeedCost"),
+  infiniteAngleVertexCost: document.getElementById("infiniteAngleVertexCost"),
+  infiniteAngleGainCost: document.getElementById("infiniteAngleGainCost"),
   infinityPointGain: document.getElementById("infinityPointGain"),
   infinityButton: document.getElementById("infinityButton"),
   infinityUpgradeTree: document.getElementById("infinityUpgradeTree"),
@@ -43,10 +64,15 @@ const elements = {
   infinityUpgradeDetailRequires: document.getElementById("infinityUpgradeDetailRequires"),
   infinityUpgradeDetailCost: document.getElementById("infinityUpgradeDetailCost"),
   infinityUpgradeDetailBuy: document.getElementById("infinityUpgradeDetailBuy"),
-  convertIpButton: document.getElementById("convertIpButton"),
-  convertIpGain: document.getElementById("convertIpGain"),
   challengeList: document.getElementById("challengeList"),
   challengeStatus: document.getElementById("challengeStatus"),
+  towerChallengeList: document.getElementById("towerChallengeList"),
+  towerFloorHeading: document.getElementById("towerFloorHeading"),
+  towerFloorValue: document.getElementById("towerFloorValue"),
+  towerScoreExponentValue: document.getElementById("towerScoreExponentValue"),
+  towerNextCost: document.getElementById("towerNextCost"),
+  towerGateStatus: document.getElementById("towerGateStatus"),
+  towerBuildButton: document.getElementById("towerBuildButton"),
   breakCapRequirement: document.getElementById("breakCapRequirement"),
   breakCapButton: document.getElementById("breakCapButton"),
   achievementList: document.getElementById("achievementList"),
@@ -79,6 +105,7 @@ const elements = {
   i18nNodes: Array.from(document.querySelectorAll("[data-i18n]")),
   infinityTabState: document.getElementById("infinityTabState"),
   infinityTabBadge: document.getElementById("infinityTabBadge"),
+  challengeTabState: document.getElementById("challengeTabState"),
   infinityUnlockNote: document.getElementById("infinityUnlockNote"),
   automationMasterToggle: document.getElementById("automationMasterToggle"),
   autoBuySpeedToggle: document.getElementById("autoBuySpeedToggle"),
@@ -105,4 +132,6 @@ const elements = {
 
 expose("canvas", () => canvas);
 expose("ctx", () => ctx);
+expose("infiniteAngleCanvas", () => infiniteAngleCanvas);
+expose("infiniteAngleCtx", () => infiniteAngleCtx);
 expose("elements", () => elements);

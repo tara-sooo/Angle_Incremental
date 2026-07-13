@@ -9,6 +9,8 @@ async function main() {
   await require("./tests/numeric-stability-module-runtime.js").runNumericStabilityModuleRuntimeTest();
   await require("./tests/post-generation-upgrade-scaling-module-runtime.js").runPostGenerationUpgradeScalingModuleRuntimeTest();
   await require("./tests/new-infinity-upgrades-module-runtime.js").runNewInfinityUpgradesModuleRuntimeTest();
+  await require("./tests/infinite-angle-module-runtime.js").runInfiniteAngleModuleRuntimeTest();
+  await require("./tests/tower-module-runtime.js").runTowerModuleRuntimeTest();
 }
 
 main().catch((error) => {

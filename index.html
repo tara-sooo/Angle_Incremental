@@ -7,40 +7,42 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="styles.css?v=0.6.2" />
+    <link rel="stylesheet" href="styles.css?v=0.7.0" />
     <!-- Keep this version aligned with version.json and APP_VERSION. -->
     <script type="importmap">
       {
         "imports": {
-          "./src/runtime/shared.js": "./src/runtime/shared.js?v=0.6.2",
-          "./src/ui/dom.js": "./src/ui/dom.js?v=0.6.2",
-          "./src/core/constants.js": "./src/core/constants.js?v=0.6.2",
-          "./src/data/i18n.js": "./src/data/i18n.js?v=0.6.2",
-          "./src/data/infinity-data.js": "./src/data/infinity-data.js?v=0.6.2",
-          "./src/core/state.js": "./src/core/state.js?v=0.6.2",
-          "./src/core/numbers.js": "./src/core/numbers.js?v=0.6.2",
-          "./src/core/save.js": "./src/core/save.js?v=0.6.2",
-          "./src/core/save-code.js": "./src/core/save-code.js?v=0.6.2",
-          "./src/systems/achievements.js": "./src/systems/achievements.js?v=0.6.2",
-          "./src/ui/render-canvas.js": "./src/ui/render-canvas.js?v=0.6.2",
-          "./src/ui/render-topbar.js": "./src/ui/render-topbar.js?v=0.6.2",
-          "./src/ui/render-challenges.js": "./src/ui/render-challenges.js?v=0.6.2",
-          "./src/ui/render-infinity.js": "./src/ui/render-infinity.js?v=0.6.2",
-          "./src/ui/render-achievements.js": "./src/ui/render-achievements.js?v=0.6.2",
-          "./src/ui/render-automation.js": "./src/ui/render-automation.js?v=0.6.2",
-          "./src/ui/render-ui.js": "./src/ui/render-ui.js?v=0.6.2",
-          "./src/systems/angle.js": "./src/systems/angle.js?v=0.6.2",
-          "./src/systems/generation.js": "./src/systems/generation.js?v=0.6.2",
-          "./src/systems/core-boost.js": "./src/systems/core-boost.js?v=0.6.2",
-          "./src/systems/infinity.js": "./src/systems/infinity.js?v=0.6.2",
-          "./src/systems/balance.js": "./src/systems/balance.js?v=0.6.2",
-          "./src/systems/balance-angle.js": "./src/systems/balance-angle.js?v=0.6.2",
-          "./src/systems/balance-generation.js": "./src/systems/balance-generation.js?v=0.6.2",
-          "./src/systems/balance-core-boost.js": "./src/systems/balance-core-boost.js?v=0.6.2",
-          "./src/systems/balance-infinity.js": "./src/systems/balance-infinity.js?v=0.6.2",
-          "./src/systems/balance-ui.js": "./src/systems/balance-ui.js?v=0.6.2",
-          "./src/systems/infinity-point-normalization.js": "./src/systems/infinity-point-normalization.js?v=0.6.2",
-          "./src/ui/events.js": "./src/ui/events.js?v=0.6.2"
+          "./src/runtime/shared.js": "./src/runtime/shared.js?v=0.7.0",
+          "./src/ui/dom.js": "./src/ui/dom.js?v=0.7.0",
+          "./src/core/constants.js": "./src/core/constants.js?v=0.7.0",
+          "./src/data/i18n.js": "./src/data/i18n.js?v=0.7.0",
+          "./src/data/infinity-data.js": "./src/data/infinity-data.js?v=0.7.0",
+          "./src/core/state.js": "./src/core/state.js?v=0.7.0",
+          "./src/core/numbers.js": "./src/core/numbers.js?v=0.7.0",
+          "./src/core/save.js": "./src/core/save.js?v=0.7.0",
+          "./src/core/save-code.js": "./src/core/save-code.js?v=0.7.0",
+          "./src/systems/achievements.js": "./src/systems/achievements.js?v=0.7.0",
+          "./src/systems/tower.js": "./src/systems/tower.js?v=0.7.0",
+          "./src/ui/render-canvas.js": "./src/ui/render-canvas.js?v=0.7.0",
+          "./src/ui/render-topbar.js": "./src/ui/render-topbar.js?v=0.7.0",
+          "./src/ui/render-challenges.js": "./src/ui/render-challenges.js?v=0.7.0",
+          "./src/ui/render-infinity.js": "./src/ui/render-infinity.js?v=0.7.0",
+          "./src/ui/render-achievements.js": "./src/ui/render-achievements.js?v=0.7.0",
+          "./src/ui/render-automation.js": "./src/ui/render-automation.js?v=0.7.0",
+          "./src/ui/render-ui.js": "./src/ui/render-ui.js?v=0.7.0",
+          "./src/systems/angle.js": "./src/systems/angle.js?v=0.7.0",
+          "./src/systems/generation.js": "./src/systems/generation.js?v=0.7.0",
+          "./src/systems/core-boost.js": "./src/systems/core-boost.js?v=0.7.0",
+          "./src/systems/infinity.js": "./src/systems/infinity.js?v=0.7.0",
+          "./src/systems/infinite-angle.js": "./src/systems/infinite-angle.js?v=0.7.0",
+          "./src/systems/balance.js": "./src/systems/balance.js?v=0.7.0",
+          "./src/systems/balance-angle.js": "./src/systems/balance-angle.js?v=0.7.0",
+          "./src/systems/balance-generation.js": "./src/systems/balance-generation.js?v=0.7.0",
+          "./src/systems/balance-core-boost.js": "./src/systems/balance-core-boost.js?v=0.7.0",
+          "./src/systems/balance-infinity.js": "./src/systems/balance-infinity.js?v=0.7.0",
+          "./src/systems/balance-ui.js": "./src/systems/balance-ui.js?v=0.7.0",
+          "./src/systems/infinity-point-normalization.js": "./src/systems/infinity-point-normalization.js?v=0.7.0",
+          "./src/ui/events.js": "./src/ui/events.js?v=0.7.0"
         }
       }
     </script>
@@ -65,6 +67,11 @@
           <span class="tab-code">INF</span>
           <small id="infinityTabState">LOCKED</small>
           <i id="infinityTabBadge" aria-hidden="true"></i>
+        </button>
+        <button class="main-tab" type="button" data-tab="challenges" aria-selected="false">
+          <span class="tab-icon">◆</span>
+          <span class="tab-code">CHAL</span>
+          <small id="challengeTabState">IC 0/8</small>
         </button>
         <button class="main-tab" type="button" data-tab="automation" aria-selected="false">
           <span class="tab-icon">⟳</span>
@@ -226,7 +233,7 @@
               <strong id="infinityPoints">0</strong>
             </div>
             <div>
-              <span>Infinite Score</span>
+              <span data-i18n="infiniteScore">Infinite Score</span>
               <strong id="infiniteScore">0</strong>
             </div>
             <div>
@@ -257,13 +264,13 @@
               <span>UPG</span>
               <strong>Upgrades</strong>
             </button>
-            <button class="infinity-subtab" type="button" data-infinity-tab="challenges" aria-selected="false">
-              <span>IC</span>
-              <strong>Challenges</strong>
-            </button>
             <button class="infinity-subtab" type="button" data-infinity-tab="angle" aria-selected="false">
               <span>IA</span>
               <strong>Infinite Angle</strong>
+            </button>
+            <button class="infinity-subtab" type="button" data-infinity-tab="tower" aria-selected="false">
+              <span>TWR</span>
+              <strong data-i18n="tower">Tower</strong>
             </button>
           </nav>
 
@@ -286,33 +293,139 @@
               </aside>
             </section>
 
-            <section class="infinity-panel infinity-subpanel" data-infinity-panel="challenges">
+            <section class="infinity-panel infinity-subpanel" data-infinity-panel="angle">
               <div class="panel-heading">
-                <span>Infinity Challenge</span>
+                <span>Infinite Angle</span>
+                <strong data-i18n="infiniteAngle">IA</strong>
+              </div>
+              <div class="infinite-angle-panel">
+                <div class="infinite-angle-playfield-wrap">
+                  <canvas id="infiniteAngleCanvas" width="900" height="420" aria-label="Infinite Angle playfield"></canvas>
+                </div>
+                <div class="infinite-angle-metrics">
+                  <div>
+                    <span data-i18n="infiniteScore">Infinity Score</span>
+                    <strong id="infiniteScorePanel">0</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="infiniteAngleBoost">IA倍率</span>
+                    <strong id="infiniteAngleBoostPanel">×1.00</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="infiniteAngleVertices">頂点</span>
+                    <strong id="infiniteAngleVertexCount">3</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="infiniteAngleCurrentGain">現在の獲得量</span>
+                    <strong id="infiniteAngleCurrentGain">1</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="infiniteAngleLap">周回時間</span>
+                    <strong id="infiniteAngleLap">6.00秒</strong>
+                  </div>
+                </div>
+                <div id="infiniteAngleUnlockNote" class="infinite-angle-unlock-note">
+                  <span data-i18n="infiniteAngleUnlockNote">1.00e20 IPで解放</span>
+                  <strong id="infiniteAngleUnlockCost">必要 1.00e20 IP</strong>
+                </div>
+                <button id="infiniteAngleUnlockButton" class="infinite-angle-unlock-button" type="button" disabled data-i18n="infiniteAngleUnlock">
+                  IAを解放
+                </button>
+                <div class="infinite-angle-upgrades" aria-label="Infinite Angle upgrades">
+                  <button id="infiniteAngleSpeedUpgrade" class="upgrade-button" type="button">
+                    <span>
+                      <b data-i18n="speedUpgrade">周回速度</b>
+                      <small id="infiniteAngleSpeedLevel">レベル0</small>
+                    </span>
+                    <em id="infiniteAngleSpeedCost">必要 5 IP</em>
+                  </button>
+                  <button id="infiniteAngleVertexUpgrade" class="upgrade-button" type="button">
+                    <span>
+                      <b data-i18n="vertexUpgrade">角の追加</b>
+                      <small id="infiniteAngleVertexLevel">レベル0</small>
+                    </span>
+                    <em id="infiniteAngleVertexCost">必要 12 IP</em>
+                  </button>
+                  <button id="infiniteAngleGainUpgrade" class="upgrade-button" type="button">
+                    <span>
+                      <b data-i18n="gainUpgrade">頂点獲得量</b>
+                      <small id="infiniteAngleGainLevel">レベル0</small>
+                    </span>
+                    <em id="infiniteAngleGainCost">必要 18 IP</em>
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            <section class="infinity-panel infinity-subpanel" data-infinity-panel="tower">
+              <div class="panel-heading">
+                <span data-i18n="tower">Tower</span>
+                <strong id="towerFloorHeading">Floor 0</strong>
+              </div>
+              <div class="tower-panel">
+                <div class="tower-metrics">
+                  <div>
+                    <span data-i18n="towerFloor">階数</span>
+                    <strong id="towerFloorValue">0</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="towerScoreExponent">スコア累乗</span>
+                    <strong id="towerScoreExponentValue">^1.00</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="towerNextCost">次の階層の必要IP</span>
+                    <strong id="towerNextCost">1.00e50 IP</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="towerGate">建設条件</span>
+                    <strong id="towerGateStatus">建設可能</strong>
+                  </div>
+                </div>
+                <p id="towerUnlockNote" class="tower-note" data-i18n="towerPersistentNote">
+                  TowerはInfinityでリセットされません。
+                </p>
+                <button id="towerBuildButton" class="tower-build-button" type="button" disabled data-i18n="towerBuild">
+                  塔を建設
+                </button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="main-panel challenges-panel" data-panel="challenges" aria-label="Challenges">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">Challenges</p>
+              <h1 data-i18n="challenges">チャレンジ</h1>
+            </div>
+            <div class="unlock-note" data-i18n="challengeReleaseNote">ICとTC</div>
+          </header>
+
+          <nav class="challenge-subtabs" aria-label="Challenge sub tabs">
+            <button class="challenge-subtab is-active" type="button" data-challenge-tab="ic" aria-selected="true">
+              <span>IC</span>
+              <strong data-i18n="infinityChallenges">Infinity Challenges</strong>
+            </button>
+            <button class="challenge-subtab" type="button" data-challenge-tab="tc" aria-selected="false">
+              <span>TC</span>
+              <strong data-i18n="towerChallenges">Tower Challenges</strong>
+            </button>
+          </nav>
+
+          <div class="challenge-subpanels">
+            <section class="challenge-panel challenge-subpanel is-active" data-challenge-panel="ic">
+              <div class="panel-heading">
+                <span data-i18n="infinityChallenges">Infinity Challenges</span>
                 <strong id="challengeStatus">未解放</strong>
               </div>
               <div id="challengeList" class="challenge-list" aria-label="Infinity Challenge list"></div>
             </section>
-
-            <section class="infinity-panel infinity-subpanel" data-infinity-panel="angle">
+            <section class="challenge-panel challenge-subpanel" data-challenge-panel="tc">
               <div class="panel-heading">
-                <span>Infinite Angle</span>
-                <strong>IP</strong>
+                <span data-i18n="towerChallenges">Tower Challenges</span>
+                <strong data-i18n="towerChallengeComingSoon">今後のリリースで実装</strong>
               </div>
-              <div class="infinite-angle-panel">
-                <div>
-                  <span>Infinite Score</span>
-                  <strong id="infiniteScorePanel">0</strong>
-                </div>
-                <div>
-                  <span data-i18n="infiniteAngleBoost">Infinite Angle倍率</span>
-                  <strong id="infiniteAngleBoostPanel">×1.00</strong>
-                </div>
-                <div class="upgrade-row">
-                  <button id="convertIpButton" class="mini-button" type="button" disabled data-i18n="convertIp">IPをIAへ</button>
-                  <strong id="convertIpGain">+0</strong>
-                </div>
-              </div>
+              <div id="towerChallengeList" class="challenge-list" aria-label="Tower Challenge list"></div>
             </section>
           </div>
         </section>
@@ -450,7 +563,9 @@
             <dt>Break Infinite Cap</dt>
             <dd data-i18n="helpBreakCap">1.00e350 到達で、Infinity 以降の強いソフトキャップを破壊します。</dd>
             <dt>Infinite Angle</dt>
-            <dd data-i18n="helpInfiniteAngle">IP を Infinite Score に変換し、頂点通過ごとの増加を伸ばします。</dd>
+            <dd data-i18n="helpInfiniteAngle">1.00e20 IPでIAを解放し、専用図形でInfinity Scoreを稼ぎます。</dd>
+            <dt data-i18n="tower">Tower</dt>
+            <dd data-i18n="helpTower">1e50 IPからTowerを建設し、階数でスコア累乗を強化します。TC解放後はクリアまで先へ進めません。</dd>
           </dl>
         </section>
 
@@ -536,17 +651,17 @@
     <div id="updateModal" class="update-modal" role="dialog" aria-modal="true" aria-labelledby="updateModalTitle" hidden>
       <div class="update-modal-card">
         <p class="eyebrow">Update</p>
-        <h2 id="updateModalTitle" data-i18n="updateTitle">0.6.2 アップデート</h2>
-        <p data-i18n="updateSummary">ランタイムを整理し、描画とUI更新を最適化しました。</p>
+        <h2 id="updateModalTitle" data-i18n="updateTitle">0.7.0 アップデート</h2>
+        <p data-i18n="updateSummary">Infinity AngleとTowerを追加し、Infinity後の画面構成とChallengesタブを整理しました。</p>
         <ul>
-          <li data-i18n="updateResetDock">Angleを表示していない間の不要な描画と高負荷時の計算を削減しました。</li>
-          <li data-i18n="updateCanvas">上部バー、Infinity Upgrade、進捗表示が状態変化に合わせて正しく更新されるようにしました。</li>
+          <li data-i18n="updateResetDock">Infinity AngleとTowerを含むInfinity後半の進行要素を追加しました。</li>
+          <li data-i18n="updateCanvas">InfinityサブタブをUpgrades / IA / Towerに分け、ICとTCをChallengesタブへ整理しました。</li>
           <li data-i18n="updateModalNote">セーブ形式10は変更ありません。既存のセーブデータをそのまま利用できます。</li>
         </ul>
         <button id="updateModalClose" class="update-modal-close" type="button" data-i18n="updateClose">閉じる</button>
       </div>
     </div>
 
-    <script type="module" src="src/main.js?v=0.6.2"></script>
+    <script type="module" src="src/main.js?v=0.7.0"></script>
   </body>
 </html>
