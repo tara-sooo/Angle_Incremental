@@ -1,6 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
 // DOM bindings are evaluated before the runtime composition root.
 
 const canvas = document.getElementById("gameCanvas");
@@ -103,8 +102,6 @@ const elements = {
   importSaveCodeButton: document.getElementById("importSaveCodeButton"),
   copySaveCodeButton: document.getElementById("copySaveCodeButton"),
 };
-
-
 
 expose("canvas", () => canvas);
 expose("ctx", () => ctx);

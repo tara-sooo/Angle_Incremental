@@ -1,7 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
-// Runtime dependencies remain unchanged during the classic-script migration phase.
+// Canvas drawing and resize behavior live here so the composition root only schedules frames.
 
 function vertexPoint(index, total = runtime.effectiveVertexCount()) {
   const size = Math.min(runtime.canvas.width, runtime.canvas.height);
@@ -128,8 +127,6 @@ function draw() {
 
   runtime.ctx.restore();
 }
-
-// Mechanically appended from src/main.js during the parity-preserving migration.
 
 function resizeCanvas() {
   const rect = runtime.canvas.getBoundingClientRect();

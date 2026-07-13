@@ -28,7 +28,7 @@ python3 -m http.server 8000
 JavaScript を変更した場合は、少なくとも構文チェックを実行してください。
 
 ```bash
-node --check game.js
+find src tests scripts -name '*.js' -print0 | xargs -0 -n1 node --check
 ```
 
 UI またはゲームプレイに影響する変更では、ブラウザでの動作確認に加え、デスクトップ・モバイル表示、セーブデータ、およびコンソールエラーを確認してください。詳細は [CONTRIBUTING.md](CONTRIBUTING.md) を参照してください。
@@ -37,7 +37,10 @@ UI またはゲームプレイに影響する変更では、ブラウザでの�
 
 - `index.html` — UI とタブ・パネルのマークアップ
 - `styles.css` — レスポンシブなレイアウトとスタイル
-- `game.js` — ゲーム状態、進行ロジック、描画、セーブ／ロード
+- `index.html` / `src/main.js` — ゲームの入口とランタイムの組み立て
+- `src/core/` — 状態、数値、セーブ、定数
+- `src/systems/` — ゲーム進行と各リセット層
+- `src/ui/` — DOM、描画、入力、画面更新
 - `angle-incremental-spec.md` — 開発者向けのゲーム仕様と数式
 - `angle-incremental-guide.md` — 初心者向けのプレイガイド
 - `CONTRIBUTING.md` — 開発・検証・ブランチ運用の手順

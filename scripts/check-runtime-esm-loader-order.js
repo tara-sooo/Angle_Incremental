@@ -3,21 +3,43 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const expectedOrder = require(path.join(root, "tests", "candidate-runtime-order.js"));
 const mainSource = fs.readFileSync(path.join(root, "src", "main.js"), "utf8");
 const imports = [...mainSource.matchAll(/^import "\.\/([^\"]+)";$/gm)]
   .map((entry) => `src/${entry[1]}`);
+const expectedOrder = [
+  "src/ui/dom.js",
+  "src/core/constants.js",
+  "src/data/i18n.js",
+  "src/data/infinity-data.js",
+  "src/core/state.js",
+  "src/core/numbers.js",
+  "src/core/save.js",
+  "src/core/save-code.js",
+  "src/systems/achievements.js",
+  "src/ui/render-canvas.js",
+  "src/ui/render-topbar.js",
+  "src/ui/render-challenges.js",
+  "src/ui/render-infinity.js",
+  "src/ui/render-achievements.js",
+  "src/ui/render-automation.js",
+  "src/ui/render-ui.js",
+  "src/systems/angle.js",
+  "src/systems/generation.js",
+  "src/systems/core-boost.js",
+  "src/systems/infinity.js",
+  "src/ui/events.js",
+  "src/systems/balance.js",
+];
 
 assert.deepStrictEqual(
   imports,
-  expectedOrder.slice(0, -1),
-  "ESM side-effect imports must match the differential candidate order",
+  expectedOrder,
+  "ESM side-effect imports must match the canonical runtime order",
 );
+assert.match(mainSource, /^import \{ runtime, expose \} from "\.\/runtime\/shared\.js";/m);
 
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.match(indexSource, /<script type="module" src="src\/main\.js[^\"]*"><\/script>/);
+assert.equal(fs.existsSync(path.join(root, "game.js")), false, "the removed classic entrypoint must stay absent");
 
-const compatibilitySource = fs.readFileSync(path.join(root, "game.js"), "utf8");
-assert.match(compatibilitySource, /import\("\.\/src\/main\.js"\)/);
-
-console.log("ESM entrypoint and import order are aligned");
+console.log("ESM entrypoint and import order are canonical");

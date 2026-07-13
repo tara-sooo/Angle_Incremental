@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
+// Achievement definitions and unlock checks.
 // Unlock checks retain their original runtime dependencies during migration.
 
 const ACHIEVEMENTS = [

@@ -47,7 +47,7 @@ git switch -c feature/infinity-statistics
 For JavaScript changes, run at least:
 
 ```bash
-node --check game.js
+find src tests scripts -name '*.js' -print0 | xargs -0 -n1 node --check
 ```
 
 For UI, gameplay, save, or balance changes, also test the affected flow in a browser. Check desktop and mobile layouts when relevant, existing saves, a new save, and browser console errors.
@@ -103,7 +103,7 @@ Keep the application version separate from the save-data schema version. A docum
 Minimum check for JavaScript changes:
 
 ```bash
-node --check game.js
+find src tests scripts -name '*.js' -print0 | xargs -0 -n1 node --check
 ```
 
 For UI or gameplay changes:

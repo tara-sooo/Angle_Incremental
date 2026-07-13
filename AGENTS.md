@@ -6,7 +6,7 @@ This is a static browser game. Core files live at the repository root:
 
 - `index.html`: game UI markup and tab/panel structure.
 - `styles.css`: responsive layout, colors, and component styling.
-- `game.js`: game state, progression logic, rendering, save/load, and debug hooks.
+- `src/main.js`: ESM composition root, game loop, rendering orchestration, and debug hooks.
 - `angle-incremental-spec.md`: gameplay specification and formulas.
 - `CONTRIBUTING.md`: branch strategy and verification workflow.
 - `progress.md`: running development notes and future TODOs.
@@ -26,7 +26,7 @@ Then open `http://127.0.0.1:8000/`.
 Check JavaScript syntax before committing:
 
 ```bash
-node --check game.js
+find src tests scripts -name '*.js' -print0 | xargs -0 -n1 node --check
 ```
 
 For UI or gameplay changes, use Firefox/Playwright or the web game client referenced in `CONTRIBUTING.md` to capture screenshots and inspect `window.render_game_to_text()`.
@@ -42,7 +42,7 @@ Keep changes scoped. Do not mix balance tuning, layout work, and unrelated bug f
 There is no formal unit test suite yet. Minimum verification for logic changes is:
 
 ```bash
-node --check game.js
+find src tests scripts -name '*.js' -print0 | xargs -0 -n1 node --check
 ```
 
 For gameplay changes, verify affected state through `window.render_game_to_text()`. For layout changes, check desktop and mobile screenshots. For save/settings changes, confirm persistence after reload and watch for browser console errors.

@@ -1,7 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
-// Functions retain their original global runtime dependencies during the classic-script migration phase.
+// Infinity progression, IP, upgrades, challenges, and Infinite Angle.
 
 function infinityUpgradeById(id) {
   return runtime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === id);
@@ -309,49 +308,6 @@ function breakInfiniteCap() {
   runtime.saveGame("manual");
 }
 
-function generationIpMultiplierLog10() {
-  if (!isChallengeCompleted(8)) return 0;
-  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - 21);
-}
-
-function floorWithFloatingPointTolerance(value) {
-  return Math.floor(value + Math.max(1, Math.abs(value)) * Number.EPSILON * 8);
-}
-
-function doubleIpGainExactly(gain) {
-  return gain > Number.MAX_VALUE / 2 ? Number.MAX_VALUE : gain * 2;
-}
-
-function balanceInfinityPointGain() {
-  if (!canInfinity()) return 0;
-  const scoreLog10 = runtime.currentScoreLog10();
-  let base;
-  if (runtime.state.infiniteCapBroken) base = Math.floor(scoreLog10 / Math.log10(2) - 307);
-  else if (hasInfinityUpgrade("9-1")) base = Math.floor(scoreLog10 / Math.log10(7) - 307);
-  else base = Math.floor(scoreLog10 - 307);
-  const gained = Math.max(1, base);
-  let gainedWithExactMultipliers = gained;
-  if (runtime.isAchievementUnlocked(17)) gainedWithExactMultipliers = doubleIpGainExactly(gainedWithExactMultipliers);
-  if (runtime.isAchievementUnlocked(21)) gainedWithExactMultipliers = doubleIpGainExactly(gainedWithExactMultipliers);
-  const ic8MultiplierLog10 = generationIpMultiplierLog10();
-  if (ic8MultiplierLog10 === 0) return gainedWithExactMultipliers;
-  const gainValue = runtime.valueFromLog10(runtime.log10Value(gainedWithExactMultipliers) + ic8MultiplierLog10);
-  if (gainValue === Number.MAX_VALUE) return Number.MAX_VALUE;
-  return Math.max(1, floorWithFloatingPointTolerance(gainValue));
-}
-
-function balanceInfinityUpgradeCostExponent() {
-  if (!hasInfinityUpgrade("7-2")) return 1;
-  const config = runtime.BALANCE_PROFILE.infinityUpgradeCostReduction;
-  const infinityCount = Math.max(0, runtime.state.infinityCount);
-  const rawExponent = 1 - infinityCount * config.perInfinity;
-  if (rawExponent >= config.softcapStartExponent) return rawExponent;
-  const postSoftcapInfinities = infinityCount - (1 - config.softcapStartExponent) / config.perInfinity;
-  return config.softcapAsymptoteExponent
-    + (config.softcapStartExponent - config.softcapAsymptoteExponent)
-      * Math.exp(-Math.max(0, postSoftcapInfinities) * config.postSoftcapDecay);
-}
-
 expose("infinityUpgradeById", () => infinityUpgradeById, (value) => { infinityUpgradeById = value; });
 expose("hasInfinityUpgrade", () => hasInfinityUpgrade, (value) => { hasInfinityUpgrade = value; });
 expose("infinityUpgradeName", () => infinityUpgradeName, (value) => { infinityUpgradeName = value; });
@@ -392,5 +348,3 @@ expose("buyInfinityUpgrade", () => buyInfinityUpgrade, (value) => { buyInfinityU
 expose("convertIpToInfiniteScore", () => convertIpToInfiniteScore, (value) => { convertIpToInfiniteScore = value; });
 expose("toggleInfinityChallenge", () => toggleInfinityChallenge, (value) => { toggleInfinityChallenge = value; });
 expose("breakInfiniteCap", () => breakInfiniteCap, (value) => { breakInfiniteCap = value; });
-expose("balanceInfinityPointGain", () => balanceInfinityPointGain, (value) => { balanceInfinityPointGain = value; });
-expose("balanceInfinityUpgradeCostExponent", () => balanceInfinityUpgradeCostExponent, (value) => { balanceInfinityUpgradeCostExponent = value; });

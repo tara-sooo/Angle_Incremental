@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline. Keep declaration order stable during migration.
+// Infinity upgrades, challenges, and their localized descriptions.
 
 const INFINITY_CHALLENGES = [
   {
