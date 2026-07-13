@@ -1,35 +1,42 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
-// Runtime dependencies remain unchanged during the classic-script migration phase.
+// Canvas drawing and resize behavior live here so the composition root only schedules frames.
 
-function vertexPoint(index, total = runtime.effectiveVertexCount()) {
-  const size = Math.min(runtime.canvas.width, runtime.canvas.height);
-  const radius = size * 0.31;
-  const cx = runtime.canvas.width / 2;
-  const cy = runtime.canvas.height * 0.54;
+function canvasGeometry() {
+  const width = runtime.canvas.width;
+  const height = runtime.canvas.height;
+  const size = Math.min(width, height);
+  return {
+    radius: size * 0.31,
+    cx: width / 2,
+    cy: height * 0.54,
+  };
+}
+
+function vertexPoint(index, total = runtime.effectiveVertexCount(), geometry = canvasGeometry()) {
   const angle = -Math.PI / 2 + (index / total) * runtime.TAU;
   return {
-    x: cx + Math.cos(angle) * radius,
-    y: cy + Math.sin(angle) * radius,
+    x: geometry.cx + Math.cos(angle) * geometry.radius,
+    y: geometry.cy + Math.sin(angle) * geometry.radius,
     angle,
   };
 }
 
-function polygonPoints() {
-  const vertices = runtime.effectiveVertexCount();
+function polygonPoints(vertices = runtime.effectiveVertexCount(), geometry = canvasGeometry()) {
   const drawCount = Math.min(vertices, runtime.MAX_DRAW_VERTICES);
-  return Array.from({ length: drawCount }, (_, index) => vertexPoint((index / drawCount) * vertices));
+  return Array.from(
+    { length: drawCount },
+    (_, index) => vertexPoint((index / drawCount) * vertices, vertices, geometry),
+  );
 }
 
-function pointPosition() {
-  const vertices = runtime.effectiveVertexCount();
+function pointPosition(vertices = runtime.effectiveVertexCount(), geometry = canvasGeometry()) {
   const edgeProgress = runtime.state.pointProgress * vertices;
   const fromIndex = Math.floor(edgeProgress) % vertices;
   const toIndex = (fromIndex + 1) % vertices;
   const local = edgeProgress - Math.floor(edgeProgress);
-  const from = vertexPoint(fromIndex);
-  const to = vertexPoint(toIndex);
+  const from = vertexPoint(fromIndex, vertices, geometry);
+  const to = vertexPoint(toIndex, vertices, geometry);
   return {
     x: from.x + (to.x - from.x) * local,
     y: from.y + (to.y - from.y) * local,
@@ -53,9 +60,11 @@ function drawBackground() {
 
 function draw() {
   drawBackground();
-  const points = polygonPoints();
-  const point = pointPosition();
-  const corePoint = vertexPoint(0);
+  const vertices = runtime.effectiveVertexCount();
+  const geometry = canvasGeometry();
+  const points = polygonPoints(vertices, geometry);
+  const point = pointPosition(vertices, geometry);
+  const corePoint = vertexPoint(0, vertices, geometry);
   const canDrawJapanese = runtime.japaneseFontReady || !document.fonts;
   const compactCanvas = runtime.canvas.getBoundingClientRect().height < 260;
 
@@ -75,7 +84,7 @@ function draw() {
   runtime.ctx.stroke();
 
   points.forEach((p, index) => {
-    if (runtime.effectiveVertexCount() > runtime.MAX_DRAW_VERTICES && index % 12 !== 0) return;
+    if (vertices > runtime.MAX_DRAW_VERTICES && index % 12 !== 0) return;
     runtime.ctx.beginPath();
     runtime.ctx.arc(p.x, p.y, 5, 0, runtime.TAU);
     runtime.ctx.fillStyle = "#55d5ee";
@@ -128,8 +137,6 @@ function draw() {
 
   runtime.ctx.restore();
 }
-
-// Mechanically appended from src/main.js during the parity-preserving migration.
 
 function resizeCanvas() {
   const rect = runtime.canvas.getBoundingClientRect();

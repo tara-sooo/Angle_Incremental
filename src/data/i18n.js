@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline. Keep declaration order stable during migration.
+// Localized UI strings and translation lookup.
 
 const TEXT = {
   ja: {
@@ -348,8 +348,6 @@ const TEXT = {
     topBarHiddenOption: "Hide",
   },
 };
-
-// Mechanically appended from src/main.js during the parity-preserving migration.
 
 function t(key) {
   return (TEXT[runtime.state.language] && TEXT[runtime.state.language][key]) || TEXT.ja[key] || key;

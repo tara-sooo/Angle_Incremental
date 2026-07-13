@@ -8,7 +8,8 @@ src/
     constants.js       # thresholds, save version, timing and balance constants
     state.js           # state object and serialized-field schema
     numbers.js         # log10 resources, huge-number helpers, formatting
-    save.js            # local storage, migration, save-code import/export
+    save.js            # local storage, migration, and reset
+    save-code.js       # encrypted save-code export/import
 
   data/
     i18n.js            # TEXT and translation helper
@@ -20,10 +21,21 @@ src/
     core-boost.js      # Core Boost requirements, effects, reset logic
     infinity.js        # Infinity, IP, IU, IC, Infinite Angle
     achievements.js    # achievement definitions and unlock checks
+    balance.js         # installs the active balance profile
+    balance-angle.js   # angle and normal-upgrade balance rules
+    balance-generation.js # Generation balance rules and save restoration
+    balance-core-boost.js # Core Boost balance rules
+    balance-infinity.js # IP and Infinity Upgrade balance rules
+    balance-ui.js      # active Infinity Upgrade tree layout
 
   ui/
     dom.js             # DOM and canvas bindings
-    render-ui.js       # UI rows, localization application, status and previews
+    render-ui.js       # shared helpers and UI update orchestration
+    render-topbar.js   # news ticker and selectable top-bar modes
+    render-challenges.js # Infinity Challenge rows
+    render-infinity.js # Infinity Upgrade tree and detail panel
+    render-achievements.js # achievement list
+    render-automation.js # automation controls and statistics
     render-canvas.js   # polygon/canvas drawing and canvas resize
     events.js          # tabs, settings, and input binding via bindEvents()
 
@@ -37,12 +49,12 @@ src/
 
 `index.html` loads `src/main.js` with `type="module"`. `main.js` imports every runtime module in deterministic dependency order. Each module imports `runtime` and `expose` from `src/runtime/shared.js`; `expose()` publishes its local live bindings into the shared registry, while cross-module references use that registry.
 
-This preserves the original runtime's live mutable bindings and reset behavior without relying on `window` globals or dynamic classic-script injection. `game.js` remains only as a compatibility bootstrap for older direct links.
+This preserves the original runtime's live mutable bindings and reset behavior without relying on `window` globals or dynamic classic-script injection. The browser entrypoint is ESM-only; direct links must load `index.html`.
 
 ## Verification
 
-- `tests/fixtures/next-runtime.js` is an immutable fixture of the pre-refactor `next/game.js` runtime.
-- `tests/differential-runtime-esm.js` compares complete state and `render_game_to_text()` output between that fixture and the ES-module runtime.
-- The differential suite covers normal upgrades, Generation, Core Boost, IU5-2/IU6-2, IC6–IC8, high-speed vertex processing, existing local saves, and bidirectional save-code import.
+- `tests/runtime-harness-esm.js` loads the canonical module runtime in a VM with a deterministic DOM and storage surface.
+- `tests/runtime-invariants-module-runtime.js` checks numerical boundaries, challenge rules, automation, save-code integrity, and diagnostic hooks against that runtime.
+- Feature-focused module-runtime tests cover normal upgrades, Generation, Core Boost, IU5-2/IU6-2, IC6–IC8, high-speed vertex processing, existing local saves, and bidirectional save-code import.
 - `tests/browser-smoke.mjs` serves the static application locally in CI, launches Chromium, and verifies ESM startup plus the runtime diagnostic surface.
-- GitHub Actions runs syntax checks, baseline regression checks, ESM differential parity checks, and the browser smoke test.
+- GitHub Actions runs syntax checks, the ESM regression suite, and the browser smoke test.

@@ -6,24 +6,21 @@ import "./data/infinity-data.js";
 import "./core/state.js";
 import "./core/numbers.js";
 import "./core/save.js";
+import "./core/save-code.js";
 import "./systems/achievements.js";
 import "./ui/render-canvas.js";
+import "./ui/render-topbar.js";
+import "./ui/render-challenges.js";
+import "./ui/render-infinity.js";
+import "./ui/render-achievements.js";
+import "./ui/render-automation.js";
 import "./ui/render-ui.js";
 import "./systems/angle.js";
 import "./systems/generation.js";
 import "./systems/core-boost.js";
 import "./systems/infinity.js";
 import "./ui/events.js";
-
-
-
-
-
-
-
-
-
-
+import "./systems/balance.js";
 
 let autoSaveElapsed = 0;
 let updateCheckElapsed = 0;
@@ -39,10 +36,6 @@ let smoothedFps = 0;
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
-
-
-
-
 
 function shouldShowUpdateModal() {
   try {
@@ -130,240 +123,6 @@ async function checkForRemoteUpdate() {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function runAutobuyers() {
   if (!runtime.hasInfinityUpgrade("1-2") || !runtime.state.automationEnabled) return;
   runtime.buyAllUpgrades({
@@ -431,10 +190,6 @@ function runLayerAutomation() {
   return false;
 }
 
-
-
-
-
 function update(dt) {
   runtime.state.totalPlayTime += dt;
   runtime.state.currentInfinityRunTime += dt;
@@ -492,60 +247,12 @@ function update(dt) {
   }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function currentFrameTime() {
   return window.performance && performance.now ? performance.now() : Date.now();
+}
+
+function drawActiveView() {
+  if (runtime.activeMainTab === "angle") runtime.draw();
 }
 
 let lastTime = currentFrameTime();
@@ -567,7 +274,7 @@ function frame(now) {
     uiUpdateElapsed %= runtime.UI_UPDATE_INTERVAL_SECONDS;
     runtime.updateUi();
   }
-  runtime.draw();
+  drawActiveView();
   requestNextFrame(frame);
 }
 
@@ -720,54 +427,6 @@ function renderGameToText() {
   });
 }
 
-// BEGIN INTEGRATED BALANCE RULES
-// This section is part of the engine so reset, save, UI, and input bindings share one source of truth.
-// 0.1.0 balance profile.
-// Generation owns score scaling; early upgrade scaling no longer changes with GR or CB count.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-const balanceResetBelowCoreBoost = runtime.resetBelowCoreBoost;
-const balanceResetBelowInfinity = runtime.resetBelowInfinity;
-const balanceApplySaveData = runtime.applySaveData;
-
-
-
 expose("autoSaveElapsed", () => autoSaveElapsed, (value) => { autoSaveElapsed = value; });
 expose("updateCheckElapsed", () => updateCheckElapsed, (value) => { updateCheckElapsed = value; });
 expose("updateCheckInFlight", () => updateCheckInFlight, (value) => { updateCheckInFlight = value; });
@@ -795,55 +454,13 @@ expose("currentFrameTime", () => currentFrameTime, (value) => { currentFrameTime
 expose("lastTime", () => lastTime, (value) => { lastTime = value; });
 expose("frame", () => frame, (value) => { frame = value; });
 expose("renderGameToText", () => renderGameToText, (value) => { renderGameToText = value; });
-expose("balanceResetBelowCoreBoost", () => balanceResetBelowCoreBoost);
-expose("balanceResetBelowInfinity", () => balanceResetBelowInfinity);
-expose("balanceApplySaveData", () => balanceApplySaveData);
-
-runtime.INFINITY_CHALLENGES[6].restriction = {
-  ja: "ショップの価格が1e30を超えると、通常アップグレードを購入できなくなる",
-  en: "Normal upgrades whose cost exceeds 1e30 cannot be bought.",
-};
-
-runtime.generationRewardForLog = runtime.balanceGenerationRewardForLog;
-runtime.earlyLayerCostScalingFactor = () => 1;
-runtime.preGenerationCostScalingLog10 = runtime.balancePreGenerationCostScalingLog10;
-runtime.canBuyNormalUpgrade = runtime.balanceCanBuyNormalUpgrade;
-runtime.infinityPointGain = runtime.balanceInfinityPointGain;
-runtime.costLog10 = runtime.balanceCostLog10;
-runtime.rawLapSpeedLog10 = runtime.balanceRawLapSpeedLog10;
-runtime.generationScorePower = runtime.balanceGenerationScorePower;
-runtime.coreBoostGainIncreaseMultiplier = runtime.balanceCoreBoostGainIncreaseMultiplier;
-runtime.vertexGainIncrease = runtime.balanceVertexGainIncrease;
-runtime.runGeneration = runtime.balanceRunGeneration;
-runtime.nextGenerationValues = runtime.balanceNextGenerationValues;
-runtime.resetBelowCoreBoost = function balanceResetCoreBoost() {
-  balanceResetBelowCoreBoost();
-  runtime.balanceApplyResetStartScore();
-};
-runtime.resetBelowInfinity = function balanceResetInfinity() {
-  balanceResetBelowInfinity();
-  runtime.applyStartingCoreBoosts();
-  runtime.balanceApplyResetStartScore();
-};
-runtime.applySaveData = function balanceApplySaveDataWrapper(data, saveVersion) {
-  balanceApplySaveData(data, saveVersion);
-  runtime.balanceRestoreGenerationCostFactor(data && data.generationCostFactor, data && data.infinityUpgradeMask);
-  runtime.applyStartingCoreBoosts();
-};
-runtime.createInfinityUpgradeRows = runtime.balanceCreateInfinityUpgradeRows;
-
-runtime.balanceRestoreGenerationCostFactorFromLocalSave();
-if (typeof runtime.updateUi === "function") runtime.updateUi();
-if (typeof runtime.draw === "function") runtime.draw();
-// END INTEGRATED BALANCE RULES
-
 window.render_game_to_text = renderGameToText;
 window.advanceTime = (ms) => {
   const steps = Math.max(1, Math.round(ms / (1000 / 60)));
   for (let i = 0; i < steps; i += 1) update(1 / 60);
   uiUpdateElapsed = 0;
   runtime.updateUi();
-  runtime.draw();
+  drawActiveView();
 };
 window.__angleDebug = {
   state: runtime.state,

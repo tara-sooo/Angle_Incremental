@@ -1276,7 +1276,7 @@ canvas {
 
 .fps-counter {
   position: fixed;
-  top: 17px;
+  top: 15px;
   right: 24px;
   z-index: 100;
   min-width: 72px;

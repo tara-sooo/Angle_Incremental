@@ -1,7 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
-// Numeric helpers and UI hooks remain in src/main.js during this migration phase.
+// Save migration, hydration, local persistence, and reset behavior.
 
 const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
 
@@ -229,120 +228,6 @@ function serializeSaveData() {
   };
 }
 
-function bytesToBase64Url(bytes) {
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function base64UrlToBytes(value) {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
-
-function cryptoApi() {
-  return globalThis.crypto && globalThis.crypto.subtle ? globalThis.crypto : null;
-}
-
-async function saveCodeKey() {
-  const api = cryptoApi();
-  if (!api) throw new Error("crypto unavailable");
-  const encoder = new TextEncoder();
-  const material = await api.subtle.importKey(
-    "raw",
-    encoder.encode(runtime.SAVE_CODE_SECRET),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
-  return api.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: encoder.encode(runtime.SAVE_CODE_SALT),
-      iterations: 120000,
-      hash: "SHA-256",
-    },
-    material,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
-}
-
-async function exportSaveCode() {
-  const api = cryptoApi();
-  if (!api) {
-    runtime.setSaveStatus(runtime.t("saveCodeCryptoUnavailable"));
-    return "";
-  }
-  const iv = api.getRandomValues(new Uint8Array(12));
-  const encoder = new TextEncoder();
-  const plaintext = encoder.encode(JSON.stringify(serializeSaveData()));
-  const encrypted = new Uint8Array(await api.subtle.encrypt({ name: "AES-GCM", iv }, await saveCodeKey(), plaintext));
-  const envelope = {
-    v: 2,
-    i: bytesToBase64Url(iv),
-    d: bytesToBase64Url(encrypted),
-  };
-  const code = `${runtime.SAVE_CODE_PREFIX}${bytesToBase64Url(encoder.encode(JSON.stringify(envelope)))}`;
-  if (runtime.elements.saveCodeArea) runtime.elements.saveCodeArea.value = code;
-  runtime.setSaveStatus(runtime.t("saveCodeExported"));
-  return code;
-}
-
-async function importSaveCode(code) {
-  try {
-    const trimmed = String(code || "").trim();
-    if (!trimmed.startsWith(runtime.SAVE_CODE_PREFIX)) throw new Error("bad prefix");
-    const api = cryptoApi();
-    if (!api) throw new Error("crypto unavailable");
-    const decoder = new TextDecoder();
-    const envelope = JSON.parse(decoder.decode(base64UrlToBytes(trimmed.slice(runtime.SAVE_CODE_PREFIX.length))));
-    if (!envelope || envelope.v !== 2 || !envelope.i || !envelope.d) throw new Error("bad envelope");
-    const decrypted = await api.subtle.decrypt(
-      { name: "AES-GCM", iv: base64UrlToBytes(envelope.i) },
-      await saveCodeKey(),
-      base64UrlToBytes(envelope.d),
-    );
-    const parsed = JSON.parse(decoder.decode(new Uint8Array(decrypted)));
-    if (!parsed || !parsed.version || parsed.version > runtime.SAVE_VERSION || !parsed.state) throw new Error("bad save");
-    applySaveData(parsed.state, parsed.version);
-    saveGame("manual");
-    runtime.updateUi();
-    runtime.draw();
-    runtime.setSaveStatus(runtime.t("saveCodeImported"));
-    return true;
-  } catch (error) {
-    runtime.setSaveStatus(cryptoApi() ? runtime.t("saveCodeInvalid") : runtime.t("saveCodeCryptoUnavailable"));
-    return false;
-  }
-}
-
-async function importSaveCodeFromUi() {
-  const ok = await importSaveCode(runtime.elements.saveCodeArea ? runtime.elements.saveCodeArea.value : "");
-  if (!ok) runtime.updateUi();
-}
-
-async function copySaveCodeFromUi() {
-  const code = runtime.elements.saveCodeArea ? runtime.elements.saveCodeArea.value.trim() : "";
-  if (!code) return;
-  try {
-    const clipboard = globalThis.navigator && globalThis.navigator.clipboard;
-    if (clipboard && clipboard.writeText) await clipboard.writeText(code);
-    else if (runtime.elements.saveCodeArea) {
-      runtime.elements.saveCodeArea.focus();
-      runtime.elements.saveCodeArea.select();
-      document.execCommand("copy");
-    }
-    runtime.setSaveStatus(runtime.t("saveCodeCopied"));
-  } catch (error) {
-    runtime.setSaveStatus(runtime.t("saveCodeInvalid"));
-  }
-}
-
 function saveGame(reason = "auto") {
   try {
     localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(serializeSaveData()));
@@ -479,14 +364,6 @@ function resetSave() {
 expose("legacyInfinityUpgradeRefundLog10", () => legacyInfinityUpgradeRefundLog10, (value) => { legacyInfinityUpgradeRefundLog10 = value; });
 expose("applySaveData", () => applySaveData, (value) => { applySaveData = value; });
 expose("serializeSaveData", () => serializeSaveData, (value) => { serializeSaveData = value; });
-expose("bytesToBase64Url", () => bytesToBase64Url, (value) => { bytesToBase64Url = value; });
-expose("base64UrlToBytes", () => base64UrlToBytes, (value) => { base64UrlToBytes = value; });
-expose("cryptoApi", () => cryptoApi, (value) => { cryptoApi = value; });
-expose("saveCodeKey", () => saveCodeKey, (value) => { saveCodeKey = value; });
-expose("exportSaveCode", () => exportSaveCode, (value) => { exportSaveCode = value; });
-expose("importSaveCode", () => importSaveCode, (value) => { importSaveCode = value; });
-expose("importSaveCodeFromUi", () => importSaveCodeFromUi, (value) => { importSaveCodeFromUi = value; });
-expose("copySaveCodeFromUi", () => copySaveCodeFromUi, (value) => { copySaveCodeFromUi = value; });
 expose("saveGame", () => saveGame, (value) => { saveGame = value; });
 expose("quarantineSave", () => quarantineSave, (value) => { quarantineSave = value; });
 expose("loadGame", () => loadGame, (value) => { loadGame = value; });
