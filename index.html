@@ -33,6 +33,7 @@
           "./src/systems/generation.js": "./src/systems/generation.js?v=0.6.2",
           "./src/systems/core-boost.js": "./src/systems/core-boost.js?v=0.6.2",
           "./src/systems/infinity.js": "./src/systems/infinity.js?v=0.6.2",
+          "./src/systems/infinite-angle.js": "./src/systems/infinite-angle.js?v=0.6.2",
           "./src/systems/balance.js": "./src/systems/balance.js?v=0.6.2",
           "./src/systems/balance-angle.js": "./src/systems/balance-angle.js?v=0.6.2",
           "./src/systems/balance-generation.js": "./src/systems/balance-generation.js?v=0.6.2",
@@ -226,7 +227,7 @@
               <strong id="infinityPoints">0</strong>
             </div>
             <div>
-              <span>Infinite Score</span>
+              <span data-i18n="infiniteScore">Infinite Score</span>
               <strong id="infiniteScore">0</strong>
             </div>
             <div>
@@ -297,20 +298,63 @@
             <section class="infinity-panel infinity-subpanel" data-infinity-panel="angle">
               <div class="panel-heading">
                 <span>Infinite Angle</span>
-                <strong>IP</strong>
+                <strong data-i18n="infiniteAngle">IA</strong>
               </div>
               <div class="infinite-angle-panel">
-                <div>
-                  <span>Infinite Score</span>
-                  <strong id="infiniteScorePanel">0</strong>
+                <div class="infinite-angle-playfield-wrap">
+                  <canvas id="infiniteAngleCanvas" width="900" height="420" aria-label="Infinite Angle playfield"></canvas>
                 </div>
-                <div>
-                  <span data-i18n="infiniteAngleBoost">Infinite Angle倍率</span>
-                  <strong id="infiniteAngleBoostPanel">×1.00</strong>
+                <div class="infinite-angle-metrics">
+                  <div>
+                    <span data-i18n="infiniteScore">Infinity Score</span>
+                    <strong id="infiniteScorePanel">0</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="infiniteAngleBoost">IA倍率</span>
+                    <strong id="infiniteAngleBoostPanel">×1.00</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="infiniteAngleVertices">頂点</span>
+                    <strong id="infiniteAngleVertexCount">3</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="infiniteAngleCurrentGain">現在の獲得量</span>
+                    <strong id="infiniteAngleCurrentGain">1</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="infiniteAngleLap">周回時間</span>
+                    <strong id="infiniteAngleLap">6.00秒</strong>
+                  </div>
                 </div>
-                <div class="upgrade-row">
-                  <button id="convertIpButton" class="mini-button" type="button" disabled data-i18n="convertIp">IPをIAへ</button>
-                  <strong id="convertIpGain">+0</strong>
+                <div id="infiniteAngleUnlockNote" class="infinite-angle-unlock-note">
+                  <span data-i18n="infiniteAngleUnlockNote">1.00e20 IPで解放</span>
+                  <strong id="infiniteAngleUnlockCost">必要 1.00e20 IP</strong>
+                </div>
+                <button id="infiniteAngleUnlockButton" class="infinite-angle-unlock-button" type="button" disabled data-i18n="infiniteAngleUnlock">
+                  IAを解放
+                </button>
+                <div class="infinite-angle-upgrades" aria-label="Infinite Angle upgrades">
+                  <button id="infiniteAngleSpeedUpgrade" class="upgrade-button" type="button">
+                    <span>
+                      <b data-i18n="speedUpgrade">周回速度</b>
+                      <small id="infiniteAngleSpeedLevel">レベル0</small>
+                    </span>
+                    <em id="infiniteAngleSpeedCost">必要 5 IP</em>
+                  </button>
+                  <button id="infiniteAngleVertexUpgrade" class="upgrade-button" type="button">
+                    <span>
+                      <b data-i18n="vertexUpgrade">角の追加</b>
+                      <small id="infiniteAngleVertexLevel">レベル0</small>
+                    </span>
+                    <em id="infiniteAngleVertexCost">必要 12 IP</em>
+                  </button>
+                  <button id="infiniteAngleGainUpgrade" class="upgrade-button" type="button">
+                    <span>
+                      <b data-i18n="gainUpgrade">頂点獲得量</b>
+                      <small id="infiniteAngleGainLevel">レベル0</small>
+                    </span>
+                    <em id="infiniteAngleGainCost">必要 18 IP</em>
+                  </button>
                 </div>
               </div>
             </section>
@@ -450,7 +494,7 @@
             <dt>Break Infinite Cap</dt>
             <dd data-i18n="helpBreakCap">1.00e350 到達で、Infinity 以降の強いソフトキャップを破壊します。</dd>
             <dt>Infinite Angle</dt>
-            <dd data-i18n="helpInfiniteAngle">IP を Infinite Score に変換し、頂点通過ごとの増加を伸ばします。</dd>
+            <dd data-i18n="helpInfiniteAngle">1.00e20 IPでIAを解放し、専用図形でInfinity Scoreを稼ぎます。</dd>
           </dl>
         </section>
 

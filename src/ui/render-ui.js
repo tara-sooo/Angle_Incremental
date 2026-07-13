@@ -119,13 +119,37 @@ function updateUi() {
   runtime.elements.infinityPoints.textContent = runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10());
   runtime.elements.infiniteScore.textContent = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
   runtime.elements.infiniteScorePanel.textContent = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
-  runtime.elements.infiniteAngleBoost.textContent = `×${runtime.infiniteAngleBoost().toFixed(2)}`;
-  runtime.elements.infiniteAngleBoostPanel.textContent = `×${runtime.infiniteAngleBoost().toFixed(2)}`;
+  const infiniteAngleBoostLog10 = runtime.infiniteAngleBoost() > 0
+    ? runtime.log10Value(runtime.infiniteAngleBoost())
+    : -Infinity;
+  runtime.elements.infiniteAngleBoost.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
+  runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`;
   runtime.elements.infinityButton.disabled = runtime.state.infinityCount === 0 || !runtime.canInfinity();
   runtime.updateInfinityUpgradeRows();
-  runtime.elements.convertIpButton.disabled = !runtime.canSpendInfinityPoints(runtime.infiniteAngleConversionCostLog10());
-  runtime.elements.convertIpGain.textContent = `${runtime.formatUiLogNumber(runtime.infiniteAngleConversionCostLog10())} IP -> +${runtime.formatUiLogNumber(runtime.infiniteScoreGainPerIpLog10())}`;
+  const infiniteAngleUnlocked = runtime.state.infiniteAngleUnlocked;
+  const infiniteAngleUnlockCostLog10 = runtime.infiniteAngleUnlockCostLog10();
+  const infiniteAngleUpgradeCosts = {
+    speed: runtime.infiniteAngleUpgradeCostLog10("speed"),
+    vertex: runtime.infiniteAngleUpgradeCostLog10("vertex"),
+    gain: runtime.infiniteAngleUpgradeCostLog10("gain"),
+  };
+  runtime.elements.infiniteAngleUnlockNote.hidden = infiniteAngleUnlocked;
+  runtime.elements.infiniteAngleUnlockButton.hidden = infiniteAngleUnlocked;
+  runtime.elements.infiniteAngleUnlockButton.disabled = !runtime.canUnlockInfiniteAngle();
+  runtime.elements.infiniteAngleUnlockCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUnlockCostLog10)} IP`;
+  runtime.elements.infiniteAngleVertexCount.textContent = `${runtime.infiniteAngleVertexCount()} ${runtime.t("infiniteAngleVertices")}`;
+  runtime.elements.infiniteAngleCurrentGain.textContent = runtime.formatUiLogNumber(runtime.infiniteAngleCurrentGainLog10());
+  runtime.elements.infiniteAngleLap.textContent = runtime.formatDuration(runtime.infiniteAngleLapDuration());
+  runtime.elements.infiniteAngleSpeedLevel.textContent = `${runtime.t("level")} ${runtime.state.infiniteAngleSpeedLevel}`;
+  runtime.elements.infiniteAngleVertexLevel.textContent = `${runtime.t("level")} ${runtime.state.infiniteAngleVertexLevel}`;
+  runtime.elements.infiniteAngleGainLevel.textContent = `${runtime.t("level")} ${runtime.state.infiniteAngleGainLevel}`;
+  runtime.elements.infiniteAngleSpeedCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.speed)} IP`;
+  runtime.elements.infiniteAngleVertexCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.vertex)} IP`;
+  runtime.elements.infiniteAngleGainCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.gain)} IP`;
+  runtime.elements.infiniteAngleSpeedUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("speed");
+  runtime.elements.infiniteAngleVertexUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("vertex");
+  runtime.elements.infiniteAngleGainUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("gain");
   const completed = runtime.completedChallengeCount();
   runtime.elements.challengeStatus.textContent = runtime.state.activeChallenge > 0
     ? `${runtime.challengeName(runtime.state.activeChallenge)} ${runtime.t("challengeRunning")}`

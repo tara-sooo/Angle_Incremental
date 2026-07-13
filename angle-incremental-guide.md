@@ -123,7 +123,9 @@ ICを開始すると、何かが弱くなったり禁止されたりします。
 
 **Break Infinite Cap** は、スコアが **1.00e350** に届くと実行できます。実行すると、Infinity条件を超えた後の強いスコア制限が外れます。
 
-**Infinite Angle** は、IPを使って **Infinite Score** を得る要素です。Infinite Scoreは頂点通過ごとの増加を強化します。ただしInfinityすると0に戻ります。
+**Infinity Angle (IA)** は、**1.00e20 IP** を一度支払うと解放される、Infinity内の独立した図形です。IAは常に進行し、IAの核到達で **Infinity Score** を稼ぎます。Infinity Scoreの `^0.3` が通常の頂点獲得量に乗算されます。
+
+IAには周回速度、角の追加、頂点獲得量の専用強化があります。これらはIPで購入し、Infinityしても残ります。InfinityするとInfinity ScoreとIAの現在の周回進行だけがリセットされます。IAにはGeneration、Core Boost、Infinity Challenge、Infinity Upgradeの補正はありません。
 
 ## 10. 実績
 

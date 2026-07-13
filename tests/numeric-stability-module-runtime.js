@@ -146,8 +146,9 @@ async function runNumericStabilityModuleRuntimeTest() {
       infinityPoints: 100000000000000000000,
       infinityPointsLog10: 20,
     }, 7);
-    debug.convertIpToInfiniteScore();
-    assert.equal(state.infinityPointsExact, "0", "spending 1e20 IP should exactly consume a 1e20 IP balance");
+    assert.equal(debug.unlockInfiniteAngle(), true, "1e20 IP should unlock Infinite Angle");
+    assert.equal(state.infiniteAngleUnlocked, true, "Infinite Angle should remain unlocked after purchase");
+    assert.equal(state.infinityPointsExact, "0", "unlocking IA should exactly consume a 1e20 IP balance");
     assert.equal(state.infinityPoints, 0, "spending all exact IP should update the numeric cache");
     assert.equal(state.infinityPointsLog10, -Infinity, "spending all exact IP should update the log cache");
   }

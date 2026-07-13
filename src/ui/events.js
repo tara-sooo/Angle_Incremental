@@ -15,6 +15,7 @@ function switchMainTab(tab) {
     panel.classList.toggle("is-active", panel.dataset.panel === runtime.activeMainTab);
   });
   runtime.resizeCanvas();
+  runtime.resizeInfiniteAngleCanvas();
 }
 
 function switchInfinitySubtab(tab) {
@@ -27,6 +28,7 @@ function switchInfinitySubtab(tab) {
   runtime.elements.infinitySubpanels.forEach((panel) => {
     panel.classList.toggle("is-active", panel.dataset.infinityPanel === runtime.activeInfinitySubtab);
   });
+  if (runtime.activeInfinitySubtab === "angle") runtime.resizeInfiniteAngleCanvas();
 }
 
 function applySetting(key, value) {
@@ -84,7 +86,10 @@ function bindEvents() {
   runtime.elements.coreBoostButton.addEventListener("click", runtime.runCoreBoost);
   runtime.elements.infinityButton.addEventListener("click", () => runtime.runInfinity(false));
   runtime.elements.infinityUpgradeDetailBuy.addEventListener("click", runtime.buySelectedInfinityUpgrade);
-  runtime.elements.convertIpButton.addEventListener("click", runtime.convertIpToInfiniteScore);
+  runtime.elements.infiniteAngleUnlockButton.addEventListener("click", runtime.unlockInfiniteAngle);
+  runtime.elements.infiniteAngleSpeedUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("speed"));
+  runtime.elements.infiniteAngleVertexUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("vertex"));
+  runtime.elements.infiniteAngleGainUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("gain"));
   runtime.elements.breakCapButton.addEventListener("click", runtime.breakInfiniteCap);
   runtime.elements.resetSaveButton.addEventListener("click", runtime.resetSave);
   runtime.elements.mainTabs.forEach((button) => {
@@ -118,10 +123,15 @@ function bindEvents() {
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
   window.addEventListener("resize", runtime.resizeCanvas);
+  window.addEventListener("resize", runtime.resizeInfiniteAngleCanvas);
   const canvasResizeObserver = window.ResizeObserver && runtime.canvas.parentElement
     ? new ResizeObserver(runtime.resizeCanvas)
     : null;
   if (canvasResizeObserver) canvasResizeObserver.observe(runtime.canvas.parentElement);
+  const infiniteAngleResizeObserver = window.ResizeObserver && runtime.infiniteAngleCanvas?.parentElement
+    ? new ResizeObserver(runtime.resizeInfiniteAngleCanvas)
+    : null;
+  if (infiniteAngleResizeObserver) infiniteAngleResizeObserver.observe(runtime.infiniteAngleCanvas.parentElement);
   window.addEventListener("keydown", (event) => {
     const updateModalVisible = runtime.elements.updateModal && !runtime.elements.updateModal.hidden;
     if (updateModalVisible && event.key === "Escape") {

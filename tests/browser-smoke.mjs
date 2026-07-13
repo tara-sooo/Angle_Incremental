@@ -38,6 +38,7 @@ const EXPECTED_MODULE_PATHS = [
   "/src/systems/generation.js",
   "/src/systems/core-boost.js",
   "/src/systems/infinity.js",
+  "/src/systems/infinite-angle.js",
   "/src/systems/balance.js",
   "/src/systems/balance-angle.js",
   "/src/systems/balance-generation.js",
@@ -272,6 +273,95 @@ try {
   assert.equal(breakCapPlacement.beforeSubtabs, true, "Break Infinite Cap control must sit above the Infinity subtabs");
   assert.equal(breakCapPlacement.inChallengePanel, false, "Break Infinite Cap control must not be inside the IC panel");
   assert.match(breakCapPlacement.conditionText, /1e350|1.00e350/, "Break Infinite Cap requirement should be visible");
+
+  const infiniteAngleUnlock = await page.evaluate(() => {
+    const { state, unlockInfiniteAngle, switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+    state.infinityPointsExact = "100000000000000000000";
+    state.infinityPoints = 1e20;
+    state.infinityPointsLog10 = 20;
+    state.infiniteAngleUnlocked = false;
+    state.infiniteScore = 0;
+    state.infiniteScoreLog10 = -Infinity;
+    const unlocked = unlockInfiniteAngle();
+    switchMainTab("angle");
+    switchInfinitySubtab("upgrades");
+    const before = state.infiniteScoreLog10;
+    window.advanceTime(6000);
+    return {
+      unlocked,
+      unlockedState: state.infiniteAngleUnlocked,
+      ipExact: state.infinityPointsExact,
+      scoreBefore: before,
+      scoreAfter: state.infiniteScoreLog10,
+      angleScore: state.scoreLog10,
+    };
+  });
+  assert.equal(infiniteAngleUnlock.unlocked, true, "IA should unlock through the runtime hook");
+  assert.equal(infiniteAngleUnlock.unlockedState, true, "IA should remain unlocked after purchase");
+  assert.equal(infiniteAngleUnlock.ipExact, "0", "IA unlock should spend 1e20 IP exactly");
+  assert.ok(infiniteAngleUnlock.scoreAfter > infiniteAngleUnlock.scoreBefore, "IA should progress while its subtab is hidden");
+
+  const infiniteAnglePanel = await page.evaluate(() => {
+    const { state, switchMainTab, switchInfinitySubtab, buyInfiniteAngleUpgrade } = window.__angleDebug;
+    state.infinityPointsExact = "100";
+    state.infinityPoints = 100;
+    state.infinityPointsLog10 = 2;
+    switchMainTab("infinity");
+    switchInfinitySubtab("angle");
+    window.advanceTime(0);
+    const canvas = document.querySelector("#infiniteAngleCanvas");
+    const panel = document.querySelector('[data-infinity-panel="angle"]');
+    const beforeLevel = state.infiniteAngleSpeedLevel;
+    const bought = buyInfiniteAngleUpgrade("speed");
+    window.advanceTime(0);
+    return {
+      panelActive: Boolean(panel?.classList.contains("is-active")),
+      canvasWidth: canvas?.getBoundingClientRect().width ?? 0,
+      canvasHeight: canvas?.getBoundingClientRect().height ?? 0,
+      canvasPixel: canvas?.getContext("2d")?.getImageData(1, 1, 1, 1).data?.[0] ?? 0,
+      scoreText: document.querySelector("#infiniteScorePanel")?.textContent?.trim() ?? "",
+      unlockHidden: Boolean(document.querySelector("#infiniteAngleUnlockButton")?.hidden),
+      unlockNoteDisplay: getComputedStyle(document.querySelector("#infiniteAngleUnlockNote")).display,
+      bought,
+      speedLevel: state.infiniteAngleSpeedLevel,
+      expectedSpeedLevel: beforeLevel + 1,
+      ipExact: state.infinityPointsExact,
+      upgradeWidths: Array.from(document.querySelectorAll(".infinite-angle-upgrades .upgrade-button"), (button) => button.getBoundingClientRect().width),
+    };
+  });
+  assert.equal(infiniteAnglePanel.panelActive, true, "Infinity > IA should activate the IA panel");
+  assert.ok(infiniteAnglePanel.canvasWidth > 0 && infiniteAnglePanel.canvasHeight > 0, "IA canvas should have a rendered size");
+  assert.notEqual(infiniteAnglePanel.canvasPixel, 0, "IA canvas should render nonblank pixels");
+  assert.notEqual(infiniteAnglePanel.scoreText, "", "IA panel should display Infinity Score");
+  assert.equal(infiniteAnglePanel.unlockHidden, true, "IA unlock control should hide after unlocking");
+  assert.equal(infiniteAnglePanel.unlockNoteDisplay, "none", "IA unlock note should hide after unlocking");
+  assert.ok(infiniteAnglePanel.upgradeWidths.every((width) => width > 0), "IA upgrade controls should remain visible");
+  assert.equal(infiniteAnglePanel.bought, true, "IA speed upgrade should be purchasable with IP");
+  assert.equal(infiniteAnglePanel.speedLevel, infiniteAnglePanel.expectedSpeedLevel, "IA speed upgrade should increase its own level");
+  assert.equal(infiniteAnglePanel.ipExact, "95", "IA speed upgrade should spend 5 IP");
+
+  const infiniteAngleDrawMode = await page.evaluate(() => {
+    const { switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+    const context = document.querySelector("#infiniteAngleCanvas")?.getContext("2d");
+    let fillCalls = 0;
+    const originalFillRect = context?.fillRect;
+    if (context && originalFillRect) {
+      context.fillRect = (...args) => {
+        fillCalls += 1;
+        return originalFillRect.apply(context, args);
+      };
+    }
+    switchMainTab("angle");
+    switchInfinitySubtab("upgrades");
+    window.advanceTime(1000);
+    const hiddenFillCalls = fillCalls;
+    switchMainTab("infinity");
+    switchInfinitySubtab("angle");
+    window.advanceTime(0);
+    return { hiddenFillCalls, visibleFillCalls: fillCalls - hiddenFillCalls };
+  });
+  assert.equal(infiniteAngleDrawMode.hiddenFillCalls, 0, "hidden IA should not draw its canvas");
+  assert.ok(infiniteAngleDrawMode.visibleFillCalls > 0, "visible IA should draw its canvas");
 
   const requestedModulePaths = new Set(moduleRequests.map((url) => url.pathname));
   EXPECTED_MODULE_PATHS.forEach((modulePath) => {

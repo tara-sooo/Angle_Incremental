@@ -95,6 +95,37 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.state.infiniteScore = 0;
     runtime.state.infiniteScoreLog10 = -Infinity;
   }
+  const legacyInfiniteAngleUnlocked = saveVersion >= 10 && (
+    infiniteScore.log > -Infinity
+    || runtime.sanitizeNumber(data.infiniteAngleUpgradeLevel, 0) > 0
+  );
+  runtime.state.infiniteAngleUnlocked = runtime.sanitizeBoolean(data.infiniteAngleUnlocked, legacyInfiniteAngleUnlocked);
+  runtime.state.infiniteAngleSpeedLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleSpeedLevel, 0)));
+  runtime.state.infiniteAngleVertexLevel = Math.min(
+    runtime.MAX_RENDERED_VERTICES - 3,
+    Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleVertexLevel, 0))),
+  );
+  runtime.state.infiniteAngleGainLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleGainLevel, 0)));
+  const infiniteAngleCurrentGain = runtime.hydrateLogResource(
+    data.infiniteAngleCurrentGain,
+    data.infiniteAngleCurrentGainLog10,
+    0,
+  );
+  runtime.state.infiniteAngleCurrentGain = infiniteAngleCurrentGain.value || 1;
+  runtime.state.infiniteAngleCurrentGainLog10 = Math.max(0, infiniteAngleCurrentGain.log);
+  runtime.state.infiniteAnglePointProgress = ((runtime.sanitizeNumber(data.infiniteAnglePointProgress, 0) % 1) + 1) % 1;
+  const infiniteAngleVertexCount = Math.max(3, runtime.state.infiniteAngleVertexLevel + 3);
+  const loadedInfiniteAngleProgress = Math.max(
+    0,
+    runtime.sanitizeNumber(
+      data.infiniteAngleTotalVertexProgress,
+      runtime.state.infiniteAnglePointProgress * infiniteAngleVertexCount,
+    ),
+  );
+  runtime.state.infiniteAngleTotalVertexProgress = loadedInfiniteAngleProgress > runtime.MAX_VERTEX_PROGRESS_TRACKED
+    ? loadedInfiniteAngleProgress % infiniteAngleVertexCount
+    : loadedInfiniteAngleProgress;
+  runtime.state.infiniteAngleLastVertexIndex = Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleLastVertexIndex, 0)));
   runtime.state.ipGainUpgradeLevel = 0;
   runtime.state.infiniteAngleUpgradeLevel = 0;
   runtime.state.softcapUpgradeLevel = 0;
@@ -314,6 +345,15 @@ function resetSave() {
     infinityPointsExact: "0",
     infiniteScore: 0,
     infiniteScoreLog10: -Infinity,
+    infiniteAngleUnlocked: false,
+    infiniteAngleSpeedLevel: 0,
+    infiniteAngleVertexLevel: 0,
+    infiniteAngleGainLevel: 0,
+    infiniteAngleCurrentGain: 1,
+    infiniteAngleCurrentGainLog10: 0,
+    infiniteAnglePointProgress: 0,
+    infiniteAngleTotalVertexProgress: 0,
+    infiniteAngleLastVertexIndex: 0,
     infinityUpgradeMask: 0,
     ipGainUpgradeLevel: 0,
     infiniteAngleUpgradeLevel: 0,

@@ -19,6 +19,7 @@ import "./systems/angle.js";
 import "./systems/generation.js";
 import "./systems/core-boost.js";
 import "./systems/infinity.js";
+import "./systems/infinite-angle.js";
 import "./ui/events.js";
 import "./systems/balance.js";
 
@@ -195,6 +196,7 @@ function update(dt) {
   runtime.state.currentInfinityRunTime += dt;
   runtime.state.currentGenerationRunTime += dt;
   runtime.updateChallengeTimers(dt);
+  runtime.updateInfiniteAngle(dt);
 
   if (runtime.hasInfinityUpgrade("1-2") && runtime.state.automationEnabled) {
     normalAutobuyElapsed += dt;
@@ -253,6 +255,7 @@ function currentFrameTime() {
 
 function drawActiveView() {
   if (runtime.activeMainTab === "angle") runtime.draw();
+  if (runtime.activeMainTab === "infinity" && runtime.activeInfinitySubtab === "angle") runtime.drawInfiniteAngle();
 }
 
 let lastTime = currentFrameTime();
@@ -288,6 +291,11 @@ function renderGameToText() {
   const generationScoreLog = runtime.currentGenerationScoreLog10();
   const infinityPointsLog = runtime.currentInfinityPointsLog10();
   const infiniteScoreLog = runtime.currentInfiniteScoreLog10();
+  const infiniteAngleCostLogs = {
+    speed: runtime.infiniteAngleUpgradeCostLog10("speed"),
+    vertex: runtime.infiniteAngleUpgradeCostLog10("vertex"),
+    gain: runtime.infiniteAngleUpgradeCostLog10("gain"),
+  };
   const currentGainLog = runtime.currentGainLog10();
   const currentCostLogs = runtime.costLogs();
   const gainExpression = runtime.gainExpressionConfig();
@@ -363,6 +371,27 @@ function renderGameToText() {
       infiniteScore: runtime.formatUiLogNumber(infiniteScoreLog),
       infiniteScoreLog10: Number.isFinite(infiniteScoreLog) ? Number(infiniteScoreLog.toPrecision(6)) : null,
       infiniteAngleBoost: Number(runtime.infiniteAngleBoost().toFixed(2)),
+      infiniteAngle: {
+        unlocked: runtime.state.infiniteAngleUnlocked,
+        score: runtime.formatUiLogNumber(infiniteScoreLog),
+        scoreLog10: Number.isFinite(infiniteScoreLog) ? Number(infiniteScoreLog.toPrecision(6)) : null,
+        boost: Number(runtime.infiniteAngleBoost().toPrecision(6)),
+        vertices: runtime.infiniteAngleVertexCount(),
+        speedLevel: runtime.state.infiniteAngleSpeedLevel,
+        vertexLevel: runtime.state.infiniteAngleVertexLevel,
+        gainLevel: runtime.state.infiniteAngleGainLevel,
+        currentGain: runtime.formatUiLogNumber(runtime.infiniteAngleCurrentGainLog10()),
+        currentGainLog10: Number(runtime.infiniteAngleCurrentGainLog10().toPrecision(6)),
+        lapSeconds: Number(runtime.infiniteAngleLapDuration().toPrecision(6)),
+        costs: {
+          speed: runtime.formatUiLogNumber(infiniteAngleCostLogs.speed),
+          vertex: runtime.formatUiLogNumber(infiniteAngleCostLogs.vertex),
+          gain: runtime.formatUiLogNumber(infiniteAngleCostLogs.gain),
+          speedLog10: Number(infiniteAngleCostLogs.speed.toPrecision(6)),
+          vertexLog10: Number(infiniteAngleCostLogs.vertex.toPrecision(6)),
+          gainLog10: Number(infiniteAngleCostLogs.gain.toPrecision(6)),
+        },
+      },
       activeChallenge: runtime.state.activeChallenge,
       completedChallenges: runtime.completedChallengeCount(),
       challengeCount: runtime.INFINITY_CHALLENGE_COUNT,
@@ -371,8 +400,7 @@ function renderGameToText() {
       softcapPower: Number(runtime.infinitySoftcapPower().toFixed(3)),
       capBroken: runtime.state.infiniteCapBroken,
       canBreakCap: runtime.canBreakInfiniteCap(),
-      infiniteAngleConversionCost: runtime.formatUiLogNumber(runtime.infiniteAngleConversionCostLog10()),
-      infiniteAngleConversionCostLog10: runtime.INFINITE_ANGLE_CONVERSION_COST_LOG10,
+      infiniteAngleUnlockCostLog10: runtime.INFINITE_ANGLE_UNLOCK_COST_LOG10,
       selectedUpgrade: selectedInfinityUpgradeId,
       selectedUpgradeCanBuy: runtime.canBuyInfinityUpgrade(selectedInfinityUpgradeId),
       upgrades: runtime.INFINITY_UPGRADES.map((upgrade) => ({
@@ -474,7 +502,9 @@ window.__angleDebug = {
   buyAllUpgrades: runtime.buyAllUpgrades,
   generationRewardFor: runtime.generationRewardFor,
   generationScoreMultiplierEffectLog10: runtime.generationScoreMultiplierEffectLog10,
-  convertIpToInfiniteScore: runtime.convertIpToInfiniteScore,
+  unlockInfiniteAngle: runtime.unlockInfiniteAngle,
+  buyInfiniteAngleUpgrade: runtime.buyInfiniteAngleUpgrade,
+  updateInfiniteAngle: runtime.updateInfiniteAngle,
   toggleInfinityChallenge: runtime.toggleInfinityChallenge,
   breakInfiniteCap: runtime.breakInfiniteCap,
   checkAchievements: runtime.checkAchievements,
@@ -497,6 +527,7 @@ runtime.loadGame();
 runtime.switchMainTab(activeMainTab);
 runtime.switchInfinitySubtab(activeInfinitySubtab);
 runtime.resizeCanvas();
+runtime.resizeInfiniteAngleCanvas();
 runtime.updateUi();
 showUpdateModalIfNeeded();
 checkForRemoteUpdate();
@@ -505,6 +536,7 @@ if (document.fonts) {
     japaneseFontReady = true;
     runtime.updateUi();
     runtime.draw();
+    runtime.drawInfiniteAngle();
   });
 } else {
   japaneseFontReady = true;

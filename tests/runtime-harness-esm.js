@@ -148,10 +148,7 @@ function createContext(initialStorage = new Map()) {
   };
   document.documentElement.requestFullscreen = () => {};
 
-  const canvas = document.getElementById("gameCanvas");
-  canvas.width = 900;
-  canvas.height = 620;
-  canvas.getContext = () => ({
+  const createCanvasContext = () => ({
     clearRect() {},
     fillRect() {},
     beginPath() {},
@@ -170,6 +167,12 @@ function createContext(initialStorage = new Map()) {
     setLineDash() {},
     setTransform() {},
   });
+  for (const canvasId of ["gameCanvas", "infiniteAngleCanvas"]) {
+    const canvas = document.getElementById(canvasId);
+    canvas.width = 900;
+    canvas.height = 620;
+    canvas.getContext = () => createCanvasContext();
+  }
 
   const storage = new Map(initialStorage);
   const performance = { now: () => 0 };

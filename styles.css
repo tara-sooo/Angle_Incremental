@@ -762,7 +762,7 @@ canvas {
 
 .infinite-angle-panel {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   gap: 10px;
 }
 
@@ -774,6 +774,98 @@ canvas {
   min-height: 42px;
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
+}
+
+.infinite-angle-panel .infinite-angle-playfield-wrap,
+.infinite-angle-panel .infinite-angle-metrics,
+.infinite-angle-panel .infinite-angle-unlock-note,
+.infinite-angle-panel .infinite-angle-upgrades {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+}
+
+.infinite-angle-panel .infinite-angle-playfield-wrap {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  align-self: start;
+  overflow: hidden;
+  height: clamp(220px, 42vh, 420px);
+  min-height: 220px;
+  border: 1px solid var(--line);
+  background: #0b1630;
+}
+
+.infinite-angle-playfield-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.infinite-angle-panel .infinite-angle-metrics {
+  grid-column: 2;
+  grid-row: 1;
+  gap: 0;
+  grid-template-columns: 1fr !important;
+}
+
+.infinite-angle-metrics > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  min-height: 34px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.infinite-angle-unlock-note {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex !important;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.infinite-angle-unlock-note strong {
+  color: var(--gold);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.infinite-angle-unlock-button,
+.infinite-angle-upgrades {
+  grid-column: 1 / -1;
+}
+
+.infinite-angle-unlock-button {
+  min-height: 42px;
+  padding: 8px 10px;
+  text-align: center;
+  background: linear-gradient(180deg, #375da7, #243f78);
+}
+
+.infinite-angle-upgrades {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.infinite-angle-panel .infinite-angle-upgrades {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.infinite-angle-unlock-note[hidden] {
+  display: none !important;
+}
+
+.infinite-angle-upgrades .upgrade-button {
+  min-width: 0;
 }
 
 .infinite-angle-panel .upgrade-row {
@@ -1532,6 +1624,31 @@ canvas {
   .statistics-grid,
   .help-list {
     grid-template-columns: 1fr;
+  }
+
+  .infinite-angle-panel .infinite-angle-playfield-wrap,
+  .infinite-angle-panel .infinite-angle-metrics,
+  .infinite-angle-panel .infinite-angle-unlock-note {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .infinite-angle-panel .infinite-angle-playfield-wrap {
+    height: 150px;
+    min-height: 150px;
+  }
+
+  .infinite-angle-playfield-wrap canvas {
+    height: 150px;
+    min-height: 150px;
+  }
+
+  .infinite-angle-upgrades {
+    grid-template-columns: 1fr;
+  }
+
+  .infinite-angle-panel .infinite-angle-upgrades {
+    grid-template-columns: 1fr !important;
   }
 
   .infinity-summary {

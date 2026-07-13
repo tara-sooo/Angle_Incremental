@@ -95,21 +95,6 @@ function challengeReward(index) {
   return runtime.challengeText(index, "reward");
 }
 
-function infiniteAngleEfficiency() {
-  return 1;
-}
-
-function infiniteAngleBoost() {
-  const scoreLog = runtime.currentInfiniteScoreLog10();
-  if (scoreLog === -Infinity) return 1;
-  const logOnePlusScore = scoreLog < 12 ? Math.log10(1 + runtime.state.infiniteScore) : scoreLog;
-  return 1 + logOnePlusScore * 0.25;
-}
-
-function infiniteAngleConversionCostLog10() {
-  return runtime.INFINITE_ANGLE_CONVERSION_COST_LOG10;
-}
-
 function canInfinity() {
   return runtime.currentScoreLog10() >= runtime.INFINITY_REQUIREMENT_LOG10;
 }
@@ -123,19 +108,6 @@ function infinityPointGain() {
   if (runtime.isAchievementUnlocked(17)) multiplier *= 2;
   if (runtime.isAchievementUnlocked(21)) multiplier *= 2;
   return gained * multiplier;
-}
-
-function infiniteScoreGainPerIp() {
-  return 10 * infiniteAngleEfficiency();
-}
-
-function infiniteScoreGainPerIpLog10() {
-  return runtime.log10Value(infiniteScoreGainPerIp());
-}
-
-function setInfinityPointBalanceFromLog10(balanceLog10) {
-  runtime.state.infinityPointsLog10 = balanceLog10;
-  runtime.normalizeInfinityPointState();
 }
 
 function canSpendInfinityPoints(costLog10) {
@@ -156,11 +128,6 @@ function spendInfinityPoints(costLog10) {
   const cost = runtime.exactInfinityPointsFromCostLog10(costLog10);
   runtime.syncInfinityPointCachesFromExact(current - cost);
   return true;
-}
-
-function addInfiniteScoreLog(amountLog) {
-  runtime.state.infiniteScoreLog10 = runtime.combineLog10(runtime.currentInfiniteScoreLog10(), amountLog);
-  runtime.state.infiniteScore = runtime.valueFromLog10(runtime.state.infiniteScoreLog10);
 }
 
 function canBreakInfiniteCap() {
@@ -202,6 +169,7 @@ function resetBelowInfinity() {
   runtime.state.coreBoostCount = 0;
   runtime.state.infiniteScore = 0;
   runtime.state.infiniteScoreLog10 = -Infinity;
+  runtime.resetInfiniteAngleRun();
   runtime.state.ic8VertexDecayElapsed = 0;
   runtime.state.currentGenerationRunTime = 0;
   runtime.state.currentInfinityRunHadGeneration = false;
@@ -278,13 +246,6 @@ function buyInfinityUpgrade(id) {
   return true;
 }
 
-function convertIpToInfiniteScore() {
-  if (!spendInfinityPoints(infiniteAngleConversionCostLog10())) return;
-  addInfiniteScoreLog(infiniteScoreGainPerIpLog10());
-  runtime.updateUi();
-  runtime.saveGame("manual");
-}
-
 function toggleInfinityChallenge(index = nextChallengeIndex()) {
   if (!infinityChallengesUnlocked()) return;
   if (runtime.state.activeChallenge === index) {
@@ -332,17 +293,11 @@ expose("challengeStateText", () => challengeStateText, (value) => { challengeSta
 expose("challengeName", () => challengeName, (value) => { challengeName = value; });
 expose("challengeRestriction", () => challengeRestriction, (value) => { challengeRestriction = value; });
 expose("challengeReward", () => challengeReward, (value) => { challengeReward = value; });
-expose("infiniteAngleEfficiency", () => infiniteAngleEfficiency, (value) => { infiniteAngleEfficiency = value; });
-expose("infiniteAngleBoost", () => infiniteAngleBoost, (value) => { infiniteAngleBoost = value; });
-expose("infiniteAngleConversionCostLog10", () => infiniteAngleConversionCostLog10, (value) => { infiniteAngleConversionCostLog10 = value; });
 expose("canInfinity", () => canInfinity, (value) => { canInfinity = value; });
 expose("infinityPointGain", () => infinityPointGain, (value) => { infinityPointGain = value; });
-expose("infiniteScoreGainPerIp", () => infiniteScoreGainPerIp, (value) => { infiniteScoreGainPerIp = value; });
-expose("infiniteScoreGainPerIpLog10", () => infiniteScoreGainPerIpLog10, (value) => { infiniteScoreGainPerIpLog10 = value; });
 expose("canSpendInfinityPoints", () => canSpendInfinityPoints, (value) => { canSpendInfinityPoints = value; });
 expose("addInfinityPoints", () => addInfinityPoints, (value) => { addInfinityPoints = value; });
 expose("spendInfinityPoints", () => spendInfinityPoints, (value) => { spendInfinityPoints = value; });
-expose("addInfiniteScoreLog", () => addInfiniteScoreLog, (value) => { addInfiniteScoreLog = value; });
 expose("canBreakInfiniteCap", () => canBreakInfiniteCap, (value) => { canBreakInfiniteCap = value; });
 expose("completeChallengeIfReady", () => completeChallengeIfReady, (value) => { completeChallengeIfReady = value; });
 expose("updateChallengeTimers", () => updateChallengeTimers, (value) => { updateChallengeTimers = value; });
@@ -352,6 +307,5 @@ expose("recordInfinityRun", () => recordInfinityRun, (value) => { recordInfinity
 expose("infinityCountGain", () => infinityCountGain, (value) => { infinityCountGain = value; });
 expose("runInfinity", () => runInfinity, (value) => { runInfinity = value; });
 expose("buyInfinityUpgrade", () => buyInfinityUpgrade, (value) => { buyInfinityUpgrade = value; });
-expose("convertIpToInfiniteScore", () => convertIpToInfiniteScore, (value) => { convertIpToInfiniteScore = value; });
 expose("toggleInfinityChallenge", () => toggleInfinityChallenge, (value) => { toggleInfinityChallenge = value; });
 expose("breakInfiniteCap", () => breakInfiniteCap, (value) => { breakInfiniteCap = value; });

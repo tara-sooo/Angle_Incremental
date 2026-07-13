@@ -16,7 +16,7 @@
 2. Generation で通常進行をリセットし、恒久補正を得る。
 3. Core Boost で Generation 以下をリセットし、より強い恒久補正を得る。
 4. Infinity で下位進行をリセットし、Infinity Point と Infinity Upgrade を解放する。
-5. Infinity Challenge、Infinite Angle、Break Infinite Cap でInfinity後半を進める。
+5. Infinity Challenge、Infinity Angle、Break Infinite Cap でInfinity後半を進める。
 
 ## 2. 用語
 
@@ -30,10 +30,11 @@
 | Generation / GR | 累計スコア 1,000,000 で解放される第1リセット層。 |
 | Core Boost / CB | 所持スコア 1.00e20 で実行できる第2リセット層。 |
 | Infinity | 所持スコア 1.80e308 で実行できる第3リセット層。 |
-| Infinity Point / IP | Infinity Upgrade購入とInfinite Angle変換に使うリソース。 |
+| Infinity Point / IP | Infinity Upgrade購入とInfinity Angleの解放・通常強化購入に使うリソース。 |
 | Infinity Upgrade / IU | IPで購入する恒久強化。 |
 | Infinity Challenge / IC | 制約付きでInfinity到達を目指すチャレンジ。 |
-| Infinite Score / IA | IP変換で得るInfinity内リソース。頂点通過ごとの増加を強化する。 |
+| Infinity Angle / IA | e20 IPで解放する、Infinity内の独立した図形進行。 |
+| Infinity Score | IAの核到達で得るInfinity内スコア。^0.3後に通常の頂点獲得量へ乗算する。 |
 | Break Infinite Cap | Infinity後の強いスコアソフトキャップを恒久的に解除する要素。 |
 
 ## 3. 基本ループ
@@ -58,6 +59,8 @@
 | Core Boost | 0 |
 | Infinity | 0 |
 | IP | 0 |
+| Infinity Angle | 未解放 |
+| Infinity Score | 0 |
 
 ### 3.2 The Angle の獲得式
 
@@ -69,7 +72,7 @@ divisor = parts
 基礎獲得log10 = (baseLog10 - log10(divisor)) * parts
 ```
 
-`parts <= 1` の場合は分割式を適用しない。IC1中、またはIC1クリア報酬の有無により、式の表示と除数が変わる。GR、CB、実績、IU、IAなどの補正は、この基礎獲得式の後に適用する。
+`parts <= 1` の場合は分割式を適用しない。IC1中、またはIC1クリア報酬の有無により、式の表示と除数が変わる。GR、CB、実績、IU、IAなどの補正は、この基礎獲得式の後に適用する。IA側はIC、GR、CB、実績、IUの補正を持たず、IA専用の頂点数と現在獲得量だけで同じ基礎式を計算する。
 
 ### 3.3 log値管理
 
@@ -220,7 +223,8 @@ Infinity実行時、Infinity未満の進行をリセットする。
 | 通常強化 | 初期化 |
 | Generation | 初期化 |
 | Core Boost | 初期化。ただしIU 10-1購入後は最低2から開始。 |
-| Infinite Score | 0 |
+| Infinity Angle | 解放状態とIA通常強化レベルを保持 |
+| Infinity Score | 0 |
 | Infinity run time | 0 |
 
 Infinity回数、IP、IU、ICクリア状況、Break Infinite Cap、実績、設定、統計履歴は保持する。
@@ -311,18 +315,58 @@ Break Infinite Capは恒久状態であり、Infinityを含む通常のリセッ
 
 Break Infinite Cap後は、`1.80e308` 以降の強いスコアソフトキャップを無効化する。Infinity到達条件は引き続き `1.80e308` である。IP獲得式は `log2(score)-307` 系へ変わる。
 
-## 11. Infinite Angle
+## 11. Infinity Angle
 
-Infinite AngleはIPをInfinite Scoreへ変換するInfinity内進行である。
+Infinity Angle (IA) は、Infinityタブ内で動き続ける独立した図形である。解放後はIAサブタブを開いていなくても進行し、IAサブタブを開いた時だけ専用キャンバスを描画する。
+
+### 11.1 解放とリセット
 
 | 項目 | 値 |
 | --- | --- |
-| 変換コスト | `1.00e20 IP` |
-| 変換量 | `+10 Infinite Score` |
-| 効果 | Infinite Scoreに応じて頂点通過ごとの増加を強化する。 |
-| リセット | Infinity実行時に0へ戻る。 |
+| 解放コスト | `1.00e20 IP` の一回払い |
+| 解放後 | Infinity Angleが常時進行する |
+| Infinity Score | IAの核到達で増加し、Infinity実行時に0へ戻る |
+| IA通常強化 | Infinity実行後も保持する |
+| IA用GR/CB | 存在しない |
 
-Infinite Scoreの効果は `1 + log10(1 + Infinite Score) * 0.25` を基準にする。
+Infinity実行時は、IAの現在獲得量、Point位置、頂点進行も初期化する。解放状態とIA通常強化レベルは保持する。旧版のInfinite Scoreが保存されている場合は、IA解放済みのInfinity Scoreとして読み込む。
+
+### 11.2 IAの基本ループ
+
+IAのPointはIA専用の頂点上を周回する。通常のThe Angleと同じく、頂点通過ごとに現在獲得量が増え、核到達時にスコアを得る。ただし、スコア計算にはIA専用の通常強化だけを使う。
+
+```text
+IA頂点数 = 3 + IA角追加レベル
+IA頂点通過ごとの増加 = 0.01 + IA頂点獲得量レベル * 0.01
+IA生ラップ速度log10 = IA周回速度レベル * log10(1.22)
+IA有効ラップ速度 = The AngleのGeneration前ソフトキャップと強いソフトキャップを適用した速度
+```
+
+核到達時のIAスコア獲得量は、The Angleと同じ `(x / y)^y` 型の基礎式を使う。ただし、IA頂点数から求めた式の部品数とIA現在獲得量以外の補正は適用しない。
+
+```text
+parts = min(floor(sqrt(IA頂点数)), 10)
+IAスコア獲得log10 = IA現在獲得log10                         (parts <= 1)
+IAスコア獲得log10 = (IA現在獲得log10 - log10(parts)) * parts (parts > 1)
+```
+
+Infinity Scoreはlog空間で加算する。通常の頂点獲得量に適用するIA倍率は次の通りで、Score 0では倍率1になる。
+
+```text
+IA倍率 = max(1, Infinity Score ^ 0.3)
+```
+
+### 11.3 IA通常強化
+
+IA通常強化はIPで購入し、The Angleの通常強化と同じ初期コスト・成長率を、IA側のレベルだけで独立に計算する。
+
+| 強化 | 基礎コスト | 成長率 | 効果 |
+| --- | ---: | ---: | --- |
+| 周回速度 | 5 IP | `x1.55` | IAの周回速度レベル +1 |
+| 角の追加 | 12 IP | `x1.72` | IAの頂点数 +1 |
+| 頂点獲得量 | 18 IP | `x1.68` | IAの頂点通過ごとの増加レベル +1 |
+
+IAのコストにはIAレベルを基準に初期追加スケーリングと高コスト帯の段階スケーリングを適用する。The Angle側のGeneration、Core Boost、Infinity Challenge、Infinity Upgradeによるコスト補正は適用しない。
 
 ## 12. 実績
 
@@ -446,6 +490,14 @@ coreBoostCount
 infinityCount
 infinityPoints / infinityPointsLog10 / infinityPointsExact
 infiniteScore / infiniteScoreLog10
+infiniteAngleUnlocked
+infiniteAngleSpeedLevel
+infiniteAngleVertexLevel
+infiniteAngleGainLevel
+infiniteAngleCurrentGain / infiniteAngleCurrentGainLog10
+infiniteAnglePointProgress
+infiniteAngleTotalVertexProgress
+infiniteAngleLastVertexIndex
 infinityUpgradeMask
 activeChallenge
 completedChallenges
@@ -463,7 +515,6 @@ display settings
 
 - IUの新しい段と分岐
 - 新しいInfinity Challenge
-- Infinite Angleの独立した図形表示
 - 後半の複数Point
 - 実績の個別追加報酬
 - 後半バランス調整
