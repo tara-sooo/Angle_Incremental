@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline. Keep declaration order stable during migration.
+// Localized UI strings and translation lookup.
 
 const TEXT = {
   ja: {
@@ -153,11 +153,11 @@ const TEXT = {
     updateReloadDeferred: "更新待機中：手動リロードしてください",
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
-    updateTitle: "0.6.1 アップデート",
-    updateSummary: "IC8のIP報酬と0.6.0セーブのバランスを調整しました。",
-    updateResetDock: "IC8クリア後のIP倍率をGRスコア倍率/1e21に変更しました。",
-    updateCanvas: "0.6.0のセーブに限り、過剰なIPとInfinite Scoreを一度だけ補正します。",
-    updateModalNote: "セーブ形式10へ移行し、形式9のIPを最大1e10、Infinite Scoreを0にします。移行後のIPに上限はありません。",
+    updateTitle: "0.6.2 アップデート",
+    updateSummary: "ランタイムを整理し、描画とUI更新を最適化しました。",
+    updateResetDock: "Angleを表示していない間の不要な描画と高負荷時の計算を削減しました。",
+    updateCanvas: "上部バー、Infinity Upgrade、進捗表示が状態変化に合わせて正しく更新されるようにしました。",
+    updateModalNote: "セーブ形式10は変更ありません。既存のセーブデータをそのまま利用できます。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -325,11 +325,11 @@ const TEXT = {
     updateReloadDeferred: "Update waiting: reload manually",
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
-    updateTitle: "Version 0.6.1",
-    updateSummary: "Adjusted IC8's IP reward and the balance of 0.6.0 saves.",
-    updateResetDock: "Changed the post-IC8 IP multiplier to GR score multiplier / 1e21.",
-    updateCanvas: "For 0.6.0 saves only, excessive IP and Infinite Score are corrected once.",
-    updateModalNote: "Migrates to save format 10, caps format 9 IP at 1e10, and resets Infinite Score to 0. There is no IP cap after migration.",
+    updateTitle: "Version 0.6.2",
+    updateSummary: "Refactored the runtime and optimized rendering and UI updates.",
+    updateResetDock: "Reduced unnecessary drawing while Angle is hidden and lowered high-load calculations.",
+    updateCanvas: "Progress and Infinity Upgrade displays now refresh correctly when values or number formats change.",
+    updateModalNote: "Save format 10 is unchanged, so existing saves remain compatible.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -348,8 +348,6 @@ const TEXT = {
     topBarHiddenOption: "Hide",
   },
 };
-
-// Mechanically appended from src/main.js during the parity-preserving migration.
 
 function t(key) {
   return (TEXT[runtime.state.language] && TEXT[runtime.state.language][key]) || TEXT.ja[key] || key;

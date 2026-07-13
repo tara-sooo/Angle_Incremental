@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline. Keep declaration order stable during migration.
+// Shared thresholds, timing values, and balance configuration.
 
 const BASE_LAP_SECONDS = 6;
 const GENERATION_UNLOCK_SCORE = 1000000;
@@ -18,7 +18,7 @@ const ACHIEVEMENT_COUNT = 14;
 const SAVE_KEY = "angle-incremental-save";
 const SAVE_QUARANTINE_KEY = "angle-incremental-save-quarantine";
 const SAVE_VERSION = 10;
-const APP_VERSION = "0.6.1";
+const APP_VERSION = "0.6.2";
 const SAVE_CODE_PREFIX = "ANGLE_SAVE_V2:";
 const SAVE_CODE_SALT = "angle-incremental-save-code-v2";
 const SAVE_CODE_SECRET = "Angle Incremental local save code obfuscation";

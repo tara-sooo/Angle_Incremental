@@ -1,7 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
-// Functions retain their original global runtime dependencies during the classic-script migration phase.
+// Core Boost requirements, effects, and reset behavior.
 
 function coreBoostRequirementLog10() {
   const multiplier = 2 ** runtime.state.coreBoostCount;
@@ -109,9 +108,6 @@ function runCoreBoost() {
   runtime.saveGame("manual");
 }
 
-function balanceCoreBoostGainIncreaseMultiplier() {
-  return Math.pow(coreBoostGainIncreaseBaseForCount(runtime.state.coreBoostCount), coreBoostBonusPower());
-}
 expose("coreBoostRequirementLog10", () => coreBoostRequirementLog10, (value) => { coreBoostRequirementLog10 = value; });
 expose("coreBoostRequirement", () => coreBoostRequirement, (value) => { coreBoostRequirement = value; });
 expose("canCoreBoost", () => canCoreBoost, (value) => { canCoreBoost = value; });
@@ -124,4 +120,3 @@ expose("nextCoreBoostValues", () => nextCoreBoostValues, (value) => { nextCoreBo
 expose("shouldPreserveVerticesThroughEarlyReset", () => shouldPreserveVerticesThroughEarlyReset, (value) => { shouldPreserveVerticesThroughEarlyReset = value; });
 expose("resetBelowCoreBoost", () => resetBelowCoreBoost, (value) => { resetBelowCoreBoost = value; });
 expose("runCoreBoost", () => runCoreBoost, (value) => { runCoreBoost = value; });
-expose("balanceCoreBoostGainIncreaseMultiplier", () => balanceCoreBoostGainIncreaseMultiplier, (value) => { balanceCoreBoostGainIncreaseMultiplier = value; });

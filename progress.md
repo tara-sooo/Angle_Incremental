@@ -2,7 +2,7 @@ Original prompt: では、中核ループを完成させてください
 
 ## Progress
 
-- Created implementation plan for a static browser game using `index.html`, `styles.css`, and `game.js`.
+- Created implementation plan for a static browser game using `index.html`, `styles.css`, and the ESM runtime under `src/`.
 - Scope: core Angle loop, Point orbit, vertex gain growth, score upgrades, Generation unlock/reset/boost, deterministic test hooks.
 - Added static game implementation with canvas rendering, upgrade buttons, Generation reset, `render_game_to_text`, and `advanceTime`.
 - Ran initial Playwright/canvas and full-page screenshot checks. Desktop and mobile layouts rendered correctly.
@@ -86,6 +86,7 @@ Original prompt: では、中核ループを完成させてください
 - Prepared the post-0.6.0 balance correction: IC8's GR-derived IP reward now divides by 1e21, and version 9 saves receive a one-time cap to 1e10 IP plus an Infinite Score reset.
 - Verified the IC8 balance correction with the full ESM regression suite and Firefox screenshots; the IC8 reward displays `/1e21` with no browser console errors.
 - Prepared the 0.6.1 release candidate metadata, asset versions, documentation, tests, and bilingual update modal while keeping save format 10.
+- Prepared the 0.6.2 release candidate metadata, asset versions, documentation, tests, and bilingual update modal while keeping save format 10.
 
 ## TODO
 

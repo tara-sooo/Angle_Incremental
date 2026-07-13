@@ -1,10 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
-// Runtime dependencies remain unchanged during the classic-script migration phase.
-
-let newsTickerIndex = 0;
-let newsTickerIterationBound = false;
+// Shared form helpers and the UI update orchestrator.
 
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
@@ -48,290 +44,6 @@ function clearElement(element) {
   }
 }
 
-function createChallengeRows() {
-  clearElement(runtime.elements.challengeList);
-  for (let index = 1; index <= runtime.INFINITY_CHALLENGE_COUNT; index += 1) {
-    const row = document.createElement("div");
-    row.className = "challenge-row";
-    row.dataset.challenge = String(index);
-
-    const info = document.createElement("div");
-    info.className = "challenge-info";
-
-    const name = document.createElement("strong");
-    name.className = "challenge-name";
-
-    const status = document.createElement("small");
-    status.className = "challenge-state";
-
-    const restriction = document.createElement("p");
-    restriction.className = "challenge-restriction";
-
-    const reward = document.createElement("p");
-    reward.className = "challenge-reward";
-
-    const button = document.createElement("button");
-    button.className = "challenge-start-button";
-    button.type = "button";
-    button.addEventListener("click", () => runtime.toggleInfinityChallenge(index));
-
-    info.append(name, status, restriction, reward);
-    row.append(info, button);
-    runtime.elements.challengeList.append(row);
-  }
-}
-
-function updateChallengeRows() {
-  runtime.elements.challengeList.querySelectorAll(".challenge-row").forEach((row) => {
-    const index = Number(row.dataset.challenge);
-    const active = runtime.state.activeChallenge === index;
-    const completed = runtime.isChallengeCompleted(index);
-    const locked = !runtime.infinityChallengesUnlocked();
-    const button = row.querySelector("button");
-
-    row.classList.toggle("is-active", active);
-    row.classList.toggle("is-completed", completed);
-    row.querySelector(".challenge-name").textContent = runtime.challengeName(index);
-    row.querySelector(".challenge-state").textContent = runtime.challengeStateText(index);
-    row.querySelector(".challenge-restriction").textContent = `${runtime.t("challengeRestrictionLabel")}: ${runtime.challengeRestriction(index)}`;
-    row.querySelector(".challenge-reward").textContent = `${runtime.t("challengeRewardLabel")}: ${runtime.challengeReward(index)}`;
-    button.textContent = active ? runtime.t("stopChallenge") : runtime.t("startChallenge");
-    button.disabled = locked || (runtime.state.activeChallenge > 0 && !active);
-  });
-}
-
-function createInfinityUpgradeRows() {
-  clearElement(runtime.elements.infinityUpgradeTree);
-  const upgradeRows = [
-    ["1-1", "1-2"],
-    ["2-1"],
-    ["3-1", "3-2"],
-    ["4-1"],
-    ["5-1", "5-2"],
-    ["6-1", "6-2"],
-    ["7-1", "7-2"],
-    ["8-1"],
-    ["9-1"],
-    ["10-1", "10-2"],
-    ["11-1", "11-2"],
-    ["12-1"],
-  ];
-
-  upgradeRows.forEach((rowIds, rowIndex) => {
-    const tier = document.createElement("div");
-    tier.className = "infinity-upgrade-tier";
-    tier.dataset.tier = String(rowIndex + 1);
-
-    rowIds.forEach((id) => {
-      const upgrade = runtime.infinityUpgradeById(id);
-      if (!upgrade) return;
-      const button = document.createElement("button");
-      button.className = "infinity-upgrade-node";
-      button.type = "button";
-      button.dataset.upgrade = upgrade.id;
-      button.addEventListener("click", () => selectInfinityUpgrade(upgrade.id));
-
-      const name = document.createElement("strong");
-      name.className = "infinity-upgrade-name";
-
-      const status = document.createElement("small");
-      status.className = "infinity-upgrade-state";
-
-      button.append(name, status);
-      tier.append(button);
-    });
-
-    runtime.elements.infinityUpgradeTree.append(tier);
-  });
-}
-
-function selectInfinityUpgrade(id) {
-  if (!runtime.infinityUpgradeById(id)) return;
-  runtime.selectedInfinityUpgradeId = id;
-  updateInfinityUpgradeRows();
-}
-
-function infinityUpgradeStateText(upgrade) {
-  if (runtime.hasInfinityUpgrade(upgrade.id)) return runtime.t("infinityUpgradePurchased");
-  if (!runtime.infinityUpgradePrerequisitesMet(upgrade)) return runtime.t("infinityUpgradeLocked");
-  if (!runtime.canSpendInfinityPoints(runtime.log10Value(upgrade.cost))) return runtime.t("infinityUpgradeNeedIp");
-  return runtime.t("infinityUpgradeAvailable");
-}
-
-function updateInfinityUpgradeDetail() {
-  const upgrade = runtime.infinityUpgradeById(runtime.selectedInfinityUpgradeId) || runtime.INFINITY_UPGRADES[0];
-  runtime.selectedInfinityUpgradeId = upgrade.id;
-  const purchased = runtime.hasInfinityUpgrade(upgrade.id);
-  const prerequisitesMet = runtime.infinityUpgradePrerequisitesMet(upgrade);
-  const affordable = runtime.canSpendInfinityPoints(runtime.log10Value(upgrade.cost));
-  const canBuy = !purchased && prerequisitesMet && affordable;
-  const requiresText = upgrade.requires.length > 0
-    ? `${runtime.t("infinityUpgradeRequires")}: ${upgrade.requires.join(", ")}`
-    : runtime.t("infinityUpgradeNoRequires");
-
-  runtime.elements.infinityUpgradeDetailName.textContent = runtime.infinityUpgradeName(upgrade.id);
-  runtime.elements.infinityUpgradeDetailState.textContent = `${runtime.t("infinityUpgradeSelected")} · ${infinityUpgradeStateText(upgrade)}`;
-  runtime.elements.infinityUpgradeDetailEffect.textContent = runtime.infinityUpgradeEffectText(upgrade.id);
-  runtime.elements.infinityUpgradeDetailRequires.textContent = requiresText;
-  runtime.elements.infinityUpgradeDetailCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(runtime.log10Value(upgrade.cost))} IP`;
-  runtime.elements.infinityUpgradeDetailBuy.textContent = purchased ? runtime.t("infinityUpgradePurchased") : runtime.t("buyInfinityUpgrade");
-  runtime.elements.infinityUpgradeDetailBuy.disabled = !canBuy;
-}
-
-function updateInfinityUpgradeRows() {
-  runtime.elements.infinityUpgradeTree.querySelectorAll(".infinity-upgrade-node").forEach((node) => {
-    const upgrade = runtime.infinityUpgradeById(node.dataset.upgrade);
-    if (!upgrade) return;
-    const purchased = runtime.hasInfinityUpgrade(upgrade.id);
-    const prerequisitesMet = runtime.infinityUpgradePrerequisitesMet(upgrade);
-    const affordable = runtime.canSpendInfinityPoints(runtime.log10Value(upgrade.cost));
-    const available = !purchased && prerequisitesMet && affordable;
-    const selected = runtime.selectedInfinityUpgradeId === upgrade.id;
-
-    node.classList.toggle("is-selected", selected);
-    node.classList.toggle("is-purchased", purchased);
-    node.classList.toggle("is-available", available);
-    node.classList.toggle("is-locked", !purchased && !prerequisitesMet);
-    node.classList.toggle("is-unaffordable", !purchased && prerequisitesMet && !affordable);
-    node.querySelector(".infinity-upgrade-name").textContent = upgrade.id;
-    node.querySelector(".infinity-upgrade-state").textContent = infinityUpgradeStateText(upgrade);
-  });
-
-  updateInfinityUpgradeDetail();
-}
-
-function buySelectedInfinityUpgrade() {
-  runtime.buyInfinityUpgrade(runtime.selectedInfinityUpgradeId);
-}
-
-function createAchievementRows() {
-  clearElement(runtime.elements.achievementList);
-  runtime.ACHIEVEMENTS.forEach((achievement, index) => {
-    const row = document.createElement("article");
-    row.className = "achievement-row";
-    row.dataset.achievement = String(index + 1);
-
-    const number = document.createElement("strong");
-    number.className = "achievement-number";
-
-    const body = document.createElement("div");
-    body.className = "achievement-body";
-
-    const title = document.createElement("h2");
-    title.className = "achievement-title";
-
-    const condition = document.createElement("p");
-    condition.className = "achievement-condition";
-
-    const reward = document.createElement("p");
-    reward.className = "achievement-reward";
-
-    const status = document.createElement("span");
-    status.className = "achievement-status";
-
-    body.append(title, condition, reward);
-    row.append(number, body, status);
-    runtime.elements.achievementList.append(row);
-  });
-}
-
-function updateAchievementRows() {
-  const language = runtime.TEXT[runtime.state.language] ? runtime.state.language : "ja";
-  runtime.elements.achievementList.querySelectorAll(".achievement-row").forEach((row) => {
-    const id = Number(row.dataset.achievement);
-    const achievement = runtime.ACHIEVEMENTS[id - 1];
-    const unlocked = runtime.isAchievementUnlocked(id);
-    const extraReward = achievement.reward[language];
-
-    row.classList.toggle("is-unlocked", unlocked);
-    row.querySelector(".achievement-number").textContent = String(id);
-    row.querySelector(".achievement-title").textContent = achievement.title[language];
-    row.querySelector(".achievement-condition").textContent = achievement.condition[language];
-    const reward = row.querySelector(".achievement-reward");
-    reward.hidden = !extraReward;
-    reward.textContent = extraReward ? `${runtime.t("achievementReward")}: ${extraReward}` : "";
-    row.querySelector(".achievement-status").textContent = unlocked ? runtime.t("achievementUnlocked") : runtime.t("achievementLocked");
-  });
-}
-
-function currentNewsMessages() {
-  const language = runtime.TEXT[runtime.state.language] ? runtime.state.language : "ja";
-  return runtime.TEXT[language].newsMessages || runtime.TEXT.ja.newsMessages || [];
-}
-
-function setNewsTickerMessage() {
-  const messages = currentNewsMessages();
-  if (messages.length === 0) return;
-  newsTickerIndex %= messages.length;
-  runtime.elements.newsTickerText.textContent = messages[newsTickerIndex];
-}
-
-function advanceNewsTickerMessage() {
-  if (runtime.state.topBarMode !== "news") return;
-  const messages = currentNewsMessages();
-  if (messages.length === 0) return;
-  newsTickerIndex = (newsTickerIndex + 1) % messages.length;
-  setNewsTickerMessage();
-}
-
-function bindNewsTickerIteration() {
-  if (newsTickerIterationBound || !runtime.elements.newsTickerText) return;
-  newsTickerIterationBound = true;
-  runtime.elements.newsTickerText.addEventListener("animationiteration", (event) => {
-    if (event.animationName && event.animationName !== "news-scroll") return;
-    advanceNewsTickerMessage();
-  });
-}
-
-function updateTopBar() {
-  if (!runtime.elements.newsTicker || !runtime.elements.newsTickerText) return;
-  bindNewsTickerIteration();
-  const mode = runtime.normalizeChoice(runtime.state.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
-  const label = runtime.elements.newsTicker.querySelector(".news-label");
-  runtime.state.topBarMode = mode;
-  if (runtime.elements.shell) runtime.elements.shell.classList.toggle("is-top-bar-hidden", mode === "hidden");
-  document.documentElement.classList.toggle("top-bar-hidden", mode === "hidden");
-  runtime.elements.newsTicker.hidden = mode === "hidden";
-  runtime.elements.newsTicker.classList.toggle("is-static", mode !== "news");
-  runtime.elements.newsTicker.classList.toggle("is-blank", mode === "blank");
-  if (mode === "hidden") return;
-  if (mode === "blank") {
-    if (label) label.textContent = "";
-    runtime.elements.newsTickerText.textContent = "";
-    return;
-  }
-  if (mode === "resources") {
-    if (label) label.textContent = runtime.t("topBarResources");
-    const score = runtime.scoreDisplay();
-    const ip = runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10());
-    const ia = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
-    runtime.elements.newsTickerText.textContent = `Score ${score} / IP ${ip} / IA ${ia}`;
-    return;
-  }
-  if (mode === "progress") {
-    if (label) label.textContent = runtime.t("topBarProgress");
-    const infinityReady = runtime.canInfinity();
-    const infinityState = infinityReady ? "READY" : runtime.state.infinityCount > 0 ? "OPEN" : "LOCKED";
-    const generationUnlocked = runtime.currentTotalScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE);
-    const generationReady = runtime.canRunGeneration();
-    const waitingPrevious = generationUnlocked
-      && runtime.state.generationCount > 0
-      && runtime.currentGenerationScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE)
-      && !generationReady;
-    const generationState = generationReady
-      ? runtime.t("generationReady")
-      : waitingPrevious
-        ? runtime.t("generationWaitingPrevious")
-        : generationUnlocked
-          ? runtime.t("generationUnlocked")
-          : runtime.t("generationLocked");
-    runtime.elements.newsTickerText.textContent = `GR ${runtime.state.generationCount} ${generationState} / CB ${runtime.state.coreBoostCount} next ${runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10())} / INF ${infinityState} / ACH ${runtime.achievementCount()}/${runtime.ACHIEVEMENT_COUNT}`;
-    return;
-  }
-  if (label) label.textContent = runtime.t("topBarNews");
-  setNewsTickerMessage();
-}
-
 function canSpendLog(amountLog) {
   return runtime.currentScoreLog10() >= amountLog;
 }
@@ -340,77 +52,13 @@ function canSpend(amount) {
   return canSpendLog(runtime.log10Value(amount));
 }
 
-function updateAutomationUi() {
-  const unlocked = runtime.hasInfinityUpgrade("1-2");
-  const generationCoreUnlocked = runtime.isAchievementUnlocked(19);
-  const infinityUnlocked = runtime.hasInfinityUpgrade("8-1");
-  if (!runtime.elements.automationMasterToggle) return;
-  runtime.elements.automationLockNote.textContent = unlocked ? runtime.t("infinityUpgradeAvailable") : runtime.t("automationLocked");
-  runtime.elements.automationMasterToggle.disabled = !unlocked;
-  runtime.elements.autoBuySpeedToggle.disabled = !unlocked;
-  runtime.elements.autoBuyVertexToggle.disabled = !unlocked;
-  runtime.elements.autoBuyGainToggle.disabled = !unlocked;
-  if (runtime.elements.autoCompleteChallengesToggle) runtime.elements.autoCompleteChallengesToggle.disabled = !runtime.infinityChallengesUnlocked();
-  [
-    runtime.elements.autoRunGenerationToggle,
-    runtime.elements.autoGenerationScoreThresholdInput,
-    runtime.elements.autoGenerationCostThresholdInput,
-    runtime.elements.autoGenerationMinimumSecondsInput,
-    runtime.elements.autoRunCoreBoostToggle,
-  ].forEach((element) => {
-    if (element) element.disabled = !generationCoreUnlocked;
-  });
-  [
-    runtime.elements.autoRunInfinityToggle,
-    runtime.elements.autoInfinityPointThresholdInput,
-  ].forEach((element) => {
-    if (element) element.disabled = !infinityUnlocked;
-  });
-  syncFormControl(runtime.elements.automationMasterToggle, unlocked && runtime.state.automationEnabled);
-  syncFormControl(runtime.elements.autoBuySpeedToggle, runtime.state.autoBuySpeed);
-  syncFormControl(runtime.elements.autoBuyVertexToggle, runtime.state.autoBuyVertex);
-  syncFormControl(runtime.elements.autoBuyGainToggle, runtime.state.autoBuyGain);
-  if (runtime.elements.autoCompleteChallengesToggle) syncFormControl(runtime.elements.autoCompleteChallengesToggle, runtime.state.autoCompleteChallenges);
-  if (runtime.elements.autoRunGenerationToggle) syncFormControl(runtime.elements.autoRunGenerationToggle, runtime.state.autoRunGeneration);
-  if (runtime.elements.autoGenerationScoreThresholdInput) syncFormControl(runtime.elements.autoGenerationScoreThresholdInput, runtime.state.autoGenerationScoreMultiplierThreshold);
-  if (runtime.elements.autoGenerationCostThresholdInput) syncFormControl(runtime.elements.autoGenerationCostThresholdInput, runtime.state.autoGenerationCostMultiplierThreshold);
-  if (runtime.elements.autoGenerationMinimumSecondsInput) syncFormControl(runtime.elements.autoGenerationMinimumSecondsInput, runtime.state.autoGenerationMinimumSeconds);
-  if (runtime.elements.autoRunCoreBoostToggle) syncFormControl(runtime.elements.autoRunCoreBoostToggle, runtime.state.autoRunCoreBoost);
-  if (runtime.elements.autoRunInfinityToggle) syncFormControl(runtime.elements.autoRunInfinityToggle, runtime.state.autoRunInfinity);
-  if (runtime.elements.autoInfinityPointThresholdInput) syncFormControl(runtime.elements.autoInfinityPointThresholdInput, runtime.state.autoInfinityPointThreshold);
-}
-
-function infinityRunRecordText(record, index) {
-  const challenge = record.challenge > 0 ? ` IC${record.challenge}` : "";
-  return `#${index + 1}${challenge} ${runtime.formatLongDuration(record.time)} / ${runtime.formatPowerOfTen(record.scoreLog10)} / +${runtime.formatUiNumber(record.ipGain)} IP`;
-}
-
-function updateStatisticsUi() {
-  if (!runtime.elements.totalPlayTime) return;
-  runtime.elements.totalPlayTime.textContent = runtime.formatLongDuration(runtime.state.totalPlayTime);
-  runtime.elements.currentInfinityRunTime.textContent = runtime.formatLongDuration(runtime.state.currentInfinityRunTime);
-  runtime.elements.fastestInfinityTime.textContent = runtime.state.fastestInfinityTime > 0 ? runtime.formatLongDuration(runtime.state.fastestInfinityTime) : runtime.t("noInfinityRuns");
-  runtime.elements.lastInfinityRuns.innerHTML = "";
-  if (runtime.state.lastInfinityRuns.length === 0) {
-    const row = document.createElement("li");
-    row.textContent = runtime.t("noInfinityRuns");
-    runtime.elements.lastInfinityRuns.append(row);
-    return;
-  }
-  runtime.state.lastInfinityRuns.forEach((record, index) => {
-    const row = document.createElement("li");
-    row.textContent = infinityRunRecordText(record, index);
-    runtime.elements.lastInfinityRuns.append(row);
-  });
-}
-
 function updateUi() {
   const currentCostLogs = runtime.costLogs();
   const unlockedAchievementsNow = runtime.checkAchievements(true);
   if (unlockedAchievementsNow.length > 0) runtime.saveGame("manual");
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
   applyLanguage();
-  updateTopBar();
+  runtime.updateTopBar();
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());
   runtime.elements.vertexGainValue.textContent = `+${runtime.formatSmallDecimal(runtime.vertexGainIncrease())}`;
@@ -475,7 +123,7 @@ function updateUi() {
   runtime.elements.infiniteAngleBoostPanel.textContent = `×${runtime.infiniteAngleBoost().toFixed(2)}`;
   runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`;
   runtime.elements.infinityButton.disabled = runtime.state.infinityCount === 0 || !runtime.canInfinity();
-  updateInfinityUpgradeRows();
+  runtime.updateInfinityUpgradeRows();
   runtime.elements.convertIpButton.disabled = !runtime.canSpendInfinityPoints(runtime.infiniteAngleConversionCostLog10());
   runtime.elements.convertIpGain.textContent = `${runtime.formatUiLogNumber(runtime.infiniteAngleConversionCostLog10())} IP -> +${runtime.formatUiLogNumber(runtime.infiniteScoreGainPerIpLog10())}`;
   const completed = runtime.completedChallengeCount();
@@ -484,7 +132,7 @@ function updateUi() {
     : !runtime.infinityChallengesUnlocked()
       ? runtime.t("locked")
       : `${completed}/${runtime.INFINITY_CHALLENGE_COUNT} ${runtime.t("completed")}`;
-  updateChallengeRows();
+  runtime.updateChallengeRows();
   const breakCapRequirement = runtime.formatPowerOfTen(runtime.BREAK_CAP_REQUIREMENT_LOG10);
   runtime.elements.breakCapRequirement.textContent = runtime.state.infiniteCapBroken
     ? runtime.t("breakCapBroken")
@@ -492,14 +140,14 @@ function updateUi() {
   runtime.elements.breakCapButton.disabled = !runtime.canBreakInfiniteCap();
   runtime.elements.breakCapButton.textContent = runtime.state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 
-  updateAutomationUi();
-  updateStatisticsUi();
+  runtime.updateAutomationUi();
+  runtime.updateStatisticsUi();
 
   const unlockedAchievements = runtime.achievementCount();
   runtime.elements.achievementTabState.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT}`;
   runtime.elements.achievementSummary.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT} ${runtime.t("tabAchievements")}`;
   runtime.elements.achievementBoost.textContent = `×${runtime.achievementGainMultiplier().toFixed(3)}`;
-  updateAchievementRows();
+  runtime.updateAchievementRows();
 
   syncFormControl(runtime.elements.floatingTextToggle, runtime.state.showFloatingText);
   syncFormControl(runtime.elements.lightEffectsToggle, runtime.state.lightEffects);
@@ -512,8 +160,6 @@ function updateUi() {
   runtime.elements.fpsCounter.hidden = !runtime.state.showFps;
   if (runtime.state.showFps) runtime.elements.fpsCounter.textContent = `FPS ${Math.round(runtime.smoothedFps)}`;
 }
-
-// Mechanically appended from src/main.js during the parity-preserving migration.
 
 function setSaveStatus(text) {
   runtime.elements.saveStatus.textContent = text;
@@ -575,63 +221,11 @@ function formatExponentPreview(current, next) {
   return currentText === nextText ? currentText : `${currentText} → ${nextText}`;
 }
 
-function balanceCreateInfinityUpgradeRows() {
-  clearElement(runtime.elements.infinityUpgradeTree);
-  const tiers = [
-    ["1-1", "1-2"],
-    ["2-1"],
-    ["3-1", "3-2"],
-    ["4-1"],
-    ["5-1", "5-2"],
-    ["6-1", "6-2"],
-    ["7-1", "7-2"],
-    ["8-1"],
-    ["9-1"],
-    ["10-1", "10-2"],
-    ["11-1", "11-2"],
-    ["12-1"],
-  ];
-  tiers.forEach((rowIds, rowIndex) => {
-    const tier = document.createElement("div");
-    tier.className = "infinity-upgrade-tier";
-    tier.dataset.tier = String(rowIndex + 1);
-    rowIds.forEach((id) => {
-      const upgrade = runtime.infinityUpgradeById(id);
-      if (!upgrade) return;
-      const button = document.createElement("button");
-      button.className = "infinity-upgrade-node";
-      button.type = "button";
-      button.dataset.upgrade = upgrade.id;
-      button.addEventListener("click", () => selectInfinityUpgrade(upgrade.id));
-      const name = document.createElement("strong");
-      name.className = "infinity-upgrade-name";
-      const status = document.createElement("small");
-      status.className = "infinity-upgrade-state";
-      button.append(name, status);
-      tier.append(button);
-    });
-    runtime.elements.infinityUpgradeTree.append(tier);
-  });
-}
 expose("applyLanguage", () => applyLanguage, (value) => { applyLanguage = value; });
 expose("syncFormControl", () => syncFormControl, (value) => { syncFormControl = value; });
 expose("clearElement", () => clearElement, (value) => { clearElement = value; });
-expose("createChallengeRows", () => createChallengeRows, (value) => { createChallengeRows = value; });
-expose("updateChallengeRows", () => updateChallengeRows, (value) => { updateChallengeRows = value; });
-expose("createInfinityUpgradeRows", () => createInfinityUpgradeRows, (value) => { createInfinityUpgradeRows = value; });
-expose("selectInfinityUpgrade", () => selectInfinityUpgrade, (value) => { selectInfinityUpgrade = value; });
-expose("infinityUpgradeStateText", () => infinityUpgradeStateText, (value) => { infinityUpgradeStateText = value; });
-expose("updateInfinityUpgradeDetail", () => updateInfinityUpgradeDetail, (value) => { updateInfinityUpgradeDetail = value; });
-expose("updateInfinityUpgradeRows", () => updateInfinityUpgradeRows, (value) => { updateInfinityUpgradeRows = value; });
-expose("buySelectedInfinityUpgrade", () => buySelectedInfinityUpgrade, (value) => { buySelectedInfinityUpgrade = value; });
-expose("createAchievementRows", () => createAchievementRows, (value) => { createAchievementRows = value; });
-expose("updateAchievementRows", () => updateAchievementRows, (value) => { updateAchievementRows = value; });
-expose("updateTopBar", () => updateTopBar, (value) => { updateTopBar = value; });
 expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
-expose("updateAutomationUi", () => updateAutomationUi, (value) => { updateAutomationUi = value; });
-expose("infinityRunRecordText", () => infinityRunRecordText, (value) => { infinityRunRecordText = value; });
-expose("updateStatisticsUi", () => updateStatisticsUi, (value) => { updateStatisticsUi = value; });
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });
 expose("setSaveStatus", () => setSaveStatus, (value) => { setSaveStatus = value; });
 expose("gainExpressionConfig", () => gainExpressionConfig, (value) => { gainExpressionConfig = value; });
@@ -644,4 +238,3 @@ expose("formatMultiplierPreview", () => formatMultiplierPreview, (value) => { fo
 expose("formatMultiplierLog", () => formatMultiplierLog, (value) => { formatMultiplierLog = value; });
 expose("formatMultiplierLogPreview", () => formatMultiplierLogPreview, (value) => { formatMultiplierLogPreview = value; });
 expose("formatExponentPreview", () => formatExponentPreview, (value) => { formatExponentPreview = value; });
-expose("balanceCreateInfinityUpgradeRows", () => balanceCreateInfinityUpgradeRows, (value) => { balanceCreateInfinityUpgradeRows = value; });

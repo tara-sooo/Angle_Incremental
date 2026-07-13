@@ -1,9 +1,8 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.6.1";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.6.2";
 
-// Extracted mechanically from the next-runtime baseline.
-// bindEvents is called by src/main.js at the original initialization point.
+// Input and settings bindings are installed by src/main.js after all modules are composed.
 
 function switchMainTab(tab) {
   runtime.activeMainTab = tab;

@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline. Keep declaration order stable during migration.
+// Mutable game state and the serialized-field schema.
 
 const state = {
   score: 0,
@@ -142,8 +142,6 @@ const SAVE_FIELDS = [
   "lastEarned",
   "lastEarnedLog10",
 ];
-
-// Mechanically appended from src/main.js during the parity-preserving migration.
 
 function normalizeChoice(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback;

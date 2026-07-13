@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
+// Achievement definitions and unlock checks.
 // Unlock checks retain their original runtime dependencies during migration.
 
 const ACHIEVEMENTS = [
@@ -186,6 +186,9 @@ const ACHIEVEMENTS = [
   },
 ];
 
+let cachedAchievementMask = null;
+let cachedAchievementCount = 0;
+
 Object.defineProperty(runtime, "ACHIEVEMENT_COUNT", {
   configurable: true,
   enumerable: true,
@@ -197,11 +200,16 @@ function isAchievementUnlocked(id) {
 }
 
 function achievementCount() {
+  const mask = runtime.state.achievementMask;
+  if (mask === cachedAchievementMask) return cachedAchievementCount;
+  cachedAchievementMask = mask;
+  cachedAchievementCount = 0;
   let count = 0;
   for (let id = 1; id <= runtime.ACHIEVEMENT_COUNT; id += 1) {
     if (isAchievementUnlocked(id)) count += 1;
   }
-  return count;
+  cachedAchievementCount = count;
+  return cachedAchievementCount;
 }
 
 function achievementGainMultiplier() {

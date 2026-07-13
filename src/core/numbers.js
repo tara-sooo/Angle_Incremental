@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 
-// Extracted mechanically from the next-runtime baseline.
+// Log-space resource arithmetic and display formatting.
 // State-dependent progression and UI formatting remain outside this helper module.
 
 function parseSavedNumber(value) {
@@ -90,8 +90,6 @@ function subtractLog10(currentLog, amountLog) {
   return remainingFactor <= 0 ? -Infinity : currentLog + Math.log10(remainingFactor);
 }
 
-
-
 function log10Value(value) {
   if (value === Infinity) return Infinity;
   return value > 0 && Number.isFinite(value) ? Math.log10(value) : -Infinity;
@@ -106,8 +104,6 @@ function combineLog10(a, b) {
   if (high - low > 15) return high;
   return clampLog10(high + Math.log10(1 + 10 ** (low - high)));
 }
-
-// Mechanically appended from src/main.js during the parity-preserving migration.
 
 function formatNumber(value) {
   if (value === Infinity) return formatLogNumber(Infinity);
@@ -221,4 +217,3 @@ expose("formatPowerOfTen", () => formatPowerOfTen, (value) => { formatPowerOfTen
 expose("formatSmallDecimal", () => formatSmallDecimal, (value) => { formatSmallDecimal = value; });
 expose("formatDuration", () => formatDuration, (value) => { formatDuration = value; });
 expose("formatLongDuration", () => formatLongDuration, (value) => { formatLongDuration = value; });
-
