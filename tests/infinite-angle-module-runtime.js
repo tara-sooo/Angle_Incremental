@@ -73,7 +73,16 @@ async function runInfiniteAngleModuleRuntimeTest() {
     const spendableIp = runtime.currentExactInfinityPoints();
 
     assert.equal(debug.buyInfiniteAngleUpgrade("speed"), true, "IA speed upgrade should be payable with IP");
+    state.infiniteAngleCurrentGain = 123;
+    state.infiniteAngleCurrentGainLog10 = Math.log10(123);
+    state.infiniteAnglePointProgress = 0.5;
+    state.infiniteAngleTotalVertexProgress = 7.5;
+    state.infiniteAngleLastVertexIndex = 2;
     assert.equal(debug.buyInfiniteAngleUpgrade("vertex"), true, "IA vertex upgrade should be payable with IP");
+    assert.equal(state.infiniteAngleCurrentGainLog10, Math.log10(123), "IA vertex upgrades must preserve current gain");
+    assert.equal(state.infiniteAnglePointProgress, 0, "IA vertex upgrades should reset point progress");
+    assert.equal(state.infiniteAngleTotalVertexProgress, 0, "IA vertex upgrades should reset vertex progress");
+    assert.equal(state.infiniteAngleLastVertexIndex, 0, "IA vertex upgrades should reset the vertex index");
     assert.equal(debug.buyInfiniteAngleUpgrade("gain"), true, "IA gain upgrade should be payable with IP");
     assert.equal(state.infiniteAngleSpeedLevel, 1, "IA speed level should increase independently");
     assert.equal(state.infiniteAngleVertexLevel, 1, "IA vertex level should increase independently");
@@ -87,6 +96,22 @@ async function runInfiniteAngleModuleRuntimeTest() {
       spendableIp - speedCost - vertexCost - gainCost,
       "IA upgrades should spend their independent IP costs",
     );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    state.infiniteAngleSpeedLevel = 222;
+    setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
+    const costLog10 = runtime.infiniteAngleUpgradeCostLog10("speed");
+    const maximumCostLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
+
+    assert.ok(costLog10 > maximumCostLog10, "IA costs above the exact IP ceiling should be recognized");
+    assert.equal(runtime.canBuyInfiniteAngleUpgrade("speed"), false, "IA upgrades above the exact IP ceiling must not be affordable");
+    assert.equal(debug.buyInfiniteAngleUpgrade("speed"), false, "IA upgrades above the exact IP ceiling must not be purchasable");
+    assert.equal(runtime.currentExactInfinityPoints(), runtime.MAX_EXACT_INFINITY_POINTS, "an over-ceiling IA purchase must not spend IP");
   }
 
   {
@@ -131,6 +156,18 @@ async function runInfiniteAngleModuleRuntimeTest() {
       Math.abs(runtime.vertexGainIncrease() - 0.01 * 10 ** 0.3) < 1e-12,
       "Infinity Score^0.3 should multiply TA vertex gain",
     );
+
+    state.infiniteScore = Number.MAX_VALUE;
+    state.infiniteScoreLog10 = 2000;
+    state.currentGain = 1;
+    state.currentGainLog10 = 0;
+    assert.equal(runtime.infiniteAngleBoostLog10(), 600, "IA boost should remain available as a log value at late-game scores");
+    runtime.passVertex(1);
+    assert.ok(state.currentGainLog10 > 308, "late-game IA boosts must keep normal vertex gain in log space");
+    state.currentGain = 1;
+    state.currentGainLog10 = 0;
+    runtime.processManyVertices(1, 2);
+    assert.ok(state.currentGainLog10 > 308, "late-game IA boosts must keep batched normal vertex gain in log space");
 
     state.infiniteAngleSpeedLevel = 1_000_000_000_000;
     debug.updateInfiniteAngle(1 / 60);

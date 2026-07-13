@@ -291,6 +291,7 @@ function renderGameToText() {
   const generationScoreLog = runtime.currentGenerationScoreLog10();
   const infinityPointsLog = runtime.currentInfinityPointsLog10();
   const infiniteScoreLog = runtime.currentInfiniteScoreLog10();
+  const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   const infiniteAngleCostLogs = {
     speed: runtime.infiniteAngleUpgradeCostLog10("speed"),
     vertex: runtime.infiniteAngleUpgradeCostLog10("vertex"),
@@ -371,11 +372,13 @@ function renderGameToText() {
       infiniteScore: runtime.formatUiLogNumber(infiniteScoreLog),
       infiniteScoreLog10: Number.isFinite(infiniteScoreLog) ? Number(infiniteScoreLog.toPrecision(6)) : null,
       infiniteAngleBoost: Number(runtime.infiniteAngleBoost().toFixed(2)),
+      infiniteAngleBoostLog10: Number.isFinite(infiniteAngleBoostLog10) ? Number(infiniteAngleBoostLog10.toPrecision(6)) : null,
       infiniteAngle: {
         unlocked: runtime.state.infiniteAngleUnlocked,
         score: runtime.formatUiLogNumber(infiniteScoreLog),
         scoreLog10: Number.isFinite(infiniteScoreLog) ? Number(infiniteScoreLog.toPrecision(6)) : null,
         boost: Number(runtime.infiniteAngleBoost().toPrecision(6)),
+        boostLog10: Number.isFinite(infiniteAngleBoostLog10) ? Number(infiniteAngleBoostLog10.toPrecision(6)) : null,
         vertices: runtime.infiniteAngleVertexCount(),
         speedLevel: runtime.state.infiniteAngleSpeedLevel,
         vertexLevel: runtime.state.infiniteAngleVertexLevel,
@@ -414,6 +417,7 @@ function renderGameToText() {
       total: runtime.ACHIEVEMENT_COUNT,
       gainMultiplier: Number(runtime.achievementGainMultiplier().toFixed(4)),
       vertexGainIncrease: Number(runtime.vertexGainIncrease().toPrecision(6)),
+      vertexGainIncreaseLog10: Number(runtime.vertexGainIncreaseLog10().toPrecision(6)),
       mask: runtime.state.achievementMask,
       generationMultiplierReward: runtime.isAchievementUnlocked(3),
       totalPlayTime: Number(runtime.state.totalPlayTime.toFixed(1)),

@@ -119,9 +119,7 @@ function updateUi() {
   runtime.elements.infinityPoints.textContent = runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10());
   runtime.elements.infiniteScore.textContent = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
   runtime.elements.infiniteScorePanel.textContent = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
-  const infiniteAngleBoostLog10 = runtime.infiniteAngleBoost() > 0
-    ? runtime.log10Value(runtime.infiniteAngleBoost())
-    : -Infinity;
+  const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   runtime.elements.infiniteAngleBoost.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`;

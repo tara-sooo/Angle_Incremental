@@ -101,14 +101,24 @@ function setCurrentGainLog10(log) {
   runtime.state.currentGain = runtime.valueFromLog10(runtime.state.currentGainLog10);
 }
 
+function addCurrentGainLog10(amountLog10) {
+  if (amountLog10 === -Infinity) return;
+  setCurrentGainLog10(runtime.combineLog10(currentGainLog10(), amountLog10));
+}
+
 function addCurrentGain(amount) {
   if (amount <= 0) return;
-  setCurrentGainLog10(runtime.combineLog10(currentGainLog10(), runtime.log10Value(amount)));
+  addCurrentGainLog10(runtime.log10Value(amount));
+}
+
+function gainAfterIncreaseLog10FromLog(increaseLog10, stepCount) {
+  if (stepCount <= 0 || increaseLog10 === -Infinity) return currentGainLog10();
+  return runtime.combineLog10(currentGainLog10(), increaseLog10 + runtime.log10Value(stepCount));
 }
 
 function gainAfterIncreaseLog10(increase, stepCount) {
   if (stepCount <= 0 || increase <= 0) return currentGainLog10();
-  return runtime.combineLog10(currentGainLog10(), runtime.log10Value(increase) + runtime.log10Value(stepCount));
+  return gainAfterIncreaseLog10FromLog(runtime.log10Value(increase), stepCount);
 }
 
 function currentPreviousGenerationScoreLog10() {
@@ -164,20 +174,24 @@ function applyInfinitySoftcap(rawLog10) {
   return runtime.INFINITY_REQUIREMENT_LOG10 + (rawLog10 - runtime.INFINITY_REQUIREMENT_LOG10) * runtime.infinitySoftcapPower();
 }
 
-function vertexGainIncrease() {
+function vertexGainIncreaseLog10() {
   const infinityResetBoost = runtime.hasInfinityUpgrade("1-1")
     ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, iu11_2EffectiveInfinityCount()) : runtime.state.infinityCount + 1)
     : 1;
-  let gain = (0.01 + effectiveGainLevel() * 0.01)
-    * runtime.coreBoostGainIncreaseMultiplier()
-    * ic8VertexGainMultiplier()
-    * runtime.infiniteAngleBoost()
-    * runtime.achievementGainMultiplier()
-    * infinityResetBoost;
-  if (runtime.state.activeChallenge === 6) return 0.001;
-  if (runtime.state.activeChallenge === 4) gain = Math.pow(gain, 0.5);
-  if (runtime.isChallengeCompleted(4)) gain = Math.pow(gain, 1.1);
-  return gain;
+  let gainLog10 = runtime.log10Value(0.01 + effectiveGainLevel() * 0.01)
+    + runtime.log10Value(runtime.coreBoostGainIncreaseMultiplier())
+    + runtime.log10Value(ic8VertexGainMultiplier())
+    + runtime.infiniteAngleBoostLog10()
+    + runtime.log10Value(runtime.achievementGainMultiplier())
+    + runtime.log10Value(infinityResetBoost);
+  if (runtime.state.activeChallenge === 6) return runtime.log10Value(0.001);
+  if (runtime.state.activeChallenge === 4) gainLog10 *= 0.5;
+  if (runtime.isChallengeCompleted(4)) gainLog10 *= 1.1;
+  return runtime.clampLog10(gainLog10);
+}
+
+function vertexGainIncrease() {
+  return runtime.valueFromLog10(vertexGainIncreaseLog10());
 }
 
 function finalScoreGainPower() {
@@ -226,7 +240,7 @@ function isCoreVertex(index) {
   return coreVertexIndices().includes(index);
 }
 
-function sumCoreHitGains(firstCoreStep, coreHits, increase) {
+function sumCoreHitGainsFromLog10(firstCoreStep, coreHits, increaseLog10) {
   const stride = runtime.effectiveVertexCount();
 
   if (coreHits > runtime.MAX_EXACT_CORE_HITS) {
@@ -235,7 +249,7 @@ function sumCoreHitGains(firstCoreStep, coreHits, increase) {
     for (let segment = 0; segment < runtime.CORE_HIT_APPROX_SEGMENTS; segment += 1) {
       const midHit = (segment + 0.5) * segmentSize;
       const stepAtMid = firstCoreStep + midHit * stride;
-      const gainLog = gainAfterIncreaseLog10(increase, stepAtMid);
+      const gainLog = gainAfterIncreaseLog10FromLog(increaseLog10, stepAtMid);
       const scoreLog = finalScoreGainFromBaseLog10(gainLog);
       earned += runtime.valueFromLog10(scoreLog) * segmentSize;
     }
@@ -244,10 +258,14 @@ function sumCoreHitGains(firstCoreStep, coreHits, increase) {
 
   let earned = 0;
   for (let hit = 0; hit < coreHits; hit += 1) {
-    const gainLog = gainAfterIncreaseLog10(increase, firstCoreStep + hit * stride);
+    const gainLog = gainAfterIncreaseLog10FromLog(increaseLog10, firstCoreStep + hit * stride);
     earned += runtime.valueFromLog10(finalScoreGainFromBaseLog10(gainLog));
   }
   return earned;
+}
+
+function sumCoreHitGains(firstCoreStep, coreHits, increase) {
+  return sumCoreHitGainsFromLog10(firstCoreStep, coreHits, runtime.log10Value(increase));
 }
 
 function earlyLayerCostScalingFactor() {
@@ -351,7 +369,7 @@ function addScore(amount, amountLog10 = runtime.log10Value(amount)) {
 }
 
 function passVertex(index) {
-  addCurrentGain(vertexGainIncrease());
+  addCurrentGainLog10(runtime.vertexGainIncreaseLog10());
   if (isCoreVertex(index)) {
     const earned = finalScoreGain();
     const resetByInfinity = addScore(earned, finalScoreGainLog10());
@@ -372,7 +390,7 @@ function processManyVertices(start, end) {
   const count = end - start + 1;
   if (count <= 0) return;
 
-  const increase = vertexGainIncrease();
+  const increaseLog10 = runtime.vertexGainIncreaseLog10();
   const vertices = runtime.effectiveVertexCount();
   const coreBatches = coreVertexIndices()
     .map((coreIndex) => {
@@ -390,10 +408,11 @@ function processManyVertices(start, end) {
     let earned = 0;
     let lastCoreStep = 0;
     coreBatches.forEach((batch) => {
-      earned += sumCoreHitGains(batch.firstCoreStep, batch.coreHits, increase);
+      earned += sumCoreHitGainsFromLog10(batch.firstCoreStep, batch.coreHits, increaseLog10);
       lastCoreStep = Math.max(lastCoreStep, batch.firstCoreStep + (batch.coreHits - 1) * vertices);
     });
-    const batchLog = runtime.log10Value(Math.max(coreHits, 1)) + finalScoreGainFromBaseLog10(gainAfterIncreaseLog10(increase, lastCoreStep));
+    const batchLog = runtime.log10Value(Math.max(coreHits, 1))
+      + finalScoreGainFromBaseLog10(gainAfterIncreaseLog10FromLog(increaseLog10, lastCoreStep));
     const resetByInfinity = addScore(earned, Number.isFinite(earned) ? runtime.log10Value(earned) : batchLog);
     if (resetByInfinity) return true;
     if (runtime.state.showFloatingText && !runtime.state.lightEffects) {
@@ -406,7 +425,7 @@ function processManyVertices(start, end) {
     }
   }
 
-  addCurrentGain(increase * count);
+  addCurrentGainLog10(increaseLog10 + runtime.log10Value(count));
   return false;
 }
 
@@ -545,7 +564,9 @@ expose("currentTotalScoreLog10", () => currentTotalScoreLog10, (value) => { curr
 expose("currentGenerationScoreLog10", () => currentGenerationScoreLog10, (value) => { currentGenerationScoreLog10 = value; });
 expose("currentGainLog10", () => currentGainLog10, (value) => { currentGainLog10 = value; });
 expose("setCurrentGainLog10", () => setCurrentGainLog10, (value) => { setCurrentGainLog10 = value; });
+expose("addCurrentGainLog10", () => addCurrentGainLog10, (value) => { addCurrentGainLog10 = value; });
 expose("addCurrentGain", () => addCurrentGain, (value) => { addCurrentGain = value; });
+expose("gainAfterIncreaseLog10FromLog", () => gainAfterIncreaseLog10FromLog, (value) => { gainAfterIncreaseLog10FromLog = value; });
 expose("gainAfterIncreaseLog10", () => gainAfterIncreaseLog10, (value) => { gainAfterIncreaseLog10 = value; });
 expose("currentPreviousGenerationScoreLog10", () => currentPreviousGenerationScoreLog10, (value) => { currentPreviousGenerationScoreLog10 = value; });
 expose("currentInfinityPointsLog10", () => currentInfinityPointsLog10, (value) => { currentInfinityPointsLog10 = value; });
@@ -558,6 +579,7 @@ expose("effectiveVertexCount", () => effectiveVertexCount, (value) => { effectiv
 expose("ic8VertexGainMultiplier", () => ic8VertexGainMultiplier, (value) => { ic8VertexGainMultiplier = value; });
 expose("scoreDisplay", () => scoreDisplay, (value) => { scoreDisplay = value; });
 expose("applyInfinitySoftcap", () => applyInfinitySoftcap, (value) => { applyInfinitySoftcap = value; });
+expose("vertexGainIncreaseLog10", () => vertexGainIncreaseLog10, (value) => { vertexGainIncreaseLog10 = value; });
 expose("vertexGainIncrease", () => vertexGainIncrease, (value) => { vertexGainIncrease = value; });
 expose("finalScoreGainPower", () => finalScoreGainPower, (value) => { finalScoreGainPower = value; });
 expose("finalScoreGainDivisor", () => finalScoreGainDivisor, (value) => { finalScoreGainDivisor = value; });
@@ -569,6 +591,7 @@ expose("finalScoreGainFromBaseLog10", () => finalScoreGainFromBaseLog10, (value)
 expose("finalScoreGainLog10", () => finalScoreGainLog10, (value) => { finalScoreGainLog10 = value; });
 expose("coreVertexIndices", () => coreVertexIndices, (value) => { coreVertexIndices = value; });
 expose("isCoreVertex", () => isCoreVertex, (value) => { isCoreVertex = value; });
+expose("sumCoreHitGainsFromLog10", () => sumCoreHitGainsFromLog10, (value) => { sumCoreHitGainsFromLog10 = value; });
 expose("sumCoreHitGains", () => sumCoreHitGains, (value) => { sumCoreHitGains = value; });
 expose("earlyLayerCostScalingFactor", () => earlyLayerCostScalingFactor, (value) => { earlyLayerCostScalingFactor = value; });
 expose("preGenerationCostScalingLog10", () => preGenerationCostScalingLog10, (value) => { preGenerationCostScalingLog10 = value; });

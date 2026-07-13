@@ -120,6 +120,10 @@ function canUnlockInfiniteAngle() {
 function resetInfiniteAngleRun() {
   runtime.state.infiniteAngleCurrentGain = 1;
   runtime.state.infiniteAngleCurrentGainLog10 = 0;
+  resetInfiniteAnglePosition();
+}
+
+function resetInfiniteAnglePosition() {
   runtime.state.infiniteAnglePointProgress = 0;
   runtime.state.infiniteAngleTotalVertexProgress = 0;
   runtime.state.infiniteAngleLastVertexIndex = 0;
@@ -136,9 +140,12 @@ function unlockInfiniteAngle() {
 }
 
 function canBuyInfiniteAngleUpgrade(kind) {
+  const costLog10 = infiniteAngleUpgradeCostLog10(kind);
+  const maximumCostLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
   return runtime.state.infiniteAngleUnlocked
     && Boolean(INFINITE_ANGLE_UPGRADES[kind])
-    && runtime.canSpendInfinityPoints(infiniteAngleUpgradeCostLog10(kind));
+    && costLog10 <= maximumCostLog10
+    && runtime.canSpendInfinityPoints(costLog10);
 }
 
 function buyInfiniteAngleUpgrade(kind) {
@@ -150,7 +157,7 @@ function buyInfiniteAngleUpgrade(kind) {
       runtime.MAX_RENDERED_VERTICES - 3,
       runtime.state.infiniteAngleVertexLevel + 1,
     );
-    resetInfiniteAngleRun();
+    resetInfiniteAnglePosition();
   }
   if (kind === "gain") runtime.state.infiniteAngleGainLevel += 1;
   runtime.updateUi();
@@ -158,10 +165,14 @@ function buyInfiniteAngleUpgrade(kind) {
   return true;
 }
 
-function infiniteAngleBoost() {
+function infiniteAngleBoostLog10() {
   const scoreLog10 = runtime.currentInfiniteScoreLog10();
-  if (scoreLog10 === -Infinity) return 1;
-  return runtime.valueFromLog10(Math.max(0, scoreLog10 * runtime.INFINITE_ANGLE_SCORE_POWER));
+  if (scoreLog10 === -Infinity) return 0;
+  return runtime.clampLog10(Math.max(0, scoreLog10 * runtime.INFINITE_ANGLE_SCORE_POWER));
+}
+
+function infiniteAngleBoost() {
+  return runtime.valueFromLog10(infiniteAngleBoostLog10());
 }
 
 function processInfiniteAngleVertices(start, end) {
@@ -258,6 +269,7 @@ expose("canUnlockInfiniteAngle", () => canUnlockInfiniteAngle);
 expose("unlockInfiniteAngle", () => unlockInfiniteAngle);
 expose("canBuyInfiniteAngleUpgrade", () => canBuyInfiniteAngleUpgrade);
 expose("buyInfiniteAngleUpgrade", () => buyInfiniteAngleUpgrade);
+expose("infiniteAngleBoostLog10", () => infiniteAngleBoostLog10);
 expose("infiniteAngleBoost", () => infiniteAngleBoost);
 expose("resetInfiniteAngleRun", () => resetInfiniteAngleRun);
 expose("updateInfiniteAngle", () => updateInfiniteAngle);

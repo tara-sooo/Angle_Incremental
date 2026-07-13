@@ -488,7 +488,7 @@ async function runNumericStabilityModuleRuntimeTest() {
     });
     state.infinityCount = 0;
     state.vertices = 3;
-    runtime.vertexGainIncrease = () => 1e275;
+    runtime.vertexGainIncreaseLog10 = () => 275;
 
     const coreHitsPastSafeSearch = 1e18;
     const endStep = coreHitsPastSafeSearch * state.vertices;
@@ -511,7 +511,7 @@ async function runNumericStabilityModuleRuntimeTest() {
     state.infinityCount = 0;
     state.vertices = 6;
     runtime.coreVertexIndices = () => [0, 3];
-    runtime.vertexGainIncrease = () => 1e275;
+    runtime.vertexGainIncreaseLog10 = () => 275;
 
     const usedBatch = runtime.processManyVertices(1, 6e18);
 
