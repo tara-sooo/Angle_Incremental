@@ -135,6 +135,8 @@ async function runNumericStabilityModuleRuntimeTest() {
       true,
       "exact IP gains above 1e20 should still allow exact 1e20 IP spending",
     );
+    assert.equal(runtime.spendInfinityPoints(20), true, "exact IP spending should succeed at the 1e20 boundary");
+    assert.equal(state.infinityPointsExact, "3570", "spending 1e20 IP should preserve the exact remainder");
   }
 
   {

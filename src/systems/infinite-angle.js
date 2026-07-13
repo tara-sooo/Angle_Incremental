@@ -4,9 +4,9 @@ import { runtime, expose } from "../runtime/shared.js";
 // challenge, or Infinity Upgrade modifiers; its own upgrades are paid with IP.
 
 const INFINITE_ANGLE_UPGRADES = Object.freeze({
-  speed: Object.freeze({ base: 5, growth: 1.55 }),
-  vertex: Object.freeze({ base: 12, growth: 1.72 }),
-  gain: Object.freeze({ base: 18, growth: 1.68 }),
+  speed: Object.freeze({ base: 1e20, growth: 1.55 }),
+  vertex: Object.freeze({ base: 2.4e20, growth: 1.72 }),
+  gain: Object.freeze({ base: 3.6e20, growth: 1.68 }),
 });
 
 function infiniteAngleVertexCount() {

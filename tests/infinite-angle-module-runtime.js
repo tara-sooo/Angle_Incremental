@@ -50,7 +50,27 @@ async function runInfiniteAngleModuleRuntimeTest() {
     state.speedLevel = 7;
     state.gainLevel = 8;
     state.vertices = 11;
-    setInfinityPoints(runtime, 100);
+    assert.ok(Math.abs(runtime.infiniteAngleUpgradeCostLog10("speed") - 20) < 1e-12, "IA speed should start at 1e20 IP");
+    assert.ok(
+      Math.abs(runtime.infiniteAngleUpgradeCostLog10("vertex") - Math.log10(2.4e20)) < 1e-12,
+      "IA vertex should start at 2.4e20 IP",
+    );
+    assert.ok(
+      Math.abs(runtime.infiniteAngleUpgradeCostLog10("gain") - Math.log10(3.6e20)) < 1e-12,
+      "IA gain should start at 3.6e20 IP",
+    );
+    state.infiniteAngleSpeedLevel = 1;
+    assert.ok(
+      Math.abs(runtime.infiniteAngleUpgradeCostLog10("speed") - Math.log10(1.55e20)) < 1e-12,
+      "IA speed growth should remain x1.55",
+    );
+    state.infiniteAngleSpeedLevel = 0;
+    const initialIp = 1000000000000000000000n;
+    const speedCost = runtime.exactInfinityPointsFromCostLog10(runtime.infiniteAngleUpgradeCostLog10("speed"));
+    const vertexCost = runtime.exactInfinityPointsFromCostLog10(runtime.infiniteAngleUpgradeCostLog10("vertex"));
+    const gainCost = runtime.exactInfinityPointsFromCostLog10(runtime.infiniteAngleUpgradeCostLog10("gain"));
+    setInfinityPoints(runtime, initialIp);
+    const spendableIp = runtime.currentExactInfinityPoints();
 
     assert.equal(debug.buyInfiniteAngleUpgrade("speed"), true, "IA speed upgrade should be payable with IP");
     assert.equal(debug.buyInfiniteAngleUpgrade("vertex"), true, "IA vertex upgrade should be payable with IP");
@@ -62,7 +82,11 @@ async function runInfiniteAngleModuleRuntimeTest() {
     assert.equal(state.speedLevel, 7, "IA speed upgrades must not change TA speed level");
     assert.equal(state.gainLevel, 8, "IA gain upgrades must not change TA gain level");
     assert.equal(state.vertices, 11, "IA vertex upgrades must not change TA vertices");
-    assert.equal(runtime.currentExactInfinityPoints(), 65n, "IA upgrades should spend their independent IP costs");
+    assert.equal(
+      runtime.currentExactInfinityPoints(),
+      spendableIp - speedCost - vertexCost - gainCost,
+      "IA upgrades should spend their independent IP costs",
+    );
   }
 
   {

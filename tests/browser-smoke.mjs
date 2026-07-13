@@ -303,15 +303,20 @@ try {
 
   const infiniteAnglePanel = await page.evaluate(() => {
     const { state, switchMainTab, switchInfinitySubtab, buyInfiniteAngleUpgrade } = window.__angleDebug;
-    state.infinityPointsExact = "100";
-    state.infinityPoints = 100;
-    state.infinityPointsLog10 = 2;
+    state.infinityPointsExact = "100000000000000000100";
+    state.infinityPoints = 1e20;
+    state.infinityPointsLog10 = 20;
     switchMainTab("infinity");
     switchInfinitySubtab("angle");
     window.advanceTime(0);
     const canvas = document.querySelector("#infiniteAngleCanvas");
     const panel = document.querySelector('[data-infinity-panel="angle"]');
     const beforeLevel = state.infiniteAngleSpeedLevel;
+    const upgradeCosts = [
+      document.querySelector("#infiniteAngleSpeedCost")?.textContent?.trim() ?? "",
+      document.querySelector("#infiniteAngleVertexCost")?.textContent?.trim() ?? "",
+      document.querySelector("#infiniteAngleGainCost")?.textContent?.trim() ?? "",
+    ];
     const bought = buyInfiniteAngleUpgrade("speed");
     window.advanceTime(0);
     return {
@@ -327,6 +332,7 @@ try {
       expectedSpeedLevel: beforeLevel + 1,
       ipExact: state.infinityPointsExact,
       upgradeWidths: Array.from(document.querySelectorAll(".infinite-angle-upgrades .upgrade-button"), (button) => button.getBoundingClientRect().width),
+      upgradeCosts,
     };
   });
   assert.equal(infiniteAnglePanel.panelActive, true, "Infinity > IA should activate the IA panel");
@@ -338,7 +344,10 @@ try {
   assert.ok(infiniteAnglePanel.upgradeWidths.every((width) => width > 0), "IA upgrade controls should remain visible");
   assert.equal(infiniteAnglePanel.bought, true, "IA speed upgrade should be purchasable with IP");
   assert.equal(infiniteAnglePanel.speedLevel, infiniteAnglePanel.expectedSpeedLevel, "IA speed upgrade should increase its own level");
-  assert.equal(infiniteAnglePanel.ipExact, "95", "IA speed upgrade should spend 5 IP");
+  assert.equal(infiniteAnglePanel.ipExact, "100", "IA speed upgrade should spend 1e20 IP");
+  assert.match(infiniteAnglePanel.upgradeCosts[0], /1\.00e20/, "IA speed cost should match the unlock scale");
+  assert.match(infiniteAnglePanel.upgradeCosts[1], /2\.40e20/, "IA vertex cost should preserve the TA price ratio");
+  assert.match(infiniteAnglePanel.upgradeCosts[2], /3\.60e20/, "IA gain cost should preserve the TA price ratio");
 
   const infiniteAngleDrawMode = await page.evaluate(() => {
     const { switchMainTab, switchInfinitySubtab } = window.__angleDebug;
