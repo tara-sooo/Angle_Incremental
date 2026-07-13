@@ -127,6 +127,8 @@ select {
 .infinity-summary,
 .infinity-panel,
 .infinity-subtabs,
+.challenge-panel,
+.challenge-subtabs,
 .achievement-overview,
 .settings-card,
 .save-panel {
@@ -335,6 +337,7 @@ canvas {
 .generation,
 .core-boost,
 .infinity-panel,
+.challenge-panel,
 .infinity-summary,
 .save-panel,
 .settings-card {
@@ -350,9 +353,10 @@ canvas {
 .metric,
 .generation > div,
 .core-boost > div,
-.infinity-panel > div:not(.upgrade-row):not(.panel-heading):not(.challenge-list):not(.infinity-upgrade-tree),
+.infinity-panel > div:not(.upgrade-row):not(.panel-heading):not(.challenge-list):not(.infinity-upgrade-tree):not(.tower-panel),
 .infinity-summary > div:not(.metric),
 .infinite-angle-panel > div:not(.upgrade-row),
+.tower-metrics > div,
 .save-panel > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -369,6 +373,7 @@ canvas {
 .infinity-panel span,
 .infinity-summary span,
 .infinite-angle-panel span,
+.tower-panel span,
 .save-panel span {
   color: var(--muted);
   font-size: 0.8rem;
@@ -382,6 +387,7 @@ canvas {
 .infinity-panel strong,
 .infinity-summary strong,
 .infinite-angle-panel strong,
+.tower-panel strong,
 .save-panel strong {
   text-align: right;
   font-size: 0.96rem;
@@ -420,6 +426,7 @@ canvas {
 .infinity-upgrade-detail-buy,
 .challenge-row button,
 .challenge-button,
+.tower-build-button,
 .break-button,
 .reset-button {
   border: 2px solid rgba(255, 255, 255, 0.14);
@@ -473,6 +480,7 @@ canvas {
 .infinity-upgrade-detail-buy:hover:not(:disabled),
 .challenge-row button:hover:not(:disabled),
 .challenge-button:hover:not(:disabled),
+.tower-build-button:hover:not(:disabled),
 .break-button:hover:not(:disabled),
 .reset-button:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -490,6 +498,7 @@ canvas {
 .infinity-upgrade-detail-buy:active:not(:disabled),
 .challenge-row button:active:not(:disabled),
 .challenge-button:active:not(:disabled),
+.tower-build-button:active:not(:disabled),
 .break-button:active:not(:disabled),
 .reset-button:active:not(:disabled) {
   transform: translateY(1px);
@@ -505,6 +514,7 @@ canvas {
 .infinity-upgrade-detail-buy:disabled,
 .challenge-row button:disabled,
 .challenge-button:disabled,
+.tower-build-button:disabled,
 .break-button:disabled {
   cursor: not-allowed;
   filter: grayscale(0.25);
@@ -598,6 +608,7 @@ canvas {
 }
 
 .infinity-page,
+.challenges-panel,
 .automation-panel,
 .statistics-panel,
 .achievements-panel,
@@ -612,12 +623,24 @@ canvas {
   padding: 10px 14px 8px;
 }
 
+.challenges-panel .page-heading {
+  min-height: 70px;
+  margin-bottom: 8px;
+  padding: 10px 14px 8px;
+}
+
 .infinity-page h1 {
   font-size: clamp(1.8rem, 3.2vw, 3rem);
   line-height: 1;
 }
 
+.challenges-panel h1 {
+  font-size: clamp(1.8rem, 3.2vw, 3rem);
+  line-height: 1;
+}
+
 .infinity-page,
+.challenges-panel,
 .automation-panel,
 .statistics-panel,
 .achievements-panel {
@@ -626,6 +649,7 @@ canvas {
 
 .infinity-summary,
 .infinity-panel,
+.challenge-panel,
 .achievement-overview,
 .settings-card,
 .save-panel {
@@ -749,6 +773,101 @@ canvas {
 .infinity-subtab.is-active {
   background: linear-gradient(180deg, #4f6fb8, #253f82);
   box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+}
+
+.challenge-subtabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  margin-bottom: 6px;
+  padding: 5px;
+}
+
+.challenge-subtab {
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  color: var(--muted);
+  border: 2px solid var(--line);
+  background: linear-gradient(180deg, #19253e, #0f182a);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.challenge-subtab span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 26px;
+  color: var(--gold);
+  font-size: 0.78rem;
+  border: 1px solid var(--line-strong);
+  background: rgba(242, 184, 75, 0.08);
+}
+
+.challenge-subtab strong {
+  color: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.challenge-subtab:hover,
+.challenge-subtab.is-active {
+  color: white;
+  border-color: var(--line-strong);
+  filter: brightness(1.14);
+}
+
+.challenge-subtab.is-active {
+  background: linear-gradient(180deg, #4f6fb8, #253f82);
+  box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+}
+
+.challenge-subpanel {
+  display: none;
+}
+
+.challenge-subpanel.is-active {
+  display: grid;
+  gap: 8px;
+}
+
+.tower-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.infinity-panel > .tower-panel > * {
+  grid-column: 1 / -1;
+}
+
+.tower-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 14px;
+}
+
+.tower-metrics > div {
+  min-height: 42px;
+}
+
+.tower-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.tower-build-button {
+  min-height: 48px;
+  padding: 9px 12px;
+  text-align: center;
+  background: linear-gradient(180deg, #b17831, #70441c);
 }
 
 .infinity-subpanel {
@@ -1571,7 +1690,7 @@ canvas {
     z-index: 10;
     min-height: auto;
     height: auto;
-    grid-template-columns: repeat(7, minmax(58px, 1fr));
+    grid-template-columns: repeat(4, minmax(58px, 1fr));
     grid-auto-rows: 56px;
     padding: 8px;
   }
@@ -1620,6 +1739,7 @@ canvas {
   .achievement-overview,
   .achievement-list,
   .infinite-angle-panel,
+  .tower-metrics,
   .settings-grid,
   .statistics-grid,
   .help-list {
@@ -1753,6 +1873,71 @@ canvas {
     white-space: nowrap;
   }
 
+  .challenge-subtabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    margin-bottom: 4px;
+    padding: 4px;
+  }
+
+  .challenge-subtab {
+    min-height: 30px;
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    padding: 4px 5px;
+  }
+
+  .challenge-subtab span {
+    width: auto;
+    height: auto;
+    min-width: 32px;
+    padding: 2px 5px;
+    font-size: 0.72rem;
+  }
+
+  .challenge-subtab strong {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .challenge-panel {
+    padding: 7px;
+  }
+
+  .tower-panel {
+    gap: 8px;
+  }
+
+  .tower-metrics {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .tower-metrics > div {
+    min-height: 30px;
+    padding: 4px 0;
+  }
+
+  .tower-panel span,
+  .tower-panel strong {
+    font-size: 0.72rem;
+  }
+
+  .tower-note {
+    font-size: 0.7rem;
+  }
+
+  .tower-build-button {
+    min-height: 40px;
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+
   .infinity-panel {
     padding: 7px;
   }
@@ -1766,11 +1951,29 @@ canvas {
     gap: 8px;
   }
 
+  .challenges-panel .page-heading {
+    align-items: center;
+    flex-direction: row;
+    min-height: 48px;
+    margin-bottom: 5px;
+    padding: 6px 9px 5px;
+    gap: 8px;
+  }
+
   .infinity-page h1 {
     font-size: 1.55rem;
   }
 
+  .challenges-panel h1 {
+    font-size: 1.55rem;
+  }
+
   .infinity-page .eyebrow {
+    margin-bottom: 1px;
+    font-size: 0.62rem;
+  }
+
+  .challenges-panel .eyebrow {
     margin-bottom: 1px;
     font-size: 0.62rem;
   }
@@ -1781,13 +1984,29 @@ canvas {
     font-size: 0.68rem;
   }
 
+  .challenges-panel .unlock-note {
+    flex: 0 0 auto;
+    padding: 5px 7px;
+    font-size: 0.68rem;
+  }
+
   .infinity-page .panel-heading {
+    min-height: 24px;
+    padding-bottom: 3px;
+  }
+
+  .challenges-panel .panel-heading {
     min-height: 24px;
     padding-bottom: 3px;
   }
 
   .infinity-page .panel-heading span,
   .infinity-page .panel-heading strong {
+    font-size: 0.72rem;
+  }
+
+  .challenges-panel .panel-heading span,
+  .challenges-panel .panel-heading strong {
     font-size: 0.72rem;
   }
 

@@ -31,6 +31,18 @@ function switchInfinitySubtab(tab) {
   if (runtime.activeInfinitySubtab === "angle") runtime.resizeInfiniteAngleCanvas();
 }
 
+function switchChallengeSubtab(tab) {
+  runtime.activeChallengeSubtab = tab;
+  runtime.elements.challengeSubtabs.forEach((button) => {
+    const active = button.dataset.challengeTab === runtime.activeChallengeSubtab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  runtime.elements.challengeSubpanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.challengePanel === runtime.activeChallengeSubtab);
+  });
+}
+
 function applySetting(key, value) {
   runtime.state[key] = value;
   if (key === "language") {
@@ -90,6 +102,7 @@ function bindEvents() {
   runtime.elements.infiniteAngleSpeedUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("speed"));
   runtime.elements.infiniteAngleVertexUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("vertex"));
   runtime.elements.infiniteAngleGainUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("gain"));
+  runtime.elements.towerBuildButton.addEventListener("click", runtime.buildTower);
   runtime.elements.breakCapButton.addEventListener("click", runtime.breakInfiniteCap);
   runtime.elements.resetSaveButton.addEventListener("click", runtime.resetSave);
   runtime.elements.mainTabs.forEach((button) => {
@@ -97,6 +110,9 @@ function bindEvents() {
   });
   runtime.elements.infinitySubtabs.forEach((button) => {
     button.addEventListener("click", () => switchInfinitySubtab(button.dataset.infinityTab));
+  });
+  runtime.elements.challengeSubtabs.forEach((button) => {
+    button.addEventListener("click", () => switchChallengeSubtab(button.dataset.challengeTab));
   });
   runtime.elements.floatingTextToggle.addEventListener("change", () => applySetting("showFloatingText", runtime.elements.floatingTextToggle.checked));
   runtime.elements.lightEffectsToggle.addEventListener("change", () => applySetting("lightEffects", runtime.elements.lightEffectsToggle.checked));
@@ -157,6 +173,7 @@ function bindEvents() {
 }
 expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
+expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
 expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
 expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });

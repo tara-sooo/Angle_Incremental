@@ -158,7 +158,27 @@ function updateUi() {
     : !runtime.infinityChallengesUnlocked()
       ? runtime.t("locked")
       : `${completed}/${runtime.INFINITY_CHALLENGE_COUNT} ${runtime.t("completed")}`;
+  runtime.elements.challengeTabState.textContent = `IC ${completed}/${runtime.INFINITY_CHALLENGE_COUNT}`;
   runtime.updateChallengeRows();
+  runtime.updateTowerChallengeRows();
+  const currentTowerFloor = runtime.towerFloor();
+  const nextTowerFloor = runtime.towerNextFloor();
+  const nextTowerCostLog10 = runtime.towerNextFloorCostLog10();
+  const towerGate = runtime.towerGateForFloor(nextTowerFloor);
+  const towerGateReady = runtime.towerCanBuildNextFloor();
+  const maximumInfinityPointLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
+  const towerCostAffordable = nextTowerCostLog10 <= maximumInfinityPointLog10
+    && runtime.canSpendInfinityPoints(nextTowerCostLog10);
+  runtime.elements.towerFloorHeading.textContent = `Floor ${currentTowerFloor}`;
+  runtime.elements.towerFloorValue.textContent = String(currentTowerFloor);
+  runtime.elements.towerScoreExponentValue.textContent = `^${runtime.towerScoreExponent().toFixed(2)}`;
+  runtime.elements.towerNextCost.textContent = `${runtime.formatUiLogNumber(nextTowerCostLog10)} IP`;
+  runtime.elements.towerGateStatus.textContent = !towerGateReady
+    ? runtime.t("towerNeedChallenge").replace("{index}", String(towerGate))
+    : !towerCostAffordable
+      ? runtime.t("towerNeedIp")
+      : runtime.t("towerBuildReady");
+  runtime.elements.towerBuildButton.disabled = !runtime.canBuildTower();
   const breakCapRequirement = runtime.formatPowerOfTen(runtime.BREAK_CAP_REQUIREMENT_LOG10);
   runtime.elements.breakCapRequirement.textContent = runtime.state.infiniteCapBroken
     ? runtime.t("breakCapBroken")

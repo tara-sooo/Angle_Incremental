@@ -22,6 +22,7 @@
           "./src/core/save.js": "./src/core/save.js?v=0.6.2",
           "./src/core/save-code.js": "./src/core/save-code.js?v=0.6.2",
           "./src/systems/achievements.js": "./src/systems/achievements.js?v=0.6.2",
+          "./src/systems/tower.js": "./src/systems/tower.js?v=0.6.2",
           "./src/ui/render-canvas.js": "./src/ui/render-canvas.js?v=0.6.2",
           "./src/ui/render-topbar.js": "./src/ui/render-topbar.js?v=0.6.2",
           "./src/ui/render-challenges.js": "./src/ui/render-challenges.js?v=0.6.2",
@@ -66,6 +67,11 @@
           <span class="tab-code">INF</span>
           <small id="infinityTabState">LOCKED</small>
           <i id="infinityTabBadge" aria-hidden="true"></i>
+        </button>
+        <button class="main-tab" type="button" data-tab="challenges" aria-selected="false">
+          <span class="tab-icon">◆</span>
+          <span class="tab-code">CHAL</span>
+          <small id="challengeTabState">IC 0/8</small>
         </button>
         <button class="main-tab" type="button" data-tab="automation" aria-selected="false">
           <span class="tab-icon">⟳</span>
@@ -258,13 +264,13 @@
               <span>UPG</span>
               <strong>Upgrades</strong>
             </button>
-            <button class="infinity-subtab" type="button" data-infinity-tab="challenges" aria-selected="false">
-              <span>IC</span>
-              <strong>Challenges</strong>
-            </button>
             <button class="infinity-subtab" type="button" data-infinity-tab="angle" aria-selected="false">
               <span>IA</span>
               <strong>Infinite Angle</strong>
+            </button>
+            <button class="infinity-subtab" type="button" data-infinity-tab="tower" aria-selected="false">
+              <span>TWR</span>
+              <strong data-i18n="tower">Tower</strong>
             </button>
           </nav>
 
@@ -285,14 +291,6 @@
                 <p id="infinityUpgradeDetailRequires">前提なし</p>
                 <button id="infinityUpgradeDetailBuy" class="infinity-upgrade-detail-buy" type="button" disabled>購入</button>
               </aside>
-            </section>
-
-            <section class="infinity-panel infinity-subpanel" data-infinity-panel="challenges">
-              <div class="panel-heading">
-                <span>Infinity Challenge</span>
-                <strong id="challengeStatus">未解放</strong>
-              </div>
-              <div id="challengeList" class="challenge-list" aria-label="Infinity Challenge list"></div>
             </section>
 
             <section class="infinity-panel infinity-subpanel" data-infinity-panel="angle">
@@ -357,6 +355,77 @@
                   </button>
                 </div>
               </div>
+            </section>
+
+            <section class="infinity-panel infinity-subpanel" data-infinity-panel="tower">
+              <div class="panel-heading">
+                <span data-i18n="tower">Tower</span>
+                <strong id="towerFloorHeading">Floor 0</strong>
+              </div>
+              <div class="tower-panel">
+                <div class="tower-metrics">
+                  <div>
+                    <span data-i18n="towerFloor">階数</span>
+                    <strong id="towerFloorValue">0</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="towerScoreExponent">スコア累乗</span>
+                    <strong id="towerScoreExponentValue">^1.00</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="towerNextCost">次の階層の必要IP</span>
+                    <strong id="towerNextCost">1.00e50 IP</strong>
+                  </div>
+                  <div>
+                    <span data-i18n="towerGate">建設条件</span>
+                    <strong id="towerGateStatus">建設可能</strong>
+                  </div>
+                </div>
+                <p id="towerUnlockNote" class="tower-note" data-i18n="towerPersistentNote">
+                  TowerはInfinityでリセットされません。
+                </p>
+                <button id="towerBuildButton" class="tower-build-button" type="button" disabled data-i18n="towerBuild">
+                  塔を建設
+                </button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="main-panel challenges-panel" data-panel="challenges" aria-label="Challenges">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">Challenges</p>
+              <h1 data-i18n="challenges">チャレンジ</h1>
+            </div>
+            <div class="unlock-note" data-i18n="challengeReleaseNote">ICとTC</div>
+          </header>
+
+          <nav class="challenge-subtabs" aria-label="Challenge sub tabs">
+            <button class="challenge-subtab is-active" type="button" data-challenge-tab="ic" aria-selected="true">
+              <span>IC</span>
+              <strong data-i18n="infinityChallenges">Infinity Challenges</strong>
+            </button>
+            <button class="challenge-subtab" type="button" data-challenge-tab="tc" aria-selected="false">
+              <span>TC</span>
+              <strong data-i18n="towerChallenges">Tower Challenges</strong>
+            </button>
+          </nav>
+
+          <div class="challenge-subpanels">
+            <section class="challenge-panel challenge-subpanel is-active" data-challenge-panel="ic">
+              <div class="panel-heading">
+                <span data-i18n="infinityChallenges">Infinity Challenges</span>
+                <strong id="challengeStatus">未解放</strong>
+              </div>
+              <div id="challengeList" class="challenge-list" aria-label="Infinity Challenge list"></div>
+            </section>
+            <section class="challenge-panel challenge-subpanel" data-challenge-panel="tc">
+              <div class="panel-heading">
+                <span data-i18n="towerChallenges">Tower Challenges</span>
+                <strong data-i18n="towerChallengeComingSoon">次リリースで実装</strong>
+              </div>
+              <div id="towerChallengeList" class="challenge-list" aria-label="Tower Challenge list"></div>
             </section>
           </div>
         </section>
@@ -495,6 +564,8 @@
             <dd data-i18n="helpBreakCap">1.00e350 到達で、Infinity 以降の強いソフトキャップを破壊します。</dd>
             <dt>Infinite Angle</dt>
             <dd data-i18n="helpInfiniteAngle">1.00e20 IPでIAを解放し、専用図形でInfinity Scoreを稼ぎます。</dd>
+            <dt data-i18n="tower">Tower</dt>
+            <dd data-i18n="helpTower">1e50 IPからTowerを建設し、階数でスコア累乗を強化します。TC解放後はクリアまで先へ進めません。</dd>
           </dl>
         </section>
 

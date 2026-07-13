@@ -27,6 +27,7 @@ const EXPECTED_MODULE_PATHS = [
   "/src/core/save.js",
   "/src/core/save-code.js",
   "/src/systems/achievements.js",
+  "/src/systems/tower.js",
   "/src/ui/render-canvas.js",
   "/src/ui/render-topbar.js",
   "/src/ui/render-challenges.js",
@@ -114,6 +115,49 @@ try {
   assert.equal(snapshot.vertices, 3);
   assert.equal(snapshot.infinity.count, 0);
   assert.equal(typeof snapshot.score, "string");
+  const tabStructure = await page.evaluate(() => {
+    const mainTabs = Array.from(document.querySelectorAll(".main-tab"), (button) => button.dataset.tab);
+    const infinityTabs = Array.from(document.querySelectorAll(".infinity-subtab"), (button) => button.dataset.infinityTab);
+    const challengeTabs = Array.from(document.querySelectorAll(".challenge-subtab"), (button) => button.dataset.challengeTab);
+    return { mainTabs, infinityTabs, challengeTabs };
+  });
+  assert.deepEqual(
+    tabStructure.mainTabs,
+    ["angle", "infinity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
+    "main tabs should place Challenges after Infinity",
+  );
+  assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
+  assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
+  const towerInitial = await page.evaluate(() => {
+    const { state, switchMainTab, switchInfinitySubtab, switchChallengeSubtab } = window.__angleDebug;
+    state.towerFloor = 0;
+    state.infinityPointsExact = "0";
+    state.infinityPoints = 0;
+    state.infinityPointsLog10 = -Infinity;
+    switchMainTab("infinity");
+    switchInfinitySubtab("tower");
+    window.advanceTime(0);
+    const towerPanel = document.querySelector('[data-infinity-panel="tower"]');
+    const towerState = {
+      panelActive: Boolean(towerPanel?.classList.contains("is-active")),
+      floor: document.querySelector("#towerFloorValue")?.textContent?.trim() ?? "",
+      cost: document.querySelector("#towerNextCost")?.textContent?.trim() ?? "",
+      buildDisabled: Boolean(document.querySelector("#towerBuildButton")?.disabled),
+    };
+    switchMainTab("challenges");
+    switchChallengeSubtab("tc");
+    return {
+      towerState,
+      challengePanelActive: Boolean(document.querySelector('[data-challenge-panel="tc"]')?.classList.contains("is-active")),
+      towerChallengeRows: document.querySelectorAll("#towerChallengeList .tower-challenge-row").length,
+    };
+  });
+  assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
+  assert.equal(towerInitial.towerState.floor, "0", "Tower should start at Floor 0");
+  assert.match(towerInitial.towerState.cost, /1\.00e50/, "Floor 1 should display an e50 IP cost");
+  assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
+  assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
+  assert.equal(towerInitial.towerChallengeRows, 4, "TC placeholder rows should be visible");
   const newsTicker = await page.evaluate(() => {
     const ticker = document.querySelector("#newsTicker");
     const item = document.querySelector("#newsTickerText");
@@ -261,7 +305,7 @@ try {
   const breakCapPlacement = await page.evaluate(() => {
     const breakCap = document.querySelector("#breakCapButton");
     const subtabs = document.querySelector(".infinity-subtabs");
-    const challengePanel = document.querySelector('[data-infinity-panel="challenges"]');
+    const challengePanel = document.querySelector('[data-panel="challenges"]');
     return {
       exists: Boolean(breakCap),
       beforeSubtabs: Boolean(breakCap && subtabs && (breakCap.compareDocumentPosition(subtabs) & Node.DOCUMENT_POSITION_FOLLOWING)),

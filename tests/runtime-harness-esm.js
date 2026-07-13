@@ -124,9 +124,11 @@ function createContext(initialStorage = new Map()) {
     },
     querySelectorAll: (selector) => {
       const values = selector === ".main-tab" || selector === ".main-panel"
-        ? ["angle", "infinity", "automation", "statistics", "achievements", "help", "settings"]
+        ? ["angle", "infinity", "challenges", "automation", "statistics", "achievements", "help", "settings"]
         : selector === ".infinity-subtab" || selector === ".infinity-subpanel"
-          ? ["upgrades", "challenges", "angle"]
+          ? ["upgrades", "angle", "tower"]
+          : selector === ".challenge-subtab" || selector === ".challenge-subpanel"
+            ? ["ic", "tc"]
           : [];
       return values.map((value) => {
         const element = new FakeElement();
@@ -134,6 +136,8 @@ function createContext(initialStorage = new Map()) {
         if (selector === ".main-panel") element.dataset.panel = value;
         if (selector === ".infinity-subtab") element.dataset.infinityTab = value;
         if (selector === ".infinity-subpanel") element.dataset.infinityPanel = value;
+        if (selector === ".challenge-subtab") element.dataset.challengeTab = value;
+        if (selector === ".challenge-subpanel") element.dataset.challengePanel = value;
         return element;
       });
     },

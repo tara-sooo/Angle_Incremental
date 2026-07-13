@@ -126,6 +126,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     ? loadedInfiniteAngleProgress % infiniteAngleVertexCount
     : loadedInfiniteAngleProgress;
   runtime.state.infiniteAngleLastVertexIndex = Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleLastVertexIndex, 0)));
+  runtime.state.towerFloor = Math.max(0, Math.floor(runtime.sanitizeNumber(data.towerFloor, 0)));
   runtime.state.ipGainUpgradeLevel = 0;
   runtime.state.infiniteAngleUpgradeLevel = 0;
   runtime.state.softcapUpgradeLevel = 0;
@@ -354,6 +355,7 @@ function resetSave() {
     infiniteAnglePointProgress: 0,
     infiniteAngleTotalVertexProgress: 0,
     infiniteAngleLastVertexIndex: 0,
+    towerFloor: 0,
     infinityUpgradeMask: 0,
     ipGainUpgradeLevel: 0,
     infiniteAngleUpgradeLevel: 0,

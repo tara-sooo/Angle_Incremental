@@ -8,6 +8,7 @@ import "./core/numbers.js";
 import "./core/save.js";
 import "./core/save-code.js";
 import "./systems/achievements.js";
+import "./systems/tower.js";
 import "./ui/render-canvas.js";
 import "./ui/render-topbar.js";
 import "./ui/render-challenges.js";
@@ -31,6 +32,7 @@ let normalAutobuyElapsed = 0;
 let uiUpdateElapsed = 0;
 let activeMainTab = "angle";
 let activeInfinitySubtab = "upgrades";
+let activeChallengeSubtab = "ic";
 let selectedInfinityUpgradeId = "1-1";
 let appliedLanguage = "";
 let smoothedFps = 0;
@@ -412,6 +414,15 @@ function renderGameToText() {
         canBuy: runtime.canBuyInfinityUpgrade(upgrade.id),
       })),
     },
+    tower: {
+      floor: runtime.towerFloor(),
+      scoreExponent: Number(runtime.towerScoreExponent().toFixed(4)),
+      nextFloor: runtime.towerNextFloor(),
+      nextCostLog10: Number(runtime.towerNextFloorCostLog10().toPrecision(6)),
+      gate: runtime.towerGateForFloor(runtime.towerNextFloor()),
+      canBuild: runtime.canBuildTower(),
+      challengeCount: runtime.TOWER_CHALLENGE_COUNT,
+    },
     achievements: {
       unlocked: runtime.achievementCount(),
       total: runtime.ACHIEVEMENT_COUNT,
@@ -433,6 +444,7 @@ function renderGameToText() {
       timeUnit: runtime.state.timeUnit,
       activeMainTab,
       activeInfinitySubtab,
+      activeChallengeSubtab,
     },
     automation: {
       unlocked: runtime.hasInfinityUpgrade("1-2"),
@@ -467,6 +479,7 @@ expose("normalAutobuyElapsed", () => normalAutobuyElapsed, (value) => { normalAu
 expose("uiUpdateElapsed", () => uiUpdateElapsed, (value) => { uiUpdateElapsed = value; });
 expose("activeMainTab", () => activeMainTab, (value) => { activeMainTab = value; });
 expose("activeInfinitySubtab", () => activeInfinitySubtab, (value) => { activeInfinitySubtab = value; });
+expose("activeChallengeSubtab", () => activeChallengeSubtab, (value) => { activeChallengeSubtab = value; });
 expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => { selectedInfinityUpgradeId = value; });
 expose("appliedLanguage", () => appliedLanguage, (value) => { appliedLanguage = value; });
 expose("smoothedFps", () => smoothedFps, (value) => { smoothedFps = value; });
@@ -514,6 +527,8 @@ window.__angleDebug = {
   checkAchievements: runtime.checkAchievements,
   switchMainTab: runtime.switchMainTab,
   switchInfinitySubtab: runtime.switchInfinitySubtab,
+  switchChallengeSubtab: runtime.switchChallengeSubtab,
+  buildTower: runtime.buildTower,
   applySetting: runtime.applySetting,
   saveGame: runtime.saveGame,
   loadGame: runtime.loadGame,
@@ -525,11 +540,13 @@ window.__angleDebug = {
 
 runtime.bindEvents();
 runtime.createChallengeRows();
+runtime.createTowerChallengeRows();
 runtime.createInfinityUpgradeRows();
 runtime.createAchievementRows();
 runtime.loadGame();
 runtime.switchMainTab(activeMainTab);
 runtime.switchInfinitySubtab(activeInfinitySubtab);
+runtime.switchChallengeSubtab(activeChallengeSubtab);
 runtime.resizeCanvas();
 runtime.resizeInfiniteAngleCanvas();
 runtime.updateUi();
