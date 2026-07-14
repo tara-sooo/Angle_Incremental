@@ -14,7 +14,7 @@ const INFINITE_ANGLE_UPGRADES = Object.freeze({
 // part of saved state so the balance simulator can compare candidates safely.
 const DEFAULT_INFINITE_ANGLE_COST_CURVE = Object.freeze({
   growthPower: 0.10,
-  postLevelScale: 0.10,
+  postLevelScale: 0.30,
 });
 let infiniteAngleCostCurve = DEFAULT_INFINITE_ANGLE_COST_CURVE;
 

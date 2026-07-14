@@ -71,7 +71,7 @@ async function runInfiniteAngleModuleRuntimeTest() {
     assert.ok(
       Math.abs(
         runtime.infiniteAngleUpgradeCostLog10("speed")
-        - (20 + 50 * Math.log10(1.4) * 0.1 + 25 ** 2 * 0.0005 * 0.1),
+        - (20 + 50 * Math.log10(1.4) * 0.1 + 25 ** 2 * 0.0005 * 0.3),
       ) < 0.001,
       "IA speed should use its softened high-level curve",
     );
@@ -79,7 +79,7 @@ async function runInfiniteAngleModuleRuntimeTest() {
     assert.ok(
       Math.abs(
         runtime.infiniteAngleUpgradeCostLog10("vertex")
-        - (Math.log10(2.4e20) + 50 * Math.log10(1.5) * 0.1 + 25 ** 2 * 0.0010 * 0.1),
+        - (Math.log10(2.4e20) + 50 * Math.log10(1.5) * 0.1 + 25 ** 2 * 0.0010 * 0.3),
       ) < 0.001,
       "IA vertex should use its softened high-level curve",
     );
@@ -87,7 +87,7 @@ async function runInfiniteAngleModuleRuntimeTest() {
     assert.ok(
       Math.abs(
         runtime.infiniteAngleUpgradeCostLog10("gain")
-        - (Math.log10(3.6e20) + 50 * Math.log10(1.45) * 0.1 + 25 ** 2 * 0.0005 * 0.1),
+        - (Math.log10(3.6e20) + 50 * Math.log10(1.45) * 0.1 + 25 ** 2 * 0.0005 * 0.3),
       ) < 0.001,
       "IA gain should use its softened high-level curve",
     );

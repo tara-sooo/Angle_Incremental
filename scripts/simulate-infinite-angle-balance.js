@@ -22,7 +22,7 @@ function parseArgs(argv) {
   const args = argv.slice(2);
   return {
     growthPower: parseNumberOption(args, "--growth-power", 0.1),
-    postLevelScale: parseNumberOption(args, "--post-scale", 0.1),
+    postLevelScale: parseNumberOption(args, "--post-scale", 0.3),
     maxSeconds: parseNumberOption(args, "--max-seconds", DEFAULT_MAX_SECONDS),
     stepSeconds: parseNumberOption(args, "--step", DEFAULT_STEP_SECONDS),
     initialIpLog10: parseNumberOption(args, "--initial-ip-log10", 5),
@@ -31,9 +31,11 @@ function parseArgs(argv) {
     generationCostThreshold: parseNumberOption(args, "--generation-cost", 1),
     infinityReserveMultiplier: parseNumberOption(args, "--infinity-reserve", 1.1),
     minimumInfinityGain: parseNumberOption(args, "--minimum-infinity-gain", 1),
+    progressSeconds: parseNumberOption(args, "--progress-seconds", 0),
     freezeLayers: args.includes("--freeze-layers"),
     disableCoreBoostAutomation: args.includes("--no-core-boost"),
     disableGenerationAutomation: args.includes("--no-generation"),
+    stopAtTarget: args.includes("--stop-at-target"),
     sweep: args.includes("--sweep"),
   };
 }
@@ -76,7 +78,7 @@ function configureIdealSnapshot(instance, options) {
   const { state } = debug;
   const allInfinityUpgrades = (1 << runtime.INFINITY_UPGRADES.length) - 1;
   const allChallenges = (1 << runtime.INFINITY_CHALLENGE_COUNT) - 1;
-  const allAchievements = (1 << runtime.ACHIEVEMENT_COUNT) - 1;
+  const allAchievements = (2 ** runtime.ACHIEVEMENT_COUNT) - 1;
 
   state.infinityCount = 10000;
   state.infinityUpgradeMask = allInfinityUpgrades;
@@ -168,6 +170,7 @@ function runSimulation(options) {
     configureIdealSnapshot(instance, options);
 
     let elapsed = 0;
+    let nextProgressAt = options.progressSeconds > 0 ? options.progressSeconds : Infinity;
     let infinityRuns = 0;
     let upgrades = 0;
     let towerBuiltAt = null;
@@ -257,6 +260,21 @@ function runSimulation(options) {
           progressMarks.set(mark, elapsed);
         }
       });
+      if (elapsed >= nextProgressAt) {
+        console.error(JSON.stringify({
+          elapsed,
+          ipLog10: runtime.log10ExactInfinityPoints(currentIp),
+          targetReachedAt,
+          infinityRuns,
+          levels: {
+            speed: runtime.state.infiniteAngleSpeedLevel,
+            vertex: runtime.state.infiniteAngleVertexLevel,
+            gain: runtime.state.infiniteAngleGainLevel,
+          },
+        }));
+        while (nextProgressAt <= elapsed) nextProgressAt += options.progressSeconds;
+      }
+      if (options.stopAtTarget && targetReachedAt !== null) return false;
       return !(targetReachedAt !== null && elapsed >= targetReachedAt + 24 * 60 * 60);
     };
 

@@ -93,6 +93,8 @@ Original prompt: では、中核ループを完成させてください
 - Softened IA upgrade growth to a dedicated curve: x1.40 / x1.50 / x1.45 with weak post-level-25 scaling and no shared staged cost scaling.
 - Further softened the IA cost curve to 0.10 growth and post-level scaling powers; the idealized simulation reaches the e50 IP Tower threshold in about 34.91 hours.
 - Shortened the IA-to-Tower path while preserving Infinity Score^0.3: IC8 IP scaling now divides by 1e20, IA per-vertex gain uses 0.011 × (level + 1), and fresh Generation automation defaults to 2x score improvement with a 1x cost threshold; the idealized 10-second simulation reaches Tower Floor1 in about 7.59 hours.
+- Added achievement 31, 六兆年と一夜の付き合い, for unlocking Infinite Angle; it multiplies Infinity Point gain by 100 and stacks with the existing IP achievement rewards.
+- Revisited the IA late-level cost curve after the achievement 31 simulation reached 1e50 IP in 277 seconds; increased the post-level cost scale from 0.10 to 0.30 while preserving the IC8 /1e20 IP correction and IA 0.011 × (level + 1) gain.
 - Infinity automation thresholds now use log-space storage and accept exponent notation while preserving the payable Infinity Point cap.
 - Prepared the 0.7.0 release pass for Infinite Angle and Tower, keeping Tower Challenge content deferred and SAVE_VERSION 10 unchanged.
 

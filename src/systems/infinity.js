@@ -107,6 +107,7 @@ function infinityPointGain() {
   let multiplier = 1;
   if (runtime.isAchievementUnlocked(17)) multiplier *= 2;
   if (runtime.isAchievementUnlocked(21)) multiplier *= 2;
+  if (runtime.isAchievementUnlocked(31)) multiplier *= 100;
   return gained * multiplier;
 }
 

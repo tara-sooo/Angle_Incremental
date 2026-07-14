@@ -19,8 +19,8 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { state } = instance.debug;
     const { runtime } = instance;
 
-    assert.equal(runtime.ACHIEVEMENT_COUNT, 30, "achievement total should be derived from the 30 definitions");
-    assert.equal(runtime.ACHIEVEMENTS.length, 30, "achievement definition array should contain 30 entries");
+    assert.equal(runtime.ACHIEVEMENT_COUNT, 31, "achievement total should be derived from the 31 definitions");
+    assert.equal(runtime.ACHIEVEMENTS.length, 31, "achievement definition array should contain 31 entries");
 
     state.achievementMask = 0;
     state.gainLevel = 10;
@@ -45,8 +45,28 @@ async function runAchievementV2ModuleRuntimeTest() {
     assert.equal(runtime.infinityPointGain(), 6, "achievement 21 should also double IP gain");
     state.achievementMask = (1 << (17 - 1)) | (1 << (21 - 1));
     assert.equal(runtime.infinityPointGain(), 12, "achievements 17 and 21 should stack to quadruple IP gain");
+    state.achievementMask = 1 << (31 - 1);
+    assert.equal(runtime.infinityPointGain(), 300, "achievement 31 should multiply IP gain by 100");
+    state.achievementMask = (1 << (17 - 1)) | (1 << (21 - 1)) | (1 << (31 - 1));
+    assert.equal(runtime.infinityPointGain(), 1200, "achievement 31 should multiply with achievements 17 and 21");
+    state.achievementMask = (1 << (17 - 1)) | (1 << (21 - 1));
     setLogResource(state, "score", 309);
     assert.equal(runtime.infinityPointGain(), 8, "achievement IP multipliers must preserve exact integer products before flooring");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
+    state.achievementMask = 0;
+    state.infiniteAngleUnlocked = false;
+    runtime.checkAchievements(false);
+    assert.equal(runtime.isAchievementUnlocked(31), false, "achievement 31 should require the IA unlock");
+
+    state.infiniteAngleUnlocked = true;
+    runtime.checkAchievements(false);
+    assert.equal(runtime.isAchievementUnlocked(31), true, "unlocking IA should unlock achievement 31");
   }
 
   {
@@ -158,6 +178,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     state.infinityPointsLog10 = 2;
     state.infinityUpgradeMask = (1 << 10) | (1 << 11);
     state.infiniteCapBroken = true;
+    state.infiniteAngleUnlocked = true;
     setLogResource(state, "score", 314);
     runtime.checkAchievements(false);
 
@@ -168,11 +189,12 @@ async function runAchievementV2ModuleRuntimeTest() {
     setLogResource(state, "score", 628.1);
     runtime.checkAchievements(false);
 
-    [15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 29, 30].forEach((id) => {
+    [15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 29, 30, 31].forEach((id) => {
       assert.equal(runtime.isAchievementUnlocked(id), true, `achievement ${id} should unlock from its condition`);
     });
     assert.equal(runtime.ACHIEVEMENTS[23].title.ja, "以前はlog10(score)-307でした", "achievement 24 should be the IU9-1 achievement");
     assert.equal(runtime.ACHIEVEMENTS[29].title.ja, "SDGsよりは簡単な課題", "achievement 30 should be the all-IC achievement");
+    assert.equal(runtime.ACHIEVEMENTS[30].title.ja, "六兆年と一夜の付き合い", "achievement 31 should be the IA unlock achievement");
   }
 
   {
@@ -232,7 +254,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     runtime.updateAchievementRows();
 
     const rows = runtime.elements.achievementList.querySelectorAll(".achievement-row");
-    assert.equal(rows.length, 30, "achievement rows should be rendered in the module runtime");
+    assert.equal(rows.length, 31, "achievement rows should be rendered in the module runtime");
 
     const firstReward = rows[0].querySelector(".achievement-reward");
     assert.equal(firstReward.textContent, "", "achievements without individual rewards should not repeat the shared reward");
@@ -252,6 +274,11 @@ async function runAchievementV2ModuleRuntimeTest() {
 
     assert.equal(rows[23].querySelector(".achievement-title").textContent, "以前はlog10(score)-307でした", "achievement 24 row should use the new order");
     assert.equal(rows[29].querySelector(".achievement-title").textContent, "SDGsよりは簡単な課題", "achievement 30 row should use the new order");
+
+    const achievement31Reward = rows[30].querySelector(".achievement-reward");
+    assert.equal(rows[30].querySelector(".achievement-title").textContent, "六兆年と一夜の付き合い", "achievement 31 row should use the new order");
+    assert.equal(achievement31Reward.textContent, "報酬: IP獲得量が×100", "achievement 31 should advertise the IP multiplier");
+    assert.equal(achievement31Reward.hidden, false, "achievement 31 reward should be visible");
   }
 
   console.log("Achievement v2 module runtime tests passed");
