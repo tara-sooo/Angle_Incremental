@@ -251,16 +251,17 @@ function update(dt) {
   runtime.state.floatingTexts = runtime.state.floatingTexts
     .map((item) => ({ ...item, life: item.life - dt, y: item.y - dt * 26 }))
     .filter((item) => item.life > 0);
+}
 
-  if (!offlineProcessing) {
-    autoSaveElapsed += dt;
-    if (autoSaveElapsed >= 5) runtime.saveGame("auto");
+function runRealTimeMaintenance(realSeconds) {
+  if (offlineProcessing || realSeconds <= 0) return;
+  autoSaveElapsed += realSeconds;
+  if (autoSaveElapsed >= 5) runtime.saveGame("auto");
 
-    updateCheckElapsed += dt;
-    if (updateCheckElapsed >= runtime.UPDATE_CHECK_INTERVAL_SECONDS) {
-      updateCheckElapsed = 0;
-      checkForRemoteUpdate();
-    }
+  updateCheckElapsed += realSeconds;
+  if (updateCheckElapsed >= runtime.UPDATE_CHECK_INTERVAL_SECONDS) {
+    updateCheckElapsed %= runtime.UPDATE_CHECK_INTERVAL_SECONDS;
+    checkForRemoteUpdate();
   }
 }
 
@@ -281,6 +282,7 @@ function advanceOnlineTime(realSeconds) {
     update(step);
     remaining -= step;
   }
+  runRealTimeMaintenance(realDt);
   return gameSeconds;
 }
 
@@ -302,15 +304,19 @@ function processOfflineElapsed(elapsedSeconds, source = "resume") {
   let processedTicks = 0;
   let timeFluxGained = 0;
   let capacityReached = false;
+  let requestedTicks = 0;
+  let precisionReduced = false;
 
   if (runtime.state.offlineProgressEnabled) {
     const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
     const maximumSeconds = tickCount * runtime.OFFLINE_PROGRESS_MAX_SECONDS_PER_TICK;
     simulatedSeconds = Math.min(elapsed, maximumSeconds);
-    processedTicks = Math.max(
+    requestedTicks = Math.max(
       1,
       Math.min(tickCount, Math.ceil(simulatedSeconds / runtime.MAX_SIMULATION_STEP_SECONDS)),
     );
+    processedTicks = Math.min(requestedTicks, runtime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS);
+    precisionReduced = processedTicks < requestedTicks;
     const tickSeconds = simulatedSeconds / processedTicks;
     offlineProcessing = true;
     try {
@@ -330,6 +336,8 @@ function processOfflineElapsed(elapsedSeconds, source = "resume") {
     elapsedSeconds: elapsed,
     simulatedSeconds,
     processedTicks,
+    requestedTicks,
+    precisionReduced,
     capped: runtime.state.offlineProgressEnabled && simulatedSeconds + 1e-9 < elapsed,
     offlineProgressEnabled: runtime.state.offlineProgressEnabled,
     timeFluxGained,
@@ -343,6 +351,7 @@ function processOfflineElapsed(elapsedSeconds, source = "resume") {
   };
   runtime.updateUi();
   runtime.saveGame("manual");
+  lastTime = currentFrameTime();
   return offlineReport;
 }
 

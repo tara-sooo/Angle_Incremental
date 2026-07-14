@@ -204,6 +204,20 @@ async function runInfiniteAngleModuleRuntimeTest() {
     runtime.updateUi();
     assert.match(runtime.elements.vertexGainValue.textContent, /e598/, "late-game vertex gain UI should use the log-backed value");
 
+    resetInfiniteAngleState(state);
+    state.infiniteAngleSpeedLevel = 0;
+    state.infiniteAngleVertexLevel = 0;
+    state.infiniteAngleGainLevel = 0;
+    const largeProgressDelta = runtime.MAX_VERTEX_PROGRESS_TRACKED * 2;
+    const largeProgressSeconds = runtime.infiniteAngleLapDuration() * largeProgressDelta / runtime.infiniteAngleVertexCount();
+    debug.updateInfiniteAngle(largeProgressSeconds);
+    assert.ok(
+      runtime.infiniteAngleCurrentGainLog10() >= Math.log10(0.011 * largeProgressDelta) - 1e-9,
+      "IA should preserve current gain across a progress delta larger than the tracking threshold",
+    );
+    assert.ok(runtime.currentInfiniteScoreLog10() > -Infinity, "IA should preserve score earned across a large progress delta");
+    assert.ok(state.infiniteAngleTotalVertexProgress < runtime.infiniteAngleVertexCount(), "large IA progress should wrap without losing the processed delta");
+
     state.infiniteAngleSpeedLevel = 1_000_000_000_000;
     debug.updateInfiniteAngle(1 / 60);
     assert.equal(Number.isFinite(state.infiniteAngleTotalVertexProgress), true, "extreme IA speed must keep progress finite");

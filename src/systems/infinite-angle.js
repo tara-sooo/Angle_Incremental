@@ -238,7 +238,7 @@ function updateInfiniteAngle(dt) {
   const previousAbsolute = runtime.state.infiniteAngleTotalVertexProgress;
   const rawProgressDelta = (dt / infiniteAngleLapDuration()) * vertices;
   const progressDelta = Number.isFinite(rawProgressDelta)
-    ? Math.min(rawProgressDelta, runtime.MAX_VERTEX_PROGRESS_TRACKED)
+    ? rawProgressDelta
     : runtime.MAX_VERTEX_PROGRESS_TRACKED;
   runtime.state.infiniteAngleTotalVertexProgress += progressDelta;
   const nearestVertex = Math.round(runtime.state.infiniteAngleTotalVertexProgress);

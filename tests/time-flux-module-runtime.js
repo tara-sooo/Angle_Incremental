@@ -47,6 +47,12 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(runtime.setTimeFluxSpeed(99), 60, "custom speed should clamp to x60");
   assert.equal(runtime.setTimeFluxSpeed(0), 1, "custom speed should clamp to x1");
 
+  runtime.autoSaveElapsed = 0;
+  state.timeFlux = 100;
+  state.timeFluxSpeed = 2;
+  debug.advanceOnlineTime(3);
+  assert.ok(Math.abs(runtime.autoSaveElapsed - 3) < 1e-9, "maintenance timers should use real seconds instead of accelerated game seconds");
+
   state.offlineProgressEnabled = false;
   state.timeFluxGainLevel = 0;
   state.timeFlux = 0;
@@ -60,7 +66,11 @@ async function runTimeFluxModuleRuntimeTest() {
   state.offlineProgressEnabled = true;
   state.timeFlux = 0;
   state.totalPlayTime = 0;
+  const originalFrameTime = runtime.currentFrameTime;
+  runtime.currentFrameTime = () => 1234;
   const progressReport = debug.processOfflineElapsed(1, "test");
+  assert.equal(runtime.lastTime, 1234, "offline resume should reset the frame clock");
+  runtime.currentFrameTime = originalFrameTime;
   assert.ok(Math.abs(state.totalPlayTime - 1) < 1e-9, "offline progress should advance total play time");
   assert.equal(state.timeFlux, 0, "offline progress should not also grant TF");
   assert.equal(progressReport.processedTicks, 30, "short offline intervals should use simulation-sized ticks");
@@ -91,6 +101,25 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.offlineProgressEnabled, true, "old saves should default to offline progress");
   assert.equal(state.offlineTickCount, 1000, "old saves should default to 1000 offline ticks");
   assert.equal(state.timeFlux, 0, "old saves should default to zero Time Flux");
+
+  const originalUpdate = runtime.update;
+  let offlineUpdateCalls = 0;
+  runtime.update = () => {
+    offlineUpdateCalls += 1;
+  };
+  try {
+    state.offlineProgressEnabled = true;
+    state.offlineTickCount = 1000000;
+    const boundedReport = debug.processOfflineElapsed(86400, "test");
+    assert.equal(
+      offlineUpdateCalls,
+      runtime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS,
+      "offline resume should enforce a synchronous tick safety limit",
+    );
+    assert.equal(boundedReport.precisionReduced, true, "the report should identify reduced offline precision");
+  } finally {
+    runtime.update = originalUpdate;
+  }
 
   const savedAt = Date.now() - 3600 * 1000;
   const loadedInstance = await loadRuntime(candidatePath, new Map([

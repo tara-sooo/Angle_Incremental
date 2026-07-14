@@ -20,7 +20,9 @@ function updateOfflineReportUi() {
     ? formatFluxTime(report.simulatedSeconds)
     : formatFluxTime(report.timeFluxGained);
   elements.offlineReportTicks.textContent = report.offlineProgressEnabled
-    ? String(report.processedTicks)
+    ? report.precisionReduced
+      ? `${report.processedTicks} / ${report.requestedTicks}`
+      : String(report.processedTicks)
     : "-";
   elements.offlineReportTimeFlux.textContent = report.offlineProgressEnabled
     ? formatFluxTime(0)
@@ -32,9 +34,11 @@ function updateOfflineReportUi() {
   elements.offlineReportIp.textContent = runtime.formatUiLogNumber(report.infinityPointsAfterLog10);
   elements.offlineReportNote.textContent = report.capped
     ? runtime.t("offlineReportCapped")
-    : report.capacityReached
-      ? runtime.t("offlineReportCapacityReached")
-      : "";
+    : report.precisionReduced
+      ? runtime.t("offlineReportPrecisionReduced")
+      : report.capacityReached
+        ? runtime.t("offlineReportCapacityReached")
+        : "";
 }
 
 function updateTimeFluxUi() {
