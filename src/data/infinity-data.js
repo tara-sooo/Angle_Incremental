@@ -44,7 +44,7 @@ const INFINITY_CHALLENGES = [
       ja: "角の数は3で固定され、CB必要スコアは^2される。角追加アップグレードは角を追加せず、頂点通過ごとの増加とスコア獲得量指数を上げる",
       en: "Vertices are fixed at 3 and Core Boost score requirements are squared. Vertex upgrades do not add vertices; they increase gain per vertex and the score gain exponent.",
     },
-    reward: { ja: "GRスコア倍率式が変化し、GRスコア倍率/1e21がIP獲得倍率にも適用される", en: "Changes the GR score multiplier formula and applies GR score multiplier / 1e21 to IP gain." },
+    reward: { ja: "GRスコア倍率式が変化し、GRスコア倍率/1e20がIP獲得倍率にも適用される", en: "Changes the GR score multiplier formula and applies GR score multiplier / 1e20 to IP gain." },
   },
 ];
 

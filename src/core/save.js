@@ -184,14 +184,22 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     0,
     runtime.sanitizeNumber(
       data.autoGenerationScoreMultiplierThreshold,
-      hasGenerationScoreMultiplierThreshold ? 1.1 : 1 + legacyScoreThreshold / 100,
+      hasGenerationScoreMultiplierThreshold
+        ? 2
+        : Object.prototype.hasOwnProperty.call(data, "autoGenerationScoreThreshold")
+          ? 1 + legacyScoreThreshold / 100
+          : 2,
     ),
   );
   runtime.state.autoGenerationCostMultiplierThreshold = Math.max(
     0,
     runtime.sanitizeNumber(
       data.autoGenerationCostMultiplierThreshold,
-      hasGenerationCostMultiplierThreshold ? 1.01 : migratedGenerationCostMultiplierThreshold,
+      hasGenerationCostMultiplierThreshold
+        ? 1
+        : Object.prototype.hasOwnProperty.call(data, "autoGenerationCostThreshold")
+          ? migratedGenerationCostMultiplierThreshold
+          : 1,
     ),
   );
   runtime.state.autoGenerationMinimumSeconds = Math.max(0, runtime.sanitizeNumber(data.autoGenerationMinimumSeconds, 0));
@@ -374,8 +382,8 @@ function resetSave() {
     autoBuyGain: true,
     autoCompleteChallenges: false,
     autoRunGeneration: false,
-    autoGenerationScoreMultiplierThreshold: 1.1,
-    autoGenerationCostMultiplierThreshold: 1.01,
+    autoGenerationScoreMultiplierThreshold: 2,
+    autoGenerationCostMultiplierThreshold: 1,
     autoGenerationMinimumSeconds: 0,
     autoGenerationLegacyOrMode: false,
     autoRunCoreBoost: false,

@@ -91,6 +91,8 @@ Original prompt: では、中核ループを完成させてください
 - Infinity now resets IA Score and transient IA progress while preserving the IA unlock and its upgrade levels; the IA canvas is rendered only in the active Infinity > IA subtab.
 - Raised IA's initial upgrade costs to 1e20 / 2.4e20 / 3.6e20 IP to match the 1e20 IP unlock scale; the 1e20-to-1e50 IP progression still needs a fresh-save playtest.
 - Softened IA upgrade growth to a dedicated curve: x1.40 / x1.50 / x1.45 with weak post-level-25 scaling and no shared staged cost scaling.
+- Further softened the IA cost curve to 0.10 growth and post-level scaling powers; the idealized simulation reaches the e50 IP Tower threshold in about 34.91 hours.
+- Shortened the IA-to-Tower path while preserving Infinity Score^0.3: IC8 IP scaling now divides by 1e20, IA per-vertex gain uses 0.011 × (level + 1), and fresh Generation automation defaults to 2x score improvement with a 1x cost threshold; the idealized 10-second simulation reaches Tower Floor1 in about 7.59 hours.
 - Prepared the 0.7.0 release pass for Infinite Angle and Tower, keeping Tower Challenge content deferred and SAVE_VERSION 10 unchanged.
 
 ## TODO

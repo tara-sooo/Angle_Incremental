@@ -144,8 +144,8 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     state.generationScoreMultiplier = 1e11;
     assert.equal(
       runtime.infinityPointGain(),
-      Math.floor(Math.max(1, Math.floor(400 - 307)) * 10),
-      "IC8 GR-derived IP multiplier must apply the effective score multiplier divided by 1e21",
+      Math.floor(Math.max(1, Math.floor(400 - 307)) * 100),
+      "IC8 GR-derived IP multiplier must apply the effective score multiplier divided by 1e20",
     );
 
     state.generationScoreMultiplierLog10 = 310;
@@ -545,6 +545,13 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     state.achievementMask = 1 << (19 - 1);
     assert.equal(runtime.runLayerAutomation(), true, "achievement 19 must unlock Core Boost automation");
     assert.equal(state.coreBoostCount, 1, "Core Boost automation should run once achievement 19 is unlocked");
+  }
+
+  {
+    const { debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    assert.equal(state.autoGenerationScoreMultiplierThreshold, 2, "new states should default Generation score automation to 2x");
+    assert.equal(state.autoGenerationCostMultiplierThreshold, 1, "new states should default Generation cost automation to 1x");
   }
 
   {

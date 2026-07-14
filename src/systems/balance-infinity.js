@@ -1,8 +1,10 @@
 import { runtime, expose } from "../runtime/shared.js";
 
+const IC8_IP_MULTIPLIER_DIVISOR_LOG10 = 20;
+
 function generationIpMultiplierLog10() {
   if (!runtime.isChallengeCompleted(8)) return 0;
-  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - 21);
+  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - IC8_IP_MULTIPLIER_DIVISOR_LOG10);
 }
 
 function floorWithFloatingPointTolerance(value) {
