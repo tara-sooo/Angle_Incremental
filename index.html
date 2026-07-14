@@ -29,12 +29,14 @@
           "./src/ui/render-infinity.js": "./src/ui/render-infinity.js?v=0.7.0",
           "./src/ui/render-achievements.js": "./src/ui/render-achievements.js?v=0.7.0",
           "./src/ui/render-automation.js": "./src/ui/render-automation.js?v=0.7.0",
+          "./src/ui/render-time-flux.js": "./src/ui/render-time-flux.js?v=0.7.0",
           "./src/ui/render-ui.js": "./src/ui/render-ui.js?v=0.7.0",
           "./src/systems/angle.js": "./src/systems/angle.js?v=0.7.0",
           "./src/systems/generation.js": "./src/systems/generation.js?v=0.7.0",
           "./src/systems/core-boost.js": "./src/systems/core-boost.js?v=0.7.0",
           "./src/systems/infinity.js": "./src/systems/infinity.js?v=0.7.0",
           "./src/systems/infinite-angle.js": "./src/systems/infinite-angle.js?v=0.7.0",
+          "./src/systems/time-flux.js": "./src/systems/time-flux.js?v=0.7.0",
           "./src/systems/balance.js": "./src/systems/balance.js?v=0.7.0",
           "./src/systems/balance-angle.js": "./src/systems/balance-angle.js?v=0.7.0",
           "./src/systems/balance-generation.js": "./src/systems/balance-generation.js?v=0.7.0",
@@ -72,6 +74,11 @@
           <span class="tab-icon">◆</span>
           <span class="tab-code">CHAL</span>
           <small id="challengeTabState">IC 0/8</small>
+        </button>
+        <button class="main-tab" type="button" data-tab="timeFlux" aria-selected="false">
+          <span class="tab-icon">◷</span>
+          <span class="tab-code">TF</span>
+          <small data-i18n="tabTimeFlux">Time Flux</small>
         </button>
         <button class="main-tab" type="button" data-tab="automation" aria-selected="false">
           <span class="tab-icon">⟳</span>
@@ -428,6 +435,93 @@
               <div id="towerChallengeList" class="challenge-list" aria-label="Tower Challenge list"></div>
             </section>
           </div>
+        </section>
+
+        <section id="timeFluxPanel" class="main-panel time-flux-panel" data-panel="timeFlux" aria-label="Time Flux">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">Time Flux</p>
+              <h1 data-i18n="timeFlux">Time Flux</h1>
+            </div>
+            <div class="unlock-note" id="timeFluxOfflineStatus">オフライン進行 有効</div>
+          </header>
+          <div class="time-flux-layout">
+            <section class="settings-card time-flux-overview">
+              <div class="panel-heading">
+                <span data-i18n="timeFluxBalance">Time Flux</span>
+                <strong id="timeFluxSpeed">×1</strong>
+              </div>
+              <div class="time-flux-metrics">
+                <div>
+                  <span data-i18n="timeFluxAmount">保有量 / 容量</span>
+                  <strong id="timeFluxAmount">0秒 / 30分</strong>
+                </div>
+                <div>
+                  <span data-i18n="timeFluxGain">獲得率</span>
+                  <strong id="timeFluxGain">6分/時</strong>
+                </div>
+              </div>
+              <div class="time-flux-speed-controls" aria-label="Time Flux speed">
+                <span data-i18n="timeFluxSpeedLabel">ゲーム速度</span>
+                <div class="segmented-control">
+                  <button class="time-flux-speed" type="button" data-speed="1" aria-pressed="true">×1</button>
+                  <button class="time-flux-speed" type="button" data-speed="2" aria-pressed="false">×2</button>
+                  <button class="time-flux-speed" type="button" data-speed="3" aria-pressed="false">×3</button>
+                </div>
+                <label class="time-flux-custom-speed" for="timeFluxCustomSpeedInput">
+                  <span data-i18n="timeFluxCustomSpeed">任意倍率</span>
+                  <input id="timeFluxCustomSpeedInput" type="number" min="4" max="60" step="1" value="4" />
+                </label>
+              </div>
+              <div class="setting-row">
+                <label for="timeFluxOfflineToggle" data-i18n="offlineProgress">オフライン進行</label>
+                <input id="timeFluxOfflineToggle" type="checkbox" checked />
+              </div>
+              <div class="setting-row">
+                <label for="timeFluxTickInput" data-i18n="offlineTickCount">オフラインティック数</label>
+                <input id="timeFluxTickInput" type="number" min="500" max="1000000" step="100" value="1000" />
+              </div>
+            </section>
+
+            <section class="settings-card time-flux-upgrades">
+              <div class="panel-heading">
+                <span data-i18n="timeFluxUpgrades">Time Flux強化</span>
+                <strong data-i18n="timeFluxPersistent">永続</strong>
+              </div>
+              <button id="timeFluxGainUpgrade" class="upgrade-button time-flux-upgrade" type="button">
+                <span>
+                  <b data-i18n="timeFluxGainUpgrade">TF獲得量</b>
+                  <small id="timeFluxGainLevel">レベル0</small>
+                </span>
+                <em id="timeFluxGainCost">必要 30分</em>
+                <strong id="timeFluxGainEffect">6分/時</strong>
+              </button>
+              <button id="timeFluxCapacityUpgrade" class="upgrade-button time-flux-upgrade" type="button">
+                <span>
+                  <b data-i18n="timeFluxCapacityUpgrade">TF容量</b>
+                  <small id="timeFluxCapacityLevel">レベル0</small>
+                </span>
+                <em id="timeFluxCapacityCost">必要 22分30秒</em>
+                <strong id="timeFluxCapacityEffect">30分</strong>
+              </button>
+            </section>
+          </div>
+          <section id="offlineReportPanel" class="time-flux-report" role="dialog" aria-live="polite" hidden>
+            <div class="panel-heading">
+              <span data-i18n="offlineReportTitle">離席中の進行</span>
+              <strong id="offlineReportMode">オフライン進行</strong>
+            </div>
+            <div class="time-flux-report-grid">
+              <div><span data-i18n="offlineReportElapsedLabel">離席時間</span><strong id="offlineReportElapsed">0秒</strong></div>
+              <div><span data-i18n="offlineReportEffectiveLabel">処理時間</span><strong id="offlineReportEffective">0秒</strong></div>
+              <div><span data-i18n="offlineReportTicksLabel">ティック数</span><strong id="offlineReportTicks">-</strong></div>
+              <div><span data-i18n="offlineReportTimeFluxLabel">獲得TF</span><strong id="offlineReportTimeFlux">0秒</strong></div>
+              <div><span data-i18n="offlineReportInfinityLabel">Infinity増加</span><strong id="offlineReportInfinity">+0</strong></div>
+              <div><span data-i18n="offlineReportIpLabel">現在IP</span><strong id="offlineReportIp">0</strong></div>
+            </div>
+            <p id="offlineReportNote"></p>
+            <button id="offlineReportClose" class="reset-button" type="button" data-i18n="offlineReportClose">閉じる</button>
+          </section>
         </section>
 
         <section class="main-panel automation-panel" data-panel="automation" aria-label="Automation">

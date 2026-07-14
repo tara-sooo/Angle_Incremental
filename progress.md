@@ -97,6 +97,8 @@ Original prompt: では、中核ループを完成させてください
 - Revisited the IA late-level cost curve after the achievement 31 simulation reached 1e50 IP in 277 seconds; increased the post-level cost scale from 0.10 to 0.30 while preserving the IC8 /1e20 IP correction and IA 0.011 × (level + 1) gain.
 - Infinity automation thresholds now use log-space storage and accept exponent notation while preserving the payable Infinity Point cap.
 - Prepared the 0.7.0 release pass for Infinite Angle and Tower, keeping Tower Challenge content deferred and SAVE_VERSION 10 unchanged.
+- Added Antimatter Dimensions-style offline progress with configurable coarse ticks, one-day-per-tick processing limits, visibility pause/resume handling, saved timestamps, and an offline result report.
+- Added a persistent Time Flux system with x1-x3 and custom x4-x60 online speed controls, TF gain/capacity upgrades, and mutually exclusive offline TF accumulation when offline progress is disabled.
 
 ## TODO
 

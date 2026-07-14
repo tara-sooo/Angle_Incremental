@@ -157,6 +157,18 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.currentInfinityRunTime = runtime.sanitizeNumber(data.currentInfinityRunTime, 0);
   runtime.state.fastestInfinityTime = runtime.sanitizeNumber(data.fastestInfinityTime, 0);
   runtime.state.lastInfinityRuns = runtime.sanitizeInfinityRunRecords(data.lastInfinityRuns);
+  runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(
+    data.offlineProgressEnabled,
+    runtime.OFFLINE_PROGRESS_DEFAULT_ENABLED,
+  );
+  runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
+  runtime.state.timeFluxCapacityLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxCapacityLevel, 0)));
+  runtime.state.timeFluxGainLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxGainLevel, 0)));
+  runtime.state.timeFlux = Math.min(
+    runtime.timeFluxCapacitySeconds(),
+    Math.max(0, runtime.sanitizeNumber(data.timeFlux, 0)),
+  );
+  runtime.state.timeFluxSpeed = runtime.clampTimeFluxSpeed(data.timeFluxSpeed);
   runtime.state.automationEnabled = runtime.sanitizeBoolean(data.automationEnabled, false);
   runtime.state.autoBuySpeed = runtime.sanitizeBoolean(data.autoBuySpeed, true);
   runtime.state.autoBuyVertex = runtime.sanitizeBoolean(data.autoBuyVertex, true);
@@ -280,8 +292,13 @@ function serializeSaveData() {
 }
 
 function saveGame(reason = "auto") {
+  if (runtime.offlineProcessing) return true;
   try {
-    localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(serializeSaveData()));
+    const savedAt = Date.now();
+    const saveData = serializeSaveData();
+    saveData.savedAt = savedAt;
+    localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(saveData));
+    if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt);
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(reason === "auto" ? runtime.t("savedAuto") : runtime.t("savedManual"));
     return true;
@@ -324,6 +341,13 @@ function loadGame() {
     }
 
     applySaveData(parsed.state, parsed.version);
+    const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
+    if (savedAt > 0 && runtime.processOfflineElapsed) {
+      if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt);
+      runtime.processOfflineElapsed(Math.max(0, (Date.now() - savedAt) / 1000), "load");
+    } else if (runtime.setOfflineBaseline) {
+      runtime.setOfflineBaseline(Date.now());
+    }
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(runtime.t("loaded"));
   } catch (error) {
@@ -336,6 +360,8 @@ function resetSave() {
   const confirmed = window.confirm(runtime.t("resetConfirm"));
   if (!confirmed) return;
   localStorage.removeItem(runtime.SAVE_KEY);
+  runtime.offlineReport = null;
+  if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(Date.now());
   Object.assign(runtime.state, {
     score: 0,
     scoreLog10: -Infinity,
@@ -387,6 +413,12 @@ function resetSave() {
     currentInfinityRunTime: 0,
     fastestInfinityTime: 0,
     lastInfinityRuns: [],
+    offlineProgressEnabled: true,
+    offlineTickCount: 1000,
+    timeFlux: 0,
+    timeFluxCapacityLevel: 0,
+    timeFluxGainLevel: 0,
+    timeFluxSpeed: 1,
     automationEnabled: false,
     autoBuySpeed: true,
     autoBuyVertex: true,

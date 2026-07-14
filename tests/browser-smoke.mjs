@@ -34,12 +34,14 @@ const EXPECTED_MODULE_PATHS = [
   "/src/ui/render-infinity.js",
   "/src/ui/render-achievements.js",
   "/src/ui/render-automation.js",
+  "/src/ui/render-time-flux.js",
   "/src/ui/render-ui.js",
   "/src/systems/angle.js",
   "/src/systems/generation.js",
   "/src/systems/core-boost.js",
   "/src/systems/infinity.js",
   "/src/systems/infinite-angle.js",
+  "/src/systems/time-flux.js",
   "/src/systems/balance.js",
   "/src/systems/balance-angle.js",
   "/src/systems/balance-generation.js",
@@ -167,7 +169,7 @@ try {
   });
   assert.deepEqual(
     tabStructure.mainTabs,
-    ["angle", "infinity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
+    ["angle", "infinity", "challenges", "timeFlux", "automation", "statistics", "achievements", "help", "settings"],
     "main tabs should place Challenges after Infinity",
   );
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
@@ -206,6 +208,70 @@ try {
   assert.equal(towerInitial.towerChallengeRows, 4, "TC placeholder rows should be visible");
   assert.match(towerInitial.towerChallengeButton, /今後のリリース/);
   assert.match(towerInitial.towerChallengeRestriction, /今後のリリース/);
+  const timeFluxInitial = await page.evaluate(() => {
+    const {
+      state,
+      switchMainTab,
+      setTimeFluxSpeed,
+      applySetting,
+      advanceOnlineTime,
+      processOfflineElapsed,
+    } = window.__angleDebug;
+    state.totalPlayTime = 0;
+    state.timeFlux = 10;
+    state.timeFluxSpeed = 1;
+    state.timeFluxGainLevel = 0;
+    state.timeFluxCapacityLevel = 0;
+    applySetting("offlineProgressEnabled", true);
+    switchMainTab("timeFlux");
+    window.advanceTime(0);
+    const initial = {
+      panelActive: Boolean(document.querySelector('[data-panel="timeFlux"]')?.classList.contains("is-active")),
+      amount: document.querySelector("#timeFluxAmount")?.textContent?.trim() ?? "",
+      gain: document.querySelector("#timeFluxGain")?.textContent?.trim() ?? "",
+      speed: document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "",
+      customSpeed: document.querySelector("#timeFluxCustomSpeedInput")?.value ?? "",
+    };
+    state.totalPlayTime = 0;
+    setTimeFluxSpeed(2);
+    advanceOnlineTime(1);
+    const accelerated = {
+      totalPlayTime: state.totalPlayTime,
+      timeFlux: state.timeFlux,
+      speed: document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "",
+    };
+    state.timeFlux = 0;
+    applySetting("offlineProgressEnabled", false);
+    const report = processOfflineElapsed(3600, "test");
+    const offline = {
+      mode: document.querySelector("#offlineReportMode")?.textContent?.trim() ?? "",
+      visible: document.querySelector("#offlineReportPanel")?.hidden === false,
+      gained: report?.timeFluxGained ?? 0,
+      totalPlayTime: state.totalPlayTime,
+    };
+    document.querySelector("#offlineReportClose")?.click();
+    applySetting("offlineProgressEnabled", true);
+    state.timeFlux = 0;
+    setTimeFluxSpeed(1);
+    switchMainTab("angle");
+    window.advanceTime(0);
+    return { initial, accelerated, offline };
+  });
+  assert.equal(timeFluxInitial.initial.panelActive, true, "Time Flux should activate as an independent main tab");
+  assert.match(timeFluxInitial.initial.amount, /10秒 \/ 30分/);
+  assert.match(timeFluxInitial.initial.gain, /6分0秒\/時/);
+  assert.equal(timeFluxInitial.initial.speed, "×1");
+  assert.equal(timeFluxInitial.initial.customSpeed, "4");
+  assert.ok(
+    Math.abs(timeFluxInitial.accelerated.totalPlayTime - 2) < 1e-9,
+    `x2 should advance two game seconds per real second (actual ${timeFluxInitial.accelerated.totalPlayTime})`,
+  );
+  assert.ok(Math.abs(timeFluxInitial.accelerated.timeFlux - 9) < 1e-9, "x2 should consume one TF per real second");
+  assert.equal(timeFluxInitial.accelerated.speed, "×2");
+  assert.equal(timeFluxInitial.offline.mode, "TF蓄積");
+  assert.equal(timeFluxInitial.offline.visible, true, "offline result should be shown after returning to the game");
+  assert.equal(timeFluxInitial.offline.gained, 360, "one hour offline should grant the base TF rate");
+  assert.ok(Math.abs(timeFluxInitial.offline.totalPlayTime - 2) < 1e-9, "TF accumulation should not advance game time");
   const newsTicker = await page.evaluate(() => {
     const ticker = document.querySelector("#newsTicker");
     const item = document.querySelector("#newsTickerText");

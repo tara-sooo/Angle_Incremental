@@ -53,6 +53,7 @@ function canSpend(amount) {
 }
 
 function updateUi() {
+  if (runtime.offlineProcessing) return;
   const currentCostLogs = runtime.costLogs();
   const unlockedAchievementsNow = runtime.checkAchievements(true);
   if (unlockedAchievementsNow.length > 0) runtime.saveGame("manual");
@@ -188,6 +189,7 @@ function updateUi() {
 
   runtime.updateAutomationUi();
   runtime.updateStatisticsUi();
+  runtime.updateTimeFluxUi();
 
   const unlockedAchievements = runtime.achievementCount();
   runtime.elements.achievementTabState.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT}`;

@@ -1420,6 +1420,129 @@ canvas {
   font-weight: 800;
 }
 
+.time-flux-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.time-flux-metrics,
+.time-flux-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.time-flux-metrics > div,
+.time-flux-report-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: rgba(7, 16, 31, 0.42);
+}
+
+.time-flux-metrics span,
+.time-flux-report-grid span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.time-flux-metrics strong,
+.time-flux-report-grid strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.time-flux-speed-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.time-flux-speed-controls > span,
+.time-flux-custom-speed span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(42px, 1fr));
+  gap: 4px;
+}
+
+.segmented-control button {
+  min-height: 34px;
+  padding: 4px 8px;
+  color: var(--muted);
+  background: #0b1324;
+  border: 1px solid var(--line-strong);
+  font-weight: 900;
+}
+
+.segmented-control button.is-active,
+.segmented-control button:hover:not(:disabled) {
+  color: white;
+  background: var(--blue);
+  border-color: var(--line-strong);
+}
+
+.time-flux-custom-speed {
+  display: grid;
+  gap: 4px;
+}
+
+.time-flux-custom-speed input {
+  width: 76px;
+  min-height: 34px;
+  color: var(--ink);
+  background: #0b1324;
+  border: 1px solid var(--line-strong);
+  padding: 4px 8px;
+  font-weight: 800;
+}
+
+.time-flux-upgrade {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.time-flux-upgrade > strong {
+  grid-column: 1 / -1;
+  color: var(--gold);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+.time-flux-report {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 2px solid var(--gold);
+  background: linear-gradient(180deg, rgba(47, 40, 26, 0.98), rgba(16, 19, 29, 0.98));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.3), inset 0 -3px 0 var(--gold);
+}
+
+.time-flux-report[hidden] {
+  display: none;
+}
+
+.time-flux-report p {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .save-panel strong {
   color: var(--muted);
   font-size: 0.84rem;
@@ -1743,8 +1866,19 @@ canvas {
   .tower-metrics,
   .settings-grid,
   .statistics-grid,
-  .help-list {
+  .help-list,
+  .time-flux-layout {
     grid-template-columns: 1fr;
+  }
+
+  .time-flux-speed-controls {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .time-flux-custom-speed {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    align-items: center;
   }
 
   .infinite-angle-panel .infinite-angle-playfield-wrap,

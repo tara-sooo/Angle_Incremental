@@ -17,6 +17,7 @@
 3. Core Boost で Generation 以下をリセットし、より強い恒久補正を得る。
 4. Infinity で下位進行をリセットし、Infinity Point と Infinity Upgrade を解放する。
 5. Infinity Challenge、Infinity Angle、Tower、Break Infinite Cap でInfinity後半を進める。
+6. オフライン進行と Time Flux で、離席中の進行とオンライン中の速度を管理する。
 
 ## 2. 用語
 
@@ -38,6 +39,8 @@
 | Infinity Score | IAの核到達で得るInfinity内スコア。^0.3後に通常の頂点獲得量へ乗算する。 |
 | Tower | IPで建設し、階数に応じてスコア累乗を強化するInfinity後の恒久要素。 |
 | Break Infinite Cap | Infinity後の強いスコアソフトキャップを恒久的に解除する要素。 |
+| オフライン進行 | 保存時刻との差分を、復帰時に複数の粗いティックとして処理する仕組み。 |
+| Time Flux / TF | オフライン進行を無効にしたときに蓄積され、オンライン中のゲーム速度に使う時間資源。 |
 
 ## 3. 基本ループ
 
@@ -459,6 +462,25 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTC�
 
 ## 14. 自動化と統計
 
+### オフライン進行
+
+ゲームは保存データの `savedAt` と現在時刻の差を離席時間として扱い、復帰時に既存のゲーム更新処理を指定回数の粗いティックへ分けて実行する。オフライン進行は初期状態で有効で、ティック数は500〜1,000,000の範囲で変更できる。1ティックあたりの処理対象時間は最大24時間で、指定ティック数を超える離席時間は処理上限として切り捨てる。
+
+オフライン進行を無効にしている場合、離席中にゲーム本体、統計時間、Infinityなどは進行しない。その代わり、離席時間に応じたTFだけを容量まで蓄積する。したがって、オフライン進行とTF蓄積は同時には発生しない。復帰時には処理時間、ティック数、Infinity増加、IP、TF獲得量をTime Fluxタブのレポートに表示する。
+
+### Time Flux
+
+TFはオンライン中だけ消費でき、Infinityを含むリセットを超えて保持される。初期TFは0秒、初期容量は30分とする。TF獲得量と容量の式は次の通り。
+
+```text
+1時間あたりのTF獲得量 = 3600 * (獲得量レベル + 1) / (獲得量レベル + 10) 秒
+TF容量 = 1800 * 2^容量レベル 秒
+獲得量強化コスト = 1800 * 1.3^獲得量レベル 秒
+容量強化コスト = 現在のTF容量 * 0.75 秒
+```
+
+ゲーム速度はx1、x2、x3、任意のx4〜x60から選ぶ。xNでは実時間1秒ごとに `(N - 1)` TFを消費し、TFが不足または0になった場合はx1へ戻る。TF強化はInfinityリセットでも失われない。Time FluxにはOF、TF変換、Time Warpは存在しない。
+
 ### 自動化
 
 | 解放条件 | 自動化 |
@@ -477,7 +499,7 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTC�
 
 ## 15. UI、ニュース、設定
 
-メインタブは The Angle、Infinity、Challenges、Automation、Statistics、Achievements、Help、Settings の順で構成する。Infinityタブ内には Upgrades、Infinite Angle、Tower の順でサブタブがある。Challengesタブ内には Infinity Challenge と Tower Challenge の順でサブタブがある。
+メインタブは The Angle、Infinity、Challenges、Time Flux、Automation、Statistics、Achievements、Help、Settings の順で構成する。Infinityタブ内には Upgrades、Infinite Angle、Tower の順でサブタブがある。Challengesタブ内には Infinity Challenge と Tower Challenge の順でサブタブがある。
 
 上部バーは設定で次の表示を選べる。
 
@@ -497,7 +519,7 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTC�
 
 セーブはローカルストレージへ自動保存し、手動保存とリセットも提供する。セーブコードは `ANGLE_SAVE_V2:` で始まり、AES-GCMを使って書き出し・読み込みする。
 
-主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower階数、Break Infinite Cap、Infinite Score、実績、自動化、統計、表示設定が含まれる。
+主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower階数、Break Infinite Cap、Infinite Score、実績、自動化、統計、表示設定、オフライン進行設定、Time Fluxとその強化レベルが含まれる。ローカルセーブには離席時間の基準となる `savedAt` も保存する。既存セーブに新しい項目がない場合は初期値へ移行し、SAVE_VERSIONは10のまま維持する。
 
 IPは大きい整数を正確に扱うため `infinityPointsExact` を正本にし、表示用に通常数値とlog10値を同期する。
 
@@ -555,6 +577,12 @@ totalPlayTime
 currentInfinityRunTime
 fastestInfinityTime
 lastInfinityRuns
+offlineProgressEnabled
+offlineTickCount
+timeFlux
+timeFluxCapacityLevel
+timeFluxGainLevel
+timeFluxSpeed
 automation settings
 display settings
 ```
