@@ -133,7 +133,8 @@ try {
   assert.equal(typeof snapshot.score, "string");
 
   const infinityAutomationThreshold = await page.evaluate(() => {
-    const { state, applySetting } = window.__angleDebug;
+    const { state, applySetting, switchMainTab } = window.__angleDebug;
+    switchMainTab("automation");
     const input = document.querySelector("#autoInfinityPointThresholdInput");
     applySetting("numberFormat", "scientific");
     applySetting("autoInfinityPointThreshold", "1e100");
@@ -144,12 +145,16 @@ try {
     applySetting("autoInfinityPointThreshold", compactValue);
     return {
       inputType: input?.type ?? "",
+      inputWidth: input?.getBoundingClientRect().width ?? 0,
+      inputHeight: input?.getBoundingClientRect().height ?? 0,
       scientificValue,
       compactValue,
       thresholdLog10: state.autoInfinityPointThresholdLog10,
     };
   });
   assert.equal(infinityAutomationThreshold.inputType, "text", "Infinity automation thresholds should use text input for exponent notation");
+  assert.ok(infinityAutomationThreshold.inputWidth >= 110, "Infinity automation threshold input should keep the numeric field width");
+  assert.ok(infinityAutomationThreshold.inputHeight >= 34, "Infinity automation threshold input should keep the numeric field height");
   assert.equal(infinityAutomationThreshold.scientificValue, "1.00e100", "scientific Infinity thresholds should display in exponent notation");
   assert.equal(infinityAutomationThreshold.compactValue, "1.00B", "compact Infinity thresholds should display in compact notation");
   assert.equal(infinityAutomationThreshold.thresholdLog10, 9, "compact Infinity threshold input should round-trip through log space");

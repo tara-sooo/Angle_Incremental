@@ -1400,7 +1400,8 @@ canvas {
   accent-color: var(--blue);
 }
 
-.setting-row input[type="number"] {
+.setting-row input[type="number"],
+.setting-row input[type="text"] {
   width: 110px;
   min-height: 34px;
   color: var(--ink);
