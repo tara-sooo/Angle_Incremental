@@ -131,6 +131,29 @@ try {
   assert.equal(snapshot.vertices, 3);
   assert.equal(snapshot.infinity.count, 0);
   assert.equal(typeof snapshot.score, "string");
+
+  const infinityAutomationThreshold = await page.evaluate(() => {
+    const { state, applySetting } = window.__angleDebug;
+    const input = document.querySelector("#autoInfinityPointThresholdInput");
+    applySetting("numberFormat", "scientific");
+    applySetting("autoInfinityPointThreshold", "1e100");
+    const scientificValue = input?.value ?? "";
+    applySetting("numberFormat", "compact");
+    applySetting("autoInfinityPointThreshold", "1e9");
+    const compactValue = input?.value ?? "";
+    applySetting("autoInfinityPointThreshold", compactValue);
+    return {
+      inputType: input?.type ?? "",
+      scientificValue,
+      compactValue,
+      thresholdLog10: state.autoInfinityPointThresholdLog10,
+    };
+  });
+  assert.equal(infinityAutomationThreshold.inputType, "text", "Infinity automation thresholds should use text input for exponent notation");
+  assert.equal(infinityAutomationThreshold.scientificValue, "1.00e100", "scientific Infinity thresholds should display in exponent notation");
+  assert.equal(infinityAutomationThreshold.compactValue, "1.00B", "compact Infinity thresholds should display in compact notation");
+  assert.equal(infinityAutomationThreshold.thresholdLog10, 9, "compact Infinity threshold input should round-trip through log space");
+
   const tabStructure = await page.evaluate(() => {
     const mainTabs = Array.from(document.querySelectorAll(".main-tab"), (button) => button.dataset.tab);
     const infinityTabs = Array.from(document.querySelectorAll(".infinity-subtab"), (button) => button.dataset.infinityTab);

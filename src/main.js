@@ -174,7 +174,13 @@ function runLayerAutomation() {
     && runtime.state.autoRunInfinity
     && runtime.state.infinityCount > 0
     && runtime.canInfinity()
-    && runtime.infinityPointGain() >= Math.max(1, runtime.state.autoInfinityPointThreshold)
+    && runtime.infinityPointGainLog10() >= Math.max(
+      0,
+      runtime.sanitizeLog10(
+        runtime.state.autoInfinityPointThresholdLog10,
+        runtime.log10Value(Math.max(1, runtime.state.autoInfinityPointThreshold)),
+      ),
+    )
   ) {
     runtime.runInfinity(false);
     return true;
@@ -461,6 +467,7 @@ function renderGameToText() {
       coreBoost: runtime.state.autoRunCoreBoost,
       infinity: runtime.state.autoRunInfinity,
       infinityPointThreshold: runtime.state.autoInfinityPointThreshold,
+      infinityPointThresholdLog10: runtime.state.autoInfinityPointThresholdLog10,
     },
     statistics: {
       totalPlayTime: Number(runtime.state.totalPlayTime.toFixed(1)),

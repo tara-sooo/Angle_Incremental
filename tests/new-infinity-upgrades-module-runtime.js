@@ -533,6 +533,44 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
   {
     const { runtime, debug } = await loadRuntime(candidatePath);
     const { state } = debug;
+    assert.equal(runtime.parseUiLogNumber("1e100"), 100, "Infinity thresholds should parse scientific notation");
+    assert.equal(runtime.parseUiLogNumber("1.00B"), 9, "Infinity thresholds should parse compact notation");
+
+    runtime.applySaveData({ autoInfinityPointThreshold: "1e100" }, 10);
+    assert.equal(state.autoInfinityPointThresholdLog10, 100, "legacy Infinity threshold saves should migrate to log space");
+    assert.equal(state.autoInfinityPointThreshold, 1e100, "migrated Infinity thresholds should keep their numeric cache");
+
+    runtime.applySaveData({ autoInfinityPointThreshold: 10, autoInfinityPointThresholdLog10: 400 }, 10);
+    assert.equal(state.autoInfinityPointThresholdLog10, 400, "saved Infinity threshold logs should take precedence");
+    assert.equal(state.autoInfinityPointThreshold, Number.MAX_VALUE, "large Infinity thresholds should cap only their numeric cache");
+
+    state.infinityUpgradeMask = purchasedMaskThrough(12);
+    state.automationEnabled = true;
+    state.autoRunInfinity = true;
+    state.autoRunGeneration = false;
+    state.autoRunCoreBoost = false;
+    state.infinityCount = 1;
+    state.infiniteCapBroken = true;
+    setLogResource(state, "score", 700);
+    assert.ok(runtime.infinityPointGainLog10() < 400, "payable Infinity gain should remain below an over-cap threshold");
+    assert.equal(runtime.runLayerAutomation(), false, "over-cap Infinity thresholds must not trigger automation");
+
+    state.numberFormat = "scientific";
+    assert.equal(runtime.formatUiLogNumber(100), "1.00e100", "scientific formatting should display Infinity thresholds as exponents");
+    state.numberFormat = "compact";
+  }
+
+  {
+    const source = await loadRuntime(candidatePath);
+    source.runtime.applySetting("autoInfinityPointThreshold", "1e400");
+    const reloaded = await loadRuntime(candidatePath, source.storage);
+    assert.equal(reloaded.debug.state.autoInfinityPointThresholdLog10, 400, "log-space Infinity thresholds should survive local saves");
+    assert.equal(reloaded.debug.state.autoInfinityPointThreshold, Number.MAX_VALUE, "reloaded large thresholds should retain their capped numeric cache");
+  }
+
+  {
+    const { runtime, debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
     state.infinityUpgradeMask = purchasedMaskThrough(12);
     state.automationEnabled = true;
     state.autoRunGeneration = true;
@@ -552,6 +590,7 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     const { state } = debug;
     assert.equal(state.autoGenerationScoreMultiplierThreshold, 2, "new states should default Generation score automation to 2x");
     assert.equal(state.autoGenerationCostMultiplierThreshold, 1, "new states should default Generation cost automation to 1x");
+    assert.equal(state.autoInfinityPointThresholdLog10, 1, "new states should default Infinity automation to 10 IP");
   }
 
   {

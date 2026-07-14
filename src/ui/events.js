@@ -68,7 +68,11 @@ function applySetting(key, value) {
     runtime.state.autoGenerationMinimumSeconds = Math.max(0, Number(value) || 0);
     runtime.state.autoGenerationLegacyOrMode = false;
   }
-  if (key === "autoInfinityPointThreshold") runtime.state.autoInfinityPointThreshold = Math.max(1, Number(value) || 1);
+  if (key === "autoInfinityPointThreshold") {
+    const thresholdLog10 = Math.max(0, runtime.parseUiLogNumber(value, 0));
+    runtime.state.autoInfinityPointThresholdLog10 = thresholdLog10;
+    runtime.state.autoInfinityPointThreshold = runtime.valueFromLog10(thresholdLog10);
+  }
   runtime.updateUi();
   runtime.draw();
   runtime.saveGame("manual");

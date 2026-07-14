@@ -110,6 +110,10 @@ function infinityPointGain() {
   return gained * multiplier;
 }
 
+function infinityPointGainLog10() {
+  return runtime.log10Value(runtime.infinityPointGain());
+}
+
 function canSpendInfinityPoints(costLog10) {
   runtime.normalizeInfinityPointState();
   return runtime.currentExactInfinityPoints() >= runtime.exactInfinityPointsFromCostLog10(costLog10);
@@ -295,6 +299,7 @@ expose("challengeRestriction", () => challengeRestriction, (value) => { challeng
 expose("challengeReward", () => challengeReward, (value) => { challengeReward = value; });
 expose("canInfinity", () => canInfinity, (value) => { canInfinity = value; });
 expose("infinityPointGain", () => infinityPointGain, (value) => { infinityPointGain = value; });
+expose("infinityPointGainLog10", () => infinityPointGainLog10, (value) => { infinityPointGainLog10 = value; });
 expose("canSpendInfinityPoints", () => canSpendInfinityPoints, (value) => { canSpendInfinityPoints = value; });
 expose("addInfinityPoints", () => addInfinityPoints, (value) => { addInfinityPoints = value; });
 expose("spendInfinityPoints", () => spendInfinityPoints, (value) => { spendInfinityPoints = value; });

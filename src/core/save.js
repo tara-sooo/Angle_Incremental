@@ -209,7 +209,18 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   );
   runtime.state.autoRunCoreBoost = runtime.sanitizeBoolean(data.autoRunCoreBoost, false);
   runtime.state.autoRunInfinity = runtime.sanitizeBoolean(data.autoRunInfinity, false);
-  runtime.state.autoInfinityPointThreshold = Math.max(1, runtime.sanitizeNumber(data.autoInfinityPointThreshold, 10));
+  const savedAutoInfinityPointThresholdLog10 = runtime.sanitizeLog10(
+    data.autoInfinityPointThresholdLog10,
+    null,
+  );
+  const autoInfinityPointThresholdLog10 = Math.max(
+    0,
+    savedAutoInfinityPointThresholdLog10 === null
+      ? runtime.parseUiLogNumber(data.autoInfinityPointThreshold, runtime.log10Value(10))
+      : savedAutoInfinityPointThresholdLog10,
+  );
+  runtime.state.autoInfinityPointThresholdLog10 = autoInfinityPointThresholdLog10;
+  runtime.state.autoInfinityPointThreshold = runtime.valueFromLog10(autoInfinityPointThresholdLog10);
   runtime.state.currentGenerationRunTime = Math.max(0, runtime.sanitizeNumber(data.currentGenerationRunTime, 0));
   runtime.state.ic8VertexDecayElapsed = runtime.sanitizeNumber(data.ic8VertexDecayElapsed, 0);
   runtime.state.noGenerationCoreBoostReached = Boolean(data.noGenerationCoreBoostReached);
@@ -389,6 +400,7 @@ function resetSave() {
     autoRunCoreBoost: false,
     autoRunInfinity: false,
     autoInfinityPointThreshold: 10,
+    autoInfinityPointThresholdLog10: 1,
     currentGenerationRunTime: 0,
     ic8VertexDecayElapsed: 0,
     noGenerationCoreBoostReached: false,
