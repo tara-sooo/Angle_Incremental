@@ -60,13 +60,15 @@ function log10Number(value) {
   return value > 0 ? Math.log10(value) : -Infinity;
 }
 
-function advanceSimulation(runtime, debug, duration) {
+function advanceSimulation(runtime, debug, duration, onStep) {
   let remaining = duration;
   while (remaining > 0) {
     const step = Math.min(runtime.MAX_SIMULATION_STEP_SECONDS, remaining);
     debug.update(step);
+    if (onStep(step) === false) return false;
     remaining -= step;
   }
+  return true;
 }
 
 function configureIdealSnapshot(instance, options) {
@@ -195,11 +197,7 @@ function runSimulation(options) {
 
     upgrades += buyCheapestInfiniteAngleUpgrades(runtime, debug);
 
-    while (elapsed < options.maxSeconds) {
-      const interval = Math.min(options.stepSeconds, options.maxSeconds - elapsed);
-      advanceSimulation(runtime, debug, interval);
-      elapsed += interval;
-
+    const processSimulationStep = () => {
       if (runtime.state.generationCount !== previousGenerationCount) {
         const multiplierEffectLog10 = runtime.generationScoreMultiplierEffectLog10();
         const ic8MultiplierLog10 = runtime.isChallengeCompleted(8)
@@ -259,7 +257,15 @@ function runSimulation(options) {
           progressMarks.set(mark, elapsed);
         }
       });
-      if (targetReachedAt !== null && elapsed >= targetReachedAt + 24 * 60 * 60) break;
+      return !(targetReachedAt !== null && elapsed >= targetReachedAt + 24 * 60 * 60);
+    };
+
+    while (elapsed < options.maxSeconds) {
+      const interval = Math.min(options.stepSeconds, options.maxSeconds - elapsed);
+      if (!advanceSimulation(runtime, debug, interval, (step) => {
+        elapsed += step;
+        return processSimulationStep();
+      })) break;
     }
 
     return {
