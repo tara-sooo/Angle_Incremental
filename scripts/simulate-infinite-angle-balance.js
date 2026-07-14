@@ -4,8 +4,9 @@ const { loadRuntime } = require("../tests/runtime-harness-esm.js");
 
 const candidatePath = path.join(__dirname, "..", "src", "main.js");
 const UPGRADE_ORDER = ["speed", "vertex", "gain"];
-const DEFAULT_MAX_SECONDS = 7 * 24 * 60 * 60;
-const DEFAULT_STEP_SECONDS = 0.1;
+// Keep the no-argument check short; long projections opt in with --max-seconds.
+const DEFAULT_MAX_SECONDS = 5 * 60;
+const DEFAULT_STEP_SECONDS = 10;
 const TARGET_LOG10 = 50;
 const TOWER_FLOOR_ONE_LOG10 = 50;
 
@@ -57,6 +58,15 @@ function reserveForUpgrade(cost, multiplier) {
 
 function log10Number(value) {
   return value > 0 ? Math.log10(value) : -Infinity;
+}
+
+function advanceSimulation(runtime, debug, duration) {
+  let remaining = duration;
+  while (remaining > 0) {
+    const step = Math.min(runtime.MAX_SIMULATION_STEP_SECONDS, remaining);
+    debug.update(step);
+    remaining -= step;
+  }
 }
 
 function configureIdealSnapshot(instance, options) {
@@ -186,8 +196,9 @@ function runSimulation(options) {
     upgrades += buyCheapestInfiniteAngleUpgrades(runtime, debug);
 
     while (elapsed < options.maxSeconds) {
-      debug.update(options.stepSeconds);
-      elapsed += options.stepSeconds;
+      const interval = Math.min(options.stepSeconds, options.maxSeconds - elapsed);
+      advanceSimulation(runtime, debug, interval);
+      elapsed += interval;
 
       if (runtime.state.generationCount !== previousGenerationCount) {
         const multiplierEffectLog10 = runtime.generationScoreMultiplierEffectLog10();
