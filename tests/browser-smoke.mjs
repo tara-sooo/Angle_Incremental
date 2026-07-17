@@ -134,6 +134,42 @@ try {
   assert.equal(snapshot.infinity.count, 0);
   assert.equal(typeof snapshot.score, "string");
 
+  const generationPreview = await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    const original = {
+      generationCount: state.generationCount,
+      previousGenerationScore: state.previousGenerationScore,
+      previousGenerationScoreLog10: state.previousGenerationScoreLog10,
+      numberFormat: state.numberFormat,
+    };
+    state.generationCount = 0;
+    state.previousGenerationScore = 0;
+    state.previousGenerationScoreLog10 = -Infinity;
+    window.advanceTime(0);
+    const notRun = document.querySelector("#previousGenerationScore")?.textContent?.trim() ?? "";
+    state.generationCount = 1;
+    state.previousGenerationScore = 1e9;
+    state.previousGenerationScoreLog10 = 9;
+    state.numberFormat = "scientific";
+    window.advanceTime(0);
+    const scientific = document.querySelector("#previousGenerationScore")?.textContent?.trim() ?? "";
+    state.numberFormat = "compact";
+    window.advanceTime(0);
+    const compact = document.querySelector("#previousGenerationScore")?.textContent?.trim() ?? "";
+    Object.assign(state, original);
+    window.advanceTime(0);
+    return {
+      headerStatusExists: Boolean(document.querySelector("#generationStatus")),
+      notRun,
+      scientific,
+      compact,
+    };
+  });
+  assert.equal(generationPreview.headerStatusExists, false, "the redundant Angle header Generation status should be removed");
+  assert.equal(generationPreview.notRun, "未実行", "the previous GR score should identify an unrun Generation");
+  assert.equal(generationPreview.scientific, "1.00e9", "the previous GR score should respect scientific formatting");
+  assert.equal(generationPreview.compact, "1.00B", "the previous GR score should respect compact formatting");
+
   const infinityAutomationThreshold = await page.evaluate(() => {
     const { state, applySetting, switchMainTab } = window.__angleDebug;
     switchMainTab("automation");

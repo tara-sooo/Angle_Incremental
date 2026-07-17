@@ -89,21 +89,13 @@ function updateUi() {
   runtime.elements.gainUpgrade.disabled = !runtime.canBuyNormalUpgrade("gain");
   runtime.elements.buyAllUpgrade.disabled = !runtime.canBuyNormalUpgrade("speed") && !runtime.canBuyNormalUpgrade("vertex") && !runtime.canBuyNormalUpgrade("gain");
 
-  const unlocked = runtime.currentTotalScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE);
   const ready = runtime.canRunGeneration();
-  const waitingPrevious = unlocked
-    && runtime.state.generationCount > 0
-    && runtime.currentGenerationScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE)
-    && !ready;
-  runtime.elements.generationStatus.textContent = ready
-    ? runtime.t("generationReady")
-    : waitingPrevious
-      ? runtime.t("generationWaitingPrevious")
-      : unlocked
-      ? runtime.t("generationUnlocked")
-      : runtime.t("generationLocked");
   runtime.elements.generationButton.disabled = !ready;
   runtime.elements.generationCount.textContent = String(runtime.state.generationCount);
+  const previousGenerationScoreLog10 = runtime.currentPreviousGenerationScoreLog10();
+  runtime.elements.previousGenerationScore.textContent = Number.isFinite(previousGenerationScoreLog10)
+    ? runtime.formatUiLogNumber(previousGenerationScoreLog10)
+    : runtime.t("generationNotRun");
   const nextGeneration = runtime.nextGenerationValues();
   runtime.elements.generationMultiplier.textContent = formatMultiplierLogPreview(runtime.generationScoreMultiplierEffectLog10(), nextGeneration.scoreMultiplierLog10);
   runtime.elements.generationCostFactor.textContent = formatMultiplierPreview(runtime.generationCostFactorEffect(), nextGeneration.costFactor);

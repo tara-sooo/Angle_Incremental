@@ -306,13 +306,6 @@ h1 {
   text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
 }
 
-.generation-status {
-  color: var(--gold);
-  font-weight: 900;
-  white-space: nowrap;
-  padding-bottom: 8px;
-}
-
 .playfield-wrap {
   min-height: 180px;
   padding: 10px;
@@ -2320,11 +2313,6 @@ canvas {
 
   .stage-panel .eyebrow {
     font-size: 0.68rem;
-  }
-
-  .generation-status {
-    padding-bottom: 0;
-    font-size: 0.86rem;
   }
 
   .playfield-wrap {
