@@ -47,9 +47,14 @@ function updateTimeFluxUi() {
   const state = runtime.state;
   const capacity = runtime.timeFluxCapacity();
   const speed = runtime.clampTimeFluxSpeed(state.timeFluxSpeed);
-  elements.timeFluxAmount.textContent = `${formatFluxTime(state.timeFlux)} / ${formatFluxTime(capacity)}`;
+  const amountText = `${formatFluxTime(state.timeFlux)} / ${formatFluxTime(capacity)}`;
+  elements.timeFluxAmount.textContent = amountText;
+  elements.timeFluxQuickAmount.textContent = amountText;
   elements.timeFluxGain.textContent = `${formatFluxTime(runtime.timeFluxGain())}/${runtime.t("hourShort")}`;
-  elements.timeFluxSpeed.textContent = `×${speed}`;
+  const speedText = `×${speed}`;
+  elements.timeFluxSpeed.textContent = speedText;
+  elements.timeFluxQuickSpeed.textContent = speedText;
+  elements.timeFluxQuickBar.hidden = !state.showTimeFluxQuickBar;
   elements.timeFluxOfflineStatus.textContent = state.offlineProgressEnabled
     ? runtime.t("offlineProgressEnabled")
     : runtime.t("offlineProgressDisabled");
@@ -70,10 +75,9 @@ function updateTimeFluxUi() {
   });
   runtime.syncFormControl(elements.timeFluxOfflineToggle, state.offlineProgressEnabled);
   runtime.syncFormControl(elements.timeFluxTickInput, state.offlineTickCount);
-  runtime.syncFormControl(
-    elements.timeFluxCustomSpeedInput,
-    speed >= 4 ? speed : 4,
-  );
+  const customSpeed = speed >= 4 ? speed : 4;
+  runtime.syncFormControl(elements.timeFluxCustomSpeedInput, customSpeed);
+  runtime.syncFormControl(elements.timeFluxQuickCustomSpeedInput, customSpeed);
   updateOfflineReportUi();
 }
 

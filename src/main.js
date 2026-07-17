@@ -566,6 +566,7 @@ function renderGameToText() {
       language: runtime.state.language,
       numberFormat: runtime.state.numberFormat,
       timeUnit: runtime.state.timeUnit,
+      showTimeFluxQuickBar: runtime.state.showTimeFluxQuickBar,
       activeMainTab,
       activeInfinitySubtab,
       activeChallengeSubtab,

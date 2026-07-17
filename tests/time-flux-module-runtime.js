@@ -11,6 +11,7 @@ async function runTimeFluxModuleRuntimeTest() {
 
   assert.equal(state.offlineProgressEnabled, true, "offline progress should default to enabled");
   assert.equal(state.offlineTickCount, 1000, "offline ticks should default to 1000");
+  assert.equal(state.showTimeFluxQuickBar, true, "the Time Flux quick bar should default to visible");
   assert.equal(state.timeFlux, 0, "new saves should start without Time Flux");
   assert.equal(runtime.timeFluxCapacity(), 1800, "initial Time Flux capacity should be 30 minutes");
   assert.equal(runtime.timeFluxGain(), 360, "initial Time Flux gain should be six minutes per hour");
@@ -87,10 +88,12 @@ async function runTimeFluxModuleRuntimeTest() {
   state.timeFluxCapacityLevel = 2;
   state.timeFluxGainLevel = 3;
   state.timeFluxSpeed = 4;
+  state.showTimeFluxQuickBar = false;
   const serialized = runtime.serializeSaveData();
   assert.equal(serialized.state.timeFlux, 123, "Time Flux should be included in local saves");
   assert.equal(serialized.state.timeFluxCapacityLevel, 2, "Time Flux upgrade levels should be saved");
   assert.equal(serialized.state.timeFluxSpeed, 4, "the selected custom speed should be saved");
+  assert.equal(serialized.state.showTimeFluxQuickBar, false, "the Time Flux quick bar setting should be saved");
 
   runtime.resetBelowInfinity();
   assert.equal(state.timeFlux, 123, "Infinity resets should preserve Time Flux");
@@ -101,6 +104,7 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.offlineProgressEnabled, true, "old saves should default to offline progress");
   assert.equal(state.offlineTickCount, 1000, "old saves should default to 1000 offline ticks");
   assert.equal(state.timeFlux, 0, "old saves should default to zero Time Flux");
+  assert.equal(state.showTimeFluxQuickBar, true, "old saves should default to a visible Time Flux quick bar");
 
   const originalUpdate = runtime.update;
   let offlineUpdateCalls = 0;

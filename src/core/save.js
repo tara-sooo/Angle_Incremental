@@ -271,6 +271,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.numberFormat = runtime.normalizeChoice(data.numberFormat, ["compact", "scientific", "detailed"], data.detailedNumbers ? "detailed" : "compact");
   runtime.state.timeUnit = runtime.normalizeChoice(data.timeUnit, ["auto", "seconds", "milliseconds"], "auto");
   runtime.state.topBarMode = runtime.normalizeChoice(data.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
+  runtime.state.showTimeFluxQuickBar = data.showTimeFluxQuickBar !== false;
   const lastEarned = runtime.hydrateLogResource(data.lastEarned, data.lastEarnedLog10);
   runtime.state.lastEarned = lastEarned.value;
   runtime.state.lastEarnedLog10 = lastEarned.log;
@@ -445,6 +446,7 @@ function resetSave() {
     numberFormat: "compact",
     timeUnit: "auto",
     topBarMode: "news",
+    showTimeFluxQuickBar: true,
     floatingTexts: [],
     lastEarned: 0,
     lastEarnedLog10: -Infinity,

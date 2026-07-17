@@ -85,6 +85,7 @@ const state = {
   numberFormat: "compact",
   timeUnit: "auto",
   topBarMode: "news",
+  showTimeFluxQuickBar: true,
   floatingTexts: [],
   lastEarned: 0,
   lastEarnedLog10: -Infinity,
@@ -173,6 +174,7 @@ const SAVE_FIELDS = [
   "numberFormat",
   "timeUnit",
   "topBarMode",
+  "showTimeFluxQuickBar",
   "lastEarned",
   "lastEarnedLog10",
 ];

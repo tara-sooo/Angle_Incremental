@@ -126,6 +126,9 @@ function bindEvents() {
   runtime.elements.timeFluxCustomSpeedInput.addEventListener("change", () => runtime.setTimeFluxSpeed(
     runtime.elements.timeFluxCustomSpeedInput.value,
   ));
+  runtime.elements.timeFluxQuickCustomSpeedInput.addEventListener("change", () => runtime.setTimeFluxSpeed(
+    runtime.elements.timeFluxQuickCustomSpeedInput.value,
+  ));
   runtime.elements.offlineReportClose.addEventListener("click", () => {
     runtime.offlineReport = null;
     runtime.updateUi();
@@ -159,6 +162,10 @@ function bindEvents() {
   runtime.elements.numberFormatSelect.addEventListener("change", () => applySetting("numberFormat", runtime.elements.numberFormatSelect.value));
   runtime.elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", runtime.elements.timeUnitSelect.value));
   runtime.elements.topBarModeSelect.addEventListener("change", () => applySetting("topBarMode", runtime.elements.topBarModeSelect.value));
+  runtime.elements.timeFluxQuickBarToggle.addEventListener("change", () => applySetting(
+    "showTimeFluxQuickBar",
+    runtime.elements.timeFluxQuickBarToggle.checked,
+  ));
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);

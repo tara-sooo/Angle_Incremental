@@ -58,6 +58,26 @@
         </div>
       </section>
 
+      <section id="timeFluxQuickBar" class="time-flux-quickbar" aria-label="Time Flux quick controls">
+        <div class="time-flux-quick-summary">
+          <span data-i18n="timeFlux">Time Flux</span>
+          <strong id="timeFluxQuickAmount">0秒 / 30分</strong>
+        </div>
+        <div class="time-flux-quick-speed">
+          <span data-i18n="timeFluxSpeedLabel">ゲーム速度</span>
+          <strong id="timeFluxQuickSpeed">×1</strong>
+          <div class="segmented-control">
+            <button class="time-flux-speed" type="button" data-speed="1" aria-pressed="true">×1</button>
+            <button class="time-flux-speed" type="button" data-speed="2" aria-pressed="false">×2</button>
+            <button class="time-flux-speed" type="button" data-speed="3" aria-pressed="false">×3</button>
+          </div>
+          <label class="time-flux-custom-speed" for="timeFluxQuickCustomSpeedInput">
+            <span data-i18n="timeFluxCustomSpeed">任意倍率</span>
+            <input id="timeFluxQuickCustomSpeedInput" class="time-flux-custom-speed-input" type="number" min="4" max="60" step="1" value="4" />
+          </label>
+        </div>
+      </section>
+
       <nav class="main-tabs" aria-label="Main tabs">
         <button class="main-tab is-active" type="button" data-tab="angle" aria-selected="true">
           <span class="tab-icon">△</span>
@@ -473,7 +493,7 @@
                 </div>
                 <label class="time-flux-custom-speed" for="timeFluxCustomSpeedInput">
                   <span data-i18n="timeFluxCustomSpeed">任意倍率</span>
-                  <input id="timeFluxCustomSpeedInput" type="number" min="4" max="60" step="1" value="4" />
+                  <input id="timeFluxCustomSpeedInput" class="time-flux-custom-speed-input" type="number" min="4" max="60" step="1" value="4" />
                 </label>
               </div>
               <div class="setting-row">
@@ -707,6 +727,10 @@
                   <option value="blank">ブランク</option>
                   <option value="hidden">隠す</option>
                 </select>
+              </div>
+              <div class="setting-row">
+                <label for="timeFluxQuickBarToggle" data-i18n="timeFluxQuickBar">TFクイックバー</label>
+                <input id="timeFluxQuickBarToggle" type="checkbox" checked />
               </div>
               <div class="setting-row">
                 <label for="floatingTextToggle" data-i18n="floatingText">浮遊テキスト</label>

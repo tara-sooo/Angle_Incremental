@@ -258,7 +258,34 @@ try {
     state.timeFluxSpeed = 1;
     state.timeFluxGainLevel = 0;
     state.timeFluxCapacityLevel = 0;
+    applySetting("showTimeFluxQuickBar", true);
     applySetting("offlineProgressEnabled", true);
+    switchMainTab("angle");
+    window.advanceTime(0);
+    const quickBarInitial = {
+      visible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
+      amount: document.querySelector("#timeFluxQuickAmount")?.textContent?.trim() ?? "",
+      speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
+      customSpeed: document.querySelector("#timeFluxQuickCustomSpeedInput")?.value ?? "",
+    };
+    document.querySelector('#timeFluxQuickBar .time-flux-speed[data-speed="2"]')?.click();
+    const quickBarChanged = {
+      stateSpeed: state.timeFluxSpeed,
+      speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
+    };
+    switchMainTab("timeFlux");
+    window.advanceTime(0);
+    const tabMirrored = document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "";
+    document.querySelector('#timeFluxPanel .time-flux-speed[data-speed="3"]')?.click();
+    const quickBarMirrored = document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "";
+    applySetting("showTimeFluxQuickBar", false);
+    const hiddenQuickBar = document.querySelector("#timeFluxQuickBar")?.hidden === true;
+    applySetting("showTimeFluxQuickBar", true);
+    applySetting("topBarMode", "hidden");
+    const quickBarWithHiddenTopBar = document.querySelector("#timeFluxQuickBar")?.hidden === false;
+    applySetting("topBarMode", "news");
+    setTimeFluxSpeed(1);
+    state.timeFlux = 10;
     switchMainTab("timeFlux");
     window.advanceTime(0);
     const initial = {
@@ -291,8 +318,28 @@ try {
     setTimeFluxSpeed(1);
     switchMainTab("angle");
     window.advanceTime(0);
-    return { initial, accelerated, offline };
+    return {
+      initial,
+      accelerated,
+      offline,
+      quickBarInitial,
+      quickBarChanged,
+      tabMirrored,
+      quickBarMirrored,
+      hiddenQuickBar,
+      quickBarWithHiddenTopBar,
+    };
   });
+  assert.equal(timeFluxInitial.quickBarInitial.visible, true, "the Time Flux quick bar should be visible on other tabs");
+  assert.match(timeFluxInitial.quickBarInitial.amount, /10秒 \/ 30分/);
+  assert.equal(timeFluxInitial.quickBarInitial.speed, "×1");
+  assert.equal(timeFluxInitial.quickBarInitial.customSpeed, "4");
+  assert.equal(timeFluxInitial.quickBarChanged.stateSpeed, 2, "the quick bar should change the shared Time Flux speed");
+  assert.equal(timeFluxInitial.quickBarChanged.speed, "×2");
+  assert.equal(timeFluxInitial.tabMirrored, "×2", "the Time Flux tab should mirror quick bar speed changes");
+  assert.equal(timeFluxInitial.quickBarMirrored, "×3", "the quick bar should mirror Time Flux tab speed changes");
+  assert.equal(timeFluxInitial.hiddenQuickBar, true, "the quick bar visibility setting should hide only the quick bar");
+  assert.equal(timeFluxInitial.quickBarWithHiddenTopBar, true, "the quick bar should be independent from top bar visibility");
   assert.equal(timeFluxInitial.initial.panelActive, true, "Time Flux should activate as an independent main tab");
   assert.match(timeFluxInitial.initial.amount, /10秒 \/ 30分/);
   assert.match(timeFluxInitial.initial.gain, /6分0秒\/時/);
@@ -343,6 +390,21 @@ try {
   });
   assert.equal(topBarModes.value, "news", "top bar mode should default to news");
   assert.deepEqual(topBarModes.options, ["news", "resources", "progress", "blank", "hidden"], "top bar mode select should expose all display modes");
+  const quickBarSetting = await page.evaluate(() => {
+    const toggle = document.querySelector("#timeFluxQuickBarToggle");
+    const before = toggle?.checked === true;
+    toggle?.click();
+    const hidden = document.querySelector("#timeFluxQuickBar")?.hidden === true;
+    toggle?.click();
+    return {
+      before,
+      hidden,
+      restored: document.querySelector("#timeFluxQuickBar")?.hidden === false,
+    };
+  });
+  assert.equal(quickBarSetting.before, true, "the TF quick bar setting should default to enabled");
+  assert.equal(quickBarSetting.hidden, true, "the TF quick bar setting should hide the quick bar");
+  assert.equal(quickBarSetting.restored, true, "the TF quick bar setting should restore the quick bar");
   const addedJapaneseNews = await page.evaluate(() => {
     const item = document.querySelector("#newsTickerText");
     window.__angleDebug.applySetting("language", "ja");
@@ -417,14 +479,18 @@ try {
   const hiddenTopBar = await page.evaluate(() => {
     window.__angleDebug.applySetting("topBarMode", "hidden");
     const ticker = document.querySelector("#newsTicker");
+    const quickBar = document.querySelector("#timeFluxQuickBar");
     const panels = document.querySelector(".main-panels");
     return {
       hidden: Boolean(ticker?.hidden),
+      quickBarVisible: quickBar?.hidden === false,
+      quickBarBottom: quickBar?.getBoundingClientRect().bottom ?? 0,
       panelTop: panels?.getBoundingClientRect().top ?? 0,
     };
   });
   assert.equal(hiddenTopBar.hidden, true, "hidden top bar should hide the bar");
-  assert.ok(hiddenTopBar.panelTop < 20, "hidden top bar should let the main panels move upward");
+  assert.equal(hiddenTopBar.quickBarVisible, true, "hidden top bar should not hide the independent Time Flux quick bar");
+  assert.ok(hiddenTopBar.panelTop >= hiddenTopBar.quickBarBottom - 1, "main panels should remain below the visible Time Flux quick bar");
   const restoredNewsTopBar = await page.evaluate(() => {
     window.__angleDebug.applySetting("topBarMode", "news");
     const item = document.querySelector("#newsTickerText");
