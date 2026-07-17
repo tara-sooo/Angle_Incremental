@@ -503,21 +503,45 @@ try {
   assert.equal(restoredNewsTopBar.animated, true, "news mode should restore scrolling animation");
   const fpsPlacement = await page.evaluate(() => {
     window.__angleDebug.applySetting("topBarMode", "news");
+    window.__angleDebug.applySetting("showTimeFluxQuickBar", true);
     window.__angleDebug.applySetting("showFps", true);
     const ticker = document.querySelector("#newsTicker")?.getBoundingClientRect();
     const track = document.querySelector(".news-track")?.getBoundingClientRect();
     const fps = document.querySelector("#fpsCounter")?.getBoundingClientRect();
     window.__angleDebug.applySetting("topBarMode", "hidden");
+    const hiddenQuickBarBottom = document.querySelector("#timeFluxQuickBar")?.getBoundingClientRect().bottom ?? 0;
     const hiddenTop = document.querySelector("#fpsCounter")?.getBoundingClientRect().top ?? 999;
     return {
       insideTopBar: Boolean(ticker && fps && fps.top >= ticker.top && fps.bottom <= ticker.bottom),
       clearOfNewsText: Boolean(track && fps && track.right <= fps.left),
+      hiddenQuickBarBottom,
       hiddenTop,
     };
   });
   assert.equal(fpsPlacement.insideTopBar, true, "FPS counter should fit inside the visible top bar");
   assert.equal(fpsPlacement.clearOfNewsText, true, "FPS counter should not overlap the news text track");
-  assert.ok(fpsPlacement.hiddenTop < 30, "FPS counter should return to the top when the top bar is hidden");
+  assert.ok(fpsPlacement.hiddenTop >= fpsPlacement.hiddenQuickBarBottom - 1, "FPS counter should stay below the visible Time Flux quick bar");
+  const achievementToastPlacement = await page.evaluate(() => {
+    const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+    window.__angleDebug.applySetting("topBarMode", "news");
+    const normalQuickBar = rect("#timeFluxQuickBar");
+    const normalToasts = rect("#achievementToasts");
+    window.__angleDebug.applySetting("topBarMode", "hidden");
+    const hiddenQuickBar = rect("#timeFluxQuickBar");
+    const hiddenToasts = rect("#achievementToasts");
+    const hiddenFps = rect("#fpsCounter");
+    window.__angleDebug.applySetting("topBarMode", "news");
+    return {
+      normalQuickBarBottom: normalQuickBar?.bottom ?? 0,
+      normalToastTop: normalToasts?.top ?? 0,
+      hiddenQuickBarBottom: hiddenQuickBar?.bottom ?? 0,
+      hiddenToastTop: hiddenToasts?.top ?? 0,
+      hiddenFpsBottom: hiddenFps?.bottom ?? 0,
+    };
+  });
+  assert.ok(achievementToastPlacement.normalToastTop >= achievementToastPlacement.normalQuickBarBottom - 1, "achievement toasts should stay below the visible Time Flux quick bar");
+  assert.ok(achievementToastPlacement.hiddenToastTop >= achievementToastPlacement.hiddenQuickBarBottom - 1, "hidden top bar achievement toasts should stay below the visible Time Flux quick bar");
+  assert.ok(achievementToastPlacement.hiddenToastTop >= achievementToastPlacement.hiddenFpsBottom - 1, "hidden top bar achievement toasts should stay below the FPS counter");
   const breakCapPlacement = await page.evaluate(() => {
     const breakCap = document.querySelector("#breakCapButton");
     const subtabs = document.querySelector(".infinity-subtabs");
