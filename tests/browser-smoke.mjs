@@ -530,6 +530,13 @@ try {
     const hiddenQuickBar = rect("#timeFluxQuickBar");
     const hiddenToasts = rect("#achievementToasts");
     const hiddenFps = rect("#fpsCounter");
+    const originalRootFontSize = document.documentElement.style.fontSize;
+    document.documentElement.style.fontSize = "32px";
+    window.__angleDebug.applySetting("topBarMode", "hidden");
+    const largeQuickBar = rect("#timeFluxQuickBar");
+    const largeToasts = rect("#achievementToasts");
+    const largeFps = rect("#fpsCounter");
+    document.documentElement.style.fontSize = originalRootFontSize;
     window.__angleDebug.applySetting("topBarMode", "news");
     return {
       normalQuickBarBottom: normalQuickBar?.bottom ?? 0,
@@ -537,11 +544,16 @@ try {
       hiddenQuickBarBottom: hiddenQuickBar?.bottom ?? 0,
       hiddenToastTop: hiddenToasts?.top ?? 0,
       hiddenFpsBottom: hiddenFps?.bottom ?? 0,
+      largeQuickBarBottom: largeQuickBar?.bottom ?? 0,
+      largeToastTop: largeToasts?.top ?? 0,
+      largeFpsBottom: largeFps?.bottom ?? 0,
     };
   });
   assert.ok(achievementToastPlacement.normalToastTop >= achievementToastPlacement.normalQuickBarBottom - 1, "achievement toasts should stay below the visible Time Flux quick bar");
   assert.ok(achievementToastPlacement.hiddenToastTop >= achievementToastPlacement.hiddenQuickBarBottom - 1, "hidden top bar achievement toasts should stay below the visible Time Flux quick bar");
   assert.ok(achievementToastPlacement.hiddenToastTop >= achievementToastPlacement.hiddenFpsBottom - 1, "hidden top bar achievement toasts should stay below the FPS counter");
+  assert.ok(achievementToastPlacement.largeToastTop >= achievementToastPlacement.largeQuickBarBottom - 1, "large text achievement toasts should stay below the visible Time Flux quick bar");
+  assert.ok(achievementToastPlacement.largeToastTop >= achievementToastPlacement.largeFpsBottom - 1, "large text achievement toasts should stay below the FPS counter");
   const breakCapPlacement = await page.evaluate(() => {
     const breakCap = document.querySelector("#breakCapButton");
     const subtabs = document.querySelector(".infinity-subtabs");

@@ -15,6 +15,7 @@
   --violet: #7256d9;
   --green: #3ba36e;
   --disabled: #4c566f;
+  --fps-counter-height: 0px;
   --time-flux-quickbar-overlay-top: 0px;
   font-family: "Noto Sans JP", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -1702,7 +1703,10 @@ canvas {
 }
 
 .top-bar-hidden .achievement-toasts {
-  top: calc(max(18px, var(--time-flux-quickbar-overlay-top)) + 38px);
+  top: max(
+    58px,
+    calc(max(18px, var(--time-flux-quickbar-overlay-top)) + var(--fps-counter-height) + 8px)
+  );
 }
 
 .achievement-toast {
