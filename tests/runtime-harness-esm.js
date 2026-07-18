@@ -124,7 +124,7 @@ function createContext(initialStorage = new Map()) {
     },
     querySelectorAll: (selector) => {
       const values = selector === ".main-tab" || selector === ".main-panel"
-        ? ["angle", "infinity", "challenges", "automation", "statistics", "achievements", "help", "settings"]
+        ? ["angle", "infinity", "challenges", "timeFlux", "automation", "statistics", "achievements", "help", "settings"]
         : selector === ".infinity-subtab" || selector === ".infinity-subpanel"
           ? ["upgrades", "angle", "tower"]
           : selector === ".challenge-subtab" || selector === ".challenge-subpanel"
@@ -142,9 +142,11 @@ function createContext(initialStorage = new Map()) {
       });
     },
     documentElement: new FakeElement("html"),
+    hidden: false,
     fonts: null,
     fullscreenElement: null,
     head: new FakeElement("head"),
+    addEventListener() {},
     exitFullscreen() {},
     execCommand() {
       return true;

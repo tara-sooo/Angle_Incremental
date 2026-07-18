@@ -15,12 +15,14 @@ import "./ui/render-challenges.js";
 import "./ui/render-infinity.js";
 import "./ui/render-achievements.js";
 import "./ui/render-automation.js";
+import "./ui/render-time-flux.js";
 import "./ui/render-ui.js";
 import "./systems/angle.js";
 import "./systems/generation.js";
 import "./systems/core-boost.js";
 import "./systems/infinity.js";
 import "./systems/infinite-angle.js";
+import "./systems/time-flux.js";
 import "./ui/events.js";
 import "./systems/balance.js";
 
@@ -36,6 +38,9 @@ let activeChallengeSubtab = "ic";
 let selectedInfinityUpgradeId = "1-1";
 let appliedLanguage = "";
 let smoothedFps = 0;
+let offlineBaselineTimestamp = Date.now();
+let offlineProcessing = false;
+let offlineReport = null;
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
@@ -174,7 +179,13 @@ function runLayerAutomation() {
     && runtime.state.autoRunInfinity
     && runtime.state.infinityCount > 0
     && runtime.canInfinity()
-    && runtime.infinityPointGain() >= Math.max(1, runtime.state.autoInfinityPointThreshold)
+    && runtime.infinityPointGainLog10() >= Math.max(
+      0,
+      runtime.sanitizeLog10(
+        runtime.state.autoInfinityPointThresholdLog10,
+        runtime.log10Value(Math.max(1, runtime.state.autoInfinityPointThreshold)),
+      ),
+    )
   ) {
     runtime.runInfinity(false);
     return true;
@@ -240,15 +251,124 @@ function update(dt) {
   runtime.state.floatingTexts = runtime.state.floatingTexts
     .map((item) => ({ ...item, life: item.life - dt, y: item.y - dt * 26 }))
     .filter((item) => item.life > 0);
+}
 
-  autoSaveElapsed += dt;
+function runRealTimeMaintenance(realSeconds) {
+  if (offlineProcessing || realSeconds <= 0) return;
+  autoSaveElapsed += realSeconds;
   if (autoSaveElapsed >= 5) runtime.saveGame("auto");
 
-  updateCheckElapsed += dt;
+  updateCheckElapsed += realSeconds;
   if (updateCheckElapsed >= runtime.UPDATE_CHECK_INTERVAL_SECONDS) {
-    updateCheckElapsed = 0;
+    updateCheckElapsed %= runtime.UPDATE_CHECK_INTERVAL_SECONDS;
     checkForRemoteUpdate();
   }
+}
+
+function advanceOnlineTime(realSeconds) {
+  const realDt = Math.max(0, runtime.sanitizeNumber(realSeconds, 0));
+  if (realDt <= 0) return 0;
+  const selectedSpeed = runtime.clampTimeFluxSpeed(runtime.state.timeFluxSpeed);
+  const requestedExtra = realDt * Math.max(0, selectedSpeed - 1);
+  const consumed = runtime.consumeTimeFlux(requestedExtra);
+  const gameSeconds = realDt + consumed;
+  if (consumed + 1e-12 < requestedExtra || (selectedSpeed > 1 && runtime.state.timeFlux <= 1e-12)) {
+    runtime.state.timeFluxSpeed = 1;
+  }
+
+  let remaining = gameSeconds;
+  while (remaining > 0) {
+    const step = Math.min(runtime.MAX_SIMULATION_STEP_SECONDS, remaining);
+    update(step);
+    remaining -= step;
+  }
+  runRealTimeMaintenance(realDt);
+  return gameSeconds;
+}
+
+function offlineSnapshot() {
+  return {
+    infinityCount: runtime.state.infinityCount,
+    infinityPointsLog10: runtime.currentInfinityPointsLog10(),
+    infiniteScoreLog10: runtime.currentInfiniteScoreLog10(),
+    timeFlux: runtime.state.timeFlux,
+    totalPlayTime: runtime.state.totalPlayTime,
+  };
+}
+
+function processOfflineElapsed(elapsedSeconds, source = "resume") {
+  const elapsed = Math.max(0, runtime.sanitizeNumber(elapsedSeconds, 0));
+  if (elapsed <= 0) return null;
+  const before = offlineSnapshot();
+  let simulatedSeconds = 0;
+  let processedTicks = 0;
+  let timeFluxGained = 0;
+  let capacityReached = false;
+  let requestedTicks = 0;
+  let precisionReduced = false;
+
+  if (runtime.state.offlineProgressEnabled) {
+    const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
+    const maximumSeconds = tickCount * runtime.OFFLINE_PROGRESS_MAX_SECONDS_PER_TICK;
+    simulatedSeconds = Math.min(elapsed, maximumSeconds);
+    requestedTicks = Math.max(
+      1,
+      Math.min(tickCount, Math.ceil(simulatedSeconds / runtime.MAX_SIMULATION_STEP_SECONDS)),
+    );
+    processedTicks = Math.min(requestedTicks, runtime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS);
+    precisionReduced = processedTicks < requestedTicks;
+    const tickSeconds = simulatedSeconds / processedTicks;
+    offlineProcessing = true;
+    try {
+      for (let tick = 0; tick < processedTicks; tick += 1) update(tickSeconds);
+    } finally {
+      offlineProcessing = false;
+    }
+  } else {
+    const theoreticalGain = runtime.timeFluxGainPerHour() * elapsed / 3600;
+    timeFluxGained = runtime.addTimeFlux(theoreticalGain);
+    capacityReached = timeFluxGained + 1e-9 < theoreticalGain;
+  }
+
+  const after = offlineSnapshot();
+  offlineReport = {
+    source,
+    elapsedSeconds: elapsed,
+    simulatedSeconds,
+    processedTicks,
+    requestedTicks,
+    precisionReduced,
+    capped: runtime.state.offlineProgressEnabled && simulatedSeconds + 1e-9 < elapsed,
+    offlineProgressEnabled: runtime.state.offlineProgressEnabled,
+    timeFluxGained,
+    capacityReached,
+    infinityCountBefore: before.infinityCount,
+    infinityCountAfter: after.infinityCount,
+    infinityPointsBeforeLog10: before.infinityPointsLog10,
+    infinityPointsAfterLog10: after.infinityPointsLog10,
+    infiniteScoreBeforeLog10: before.infiniteScoreLog10,
+    infiniteScoreAfterLog10: after.infiniteScoreLog10,
+  };
+  runtime.updateUi();
+  runtime.saveGame("manual");
+  lastTime = currentFrameTime();
+  return offlineReport;
+}
+
+function setOfflineBaseline(timestamp = Date.now()) {
+  const value = runtime.sanitizeNumber(timestamp, Date.now());
+  offlineBaselineTimestamp = Number.isFinite(value) ? value : Date.now();
+}
+
+function handleVisibilityChange() {
+  if (document.hidden) {
+    runtime.saveGame("auto");
+    setOfflineBaseline(Date.now());
+    return;
+  }
+  const elapsed = Math.max(0, (Date.now() - offlineBaselineTimestamp) / 1000);
+  if (elapsed > 0) processOfflineElapsed(elapsed, "visibility");
+  else setOfflineBaseline(Date.now());
 }
 
 function currentFrameTime() {
@@ -268,10 +388,14 @@ function frame(now) {
     smoothedFps = smoothedFps === 0 ? instantFps : smoothedFps * 0.9 + instantFps * 0.1;
   }
   lastTime = now;
+  if (document.hidden) {
+    requestNextFrame(frame);
+    return;
+  }
   let remaining = dt;
   while (remaining > 0) {
     const step = Math.min(runtime.MAX_SIMULATION_STEP_SECONDS, remaining);
-    update(step);
+    advanceOnlineTime(step);
     remaining -= step;
   }
   uiUpdateElapsed += dt;
@@ -442,6 +566,7 @@ function renderGameToText() {
       language: runtime.state.language,
       numberFormat: runtime.state.numberFormat,
       timeUnit: runtime.state.timeUnit,
+      showTimeFluxQuickBar: runtime.state.showTimeFluxQuickBar,
       activeMainTab,
       activeInfinitySubtab,
       activeChallengeSubtab,
@@ -461,12 +586,24 @@ function renderGameToText() {
       coreBoost: runtime.state.autoRunCoreBoost,
       infinity: runtime.state.autoRunInfinity,
       infinityPointThreshold: runtime.state.autoInfinityPointThreshold,
+      infinityPointThresholdLog10: runtime.state.autoInfinityPointThresholdLog10,
     },
     statistics: {
       totalPlayTime: Number(runtime.state.totalPlayTime.toFixed(1)),
       currentInfinityRunTime: Number(runtime.state.currentInfinityRunTime.toFixed(1)),
       fastestInfinityTime: runtime.state.fastestInfinityTime > 0 ? Number(runtime.state.fastestInfinityTime.toFixed(1)) : null,
       lastInfinityRuns: runtime.state.lastInfinityRuns,
+    },
+    timeFlux: {
+      amount: Number(runtime.state.timeFlux.toPrecision(6)),
+      capacity: Number(runtime.timeFluxCapacity().toPrecision(6)),
+      gainPerHour: Number(runtime.timeFluxGain().toPrecision(6)),
+      capacityLevel: runtime.state.timeFluxCapacityLevel,
+      gainLevel: runtime.state.timeFluxGainLevel,
+      speed: runtime.state.timeFluxSpeed,
+      offlineProgressEnabled: runtime.state.offlineProgressEnabled,
+      offlineTickCount: runtime.state.offlineTickCount,
+      report: offlineReport,
     },
   });
 }
@@ -483,6 +620,9 @@ expose("activeChallengeSubtab", () => activeChallengeSubtab, (value) => { active
 expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => { selectedInfinityUpgradeId = value; });
 expose("appliedLanguage", () => appliedLanguage, (value) => { appliedLanguage = value; });
 expose("smoothedFps", () => smoothedFps, (value) => { smoothedFps = value; });
+expose("offlineBaselineTimestamp", () => offlineBaselineTimestamp, (value) => { offlineBaselineTimestamp = value; });
+expose("offlineProcessing", () => offlineProcessing, (value) => { offlineProcessing = value; });
+expose("offlineReport", () => offlineReport, (value) => { offlineReport = value; });
 expose("requestNextFrame", () => requestNextFrame);
 expose("shouldShowUpdateModal", () => shouldShowUpdateModal, (value) => { shouldShowUpdateModal = value; });
 expose("closeUpdateModal", () => closeUpdateModal, (value) => { closeUpdateModal = value; });
@@ -495,6 +635,10 @@ expose("runAutobuyers", () => runAutobuyers, (value) => { runAutobuyers = value;
 expose("shouldAutoRunGeneration", () => shouldAutoRunGeneration, (value) => { shouldAutoRunGeneration = value; });
 expose("runLayerAutomation", () => runLayerAutomation, (value) => { runLayerAutomation = value; });
 expose("update", () => update, (value) => { update = value; });
+expose("advanceOnlineTime", () => advanceOnlineTime, (value) => { advanceOnlineTime = value; });
+expose("processOfflineElapsed", () => processOfflineElapsed, (value) => { processOfflineElapsed = value; });
+expose("setOfflineBaseline", () => setOfflineBaseline, (value) => { setOfflineBaseline = value; });
+expose("handleVisibilityChange", () => handleVisibilityChange, (value) => { handleVisibilityChange = value; });
 expose("currentFrameTime", () => currentFrameTime, (value) => { currentFrameTime = value; });
 expose("lastTime", () => lastTime, (value) => { lastTime = value; });
 expose("frame", () => frame, (value) => { frame = value; });
@@ -502,7 +646,7 @@ expose("renderGameToText", () => renderGameToText, (value) => { renderGameToText
 window.render_game_to_text = renderGameToText;
 window.advanceTime = (ms) => {
   const steps = Math.max(1, Math.round(ms / (1000 / 60)));
-  for (let i = 0; i < steps; i += 1) update(1 / 60);
+  for (let i = 0; i < steps; i += 1) advanceOnlineTime(1 / 60);
   uiUpdateElapsed = 0;
   runtime.updateUi();
   drawActiveView();
@@ -521,6 +665,8 @@ window.__angleDebug = {
   generationScoreMultiplierEffectLog10: runtime.generationScoreMultiplierEffectLog10,
   unlockInfiniteAngle: runtime.unlockInfiniteAngle,
   buyInfiniteAngleUpgrade: runtime.buyInfiniteAngleUpgrade,
+  buyTimeFluxUpgrade: runtime.buyTimeFluxUpgrade,
+  setTimeFluxSpeed: runtime.setTimeFluxSpeed,
   updateInfiniteAngle: runtime.updateInfiniteAngle,
   toggleInfinityChallenge: runtime.toggleInfinityChallenge,
   breakInfiniteCap: runtime.breakInfiniteCap,
@@ -530,6 +676,8 @@ window.__angleDebug = {
   switchChallengeSubtab: runtime.switchChallengeSubtab,
   buildTower: runtime.buildTower,
   applySetting: runtime.applySetting,
+  advanceOnlineTime,
+  processOfflineElapsed,
   saveGame: runtime.saveGame,
   loadGame: runtime.loadGame,
   resetSave: runtime.resetSave,

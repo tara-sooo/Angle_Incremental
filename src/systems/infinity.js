@@ -107,7 +107,12 @@ function infinityPointGain() {
   let multiplier = 1;
   if (runtime.isAchievementUnlocked(17)) multiplier *= 2;
   if (runtime.isAchievementUnlocked(21)) multiplier *= 2;
+  if (runtime.isAchievementUnlocked(31)) multiplier *= 100;
   return gained * multiplier;
+}
+
+function infinityPointGainLog10() {
+  return runtime.log10Value(runtime.infinityPointGain());
 }
 
 function canSpendInfinityPoints(costLog10) {
@@ -295,6 +300,7 @@ expose("challengeRestriction", () => challengeRestriction, (value) => { challeng
 expose("challengeReward", () => challengeReward, (value) => { challengeReward = value; });
 expose("canInfinity", () => canInfinity, (value) => { canInfinity = value; });
 expose("infinityPointGain", () => infinityPointGain, (value) => { infinityPointGain = value; });
+expose("infinityPointGainLog10", () => infinityPointGainLog10, (value) => { infinityPointGainLog10 = value; });
 expose("canSpendInfinityPoints", () => canSpendInfinityPoints, (value) => { canSpendInfinityPoints = value; });
 expose("addInfinityPoints", () => addInfinityPoints, (value) => { addInfinityPoints = value; });
 expose("spendInfinityPoints", () => spendInfinityPoints, (value) => { spendInfinityPoints = value; });

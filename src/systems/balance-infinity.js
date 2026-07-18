@@ -1,16 +1,22 @@
 import { runtime, expose } from "../runtime/shared.js";
 
+const IC8_IP_MULTIPLIER_DIVISOR_LOG10 = 20;
+
 function generationIpMultiplierLog10() {
   if (!runtime.isChallengeCompleted(8)) return 0;
-  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - 21);
+  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - IC8_IP_MULTIPLIER_DIVISOR_LOG10);
 }
 
 function floorWithFloatingPointTolerance(value) {
   return Math.floor(value + Math.max(1, Math.abs(value)) * Number.EPSILON * 8);
 }
 
+function multiplyIpGainExactly(gain, multiplier) {
+  return gain > Number.MAX_VALUE / multiplier ? Number.MAX_VALUE : gain * multiplier;
+}
+
 function doubleIpGainExactly(gain) {
-  return gain > Number.MAX_VALUE / 2 ? Number.MAX_VALUE : gain * 2;
+  return multiplyIpGainExactly(gain, 2);
 }
 
 function balanceInfinityPointGain() {
@@ -24,6 +30,7 @@ function balanceInfinityPointGain() {
   let gainedWithExactMultipliers = gained;
   if (runtime.isAchievementUnlocked(17)) gainedWithExactMultipliers = doubleIpGainExactly(gainedWithExactMultipliers);
   if (runtime.isAchievementUnlocked(21)) gainedWithExactMultipliers = doubleIpGainExactly(gainedWithExactMultipliers);
+  if (runtime.isAchievementUnlocked(31)) gainedWithExactMultipliers = multiplyIpGainExactly(gainedWithExactMultipliers, 100);
   const ic8MultiplierLog10 = generationIpMultiplierLog10();
   if (ic8MultiplierLog10 === 0) return gainedWithExactMultipliers;
   const gainValue = runtime.valueFromLog10(runtime.log10Value(gainedWithExactMultipliers) + ic8MultiplierLog10);

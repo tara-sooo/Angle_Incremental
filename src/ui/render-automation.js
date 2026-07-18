@@ -41,7 +41,12 @@ function updateAutomationUi() {
   if (runtime.elements.autoGenerationMinimumSecondsInput) runtime.syncFormControl(runtime.elements.autoGenerationMinimumSecondsInput, runtime.state.autoGenerationMinimumSeconds);
   if (runtime.elements.autoRunCoreBoostToggle) runtime.syncFormControl(runtime.elements.autoRunCoreBoostToggle, runtime.state.autoRunCoreBoost);
   if (runtime.elements.autoRunInfinityToggle) runtime.syncFormControl(runtime.elements.autoRunInfinityToggle, runtime.state.autoRunInfinity);
-  if (runtime.elements.autoInfinityPointThresholdInput) runtime.syncFormControl(runtime.elements.autoInfinityPointThresholdInput, runtime.state.autoInfinityPointThreshold);
+  if (runtime.elements.autoInfinityPointThresholdInput) {
+    runtime.syncFormControl(
+      runtime.elements.autoInfinityPointThresholdInput,
+      runtime.formatUiLogNumber(runtime.state.autoInfinityPointThresholdLog10),
+    );
+  }
 }
 
 function infinityRunListSignature() {

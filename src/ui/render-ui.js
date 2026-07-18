@@ -53,6 +53,7 @@ function canSpend(amount) {
 }
 
 function updateUi() {
+  if (runtime.offlineProcessing) return;
   const currentCostLogs = runtime.costLogs();
   const unlockedAchievementsNow = runtime.checkAchievements(true);
   if (unlockedAchievementsNow.length > 0) runtime.saveGame("manual");
@@ -88,21 +89,13 @@ function updateUi() {
   runtime.elements.gainUpgrade.disabled = !runtime.canBuyNormalUpgrade("gain");
   runtime.elements.buyAllUpgrade.disabled = !runtime.canBuyNormalUpgrade("speed") && !runtime.canBuyNormalUpgrade("vertex") && !runtime.canBuyNormalUpgrade("gain");
 
-  const unlocked = runtime.currentTotalScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE);
   const ready = runtime.canRunGeneration();
-  const waitingPrevious = unlocked
-    && runtime.state.generationCount > 0
-    && runtime.currentGenerationScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE)
-    && !ready;
-  runtime.elements.generationStatus.textContent = ready
-    ? runtime.t("generationReady")
-    : waitingPrevious
-      ? runtime.t("generationWaitingPrevious")
-      : unlocked
-      ? runtime.t("generationUnlocked")
-      : runtime.t("generationLocked");
   runtime.elements.generationButton.disabled = !ready;
   runtime.elements.generationCount.textContent = String(runtime.state.generationCount);
+  const previousGenerationScoreLog10 = runtime.currentPreviousGenerationScoreLog10();
+  runtime.elements.previousGenerationScore.textContent = Number.isFinite(previousGenerationScoreLog10)
+    ? runtime.formatUiLogNumber(previousGenerationScoreLog10)
+    : runtime.t("generationNotRun");
   const nextGeneration = runtime.nextGenerationValues();
   runtime.elements.generationMultiplier.textContent = formatMultiplierLogPreview(runtime.generationScoreMultiplierEffectLog10(), nextGeneration.scoreMultiplierLog10);
   runtime.elements.generationCostFactor.textContent = formatMultiplierPreview(runtime.generationCostFactorEffect(), nextGeneration.costFactor);
@@ -188,6 +181,7 @@ function updateUi() {
 
   runtime.updateAutomationUi();
   runtime.updateStatisticsUi();
+  runtime.updateTimeFluxUi();
 
   const unlockedAchievements = runtime.achievementCount();
   runtime.elements.achievementTabState.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT}`;
@@ -202,9 +196,17 @@ function updateUi() {
   syncFormControl(runtime.elements.numberFormatSelect, runtime.state.numberFormat);
   syncFormControl(runtime.elements.timeUnitSelect, runtime.state.timeUnit);
   syncFormControl(runtime.elements.topBarModeSelect, runtime.state.topBarMode);
+  syncFormControl(runtime.elements.timeFluxQuickBarToggle, runtime.state.showTimeFluxQuickBar);
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);
   runtime.elements.fpsCounter.hidden = !runtime.state.showFps;
   if (runtime.state.showFps) runtime.elements.fpsCounter.textContent = `FPS ${Math.round(runtime.smoothedFps)}`;
+  const rootStyle = document.documentElement?.style;
+  if (typeof rootStyle?.setProperty === "function") {
+    const fpsHeight = runtime.elements.fpsCounter.hidden
+      ? 0
+      : Math.ceil(runtime.elements.fpsCounter.getBoundingClientRect().height);
+    rootStyle.setProperty("--fps-counter-height", `${fpsHeight}px`);
+  }
 }
 
 function setSaveStatus(text) {

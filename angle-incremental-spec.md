@@ -1,6 +1,6 @@
 # Angle Incremental 開発仕様書
 
-対象リリース: **0.7.0**
+対象リリース: **0.8.0**
 
 この文書は、現行公開版のゲーム仕様と実装基準をまとめる。プレイヤー向けの遊び方は [angle-incremental-guide.md](angle-incremental-guide.md) を参照する。
 
@@ -17,6 +17,7 @@
 3. Core Boost で Generation 以下をリセットし、より強い恒久補正を得る。
 4. Infinity で下位進行をリセットし、Infinity Point と Infinity Upgrade を解放する。
 5. Infinity Challenge、Infinity Angle、Tower、Break Infinite Cap でInfinity後半を進める。
+6. オフライン進行と Time Flux で、離席中の進行とオンライン中の速度を管理する。
 
 ## 2. 用語
 
@@ -38,6 +39,8 @@
 | Infinity Score | IAの核到達で得るInfinity内スコア。^0.3後に通常の頂点獲得量へ乗算する。 |
 | Tower | IPで建設し、階数に応じてスコア累乗を強化するInfinity後の恒久要素。 |
 | Break Infinite Cap | Infinity後の強いスコアソフトキャップを恒久的に解除する要素。 |
+| オフライン進行 | 保存時刻との差分を、復帰時に複数の粗いティックとして処理する仕組み。 |
+| Time Flux / TF | オフライン進行を無効にしたときに蓄積され、オンライン中のゲーム速度に使う時間資源。 |
 
 ## 3. 基本ループ
 
@@ -146,7 +149,7 @@ IC8クリア後は、GRスコア倍率の式が次のように変わる。コス
 
 ```text
 スコア倍率log10 = generationScoreLog10 * 0.014 + 浅いGRスコア補正
-IP倍率 = max(1, スコア倍率 / 1e21)
+IP倍率 = max(1, スコア倍率 / 1e20)
 ```
 
 再Generationは、今回のGeneration中スコアが前回Generation実行時のスコアを超える場合のみ実行できる。
@@ -299,7 +302,7 @@ ICはIU 4-1購入後に解放される。IC中にInfinity条件を満たしてIn
 | IC5 環境配慮 | Core Boostを実行できない。 | Core Boostの獲得指数 `+0.01`。 |
 | IC6 下剋上された | 頂点通過ごとの増加は0.001で固定される。 | Infinity回数獲得量 `x2`。 |
 | IC7 倹約家もどき | スコアが1e30を超えると、通常強化を購入できない。 | 通常強化購入時にスコアを消費しない。ただし購入価格以上のスコアは必要。 |
-| IC8 反出生主義 | 頂点数は3で固定され、CB必要スコアは `^2` される。角追加アップグレードは角を追加せず、頂点通過ごとの増加とスコア獲得量指数を上げる。 | GRスコア倍率式が変化し、GRスコア倍率/1e21がIP獲得倍率にも適用される。 |
+| IC8 反出生主義 | 頂点数は3で固定され、CB必要スコアは `^2` される。角追加アップグレードは角を追加せず、頂点通過ごとの増加とスコア獲得量指数を上げる。 | GRスコア倍率式が変化し、GRスコア倍率/1e20がIP獲得倍率にも適用される。 |
 
 IC自動完了がオンの場合、条件を満たしたアクティブICは自動でInfinity実行される。
 
@@ -339,7 +342,7 @@ IAのPointはIA専用の頂点上を周回する。通常のThe Angleと同じ�
 
 ```text
 IA頂点数 = 3 + IA角追加レベル
-IA頂点通過ごとの増加 = 0.01 + IA頂点獲得量レベル * 0.01
+IA頂点通過ごとの増加 = 0.011 * (IA頂点獲得量レベル + 1)
 IA生ラップ速度log10 = IA周回速度レベル * log10(1.22)
 IA有効ラップ速度 = The AngleのGeneration前ソフトキャップと強いソフトキャップを適用した速度
 ```
@@ -368,10 +371,11 @@ IA通常強化はIPで購入し、IA側のレベルだけで独立に計算す�
 | 角の追加 | `2.40e20 IP` | `x1.50` | IAの頂点数 +1 |
 | 頂点獲得量 | `3.60e20 IP` | `x1.45` | IAの頂点通過ごとの増加レベル +1 |
 
-IAのコストは、レベル25までは基礎コストと成長率だけで計算し、レベル25を超えた分にだけ次の初期追加スケーリングを適用する。The Angle側のGeneration、Core Boost、Infinity Challenge、Infinity Upgradeによるコスト補正や段階スケーリングは適用しない。
+IAのコストは、基礎コストと名目成長率に成長係数`0.10`を適用し、レベル25を超えた分にだけ次の追加スケーリングを適用する。The Angle側のGeneration、Core Boost、Infinity Challenge、Infinity Upgradeによるコスト補正や段階スケーリングは適用しない。
 
 ```text
-追加コストlog10 = max(0, IAレベル - 25)^2 * IAごとの補正値
+IAコストlog10 = log10(基礎コスト) + IAレベル * log10(名目成長率) * 0.10 + 追加コストlog10
+追加コストlog10 = max(0, IAレベル - 25)^2 * IAごとの補正値 * 0.30
 周回速度の補正値 = 0.0005
 角の追加の補正値 = 0.0010
 頂点獲得量の補正値 = 0.0005
@@ -410,11 +414,11 @@ Floor 13より後の必要IPは、必要IPのlog10を `345 * 1.15^(階数 - 13)`
 
 ### 12.2 Tower Challengeの現行状態
 
-TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTCの具体的な制約、開始処理、完了条件、報酬は未実装であり、Challengesタブには将来実装予定のプレースホルダーを表示する。TCをクリアできない状態では、対応する次の階数を建設できない。
+TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.8.0ではTCの具体的な制約、開始処理、完了条件、報酬は未実装であり、Challengesタブには将来実装予定のプレースホルダーを表示する。TCをクリアできない状態では、対応する次の階数を建設できない。
 
 ## 13. 実績
 
-実績は30個あり、すべてのリセットを超えて保持される。
+実績は31個あり、すべてのリセットを超えて保持される。
 
 ```text
 実績倍率 = 1.01 ^ 達成済み実績数
@@ -454,8 +458,28 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTC�
 | 28 | IC7をクリア | なし |
 | 29 | スコアが1e628を超える | なし |
 | 30 | ICを8つクリア | なし |
+| 31 | IAを解放 | IP獲得量 `x100` |
 
 ## 14. 自動化と統計
+
+### オフライン進行
+
+ゲームは保存データの `savedAt` と現在時刻の差を離席時間として扱い、復帰時に既存のゲーム更新処理を指定回数の粗いティックへ分けて実行する。オフライン進行は初期状態で有効で、ティック数は500〜1,000,000の範囲で変更できる。1ティックあたりの処理対象時間は最大24時間で、指定ティック数を超える離席時間は処理上限として切り捨てる。ブラウザを長時間ブロックしないため、1回の復帰処理で実行するティック数には10,000回の安全上限を設け、これを超える指定はより粗いティックへまとめる。
+
+オフライン進行を無効にしている場合、離席中にゲーム本体、統計時間、Infinityなどは進行しない。その代わり、離席時間に応じたTFだけを容量まで蓄積する。したがって、オフライン進行とTF蓄積は同時には発生しない。復帰時には処理時間、ティック数、Infinity増加、IP、TF獲得量をTime Fluxタブのレポートに表示する。
+
+### Time Flux
+
+TFはオンライン中だけ消費でき、Infinityを含むリセットを超えて保持される。初期TFは0秒、初期容量は30分とする。TF獲得量と容量の式は次の通り。
+
+```text
+1時間あたりのTF獲得量 = 3600 * (獲得量レベル + 1) / (獲得量レベル + 10) 秒
+TF容量 = 1800 * 2^容量レベル 秒
+獲得量強化コスト = 1800 * 1.3^獲得量レベル 秒
+容量強化コスト = 現在のTF容量 * 0.75 秒
+```
+
+ゲーム速度はx1、x2、x3、任意のx4〜x60から選ぶ。速度とTF残量は全メインタブ上部のクイックバーから操作・確認でき、Time Fluxタブにも同じ操作を残す。xNでは実時間1秒ごとに `(N - 1)` TFを消費し、TFが不足または0になった場合はx1へ戻る。TF強化はInfinityリセットでも失われない。Time FluxにはOF、TF変換、Time Warpは存在しない。
 
 ### 自動化
 
@@ -466,7 +490,8 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTC�
 | 実績19 | Generation自動実行とCore Boost自動実行。 |
 | IU 8-1 | Infinity自動実行。 |
 
-通常強化の自動購入は0.1秒ごとに実行される。Generation自動実行は、スコア倍率増加、コスト倍率改善、最小経過秒数のしきい値を持つ。Infinity自動実行はIP獲得量しきい値を持つ。
+通常強化の自動購入は0.1秒ごとに実行される。Generation自動実行は、スコア倍率増加、コスト倍率改善、最小経過秒数のしきい値を持つ。Infinity自動実行はIP獲得量しきい値を持ち、しきい値はlog10で保存する。UIでは現在の数値表記設定に応じた数値または指数表記を入力できる。Infinity Pointの支払可能上限を超えるしきい値は保存・表示できるが、自動実行条件は満たさない。
+新規状態のGeneration自動実行しきい値は、スコア倍率増加`2.0`倍、コスト倍率改善`1.0`倍、最小経過秒数`0`秒とする。既存セーブに保存された設定値は保持する。
 
 ### 統計
 
@@ -474,7 +499,7 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTC�
 
 ## 15. UI、ニュース、設定
 
-メインタブは The Angle、Infinity、Challenges、Automation、Statistics、Achievements、Help、Settings の順で構成する。Infinityタブ内には Upgrades、Infinite Angle、Tower の順でサブタブがある。Challengesタブ内には Infinity Challenge と Tower Challenge の順でサブタブがある。
+メインタブは The Angle、Infinity、Challenges、Time Flux、Automation、Statistics、Achievements、Help、Settings の順で構成する。Infinityタブ内には Upgrades、Infinite Angle、Tower の順でサブタブがある。Challengesタブ内には Infinity Challenge と Tower Challenge の順でサブタブがある。
 
 上部バーは設定で次の表示を選べる。
 
@@ -488,13 +513,13 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.7.0ではTC�
 
 ニュースは自動スクロールするが、スクリーンリーダー向けのライブリージョンにはしない。ニュース本文の切り替えはスクロール完了タイミングに同期する。
 
-設定では、言語、数値表記、時間単位、軽量表示、浮遊テキスト、FPS表示、上部バー表示を保存する。
+設定では、言語、数値表記、時間単位、軽量表示、浮遊テキスト、FPS表示、上部バー表示、TFクイックバー表示を保存する。TFクイックバーは上部バー表示とは独立して表示・非表示を切り替えられる。
 
 ## 16. セーブと更新
 
 セーブはローカルストレージへ自動保存し、手動保存とリセットも提供する。セーブコードは `ANGLE_SAVE_V2:` で始まり、AES-GCMを使って書き出し・読み込みする。
 
-主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower階数、Break Infinite Cap、Infinite Score、実績、自動化、統計、表示設定が含まれる。
+主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower階数、Break Infinite Cap、Infinite Score、実績、自動化、統計、表示設定、オフライン進行設定、Time Fluxとその強化レベルが含まれる。ローカルセーブには離席時間の基準となる `savedAt` も保存する。既存セーブに新しい項目がない場合は初期値へ移行し、SAVE_VERSIONは10のまま維持する。
 
 IPは大きい整数を正確に扱うため `infinityPointsExact` を正本にし、表示用に通常数値とlog10値を同期する。
 
@@ -511,7 +536,7 @@ major.minor.patch
 - `APP_VERSION`: 公開アプリのバージョン。`version.json` の `appVersion` と一致させる。
 - `SAVE_VERSION`: セーブデータの移行が必要な場合に上げる保存形式バージョン。
 
-0.7.0時点では、`APP_VERSION = 0.7.0`、`SAVE_VERSION = 10` である。Tower階数は既存セーブにない場合 `0` として読み込み、保存形式の変更は行わない。
+0.8.0時点では、`APP_VERSION = 0.8.0`、`SAVE_VERSION = 10` である。Tower階数は既存セーブにない場合 `0` として読み込み、保存形式の変更は行わない。
 
 ブラウザのキャッシュ対策として、CSS/JSのURLにはアプリバージョンのクエリを付ける。起動中クライアントは `version.json` を定期確認し、新しい `appVersion` を検出したら保存してリロードを促す。
 
@@ -552,6 +577,13 @@ totalPlayTime
 currentInfinityRunTime
 fastestInfinityTime
 lastInfinityRuns
+offlineProgressEnabled
+offlineTickCount
+timeFlux
+timeFluxCapacityLevel
+timeFluxGainLevel
+timeFluxSpeed
+showTimeFluxQuickBar
 automation settings
 display settings
 ```

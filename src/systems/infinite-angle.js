@@ -9,6 +9,24 @@ const INFINITE_ANGLE_UPGRADES = Object.freeze({
   gain: Object.freeze({ base: 3.6e20, growth: 1.45, scalingStartsAfter: 25, scalingLogScale: 0.0005 }),
 });
 
+// The shared coefficients soften the early curve while retaining the role-specific
+// base prices and post-level scaling ratios. This value is runtime-only and is not
+// part of saved state so the balance simulator can compare candidates safely.
+const DEFAULT_INFINITE_ANGLE_COST_CURVE = Object.freeze({
+  growthPower: 0.10,
+  postLevelScale: 0.30,
+});
+let infiniteAngleCostCurve = DEFAULT_INFINITE_ANGLE_COST_CURVE;
+
+function setInfiniteAngleCostCurve(value) {
+  if (!value || !Number.isFinite(value.growthPower) || !Number.isFinite(value.postLevelScale)) return;
+  if (value.growthPower < 0 || value.postLevelScale < 0) return;
+  infiniteAngleCostCurve = Object.freeze({
+    growthPower: value.growthPower,
+    postLevelScale: value.postLevelScale,
+  });
+}
+
 function infiniteAngleVertexCount() {
   const level = Math.max(0, Math.floor(runtime.state.infiniteAngleVertexLevel));
   return Math.min(runtime.MAX_RENDERED_VERTICES, 3 + level);
@@ -35,7 +53,7 @@ function addInfiniteAngleCurrentGain(amount) {
 }
 
 function infiniteAngleGainIncrease() {
-  return 0.01 + Math.max(0, Math.floor(runtime.state.infiniteAngleGainLevel)) * 0.01;
+  return 0.011 + Math.max(0, Math.floor(runtime.state.infiniteAngleGainLevel)) * 0.011;
 }
 
 function infiniteAngleRawLapSpeedLog10() {
@@ -94,9 +112,12 @@ function infiniteAngleUpgradeCostLog10(kind) {
   const definition = INFINITE_ANGLE_UPGRADES[kind];
   if (!definition) return Infinity;
   const level = infiniteAngleUpgradeLevel(kind);
-  const rawLog = runtime.log10Value(definition.base) + level * runtime.log10Value(definition.growth);
+  const rawLog = runtime.log10Value(definition.base)
+    + level * runtime.log10Value(definition.growth) * infiniteAngleCostCurve.growthPower;
   const excess = Math.max(0, level - definition.scalingStartsAfter);
-  return runtime.clampLog10(rawLog + excess * excess * definition.scalingLogScale);
+  return runtime.clampLog10(
+    rawLog + excess * excess * definition.scalingLogScale * infiniteAngleCostCurve.postLevelScale,
+  );
 }
 
 function infiniteAngleUnlockCostLog10() {
@@ -217,7 +238,7 @@ function updateInfiniteAngle(dt) {
   const previousAbsolute = runtime.state.infiniteAngleTotalVertexProgress;
   const rawProgressDelta = (dt / infiniteAngleLapDuration()) * vertices;
   const progressDelta = Number.isFinite(rawProgressDelta)
-    ? Math.min(rawProgressDelta, runtime.MAX_VERTEX_PROGRESS_TRACKED)
+    ? rawProgressDelta
     : runtime.MAX_VERTEX_PROGRESS_TRACKED;
   runtime.state.infiniteAngleTotalVertexProgress += progressDelta;
   const nearestVertex = Math.round(runtime.state.infiniteAngleTotalVertexProgress);
@@ -255,6 +276,8 @@ expose("infiniteAngleLapDuration", () => infiniteAngleLapDuration);
 expose("infiniteAngleGainExpressionParts", () => infiniteAngleGainExpressionParts);
 expose("infiniteAngleScoreGainLog10", () => infiniteAngleScoreGainLog10);
 expose("infiniteAngleUpgradeCostLog10", () => infiniteAngleUpgradeCostLog10);
+expose("DEFAULT_INFINITE_ANGLE_COST_CURVE", () => DEFAULT_INFINITE_ANGLE_COST_CURVE);
+expose("infiniteAngleCostCurve", () => infiniteAngleCostCurve, setInfiniteAngleCostCurve);
 expose("infiniteAngleUnlockCostLog10", () => infiniteAngleUnlockCostLog10);
 expose("canUnlockInfiniteAngle", () => canUnlockInfiniteAngle);
 expose("unlockInfiniteAngle", () => unlockInfiniteAngle);

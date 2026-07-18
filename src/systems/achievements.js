@@ -184,6 +184,12 @@ const ACHIEVEMENTS = [
     reward: { ja: "", en: "" },
     isUnlocked: () => runtime.completedChallengeCount() >= 8,
   },
+  {
+    title: { ja: "六兆年と一夜の付き合い", en: "Six Trillion Years and One Night Together" },
+    condition: { ja: "IAを解放", en: "Unlock Infinite Angle." },
+    reward: { ja: "IP獲得量が×100", en: "Infinity Point gain x100." },
+    isUnlocked: () => runtime.state.infiniteAngleUnlocked,
+  },
 ];
 
 let cachedAchievementMask = null;

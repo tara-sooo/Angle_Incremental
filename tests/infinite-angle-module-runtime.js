@@ -61,22 +61,34 @@ async function runInfiniteAngleModuleRuntimeTest() {
     );
     state.infiniteAngleSpeedLevel = 1;
     assert.ok(
-      Math.abs(runtime.infiniteAngleUpgradeCostLog10("speed") - Math.log10(1.4e20)) < 1e-12,
-      "IA speed growth should be x1.40",
+      Math.abs(
+        runtime.infiniteAngleUpgradeCostLog10("speed")
+        - (20 + Math.log10(1.4) * 0.1),
+      ) < 1e-12,
+      "IA speed growth should use the softened curve",
     );
     state.infiniteAngleSpeedLevel = 50;
     assert.ok(
-      Math.abs(runtime.infiniteAngleUpgradeCostLog10("speed") - 27.619) < 0.001,
+      Math.abs(
+        runtime.infiniteAngleUpgradeCostLog10("speed")
+        - (20 + 50 * Math.log10(1.4) * 0.1 + 25 ** 2 * 0.0005 * 0.3),
+      ) < 0.001,
       "IA speed should use its softened high-level curve",
     );
     state.infiniteAngleVertexLevel = 50;
     assert.ok(
-      Math.abs(runtime.infiniteAngleUpgradeCostLog10("vertex") - 29.810) < 0.001,
+      Math.abs(
+        runtime.infiniteAngleUpgradeCostLog10("vertex")
+        - (Math.log10(2.4e20) + 50 * Math.log10(1.5) * 0.1 + 25 ** 2 * 0.0010 * 0.3),
+      ) < 0.001,
       "IA vertex should use its softened high-level curve",
     );
     state.infiniteAngleGainLevel = 50;
     assert.ok(
-      Math.abs(runtime.infiniteAngleUpgradeCostLog10("gain") - 28.937) < 0.001,
+      Math.abs(
+        runtime.infiniteAngleUpgradeCostLog10("gain")
+        - (Math.log10(3.6e20) + 50 * Math.log10(1.45) * 0.1 + 25 ** 2 * 0.0005 * 0.3),
+      ) < 0.001,
       "IA gain should use its softened high-level curve",
     );
     state.infiniteAngleSpeedLevel = 0;
@@ -152,6 +164,10 @@ async function runInfiniteAngleModuleRuntimeTest() {
     const scoreBefore = runtime.currentInfiniteScoreLog10();
     debug.updateInfiniteAngle(runtime.infiniteAngleLapDuration());
     assert.ok(runtime.currentInfiniteScoreLog10() > scoreBefore, "IA should earn Infinity Score continuously");
+    assert.ok(
+      Math.abs(runtime.infiniteAngleCurrentGainLog10() - Math.log10(1.033)) < 1e-12,
+      "IA per-vertex gain should use the adjusted 0.011 increase",
+    );
     assert.equal(state.infiniteAnglePointProgress, 0, "one IA lap should return to the first vertex");
     assert.equal(state.generationCount, 4, "IA progression must not use Generation state");
     assert.equal(state.coreBoostCount, 3, "IA progression must not use Core Boost state");
@@ -187,6 +203,20 @@ async function runInfiniteAngleModuleRuntimeTest() {
     assert.ok(state.currentGainLog10 > 308, "late-game IA boosts must keep batched normal vertex gain in log space");
     runtime.updateUi();
     assert.match(runtime.elements.vertexGainValue.textContent, /e598/, "late-game vertex gain UI should use the log-backed value");
+
+    resetInfiniteAngleState(state);
+    state.infiniteAngleSpeedLevel = 0;
+    state.infiniteAngleVertexLevel = 0;
+    state.infiniteAngleGainLevel = 0;
+    const largeProgressDelta = runtime.MAX_VERTEX_PROGRESS_TRACKED * 2;
+    const largeProgressSeconds = runtime.infiniteAngleLapDuration() * largeProgressDelta / runtime.infiniteAngleVertexCount();
+    debug.updateInfiniteAngle(largeProgressSeconds);
+    assert.ok(
+      runtime.infiniteAngleCurrentGainLog10() >= Math.log10(0.011 * largeProgressDelta) - 1e-9,
+      "IA should preserve current gain across a progress delta larger than the tracking threshold",
+    );
+    assert.ok(runtime.currentInfiniteScoreLog10() > -Infinity, "IA should preserve score earned across a large progress delta");
+    assert.ok(state.infiniteAngleTotalVertexProgress < runtime.infiniteAngleVertexCount(), "large IA progress should wrap without losing the processed delta");
 
     state.infiniteAngleSpeedLevel = 1_000_000_000_000;
     debug.updateInfiniteAngle(1 / 60);

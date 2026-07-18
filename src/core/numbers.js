@@ -3,6 +3,15 @@ import { runtime, expose } from "../runtime/shared.js";
 // Log-space resource arithmetic and display formatting.
 // State-dependent progression and UI formatting remain outside this helper module.
 
+const COMPACT_UNIT_LOG10 = Object.freeze({
+  m: 6,
+  b: 9,
+  t: 12,
+  qa: 15,
+  qi: 18,
+  sx: 21,
+});
+
 function parseSavedNumber(value) {
   if (typeof value === "number") return value;
   if (typeof value !== "string") return NaN;
@@ -47,6 +56,22 @@ function logFromSavedValue(value, fallback = -Infinity) {
   if (parsed === Infinity || parsed === Number.MAX_VALUE) return Math.log10(Number.MAX_VALUE);
   const log = log10Value(parsed);
   return log > -Infinity ? log : fallback;
+}
+
+function parseUiLogNumber(value, fallback = -Infinity) {
+  if (typeof value === "string") {
+    const trimmed = value.trim().replace(/,/g, "");
+    const compactMatch = trimmed.match(/^([+-]?(?:\d+\.?\d*|\.\d+))\s*(M|B|T|Qa|Qi|Sx)$/i);
+    if (compactMatch) {
+      const mantissa = Number(compactMatch[1]);
+      const exponent = COMPACT_UNIT_LOG10[compactMatch[2].toLowerCase()];
+      if (mantissa > 0 && Number.isFinite(mantissa) && exponent !== undefined) {
+        return clampLog10(Math.log10(mantissa) + exponent);
+      }
+    }
+    return logFromSavedValue(trimmed, fallback);
+  }
+  return logFromSavedValue(value, fallback);
 }
 
 function hydrateLog10(savedLog, savedValue, fallback = -Infinity) {
@@ -200,6 +225,7 @@ expose("sanitizeNumber", () => sanitizeNumber, (value) => { sanitizeNumber = val
 expose("sanitizeLog10", () => sanitizeLog10, (value) => { sanitizeLog10 = value; });
 expose("clampLog10", () => clampLog10, (value) => { clampLog10 = value; });
 expose("logFromSavedValue", () => logFromSavedValue, (value) => { logFromSavedValue = value; });
+expose("parseUiLogNumber", () => parseUiLogNumber, (value) => { parseUiLogNumber = value; });
 expose("hydrateLog10", () => hydrateLog10, (value) => { hydrateLog10 = value; });
 expose("hydrateLogResource", () => hydrateLogResource, (value) => { hydrateLogResource = value; });
 expose("sanitizeBoolean", () => sanitizeBoolean, (value) => { sanitizeBoolean = value; });

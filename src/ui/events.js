@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.7.0";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.8.0";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
@@ -52,6 +52,8 @@ function applySetting(key, value) {
   if (key === "numberFormat") runtime.state.numberFormat = runtime.normalizeChoice(value, ["compact", "scientific", "detailed"], "compact");
   if (key === "timeUnit") runtime.state.timeUnit = runtime.normalizeChoice(value, ["auto", "seconds", "milliseconds"], "auto");
   if (key === "topBarMode") runtime.state.topBarMode = runtime.normalizeChoice(value, ["news", "resources", "progress", "blank", "hidden"], "news");
+  if (key === "offlineProgressEnabled") runtime.state.offlineProgressEnabled = Boolean(value);
+  if (key === "offlineTickCount") runtime.state.offlineTickCount = runtime.clampOfflineTickCount(value);
   if (key === "showFloatingText" && !value) runtime.state.floatingTexts = [];
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
   if (key === "showFps") runtime.state.showFps = Boolean(value);
@@ -68,7 +70,11 @@ function applySetting(key, value) {
     runtime.state.autoGenerationMinimumSeconds = Math.max(0, Number(value) || 0);
     runtime.state.autoGenerationLegacyOrMode = false;
   }
-  if (key === "autoInfinityPointThreshold") runtime.state.autoInfinityPointThreshold = Math.max(1, Number(value) || 1);
+  if (key === "autoInfinityPointThreshold") {
+    const thresholdLog10 = Math.max(0, runtime.parseUiLogNumber(value, 0));
+    runtime.state.autoInfinityPointThresholdLog10 = thresholdLog10;
+    runtime.state.autoInfinityPointThreshold = runtime.valueFromLog10(thresholdLog10);
+  }
   runtime.updateUi();
   runtime.draw();
   runtime.saveGame("manual");
@@ -104,6 +110,29 @@ function bindEvents() {
   runtime.elements.infiniteAngleGainUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("gain"));
   runtime.elements.towerBuildButton.addEventListener("click", runtime.buildTower);
   runtime.elements.breakCapButton.addEventListener("click", runtime.breakInfiniteCap);
+  runtime.elements.timeFluxGainUpgrade.addEventListener("click", () => runtime.buyTimeFluxUpgrade("gain"));
+  runtime.elements.timeFluxCapacityUpgrade.addEventListener("click", () => runtime.buyTimeFluxUpgrade("capacity"));
+  runtime.elements.timeFluxSpeedButtons.forEach((button) => {
+    button.addEventListener("click", () => runtime.setTimeFluxSpeed(button.dataset.speed));
+  });
+  runtime.elements.timeFluxOfflineToggle.addEventListener("change", () => applySetting(
+    "offlineProgressEnabled",
+    runtime.elements.timeFluxOfflineToggle.checked,
+  ));
+  runtime.elements.timeFluxTickInput.addEventListener("change", () => applySetting(
+    "offlineTickCount",
+    runtime.elements.timeFluxTickInput.value,
+  ));
+  runtime.elements.timeFluxCustomSpeedInput.addEventListener("change", () => runtime.setTimeFluxSpeed(
+    runtime.elements.timeFluxCustomSpeedInput.value,
+  ));
+  runtime.elements.timeFluxQuickCustomSpeedInput.addEventListener("change", () => runtime.setTimeFluxSpeed(
+    runtime.elements.timeFluxQuickCustomSpeedInput.value,
+  ));
+  runtime.elements.offlineReportClose.addEventListener("click", () => {
+    runtime.offlineReport = null;
+    runtime.updateUi();
+  });
   runtime.elements.resetSaveButton.addEventListener("click", runtime.resetSave);
   runtime.elements.mainTabs.forEach((button) => {
     button.addEventListener("click", () => switchMainTab(button.dataset.tab));
@@ -133,11 +162,16 @@ function bindEvents() {
   runtime.elements.numberFormatSelect.addEventListener("change", () => applySetting("numberFormat", runtime.elements.numberFormatSelect.value));
   runtime.elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", runtime.elements.timeUnitSelect.value));
   runtime.elements.topBarModeSelect.addEventListener("change", () => applySetting("topBarMode", runtime.elements.topBarModeSelect.value));
+  runtime.elements.timeFluxQuickBarToggle.addEventListener("change", () => applySetting(
+    "showTimeFluxQuickBar",
+    runtime.elements.timeFluxQuickBarToggle.checked,
+  ));
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
+  if (document.addEventListener) document.addEventListener("visibilitychange", runtime.handleVisibilityChange);
   window.addEventListener("resize", runtime.resizeCanvas);
   window.addEventListener("resize", runtime.resizeInfiniteAngleCanvas);
   const canvasResizeObserver = window.ResizeObserver && runtime.canvas.parentElement

@@ -91,11 +91,18 @@ Original prompt: では、中核ループを完成させてください
 - Infinity now resets IA Score and transient IA progress while preserving the IA unlock and its upgrade levels; the IA canvas is rendered only in the active Infinity > IA subtab.
 - Raised IA's initial upgrade costs to 1e20 / 2.4e20 / 3.6e20 IP to match the 1e20 IP unlock scale; the 1e20-to-1e50 IP progression still needs a fresh-save playtest.
 - Softened IA upgrade growth to a dedicated curve: x1.40 / x1.50 / x1.45 with weak post-level-25 scaling and no shared staged cost scaling.
+- Further softened the IA cost curve to 0.10 growth and post-level scaling powers; the idealized simulation reaches the e50 IP Tower threshold in about 34.91 hours.
+- Shortened the IA-to-Tower path while preserving Infinity Score^0.3: IC8 IP scaling now divides by 1e20, IA per-vertex gain uses 0.011 × (level + 1), and fresh Generation automation defaults to 2x score improvement with a 1x cost threshold; the idealized 10-second simulation reaches Tower Floor1 in about 7.59 hours.
+- Added achievement 31, 六兆年と一夜の付き合い, for unlocking Infinite Angle; it multiplies Infinity Point gain by 100 and stacks with the existing IP achievement rewards.
+- Revisited the IA late-level cost curve after the achievement 31 simulation reached 1e50 IP in 277 seconds; increased the post-level cost scale from 0.10 to 0.30 while preserving the IC8 /1e20 IP correction and IA 0.011 × (level + 1) gain.
+- Infinity automation thresholds now use log-space storage and accept exponent notation while preserving the payable Infinity Point cap.
 - Prepared the 0.7.0 release pass for Infinite Angle and Tower, keeping Tower Challenge content deferred and SAVE_VERSION 10 unchanged.
+- Added Antimatter Dimensions-style offline progress with configurable coarse ticks, one-day-per-tick processing limits, visibility pause/resume handling, saved timestamps, and an offline result report.
+- Added a persistent Time Flux system with x1-x3 and custom x4-x60 online speed controls, TF gain/capacity upgrades, and mutually exclusive offline TF accumulation when offline progress is disabled.
+- Prepared the 0.8.0 release candidate for Infinite Angle balance and automation, offline progress, Time Flux, previous Generation score display, and the global TF quick bar; Tower Challenge remains deferred and SAVE_VERSION 10 is unchanged.
 
 ## TODO
 
-- Verify the new save-code controls, IC auto-complete toggle, and updated IC formula display in Firefox/Playwright on desktop and mobile before release.
 - Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinity Angle upgrade curves.

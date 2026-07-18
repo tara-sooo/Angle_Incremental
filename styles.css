@@ -15,6 +15,8 @@
   --violet: #7256d9;
   --green: #3ba36e;
   --disabled: #4c566f;
+  --fps-counter-height: 0px;
+  --time-flux-quickbar-overlay-top: 0px;
   font-family: "Noto Sans JP", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -43,14 +45,14 @@ select {
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 86px;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 10px;
   align-items: stretch;
   padding: 9px 0;
 }
 
 .shell.is-top-bar-hidden {
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .news-ticker {
@@ -70,6 +72,63 @@ select {
 
 .news-ticker[hidden] {
   display: none;
+}
+
+.time-flux-quickbar {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 2px solid var(--line-strong);
+  background: linear-gradient(180deg, rgba(23, 36, 59, 0.96), rgba(12, 20, 35, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 12px 26px rgba(0, 0, 0, 0.24);
+}
+
+.time-flux-quickbar[hidden] {
+  display: none;
+}
+
+.shell.is-top-bar-hidden .time-flux-quickbar {
+  grid-row: 1;
+}
+
+.time-flux-quick-summary {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.time-flux-quick-summary span,
+.time-flux-quick-speed > span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.time-flux-quick-summary strong,
+.time-flux-quick-speed > strong {
+  color: var(--gold);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.time-flux-quick-speed {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto auto minmax(140px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-flux-quick-speed .segmented-control {
+  min-width: 0;
 }
 
 .news-label {
@@ -139,7 +198,7 @@ select {
 
 .main-tabs {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 3;
   order: 2;
   height: 100%;
   min-height: 0;
@@ -154,7 +213,7 @@ select {
 
 .shell.is-top-bar-hidden .main-tabs,
 .shell.is-top-bar-hidden .main-panels {
-  grid-row: 1;
+  grid-row: 2;
 }
 
 .main-tab {
@@ -220,7 +279,7 @@ select {
 
 .main-panels {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 3;
   order: 1;
   min-width: 0;
   height: 100%;
@@ -304,13 +363,6 @@ h1 {
   line-height: 0.88;
   letter-spacing: 0;
   text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
-}
-
-.generation-status {
-  color: var(--gold);
-  font-weight: 900;
-  white-space: nowrap;
-  padding-bottom: 8px;
 }
 
 .playfield-wrap {
@@ -1400,7 +1452,8 @@ canvas {
   accent-color: var(--blue);
 }
 
-.setting-row input[type="number"] {
+.setting-row input[type="number"],
+.setting-row input[type="text"] {
   width: 110px;
   min-height: 34px;
   color: var(--ink);
@@ -1416,6 +1469,129 @@ canvas {
   background: #0b1324;
   border: 1px solid var(--line-strong);
   padding: 4px 8px;
+  font-weight: 800;
+}
+
+.time-flux-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.time-flux-metrics,
+.time-flux-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.time-flux-metrics > div,
+.time-flux-report-grid > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: rgba(7, 16, 31, 0.42);
+}
+
+.time-flux-metrics span,
+.time-flux-report-grid span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.time-flux-metrics strong,
+.time-flux-report-grid strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.time-flux-speed-controls {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.time-flux-speed-controls > span,
+.time-flux-custom-speed span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(42px, 1fr));
+  gap: 4px;
+}
+
+.segmented-control button {
+  min-height: 34px;
+  padding: 4px 8px;
+  color: var(--muted);
+  background: #0b1324;
+  border: 1px solid var(--line-strong);
+  font-weight: 900;
+}
+
+.segmented-control button.is-active,
+.segmented-control button:hover:not(:disabled) {
+  color: white;
+  background: var(--blue);
+  border-color: var(--line-strong);
+}
+
+.time-flux-custom-speed {
+  display: grid;
+  gap: 4px;
+}
+
+.time-flux-custom-speed input {
+  width: 76px;
+  min-height: 34px;
+  color: var(--ink);
+  background: #0b1324;
+  border: 1px solid var(--line-strong);
+  padding: 4px 8px;
+  font-weight: 800;
+}
+
+.time-flux-upgrade {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.time-flux-upgrade > strong {
+  grid-column: 1 / -1;
+  color: var(--gold);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+.time-flux-report {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 2px solid var(--gold);
+  background: linear-gradient(180deg, rgba(47, 40, 26, 0.98), rgba(16, 19, 29, 0.98));
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.3), inset 0 -3px 0 var(--gold);
+}
+
+.time-flux-report[hidden] {
+  display: none;
+}
+
+.time-flux-report p {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--gold);
+  font-size: 0.78rem;
   font-weight: 800;
 }
 
@@ -1507,7 +1683,7 @@ canvas {
 }
 
 .top-bar-hidden .fps-counter {
-  top: 18px;
+  top: max(18px, var(--time-flux-quickbar-overlay-top));
   right: 112px;
 }
 
@@ -1517,13 +1693,20 @@ canvas {
 
 .achievement-toasts {
   position: fixed;
-  top: 58px;
+  top: max(58px, var(--time-flux-quickbar-overlay-top));
   right: 112px;
   z-index: 110;
   display: grid;
   gap: 8px;
   width: min(320px, calc(100vw - 140px));
   pointer-events: none;
+}
+
+.top-bar-hidden .achievement-toasts {
+  top: max(
+    58px,
+    calc(max(18px, var(--time-flux-quickbar-overlay-top)) + var(--fps-counter-height) + 8px)
+  );
 }
 
 .achievement-toast {
@@ -1627,7 +1810,7 @@ canvas {
   }
 
   .top-bar-hidden .fps-counter {
-    top: 12px;
+    top: max(12px, var(--time-flux-quickbar-overlay-top));
     right: 12px;
   }
 
@@ -1636,6 +1819,10 @@ canvas {
     bottom: 84px;
     right: 12px;
     width: min(300px, calc(100vw - 24px));
+  }
+
+  .top-bar-hidden .achievement-toasts {
+    top: auto;
   }
 }
 
@@ -1655,14 +1842,14 @@ canvas {
     height: 100svh;
     min-height: 0;
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
     gap: 6px;
     overflow: hidden;
     padding: 7px 0;
   }
 
   .shell.is-top-bar-hidden {
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
   }
 
   .news-ticker {
@@ -1682,9 +1869,35 @@ canvas {
     animation-duration: 19s;
   }
 
+  .time-flux-quickbar {
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: 1fr;
+    gap: 5px;
+    padding: 5px 7px;
+  }
+
+  .shell.is-top-bar-hidden .time-flux-quickbar {
+    grid-row: 1;
+  }
+
+  .time-flux-quick-summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .time-flux-quick-speed {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .time-flux-quick-speed .time-flux-custom-speed {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) 76px;
+    align-items: center;
+  }
+
   .main-tabs {
     grid-column: 1;
-    grid-row: 3;
+    grid-row: 4;
     order: 2;
     position: relative;
     z-index: 10;
@@ -1696,11 +1909,11 @@ canvas {
   }
 
   .shell.is-top-bar-hidden .main-tabs {
-    grid-row: 2;
+    grid-row: 3;
   }
 
   .shell.is-top-bar-hidden .main-panels {
-    grid-row: 1;
+    grid-row: 2;
   }
 
   .main-tab {
@@ -1716,7 +1929,7 @@ canvas {
 
   .main-panels {
     grid-column: 1;
-    grid-row: 2;
+    grid-row: 3;
     order: 1;
     height: auto;
     min-height: 0;
@@ -1742,8 +1955,19 @@ canvas {
   .tower-metrics,
   .settings-grid,
   .statistics-grid,
-  .help-list {
+  .help-list,
+  .time-flux-layout {
     grid-template-columns: 1fr;
+  }
+
+  .time-flux-speed-controls {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .time-flux-custom-speed {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    align-items: center;
   }
 
   .infinite-angle-panel .infinite-angle-playfield-wrap,
@@ -2185,11 +2409,6 @@ canvas {
 
   .stage-panel .eyebrow {
     font-size: 0.68rem;
-  }
-
-  .generation-status {
-    padding-bottom: 0;
-    font-size: 0.86rem;
   }
 
   .playfield-wrap {
