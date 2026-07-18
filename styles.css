@@ -105,8 +105,7 @@ select {
 }
 
 .time-flux-quick-summary span,
-.time-flux-quick-speed > span,
-.time-flux-custom-speed-summary span {
+.time-flux-quick-speed > span {
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 900;
@@ -114,8 +113,7 @@ select {
 }
 
 .time-flux-quick-summary strong,
-.time-flux-quick-speed > strong,
-.time-flux-custom-speed-summary strong {
+.time-flux-quick-speed > strong {
   color: var(--gold);
   font-size: 0.86rem;
   white-space: nowrap;
@@ -124,21 +122,13 @@ select {
 .time-flux-quick-speed {
   min-width: 0;
   display: grid;
-  grid-template-columns: auto auto minmax(140px, 1fr) auto;
+  grid-template-columns: auto auto minmax(180px, 1fr);
   align-items: center;
   gap: 8px;
 }
 
 .time-flux-quick-speed .segmented-control {
   min-width: 0;
-}
-
-.time-flux-custom-speed-summary {
-  display: grid;
-  grid-template-columns: auto auto;
-  align-items: baseline;
-  gap: 4px;
-  white-space: nowrap;
 }
 
 .news-label {
@@ -1543,7 +1533,7 @@ canvas {
 
 .segmented-control {
   display: grid;
-  grid-template-columns: repeat(3, minmax(42px, 1fr));
+  grid-template-columns: repeat(4, minmax(42px, 1fr));
   gap: 4px;
 }
 
@@ -1561,6 +1551,30 @@ canvas {
   color: white;
   background: var(--blue);
   border-color: var(--line-strong);
+}
+
+.time-flux-custom-speed-button {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding-inline: 6px;
+  white-space: nowrap;
+}
+
+.time-flux-custom-speed-button strong {
+  color: var(--gold);
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.time-flux-custom-speed-button.is-active strong,
+.time-flux-custom-speed-button:hover:not(:disabled) strong {
+  color: white;
+}
+
+.time-flux-custom-speed-button:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
 }
 
 .time-flux-custom-speed {
@@ -1903,11 +1917,6 @@ canvas {
 
   .time-flux-quick-speed {
     grid-template-columns: auto auto minmax(0, 1fr);
-  }
-
-  .time-flux-custom-speed-summary {
-    grid-column: 1 / -1;
-    justify-self: end;
   }
 
   .main-tabs {
