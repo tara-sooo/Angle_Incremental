@@ -63,7 +63,7 @@ async function runInfiniteAngleModuleRuntimeTest() {
     assert.ok(
       Math.abs(
         runtime.infiniteAngleUpgradeCostLog10("speed")
-        - (20 + Math.log10(1.4) * 0.1),
+        - (20 + Math.log10(1.4) * 0.11),
       ) < 1e-12,
       "IA speed growth should use the softened curve",
     );
@@ -71,7 +71,7 @@ async function runInfiniteAngleModuleRuntimeTest() {
     assert.ok(
       Math.abs(
         runtime.infiniteAngleUpgradeCostLog10("speed")
-        - (20 + 50 * Math.log10(1.4) * 0.1 + 25 ** 2 * 0.0005 * 0.3),
+        - (20 + 50 * Math.log10(1.4) * 0.11 + 25 ** 2 * 0.0005 * 0.35),
       ) < 0.001,
       "IA speed should use its softened high-level curve",
     );
@@ -79,7 +79,7 @@ async function runInfiniteAngleModuleRuntimeTest() {
     assert.ok(
       Math.abs(
         runtime.infiniteAngleUpgradeCostLog10("vertex")
-        - (Math.log10(2.4e20) + 50 * Math.log10(1.5) * 0.1 + 25 ** 2 * 0.0010 * 0.3),
+        - (Math.log10(2.4e20) + 50 * Math.log10(1.5) * 0.11 + 25 ** 2 * 0.0010 * 0.35),
       ) < 0.001,
       "IA vertex should use its softened high-level curve",
     );
@@ -87,7 +87,7 @@ async function runInfiniteAngleModuleRuntimeTest() {
     assert.ok(
       Math.abs(
         runtime.infiniteAngleUpgradeCostLog10("gain")
-        - (Math.log10(3.6e20) + 50 * Math.log10(1.45) * 0.1 + 25 ** 2 * 0.0005 * 0.3),
+        - (Math.log10(3.6e20) + 50 * Math.log10(1.45) * 0.11 + 25 ** 2 * 0.0005 * 0.35),
       ) < 0.001,
       "IA gain should use its softened high-level curve",
     );
@@ -125,6 +125,26 @@ async function runInfiniteAngleModuleRuntimeTest() {
       spendableIp - speedCost - vertexCost - gainCost,
       "IA upgrades should spend their independent IP costs",
     );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    setInfinityPoints(runtime, 1_000_000_000_000_000_000_000n);
+
+    const purchases = debug.buyAllInfiniteAngleUpgrades();
+    assert.ok(purchases > 0, "IA Buy All should purchase affordable upgrades");
+    assert.ok(state.infiniteAngleSpeedLevel > 0, "IA Buy All should include speed upgrades");
+    assert.ok(state.infiniteAngleVertexLevel > 0, "IA Buy All should include vertex upgrades");
+    assert.ok(state.infiniteAngleGainLevel > 0, "IA Buy All should include gain upgrades");
+    assert.equal(
+      purchases,
+      state.infiniteAngleSpeedLevel + state.infiniteAngleVertexLevel + state.infiniteAngleGainLevel,
+      "IA Buy All should report the number of individual purchases",
+    );
+    assert.ok(runtime.currentExactInfinityPoints() < 1_000_000_000_000_000_000_000n, "IA Buy All should spend IP");
   }
 
   {

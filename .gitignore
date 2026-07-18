@@ -1,4 +1,6 @@
 output/
+browser-smoke-report.json
+node_modules/
 .DS_Store
 Thumbs.db
 *.log

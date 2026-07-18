@@ -242,6 +242,7 @@ async function runNumericStabilityModuleRuntimeTest() {
     state.scoreLog10 = 309;
     state.score = Number.MAX_VALUE;
     state.currentInfinityRunTime = 0.00033;
+    state.currentInfinityRealTime = 0.00033;
 
     runInfinity(false);
 
@@ -255,6 +256,8 @@ async function runNumericStabilityModuleRuntimeTest() {
       1 / 60,
       "fastest Infinity time must use the one-frame recording floor",
     );
+    assert.equal(state.lastInfinityRuns[0].realTime, 1 / 60, "sub-frame real Infinity runs must use the one-frame floor");
+    assert.equal(state.fastestInfinityRealTime, 1 / 60, "fastest real Infinity time must use the one-frame floor");
   }
 
   {
@@ -265,11 +268,14 @@ async function runNumericStabilityModuleRuntimeTest() {
     state.scoreLog10 = 309;
     state.score = Number.MAX_VALUE;
     state.currentInfinityRunTime = 0.2;
+    state.currentInfinityRealTime = 0.15;
 
     runInfinity(false);
 
     assert.equal(state.lastInfinityRuns[0].time, 0.2, "normal Infinity run times must be preserved");
     assert.equal(state.fastestInfinityTime, 0.2, "normal fastest Infinity times must be preserved");
+    assert.equal(state.lastInfinityRuns[0].realTime, 0.15, "normal real Infinity run times must be preserved");
+    assert.equal(state.fastestInfinityRealTime, 0.15, "normal fastest real Infinity times must be preserved");
   }
 
   {
@@ -280,11 +286,14 @@ async function runNumericStabilityModuleRuntimeTest() {
     state.scoreLog10 = 309;
     state.score = Number.MAX_VALUE;
     state.currentInfinityRunTime = 0;
+    state.currentInfinityRealTime = 0;
 
     runInfinity(false);
 
     assert.equal(state.lastInfinityRuns[0].time, 0, "zero-time Infinity records must remain zero-time records");
     assert.equal(state.fastestInfinityTime, 0, "zero-time Infinity records must not update fastest Infinity");
+    assert.equal(state.lastInfinityRuns[0].realTime, 0, "zero-time real Infinity records must remain zero-time records");
+    assert.equal(state.fastestInfinityRealTime, 0, "zero-time real Infinity records must not update fastest real Infinity");
   }
 
   {

@@ -105,7 +105,8 @@ select {
 }
 
 .time-flux-quick-summary span,
-.time-flux-quick-speed > span {
+.time-flux-quick-speed > span,
+.time-flux-custom-speed-summary span {
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 900;
@@ -113,7 +114,8 @@ select {
 }
 
 .time-flux-quick-summary strong,
-.time-flux-quick-speed > strong {
+.time-flux-quick-speed > strong,
+.time-flux-custom-speed-summary strong {
   color: var(--gold);
   font-size: 0.86rem;
   white-space: nowrap;
@@ -129,6 +131,14 @@ select {
 
 .time-flux-quick-speed .segmented-control {
   min-width: 0;
+}
+
+.time-flux-custom-speed-summary {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .news-label {
@@ -1031,6 +1041,12 @@ canvas {
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
 }
 
+.infinite-angle-upgrades .infinite-angle-buy-all {
+  grid-column: 1 / -1;
+  min-height: 42px;
+  text-align: center;
+}
+
 .infinite-angle-unlock-note[hidden] {
   display: none !important;
 }
@@ -1889,10 +1905,9 @@ canvas {
     grid-template-columns: auto auto minmax(0, 1fr);
   }
 
-  .time-flux-quick-speed .time-flux-custom-speed {
+  .time-flux-custom-speed-summary {
     grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1fr) 76px;
-    align-items: center;
+    justify-self: end;
   }
 
   .main-tabs {
