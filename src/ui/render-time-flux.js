@@ -55,7 +55,32 @@ function updateTimeFluxUi() {
   elements.timeFluxSpeed.textContent = speedText;
   elements.timeFluxQuickSpeed.textContent = speedText;
   const customSpeed = runtime.clampTimeFluxCustomSpeed(state.timeFluxCustomSpeed);
+  const customSpeedInputDirty = elements.timeFluxCustomSpeedInput?.dataset.customSpeedDirty === "true";
+  const customSpeedButtonValue = customSpeedInputDirty
+    ? runtime.clampTimeFluxCustomSpeed(elements.timeFluxCustomSpeedInput.value)
+    : customSpeed;
   elements.timeFluxQuickCustomSpeed.textContent = `×${customSpeed}`;
+  if (elements.timeFluxQuickCustomSpeedButton) {
+    const customActive = speed === customSpeed;
+    elements.timeFluxQuickCustomSpeedButton.classList.toggle("is-active", customActive);
+    elements.timeFluxQuickCustomSpeedButton.setAttribute("aria-pressed", String(customActive));
+    elements.timeFluxQuickCustomSpeedButton.setAttribute(
+      "aria-label",
+      `${runtime.t("timeFluxCustomSpeedLabel")} ×${customSpeed}`,
+    );
+  }
+  if (elements.timeFluxCustomSpeedApplyValue) {
+    elements.timeFluxCustomSpeedApplyValue.textContent = `×${customSpeedButtonValue}`;
+  }
+  if (elements.timeFluxCustomSpeedApply) {
+    const customActive = speed === customSpeedButtonValue;
+    elements.timeFluxCustomSpeedApply.classList.toggle("is-active", customActive);
+    elements.timeFluxCustomSpeedApply.setAttribute("aria-pressed", String(customActive));
+    elements.timeFluxCustomSpeedApply.setAttribute(
+      "aria-label",
+      `${runtime.t("timeFluxCustomSpeedApply")} ×${customSpeedButtonValue}`,
+    );
+  }
   elements.timeFluxQuickBar.hidden = !state.showTimeFluxQuickBar;
   const quickBarOverlayTop = state.showTimeFluxQuickBar
     ? Math.ceil(elements.timeFluxQuickBar.getBoundingClientRect().bottom + 10)
@@ -87,7 +112,7 @@ function updateTimeFluxUi() {
   });
   runtime.syncFormControl(elements.timeFluxOfflineToggle, state.offlineProgressEnabled);
   runtime.syncFormControl(elements.timeFluxTickInput, state.offlineTickCount);
-  runtime.syncFormControl(elements.timeFluxCustomSpeedInput, customSpeed);
+  if (!customSpeedInputDirty) runtime.syncFormControl(elements.timeFluxCustomSpeedInput, customSpeed);
   updateOfflineReportUi();
 }
 

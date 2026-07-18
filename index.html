@@ -70,10 +70,15 @@
             <button class="time-flux-speed" type="button" data-speed="1" aria-pressed="true">×1</button>
             <button class="time-flux-speed" type="button" data-speed="2" aria-pressed="false">×2</button>
             <button class="time-flux-speed" type="button" data-speed="3" aria-pressed="false">×3</button>
-          </div>
-          <div class="time-flux-custom-speed-summary">
-            <span data-i18n="timeFluxCustomSpeedLabel">任意倍率</span>
-            <strong id="timeFluxQuickCustomSpeed">×4</strong>
+            <button
+              id="timeFluxQuickCustomSpeedButton"
+              class="time-flux-custom-speed-button"
+              type="button"
+              aria-pressed="false"
+              aria-label="任意倍率 ×4"
+            >
+              <strong id="timeFluxQuickCustomSpeed">×4</strong>
+            </button>
           </div>
         </div>
       </section>
@@ -493,6 +498,15 @@
                   <button class="time-flux-speed" type="button" data-speed="1" aria-pressed="true">×1</button>
                   <button class="time-flux-speed" type="button" data-speed="2" aria-pressed="false">×2</button>
                   <button class="time-flux-speed" type="button" data-speed="3" aria-pressed="false">×3</button>
+                  <button
+                    id="timeFluxCustomSpeedApply"
+                    class="time-flux-custom-speed-button"
+                    type="button"
+                    aria-pressed="false"
+                    aria-label="任意倍率を適用 ×4"
+                  >
+                    <strong id="timeFluxCustomSpeedApplyValue">×4</strong>
+                  </button>
                 </div>
                 <label class="time-flux-custom-speed" for="timeFluxCustomSpeedInput">
                   <span data-i18n="timeFluxCustomSpeed">任意倍率</span>
