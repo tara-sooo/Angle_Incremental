@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.7.0";
+const EXPECTED_ASSET_VERSION = "0.8.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -121,13 +121,107 @@ try {
       summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.7.0 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.7.0 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /Infinity Angle/);
+  assert.equal(updateModal.visible, true, "the 0.8.0 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.8.0 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /Time Flux/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   await page.locator("#updateModalClose").click();
   await page.waitForFunction(() => document.querySelector("#updateModal")?.hidden === true);
+
+  const existingSaveFixtures = [
+    {
+      name: "0.7.0-style-v10",
+      state: {
+        generationCount: 4,
+        previousGenerationScore: 1e12,
+        previousGenerationScoreLog10: 12,
+        infiniteAngleUnlocked: true,
+        infiniteAngleSpeedLevel: 2,
+        infiniteAngleVertexLevel: 3,
+        infiniteAngleGainLevel: 1,
+        towerFloor: 2,
+        infinityPointsExact: "100000000000000000000",
+        infinityPoints: 1e20,
+        infinityPointsLog10: 20,
+      },
+      expected: {
+        generationCount: 4,
+        infiniteAngleUnlocked: true,
+        towerFloor: 2,
+        timeFlux: 0,
+        offlineProgressEnabled: true,
+        showTimeFluxQuickBar: true,
+      },
+    },
+    {
+      name: "0.8.0-v10",
+      state: {
+        generationCount: 5,
+        previousGenerationScore: 1e15,
+        previousGenerationScoreLog10: 15,
+        infiniteAngleUnlocked: true,
+        infiniteAngleSpeedLevel: 4,
+        infiniteAngleVertexLevel: 5,
+        infiniteAngleGainLevel: 2,
+        towerFloor: 3,
+        offlineProgressEnabled: true,
+        offlineTickCount: 5000,
+        timeFlux: 123,
+        timeFluxCapacityLevel: 2,
+        timeFluxGainLevel: 1,
+        timeFluxSpeed: 1,
+        showTimeFluxQuickBar: true,
+      },
+      expected: {
+        generationCount: 5,
+        infiniteAngleUnlocked: true,
+        towerFloor: 3,
+        timeFlux: 123,
+        offlineProgressEnabled: true,
+        showTimeFluxQuickBar: true,
+      },
+    },
+  ];
+  for (const fixture of existingSaveFixtures) {
+    const existingContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const existingErrors = [];
+    await existingContext.addInitScript((saveData) => {
+      localStorage.setItem("angle-incremental-save", JSON.stringify(saveData));
+      localStorage.setItem("angle-incremental-seen-version", "0.8.0");
+    }, {
+      version: 10,
+      savedAt: Date.now(),
+      state: fixture.state,
+    });
+    const existingPage = await existingContext.newPage();
+    existingPage.on("pageerror", (error) => existingErrors.push(error.message));
+    existingPage.on("console", (message) => {
+      if (message.type() === "error") existingErrors.push(message.text());
+    });
+    try {
+      await existingPage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
+      await existingPage.waitForFunction(() => (
+        typeof window.render_game_to_text === "function"
+        && Boolean(window.__angleDebug?.state)
+      ));
+      const loaded = await existingPage.evaluate(() => {
+        const { state } = window.__angleDebug;
+        return {
+          generationCount: state.generationCount,
+          infiniteAngleUnlocked: state.infiniteAngleUnlocked,
+          towerFloor: state.towerFloor,
+          timeFlux: state.timeFlux,
+          offlineProgressEnabled: state.offlineProgressEnabled,
+          showTimeFluxQuickBar: state.showTimeFluxQuickBar,
+        };
+      });
+      assert.deepEqual(loaded, fixture.expected, `${fixture.name} should load without losing progress or TF settings`);
+      assert.deepEqual(existingErrors, [], `${fixture.name} should load without browser errors`);
+    } finally {
+      await existingContext.close();
+    }
+  }
 
   const snapshot = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
   assert.equal(snapshot.vertices, 3);

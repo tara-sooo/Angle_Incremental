@@ -99,10 +99,10 @@ Original prompt: では、中核ループを完成させてください
 - Prepared the 0.7.0 release pass for Infinite Angle and Tower, keeping Tower Challenge content deferred and SAVE_VERSION 10 unchanged.
 - Added Antimatter Dimensions-style offline progress with configurable coarse ticks, one-day-per-tick processing limits, visibility pause/resume handling, saved timestamps, and an offline result report.
 - Added a persistent Time Flux system with x1-x3 and custom x4-x60 online speed controls, TF gain/capacity upgrades, and mutually exclusive offline TF accumulation when offline progress is disabled.
+- Prepared the 0.8.0 release candidate for Infinite Angle balance and automation, offline progress, Time Flux, previous Generation score display, and the global TF quick bar; Tower Challenge remains deferred and SAVE_VERSION 10 is unchanged.
 
 ## TODO
 
-- Verify the new save-code controls, IC auto-complete toggle, and updated IC formula display in Firefox/Playwright on desktop and mobile before release.
 - Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: tune Infinity Point gain, softcap strength, IC penalties/rewards, and Infinity Angle upgrade curves.
