@@ -13,8 +13,8 @@ const INFINITE_ANGLE_UPGRADES = Object.freeze({
 // base prices and post-level scaling ratios. This value is runtime-only and is not
 // part of saved state so the balance simulator can compare candidates safely.
 const DEFAULT_INFINITE_ANGLE_COST_CURVE = Object.freeze({
-  growthPower: 0.10,
-  postLevelScale: 0.30,
+  growthPower: 0.11,
+  postLevelScale: 0.35,
 });
 let infiniteAngleCostCurve = DEFAULT_INFINITE_ANGLE_COST_CURVE;
 
@@ -156,11 +156,12 @@ function canBuyInfiniteAngleUpgrade(kind) {
   const maximumCostLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
   return runtime.state.infiniteAngleUnlocked
     && Boolean(INFINITE_ANGLE_UPGRADES[kind])
+    && (kind !== "vertex" || infiniteAngleUpgradeLevel("vertex") < runtime.MAX_RENDERED_VERTICES - 3)
     && costLog10 <= maximumCostLog10
     && runtime.canSpendInfinityPoints(costLog10);
 }
 
-function buyInfiniteAngleUpgrade(kind) {
+function purchaseInfiniteAngleUpgrade(kind) {
   if (!canBuyInfiniteAngleUpgrade(kind)) return false;
   if (!runtime.spendInfinityPoints(infiniteAngleUpgradeCostLog10(kind))) return false;
   if (kind === "speed") runtime.state.infiniteAngleSpeedLevel += 1;
@@ -172,9 +173,49 @@ function buyInfiniteAngleUpgrade(kind) {
     resetInfiniteAnglePosition();
   }
   if (kind === "gain") runtime.state.infiniteAngleGainLevel += 1;
-  runtime.updateUi();
-  runtime.saveGame("manual");
   return true;
+}
+
+function buyInfiniteAngleUpgrade(kind, options = {}) {
+  if (typeof Event !== "undefined" && options instanceof Event) options = {};
+  const purchased = purchaseInfiniteAngleUpgrade(kind);
+  if (!purchased) return false;
+  if (options.refresh !== false) runtime.updateUi();
+  if (options.save !== false) runtime.saveGame("manual");
+  return true;
+}
+
+function buyAllInfiniteAngleUpgrades(options = {}) {
+  if (typeof Event !== "undefined" && options instanceof Event) options = {};
+  const refresh = options.refresh !== false;
+  const persist = options.save !== false;
+  const allowSpeed = options.allowSpeed !== false;
+  const allowVertex = options.allowVertex !== false;
+  const allowGain = options.allowGain !== false;
+  let purchases = 0;
+  let bought = true;
+  while (bought && purchases < runtime.BUY_ALL_LIMIT) {
+    bought = false;
+    if (allowSpeed && purchaseInfiniteAngleUpgrade("speed")) {
+      purchases += 1;
+      bought = true;
+      if (purchases >= runtime.BUY_ALL_LIMIT) break;
+    }
+    if (allowVertex && purchaseInfiniteAngleUpgrade("vertex")) {
+      purchases += 1;
+      bought = true;
+      if (purchases >= runtime.BUY_ALL_LIMIT) break;
+    }
+    if (allowGain && purchaseInfiniteAngleUpgrade("gain")) {
+      purchases += 1;
+      bought = true;
+    }
+  }
+  if (purchases > 0) {
+    if (refresh) runtime.updateUi();
+    if (persist) runtime.saveGame("manual");
+  }
+  return purchases;
 }
 
 function infiniteAngleBoostLog10() {
@@ -283,6 +324,7 @@ expose("canUnlockInfiniteAngle", () => canUnlockInfiniteAngle);
 expose("unlockInfiniteAngle", () => unlockInfiniteAngle);
 expose("canBuyInfiniteAngleUpgrade", () => canBuyInfiniteAngleUpgrade);
 expose("buyInfiniteAngleUpgrade", () => buyInfiniteAngleUpgrade);
+expose("buyAllInfiniteAngleUpgrades", () => buyAllInfiniteAngleUpgrades);
 expose("infiniteAngleBoostLog10", () => infiniteAngleBoostLog10);
 expose("infiniteAngleBoost", () => infiniteAngleBoost);
 expose("resetInfiniteAngleRun", () => resetInfiniteAngleRun);

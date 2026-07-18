@@ -154,8 +154,11 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.state.achievementMask = loadedAchievementMask;
   }
   runtime.state.totalPlayTime = runtime.sanitizeNumber(data.totalPlayTime, 0);
+  runtime.state.totalRealPlayTime = runtime.sanitizeNumber(data.totalRealPlayTime, 0);
   runtime.state.currentInfinityRunTime = runtime.sanitizeNumber(data.currentInfinityRunTime, 0);
+  runtime.state.currentInfinityRealTime = runtime.sanitizeNumber(data.currentInfinityRealTime, 0);
   runtime.state.fastestInfinityTime = runtime.sanitizeNumber(data.fastestInfinityTime, 0);
+  runtime.state.fastestInfinityRealTime = runtime.sanitizeNumber(data.fastestInfinityRealTime, 0);
   runtime.state.lastInfinityRuns = runtime.sanitizeInfinityRunRecords(data.lastInfinityRuns);
   runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(
     data.offlineProgressEnabled,
@@ -168,7 +171,13 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.timeFluxCapacitySeconds(),
     Math.max(0, runtime.sanitizeNumber(data.timeFlux, 0)),
   );
-  runtime.state.timeFluxSpeed = runtime.clampTimeFluxSpeed(data.timeFluxSpeed);
+  const loadedTimeFluxSpeed = runtime.clampTimeFluxSpeed(data.timeFluxSpeed);
+  const hasCustomTimeFluxSpeed = Object.prototype.hasOwnProperty.call(data, "timeFluxCustomSpeed");
+  const loadedCustomTimeFluxSpeed = runtime.clampTimeFluxCustomSpeed(
+    hasCustomTimeFluxSpeed ? data.timeFluxCustomSpeed : Math.max(4, loadedTimeFluxSpeed),
+  );
+  runtime.state.timeFluxSpeed = loadedTimeFluxSpeed;
+  runtime.state.timeFluxCustomSpeed = loadedCustomTimeFluxSpeed;
   runtime.state.automationEnabled = runtime.sanitizeBoolean(data.automationEnabled, false);
   runtime.state.autoBuySpeed = runtime.sanitizeBoolean(data.autoBuySpeed, true);
   runtime.state.autoBuyVertex = runtime.sanitizeBoolean(data.autoBuyVertex, true);
@@ -411,8 +420,11 @@ function resetSave() {
     infiniteCapBroken: false,
     achievementMask: 0,
     totalPlayTime: 0,
+    totalRealPlayTime: 0,
     currentInfinityRunTime: 0,
+    currentInfinityRealTime: 0,
     fastestInfinityTime: 0,
+    fastestInfinityRealTime: 0,
     lastInfinityRuns: [],
     offlineProgressEnabled: true,
     offlineTickCount: 1000,
@@ -420,6 +432,7 @@ function resetSave() {
     timeFluxCapacityLevel: 0,
     timeFluxGainLevel: 0,
     timeFluxSpeed: 1,
+    timeFluxCustomSpeed: 4,
     automationEnabled: false,
     autoBuySpeed: true,
     autoBuyVertex: true,

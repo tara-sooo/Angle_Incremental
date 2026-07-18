@@ -82,8 +82,54 @@ async function runGenerationRewardChecks() {
   assert.ok(afterThreeGenerations < afterTwoGenerations);
 }
 
+async function runPreviousGenerationScoreChecks() {
+  const source = await loadRuntime(candidateRuntimePath);
+  const { debug, runtime } = source;
+  const { state } = debug;
+
+  state.generationCount = 0;
+  state.generationScore = 1e25;
+  state.generationScoreLog10 = 25;
+  assert.equal(runtime.currentPreviousGenerationScoreLog10(), -Infinity, "an unrun game should not show a previous GR score");
+  assert.equal(runtime.generationRequirementLog10(), 6, "the first GR should use the initial unlock requirement");
+  assert.equal(runtime.canRunGeneration(), true, "the first GR should be available at the unlock score");
+
+  runtime.runGeneration();
+  assert.equal(state.previousGenerationScoreLog10, 25, "manual GR should store the score reached before reset");
+  assert.equal(runtime.currentPreviousGenerationScoreLog10(), 25, "the displayed previous GR score should match the completed run");
+  assert.equal(runtime.generationRequirementLog10(), 25, "the next GR requirement should use the completed run score");
+  assert.equal(runtime.canRunGeneration(), false, "matching the previous GR score should not immediately allow another GR");
+
+  state.generationScore = 1e26;
+  state.generationScoreLog10 = 26;
+  assert.equal(runtime.canRunGeneration(), true, "a score above the previous GR should allow the next run");
+  runtime.runGeneration();
+  assert.equal(state.previousGenerationScoreLog10, 26, "the second GR should replace the previous score with the latest run");
+
+  debug.saveGame("manual");
+  const reloaded = await loadRuntime(candidateRuntimePath, source.storage);
+  assert.equal(
+    reloaded.runtime.currentPreviousGenerationScoreLog10(),
+    26,
+    "the previous GR score should survive save and reload without shifting generations",
+  );
+  assert.equal(
+    reloaded.runtime.generationRequirementLog10(),
+    26,
+    "the post-reload GR requirement should remain aligned with the displayed score",
+  );
+
+  reloaded.runtime.resetBelowInfinity();
+  assert.equal(
+    reloaded.runtime.currentPreviousGenerationScoreLog10(),
+    -Infinity,
+    "Infinity reset should clear the previous GR score along with the Generation layer",
+  );
+}
+
 async function runPostGenerationUpgradeScalingModuleRuntimeTest() {
   await runGenerationRewardChecks();
+  await runPreviousGenerationScoreChecks();
   console.log("Post-Generation upgrade scaling module runtime tests passed");
 }
 

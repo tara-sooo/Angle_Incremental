@@ -132,6 +132,9 @@ function updateUi() {
   runtime.elements.infiniteAngleUnlockNote.hidden = infiniteAngleUnlocked;
   runtime.elements.infiniteAngleUnlockButton.hidden = infiniteAngleUnlocked;
   runtime.elements.infiniteAngleUnlockButton.disabled = !runtime.canUnlockInfiniteAngle();
+  runtime.elements.infiniteAngleBuyAllUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("speed")
+    && !runtime.canBuyInfiniteAngleUpgrade("vertex")
+    && !runtime.canBuyInfiniteAngleUpgrade("gain");
   runtime.elements.infiniteAngleUnlockCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUnlockCostLog10)} IP`;
   runtime.elements.infiniteAngleVertexCount.textContent = `${runtime.infiniteAngleVertexCount()} ${runtime.t("infiniteAngleVertices")}`;
   runtime.elements.infiniteAngleCurrentGain.textContent = runtime.formatUiLogNumber(runtime.infiniteAngleCurrentGainLog10());
@@ -200,13 +203,6 @@ function updateUi() {
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);
   runtime.elements.fpsCounter.hidden = !runtime.state.showFps;
   if (runtime.state.showFps) runtime.elements.fpsCounter.textContent = `FPS ${Math.round(runtime.smoothedFps)}`;
-  const rootStyle = document.documentElement?.style;
-  if (typeof rootStyle?.setProperty === "function") {
-    const fpsHeight = runtime.elements.fpsCounter.hidden
-      ? 0
-      : Math.ceil(runtime.elements.fpsCounter.getBoundingClientRect().height);
-    rootStyle.setProperty("--fps-counter-height", `${fpsHeight}px`);
-  }
 }
 
 function setSaveStatus(text) {

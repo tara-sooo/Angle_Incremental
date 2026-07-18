@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.8.0";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.7.0";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
@@ -105,6 +105,7 @@ function bindEvents() {
   runtime.elements.infinityButton.addEventListener("click", () => runtime.runInfinity(false));
   runtime.elements.infinityUpgradeDetailBuy.addEventListener("click", runtime.buySelectedInfinityUpgrade);
   runtime.elements.infiniteAngleUnlockButton.addEventListener("click", runtime.unlockInfiniteAngle);
+  runtime.elements.infiniteAngleBuyAllUpgrade.addEventListener("click", () => runtime.buyAllInfiniteAngleUpgrades());
   runtime.elements.infiniteAngleSpeedUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("speed"));
   runtime.elements.infiniteAngleVertexUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("vertex"));
   runtime.elements.infiniteAngleGainUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("gain"));
@@ -123,11 +124,8 @@ function bindEvents() {
     "offlineTickCount",
     runtime.elements.timeFluxTickInput.value,
   ));
-  runtime.elements.timeFluxCustomSpeedInput.addEventListener("change", () => runtime.setTimeFluxSpeed(
+  runtime.elements.timeFluxCustomSpeedInput.addEventListener("change", () => runtime.setTimeFluxCustomSpeed(
     runtime.elements.timeFluxCustomSpeedInput.value,
-  ));
-  runtime.elements.timeFluxQuickCustomSpeedInput.addEventListener("change", () => runtime.setTimeFluxSpeed(
-    runtime.elements.timeFluxQuickCustomSpeedInput.value,
   ));
   runtime.elements.offlineReportClose.addEventListener("click", () => {
     runtime.offlineReport = null;

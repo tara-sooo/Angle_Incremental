@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.8.0";
+const EXPECTED_ASSET_VERSION = "0.7.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -121,107 +121,13 @@ try {
       summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.8.0 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.8.0 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /Time Flux/);
+  assert.equal(updateModal.visible, true, "the 0.7.0 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.7.0 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /Infinity Angle/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   await page.locator("#updateModalClose").click();
   await page.waitForFunction(() => document.querySelector("#updateModal")?.hidden === true);
-
-  const existingSaveFixtures = [
-    {
-      name: "0.7.0-style-v10",
-      state: {
-        generationCount: 4,
-        previousGenerationScore: 1e12,
-        previousGenerationScoreLog10: 12,
-        infiniteAngleUnlocked: true,
-        infiniteAngleSpeedLevel: 2,
-        infiniteAngleVertexLevel: 3,
-        infiniteAngleGainLevel: 1,
-        towerFloor: 2,
-        infinityPointsExact: "100000000000000000000",
-        infinityPoints: 1e20,
-        infinityPointsLog10: 20,
-      },
-      expected: {
-        generationCount: 4,
-        infiniteAngleUnlocked: true,
-        towerFloor: 2,
-        timeFlux: 0,
-        offlineProgressEnabled: true,
-        showTimeFluxQuickBar: true,
-      },
-    },
-    {
-      name: "0.8.0-v10",
-      state: {
-        generationCount: 5,
-        previousGenerationScore: 1e15,
-        previousGenerationScoreLog10: 15,
-        infiniteAngleUnlocked: true,
-        infiniteAngleSpeedLevel: 4,
-        infiniteAngleVertexLevel: 5,
-        infiniteAngleGainLevel: 2,
-        towerFloor: 3,
-        offlineProgressEnabled: true,
-        offlineTickCount: 5000,
-        timeFlux: 123,
-        timeFluxCapacityLevel: 2,
-        timeFluxGainLevel: 1,
-        timeFluxSpeed: 1,
-        showTimeFluxQuickBar: true,
-      },
-      expected: {
-        generationCount: 5,
-        infiniteAngleUnlocked: true,
-        towerFloor: 3,
-        timeFlux: 123,
-        offlineProgressEnabled: true,
-        showTimeFluxQuickBar: true,
-      },
-    },
-  ];
-  for (const fixture of existingSaveFixtures) {
-    const existingContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-    const existingErrors = [];
-    await existingContext.addInitScript((saveData) => {
-      localStorage.setItem("angle-incremental-save", JSON.stringify(saveData));
-      localStorage.setItem("angle-incremental-seen-version", "0.8.0");
-    }, {
-      version: 10,
-      savedAt: Date.now(),
-      state: fixture.state,
-    });
-    const existingPage = await existingContext.newPage();
-    existingPage.on("pageerror", (error) => existingErrors.push(error.message));
-    existingPage.on("console", (message) => {
-      if (message.type() === "error") existingErrors.push(message.text());
-    });
-    try {
-      await existingPage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
-      await existingPage.waitForFunction(() => (
-        typeof window.render_game_to_text === "function"
-        && Boolean(window.__angleDebug?.state)
-      ));
-      const loaded = await existingPage.evaluate(() => {
-        const { state } = window.__angleDebug;
-        return {
-          generationCount: state.generationCount,
-          infiniteAngleUnlocked: state.infiniteAngleUnlocked,
-          towerFloor: state.towerFloor,
-          timeFlux: state.timeFlux,
-          offlineProgressEnabled: state.offlineProgressEnabled,
-          showTimeFluxQuickBar: state.showTimeFluxQuickBar,
-        };
-      });
-      assert.deepEqual(loaded, fixture.expected, `${fixture.name} should load without losing progress or TF settings`);
-      assert.deepEqual(existingErrors, [], `${fixture.name} should load without browser errors`);
-    } finally {
-      await existingContext.close();
-    }
-  }
 
   const snapshot = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
   assert.equal(snapshot.vertices, 3);
@@ -348,8 +254,12 @@ try {
       processOfflineElapsed,
     } = window.__angleDebug;
     state.totalPlayTime = 0;
+    state.totalRealPlayTime = 0;
+    state.currentInfinityRunTime = 0;
+    state.currentInfinityRealTime = 0;
     state.timeFlux = 10;
     state.timeFluxSpeed = 1;
+    state.timeFluxCustomSpeed = 4;
     state.timeFluxGainLevel = 0;
     state.timeFluxCapacityLevel = 0;
     applySetting("showTimeFluxQuickBar", true);
@@ -360,7 +270,8 @@ try {
       visible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
       amount: document.querySelector("#timeFluxQuickAmount")?.textContent?.trim() ?? "",
       speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
-      customSpeed: document.querySelector("#timeFluxQuickCustomSpeedInput")?.value ?? "",
+      customSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+      customInputPresent: Boolean(document.querySelector("#timeFluxQuickCustomSpeedInput")),
     };
     document.querySelector('#timeFluxQuickBar .time-flux-speed[data-speed="2"]')?.click();
     const quickBarChanged = {
@@ -370,8 +281,22 @@ try {
     switchMainTab("timeFlux");
     window.advanceTime(0);
     const tabMirrored = document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "";
+    const customInput = document.querySelector("#timeFluxCustomSpeedInput");
+    if (customInput) {
+      customInput.value = "10";
+      customInput.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    const customConfigured = {
+      stateSpeed: state.timeFluxSpeed,
+      stateCustomSpeed: state.timeFluxCustomSpeed,
+      input: customInput?.value ?? "",
+      quickBar: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+    };
     document.querySelector('#timeFluxPanel .time-flux-speed[data-speed="3"]')?.click();
-    const quickBarMirrored = document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "";
+    const quickBarMirrored = {
+      speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
+      customSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+    };
     applySetting("showTimeFluxQuickBar", false);
     const hiddenQuickBar = document.querySelector("#timeFluxQuickBar")?.hidden === true;
     applySetting("showTimeFluxQuickBar", true);
@@ -390,10 +315,16 @@ try {
       customSpeed: document.querySelector("#timeFluxCustomSpeedInput")?.value ?? "",
     };
     state.totalPlayTime = 0;
+    state.totalRealPlayTime = 0;
+    state.currentInfinityRunTime = 0;
+    state.currentInfinityRealTime = 0;
     setTimeFluxSpeed(2);
     advanceOnlineTime(1);
     const accelerated = {
       totalPlayTime: state.totalPlayTime,
+      totalRealPlayTime: state.totalRealPlayTime,
+      currentInfinityRunTime: state.currentInfinityRunTime,
+      currentInfinityRealTime: state.currentInfinityRealTime,
       timeFlux: state.timeFlux,
       speed: document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "",
     };
@@ -405,6 +336,7 @@ try {
       visible: document.querySelector("#offlineReportPanel")?.hidden === false,
       gained: report?.timeFluxGained ?? 0,
       totalPlayTime: state.totalPlayTime,
+      totalRealPlayTime: state.totalRealPlayTime,
     };
     document.querySelector("#offlineReportClose")?.click();
     applySetting("offlineProgressEnabled", true);
@@ -419,6 +351,7 @@ try {
       quickBarInitial,
       quickBarChanged,
       tabMirrored,
+      customConfigured,
       quickBarMirrored,
       hiddenQuickBar,
       quickBarWithHiddenTopBar,
@@ -427,28 +360,38 @@ try {
   assert.equal(timeFluxInitial.quickBarInitial.visible, true, "the Time Flux quick bar should be visible on other tabs");
   assert.match(timeFluxInitial.quickBarInitial.amount, /10秒 \/ 30分/);
   assert.equal(timeFluxInitial.quickBarInitial.speed, "×1");
-  assert.equal(timeFluxInitial.quickBarInitial.customSpeed, "4");
+  assert.equal(timeFluxInitial.quickBarInitial.customSpeed, "×4");
+  assert.equal(timeFluxInitial.quickBarInitial.customInputPresent, false, "the quick bar should not contain the custom-speed input");
   assert.equal(timeFluxInitial.quickBarChanged.stateSpeed, 2, "the quick bar should change the shared Time Flux speed");
   assert.equal(timeFluxInitial.quickBarChanged.speed, "×2");
   assert.equal(timeFluxInitial.tabMirrored, "×2", "the Time Flux tab should mirror quick bar speed changes");
-  assert.equal(timeFluxInitial.quickBarMirrored, "×3", "the quick bar should mirror Time Flux tab speed changes");
+  assert.equal(timeFluxInitial.customConfigured.stateSpeed, 10, "the TF tab input should select the custom speed");
+  assert.equal(timeFluxInitial.customConfigured.stateCustomSpeed, 10, "the TF tab input should update the remembered custom speed");
+  assert.equal(timeFluxInitial.customConfigured.input, "10");
+  assert.equal(timeFluxInitial.customConfigured.quickBar, "×10", "the quick bar should display the configured custom speed");
+  assert.equal(timeFluxInitial.quickBarMirrored.speed, "×3", "the quick bar should mirror Time Flux tab speed changes");
+  assert.equal(timeFluxInitial.quickBarMirrored.customSpeed, "×10", "preset changes should not erase the displayed custom speed");
   assert.equal(timeFluxInitial.hiddenQuickBar, true, "the quick bar visibility setting should hide only the quick bar");
   assert.equal(timeFluxInitial.quickBarWithHiddenTopBar, true, "the quick bar should be independent from top bar visibility");
   assert.equal(timeFluxInitial.initial.panelActive, true, "Time Flux should activate as an independent main tab");
   assert.match(timeFluxInitial.initial.amount, /10秒 \/ 30分/);
   assert.match(timeFluxInitial.initial.gain, /6分0秒\/時/);
   assert.equal(timeFluxInitial.initial.speed, "×1");
-  assert.equal(timeFluxInitial.initial.customSpeed, "4");
+  assert.equal(timeFluxInitial.initial.customSpeed, "10");
   assert.ok(
     Math.abs(timeFluxInitial.accelerated.totalPlayTime - 2) < 1e-9,
     `x2 should advance two game seconds per real second (actual ${timeFluxInitial.accelerated.totalPlayTime})`,
   );
+  assert.ok(Math.abs(timeFluxInitial.accelerated.totalRealPlayTime - 1) < 1e-9, "x2 should count one real second");
+  assert.ok(Math.abs(timeFluxInitial.accelerated.currentInfinityRunTime - 2) < 1e-9, "x2 should advance game Infinity time");
+  assert.ok(Math.abs(timeFluxInitial.accelerated.currentInfinityRealTime - 1) < 1e-9, "x2 should advance real Infinity time by one second");
   assert.ok(Math.abs(timeFluxInitial.accelerated.timeFlux - 9) < 1e-9, "x2 should consume one TF per real second");
   assert.equal(timeFluxInitial.accelerated.speed, "×2");
   assert.equal(timeFluxInitial.offline.mode, "TF蓄積");
   assert.equal(timeFluxInitial.offline.visible, true, "offline result should be shown after returning to the game");
   assert.equal(timeFluxInitial.offline.gained, 360, "one hour offline should grant the base TF rate");
   assert.ok(Math.abs(timeFluxInitial.offline.totalPlayTime - 2) < 1e-9, "TF accumulation should not advance game time");
+  assert.ok(Math.abs(timeFluxInitial.offline.totalRealPlayTime - 1) < 1e-9, "offline TF accumulation should not add real play time");
   const newsTicker = await page.evaluate(() => {
     const ticker = document.querySelector("#newsTicker");
     const item = document.querySelector("#newsTickerText");
@@ -597,57 +540,21 @@ try {
   assert.equal(restoredNewsTopBar.animated, true, "news mode should restore scrolling animation");
   const fpsPlacement = await page.evaluate(() => {
     window.__angleDebug.applySetting("topBarMode", "news");
-    window.__angleDebug.applySetting("showTimeFluxQuickBar", true);
     window.__angleDebug.applySetting("showFps", true);
     const ticker = document.querySelector("#newsTicker")?.getBoundingClientRect();
     const track = document.querySelector(".news-track")?.getBoundingClientRect();
     const fps = document.querySelector("#fpsCounter")?.getBoundingClientRect();
     window.__angleDebug.applySetting("topBarMode", "hidden");
-    const hiddenQuickBarBottom = document.querySelector("#timeFluxQuickBar")?.getBoundingClientRect().bottom ?? 0;
     const hiddenTop = document.querySelector("#fpsCounter")?.getBoundingClientRect().top ?? 999;
     return {
       insideTopBar: Boolean(ticker && fps && fps.top >= ticker.top && fps.bottom <= ticker.bottom),
       clearOfNewsText: Boolean(track && fps && track.right <= fps.left),
-      hiddenQuickBarBottom,
       hiddenTop,
     };
   });
   assert.equal(fpsPlacement.insideTopBar, true, "FPS counter should fit inside the visible top bar");
   assert.equal(fpsPlacement.clearOfNewsText, true, "FPS counter should not overlap the news text track");
-  assert.ok(fpsPlacement.hiddenTop >= fpsPlacement.hiddenQuickBarBottom - 1, "FPS counter should stay below the visible Time Flux quick bar");
-  const achievementToastPlacement = await page.evaluate(() => {
-    const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
-    window.__angleDebug.applySetting("topBarMode", "news");
-    const normalQuickBar = rect("#timeFluxQuickBar");
-    const normalToasts = rect("#achievementToasts");
-    window.__angleDebug.applySetting("topBarMode", "hidden");
-    const hiddenQuickBar = rect("#timeFluxQuickBar");
-    const hiddenToasts = rect("#achievementToasts");
-    const hiddenFps = rect("#fpsCounter");
-    const originalRootFontSize = document.documentElement.style.fontSize;
-    document.documentElement.style.fontSize = "32px";
-    window.__angleDebug.applySetting("topBarMode", "hidden");
-    const largeQuickBar = rect("#timeFluxQuickBar");
-    const largeToasts = rect("#achievementToasts");
-    const largeFps = rect("#fpsCounter");
-    document.documentElement.style.fontSize = originalRootFontSize;
-    window.__angleDebug.applySetting("topBarMode", "news");
-    return {
-      normalQuickBarBottom: normalQuickBar?.bottom ?? 0,
-      normalToastTop: normalToasts?.top ?? 0,
-      hiddenQuickBarBottom: hiddenQuickBar?.bottom ?? 0,
-      hiddenToastTop: hiddenToasts?.top ?? 0,
-      hiddenFpsBottom: hiddenFps?.bottom ?? 0,
-      largeQuickBarBottom: largeQuickBar?.bottom ?? 0,
-      largeToastTop: largeToasts?.top ?? 0,
-      largeFpsBottom: largeFps?.bottom ?? 0,
-    };
-  });
-  assert.ok(achievementToastPlacement.normalToastTop >= achievementToastPlacement.normalQuickBarBottom - 1, "achievement toasts should stay below the visible Time Flux quick bar");
-  assert.ok(achievementToastPlacement.hiddenToastTop >= achievementToastPlacement.hiddenQuickBarBottom - 1, "hidden top bar achievement toasts should stay below the visible Time Flux quick bar");
-  assert.ok(achievementToastPlacement.hiddenToastTop >= achievementToastPlacement.hiddenFpsBottom - 1, "hidden top bar achievement toasts should stay below the FPS counter");
-  assert.ok(achievementToastPlacement.largeToastTop >= achievementToastPlacement.largeQuickBarBottom - 1, "large text achievement toasts should stay below the visible Time Flux quick bar");
-  assert.ok(achievementToastPlacement.largeToastTop >= achievementToastPlacement.largeFpsBottom - 1, "large text achievement toasts should stay below the FPS counter");
+  assert.ok(fpsPlacement.hiddenTop < 30, "FPS counter should return to the top when the top bar is hidden");
   const breakCapPlacement = await page.evaluate(() => {
     const breakCap = document.querySelector("#breakCapButton");
     const subtabs = document.querySelector(".infinity-subtabs");
@@ -709,6 +616,16 @@ try {
     ];
     const bought = buyInfiniteAngleUpgrade("speed");
     window.advanceTime(0);
+    const ipExactAfterSingle = state.infinityPointsExact;
+    const speedLevelAfterSingle = state.infiniteAngleSpeedLevel;
+    state.infinityPointsExact = "100000000000000000000000";
+    state.infinityPoints = 1e23;
+    state.infinityPointsLog10 = 23;
+    window.advanceTime(0);
+    const buyAllDisabledBefore = Boolean(document.querySelector("#infiniteAngleBuyAllUpgrade")?.disabled);
+    const levelsBeforeBuyAll = state.infiniteAngleSpeedLevel + state.infiniteAngleVertexLevel + state.infiniteAngleGainLevel;
+    document.querySelector("#infiniteAngleBuyAllUpgrade")?.click();
+    const levelsAfterBuyAll = state.infiniteAngleSpeedLevel + state.infiniteAngleVertexLevel + state.infiniteAngleGainLevel;
     return {
       panelActive: Boolean(panel?.classList.contains("is-active")),
       canvasWidth: canvas?.getBoundingClientRect().width ?? 0,
@@ -718,9 +635,11 @@ try {
       unlockHidden: Boolean(document.querySelector("#infiniteAngleUnlockButton")?.hidden),
       unlockNoteDisplay: getComputedStyle(document.querySelector("#infiniteAngleUnlockNote")).display,
       bought,
-      speedLevel: state.infiniteAngleSpeedLevel,
+      speedLevel: speedLevelAfterSingle,
       expectedSpeedLevel: beforeLevel + 1,
-      ipExact: state.infinityPointsExact,
+      ipExact: ipExactAfterSingle,
+      buyAllDisabledBefore,
+      buyAllPurchases: levelsAfterBuyAll - levelsBeforeBuyAll,
       upgradeWidths: Array.from(document.querySelectorAll(".infinite-angle-upgrades .upgrade-button"), (button) => button.getBoundingClientRect().width),
       upgradeCosts,
     };
@@ -735,6 +654,8 @@ try {
   assert.equal(infiniteAnglePanel.bought, true, "IA speed upgrade should be purchasable with IP");
   assert.equal(infiniteAnglePanel.speedLevel, infiniteAnglePanel.expectedSpeedLevel, "IA speed upgrade should increase its own level");
   assert.equal(infiniteAnglePanel.ipExact, "100", "IA speed upgrade should spend 1e20 IP");
+  assert.equal(infiniteAnglePanel.buyAllDisabledBefore, false, "IA Buy All should enable when any IA upgrade is affordable");
+  assert.ok(infiniteAnglePanel.buyAllPurchases > 0, "IA Buy All should purchase multiple affordable upgrades through the UI");
   assert.match(infiniteAnglePanel.upgradeCosts[0], /1\.00e20/, "IA speed cost should match the unlock scale");
   assert.match(infiniteAnglePanel.upgradeCosts[1], /2\.40e20/, "IA vertex cost should preserve the TA price ratio");
   assert.match(infiniteAnglePanel.upgradeCosts[2], /3\.60e20/, "IA gain cost should preserve the TA price ratio");

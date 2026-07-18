@@ -21,8 +21,8 @@ function parseNumberOption(args, name, fallback) {
 function parseArgs(argv) {
   const args = argv.slice(2);
   return {
-    growthPower: parseNumberOption(args, "--growth-power", 0.1),
-    postLevelScale: parseNumberOption(args, "--post-scale", 0.3),
+    growthPower: parseNumberOption(args, "--growth-power", 0.11),
+    postLevelScale: parseNumberOption(args, "--post-scale", 0.35),
     maxSeconds: parseNumberOption(args, "--max-seconds", DEFAULT_MAX_SECONDS),
     stepSeconds: parseNumberOption(args, "--step", DEFAULT_STEP_SECONDS),
     initialIpLog10: parseNumberOption(args, "--initial-ip-log10", 5),

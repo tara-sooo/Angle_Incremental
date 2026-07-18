@@ -94,6 +94,7 @@ function sanitizeInfinityRunRecords(value) {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 10).map((record) => ({
     time: sanitizeNumber(record && record.time, 0),
+    realTime: sanitizeNumber(record && record.realTime, null),
     scoreLog10: sanitizeLog10(record && record.scoreLog10, -Infinity),
     ipGain: Math.max(0, Math.floor(sanitizeNumber(record && record.ipGain, 0))),
     challenge: Math.max(0, Math.floor(sanitizeNumber(record && record.challenge, 0))),

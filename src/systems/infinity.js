@@ -194,11 +194,16 @@ function applyStartingCoreBoosts() {
 
 function recordInfinityRun(scoreLog, gained, challenge, noGenerationCoreBoost = false) {
   const elapsed = runtime.state.currentInfinityRunTime;
+  const realElapsed = runtime.state.currentInfinityRealTime;
   const recordedTime = elapsed > 0
     ? Math.max(elapsed, runtime.MIN_RECORDED_INFINITY_SECONDS)
     : 0;
+  const recordedRealTime = realElapsed > 0
+    ? Math.max(realElapsed, runtime.MIN_RECORDED_INFINITY_SECONDS)
+    : 0;
   const record = {
     time: recordedTime,
+    realTime: recordedRealTime,
     scoreLog10: scoreLog,
     ipGain: gained,
     challenge,
@@ -208,6 +213,9 @@ function recordInfinityRun(scoreLog, gained, challenge, noGenerationCoreBoost = 
   runtime.state.lastInfinityRuns = runtime.state.lastInfinityRuns.slice(0, 10);
   if (record.time > 0 && (runtime.state.fastestInfinityTime <= 0 || record.time < runtime.state.fastestInfinityTime)) {
     runtime.state.fastestInfinityTime = record.time;
+  }
+  if (record.realTime > 0 && (runtime.state.fastestInfinityRealTime <= 0 || record.realTime < runtime.state.fastestInfinityRealTime)) {
+    runtime.state.fastestInfinityRealTime = record.realTime;
   }
 }
 
@@ -236,6 +244,7 @@ function runInfinity(forced = false) {
   runtime.checkAchievements(true);
   runtime.resetBelowInfinity();
   runtime.state.currentInfinityRunTime = 0;
+  runtime.state.currentInfinityRealTime = 0;
   runtime.updateUi();
   runtime.saveGame("manual");
 }

@@ -15,8 +15,6 @@
   --violet: #7256d9;
   --green: #3ba36e;
   --disabled: #4c566f;
-  --fps-counter-height: 0px;
-  --time-flux-quickbar-overlay-top: 0px;
   font-family: "Noto Sans JP", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -105,7 +103,8 @@ select {
 }
 
 .time-flux-quick-summary span,
-.time-flux-quick-speed > span {
+.time-flux-quick-speed > span,
+.time-flux-custom-speed-summary span {
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 900;
@@ -113,7 +112,8 @@ select {
 }
 
 .time-flux-quick-summary strong,
-.time-flux-quick-speed > strong {
+.time-flux-quick-speed > strong,
+.time-flux-custom-speed-summary strong {
   color: var(--gold);
   font-size: 0.86rem;
   white-space: nowrap;
@@ -129,6 +129,14 @@ select {
 
 .time-flux-quick-speed .segmented-control {
   min-width: 0;
+}
+
+.time-flux-custom-speed-summary {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .news-label {
@@ -1031,6 +1039,12 @@ canvas {
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
 }
 
+.infinite-angle-upgrades .infinite-angle-buy-all {
+  grid-column: 1 / -1;
+  min-height: 42px;
+  text-align: center;
+}
+
 .infinite-angle-unlock-note[hidden] {
   display: none !important;
 }
@@ -1683,7 +1697,7 @@ canvas {
 }
 
 .top-bar-hidden .fps-counter {
-  top: max(18px, var(--time-flux-quickbar-overlay-top));
+  top: 18px;
   right: 112px;
 }
 
@@ -1693,20 +1707,13 @@ canvas {
 
 .achievement-toasts {
   position: fixed;
-  top: max(58px, var(--time-flux-quickbar-overlay-top));
+  top: 58px;
   right: 112px;
   z-index: 110;
   display: grid;
   gap: 8px;
   width: min(320px, calc(100vw - 140px));
   pointer-events: none;
-}
-
-.top-bar-hidden .achievement-toasts {
-  top: max(
-    58px,
-    calc(max(18px, var(--time-flux-quickbar-overlay-top)) + var(--fps-counter-height) + 8px)
-  );
 }
 
 .achievement-toast {
@@ -1810,7 +1817,7 @@ canvas {
   }
 
   .top-bar-hidden .fps-counter {
-    top: max(12px, var(--time-flux-quickbar-overlay-top));
+    top: 12px;
     right: 12px;
   }
 
@@ -1819,10 +1826,6 @@ canvas {
     bottom: 84px;
     right: 12px;
     width: min(300px, calc(100vw - 24px));
-  }
-
-  .top-bar-hidden .achievement-toasts {
-    top: auto;
   }
 }
 
@@ -1889,10 +1892,9 @@ canvas {
     grid-template-columns: auto auto minmax(0, 1fr);
   }
 
-  .time-flux-quick-speed .time-flux-custom-speed {
+  .time-flux-custom-speed-summary {
     grid-column: 1 / -1;
-    grid-template-columns: minmax(0, 1fr) 76px;
-    align-items: center;
+    justify-self: end;
   }
 
   .main-tabs {

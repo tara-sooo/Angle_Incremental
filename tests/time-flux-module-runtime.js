@@ -13,6 +13,10 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.offlineTickCount, 1000, "offline ticks should default to 1000");
   assert.equal(state.showTimeFluxQuickBar, true, "the Time Flux quick bar should default to visible");
   assert.equal(state.timeFlux, 0, "new saves should start without Time Flux");
+  assert.equal(state.timeFluxCustomSpeed, 4, "the custom speed should default to x4");
+  assert.equal(state.totalRealPlayTime, 0, "new saves should start without real play time");
+  assert.equal(state.currentInfinityRealTime, 0, "new Infinity runs should start without real play time");
+  assert.equal(state.fastestInfinityRealTime, 0, "new saves should start without a fastest real Infinity time");
   assert.equal(runtime.timeFluxCapacity(), 1800, "initial Time Flux capacity should be 30 minutes");
   assert.equal(runtime.timeFluxGain(), 360, "initial Time Flux gain should be six minutes per hour");
   assert.equal(runtime.timeFluxGainUpgradeCost(), 1800, "the first gain upgrade should cost 30 minutes");
@@ -31,22 +35,36 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.timeFlux, 0, "gain upgrade should consume its exact cost");
 
   state.totalPlayTime = 0;
+  state.totalRealPlayTime = 0;
+  state.currentInfinityRunTime = 0;
+  state.currentInfinityRealTime = 0;
   state.timeFlux = 10;
   state.timeFluxSpeed = 2;
   const twoXGameSeconds = debug.advanceOnlineTime(3);
   assert.equal(twoXGameSeconds, 6, "x2 should turn three real seconds into six game seconds");
   assert.equal(state.timeFlux, 7, "x2 should consume one TF per real second");
+  assert.equal(state.totalPlayTime, 6, "x2 should advance game time by six seconds");
+  assert.equal(state.totalRealPlayTime, 3, "x2 should advance real play time by three seconds");
+  assert.equal(state.currentInfinityRunTime, 6, "x2 should advance the game-time Infinity timer by six seconds");
+  assert.equal(state.currentInfinityRealTime, 3, "x2 should advance the real-time Infinity timer by three seconds");
 
   state.totalPlayTime = 0;
+  state.totalRealPlayTime = 0;
+  state.currentInfinityRunTime = 0;
+  state.currentInfinityRealTime = 0;
   state.timeFlux = 59;
   state.timeFluxSpeed = 60;
   const sixtyXGameSeconds = debug.advanceOnlineTime(1);
   assert.equal(sixtyXGameSeconds, 60, "custom x60 should process sixty game seconds");
   assert.equal(state.timeFlux, 0, "x60 should consume 59 TF per real second");
   assert.equal(state.timeFluxSpeed, 1, "speed should return to x1 when TF is depleted");
+  assert.equal(state.timeFluxCustomSpeed, 4, "depletion should not erase the configured custom speed");
 
-  assert.equal(runtime.setTimeFluxSpeed(99), 60, "custom speed should clamp to x60");
-  assert.equal(runtime.setTimeFluxSpeed(0), 1, "custom speed should clamp to x1");
+  assert.equal(runtime.setTimeFluxCustomSpeed(99), 60, "custom speed should clamp to x60");
+  assert.equal(state.timeFluxCustomSpeed, 60, "setting a custom speed should remember it separately");
+  assert.equal(runtime.setTimeFluxSpeed(2), 2, "preset speed should select x2");
+  assert.equal(state.timeFluxCustomSpeed, 60, "preset speed changes should preserve the custom speed");
+  assert.equal(runtime.setTimeFluxCustomSpeed(0), 4, "custom speed should clamp to x4");
 
   runtime.autoSaveElapsed = 0;
   state.timeFlux = 100;
@@ -58,21 +76,25 @@ async function runTimeFluxModuleRuntimeTest() {
   state.timeFluxGainLevel = 0;
   state.timeFlux = 0;
   state.totalPlayTime = 0;
+  state.totalRealPlayTime = 0;
   const fluxReport = debug.processOfflineElapsed(3600, "test");
   assert.equal(state.timeFlux, 360, "disabled offline progress should accumulate six minutes of TF per hour");
   assert.equal(state.totalPlayTime, 0, "TF accumulation mode should pause total play time");
+  assert.equal(state.totalRealPlayTime, 0, "TF accumulation mode should not add real play time");
   assert.equal(fluxReport.offlineProgressEnabled, false, "the report should identify TF accumulation mode");
   assert.equal(fluxReport.timeFluxGained, 360, "the report should record actual TF gained");
 
   state.offlineProgressEnabled = true;
   state.timeFlux = 0;
   state.totalPlayTime = 0;
+  state.totalRealPlayTime = 0;
   const originalFrameTime = runtime.currentFrameTime;
   runtime.currentFrameTime = () => 1234;
   const progressReport = debug.processOfflineElapsed(1, "test");
   assert.equal(runtime.lastTime, 1234, "offline resume should reset the frame clock");
   runtime.currentFrameTime = originalFrameTime;
   assert.ok(Math.abs(state.totalPlayTime - 1) < 1e-9, "offline progress should advance total play time");
+  assert.equal(state.totalRealPlayTime, 0, "offline progress should not advance real play time");
   assert.equal(state.timeFlux, 0, "offline progress should not also grant TF");
   assert.equal(progressReport.processedTicks, 30, "short offline intervals should use simulation-sized ticks");
 
@@ -87,13 +109,20 @@ async function runTimeFluxModuleRuntimeTest() {
   state.timeFlux = 123;
   state.timeFluxCapacityLevel = 2;
   state.timeFluxGainLevel = 3;
-  state.timeFluxSpeed = 4;
+  state.totalRealPlayTime = 12.5;
+  state.currentInfinityRealTime = 3.5;
+  state.fastestInfinityRealTime = 2.5;
+  runtime.setTimeFluxCustomSpeed(4);
   state.showTimeFluxQuickBar = false;
   const serialized = runtime.serializeSaveData();
   assert.equal(serialized.state.timeFlux, 123, "Time Flux should be included in local saves");
   assert.equal(serialized.state.timeFluxCapacityLevel, 2, "Time Flux upgrade levels should be saved");
   assert.equal(serialized.state.timeFluxSpeed, 4, "the selected custom speed should be saved");
+  assert.equal(serialized.state.timeFluxCustomSpeed, 4, "the configured custom speed should be saved separately");
   assert.equal(serialized.state.showTimeFluxQuickBar, false, "the Time Flux quick bar setting should be saved");
+  assert.equal(serialized.state.totalRealPlayTime, 12.5, "real play time should be included in local saves");
+  assert.equal(serialized.state.currentInfinityRealTime, 3.5, "current real Infinity time should be saved");
+  assert.equal(serialized.state.fastestInfinityRealTime, 2.5, "fastest real Infinity time should be saved");
 
   runtime.resetBelowInfinity();
   assert.equal(state.timeFlux, 123, "Infinity resets should preserve Time Flux");
@@ -104,7 +133,28 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.offlineProgressEnabled, true, "old saves should default to offline progress");
   assert.equal(state.offlineTickCount, 1000, "old saves should default to 1000 offline ticks");
   assert.equal(state.timeFlux, 0, "old saves should default to zero Time Flux");
+  assert.equal(state.timeFluxCustomSpeed, 4, "old saves should default to a x4 custom speed");
   assert.equal(state.showTimeFluxQuickBar, true, "old saves should default to a visible Time Flux quick bar");
+  assert.equal(state.totalRealPlayTime, 0, "old saves should default to zero real play time");
+  assert.equal(state.currentInfinityRealTime, 0, "old saves should default to zero real Infinity time");
+  assert.equal(state.fastestInfinityRealTime, 0, "old saves should default to no fastest real Infinity time");
+
+  runtime.applySaveData({
+    lastInfinityRuns: [{ time: 4, scoreLog10: 3, ipGain: 2, challenge: 0 }],
+  }, 10);
+  assert.equal(state.lastInfinityRuns[0].realTime, null, "legacy Infinity history should show unknown real time");
+  runtime.applySaveData({
+    lastInfinityRuns: [{ time: 4, realTime: 1.5, scoreLog10: 3, ipGain: 2, challenge: 0 }],
+  }, 10);
+  assert.equal(state.lastInfinityRuns[0].realTime, 1.5, "new Infinity history should preserve real time");
+
+  runtime.applySaveData({ timeFluxSpeed: 12 }, 10);
+  assert.equal(state.timeFluxSpeed, 12, "old saves should preserve their selected speed");
+  assert.equal(state.timeFluxCustomSpeed, 12, "old saves should migrate a custom selected speed");
+  runtime.applySaveData({ timeFluxSpeed: 2, timeFluxCustomSpeed: 99 }, 10);
+  assert.equal(state.timeFluxSpeed, 2, "saved preset speed should remain the active speed");
+  assert.equal(state.timeFluxCustomSpeed, 60, "saved custom speed should be clamped independently");
+  runtime.applySaveData({}, 10);
 
   const originalUpdate = runtime.update;
   let offlineUpdateCalls = 0;

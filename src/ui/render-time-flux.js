@@ -54,17 +54,9 @@ function updateTimeFluxUi() {
   const speedText = `×${speed}`;
   elements.timeFluxSpeed.textContent = speedText;
   elements.timeFluxQuickSpeed.textContent = speedText;
+  const customSpeed = runtime.clampTimeFluxCustomSpeed(state.timeFluxCustomSpeed);
+  elements.timeFluxQuickCustomSpeed.textContent = `×${customSpeed}`;
   elements.timeFluxQuickBar.hidden = !state.showTimeFluxQuickBar;
-  const quickBarOverlayTop = state.showTimeFluxQuickBar
-    ? Math.ceil(elements.timeFluxQuickBar.getBoundingClientRect().bottom + 10)
-    : 0;
-  const rootStyle = document.documentElement?.style;
-  if (typeof rootStyle?.setProperty === "function") {
-    rootStyle.setProperty(
-      "--time-flux-quickbar-overlay-top",
-      `${quickBarOverlayTop}px`,
-    );
-  }
   elements.timeFluxOfflineStatus.textContent = state.offlineProgressEnabled
     ? runtime.t("offlineProgressEnabled")
     : runtime.t("offlineProgressDisabled");
@@ -85,9 +77,7 @@ function updateTimeFluxUi() {
   });
   runtime.syncFormControl(elements.timeFluxOfflineToggle, state.offlineProgressEnabled);
   runtime.syncFormControl(elements.timeFluxTickInput, state.offlineTickCount);
-  const customSpeed = speed >= 4 ? speed : 4;
   runtime.syncFormControl(elements.timeFluxCustomSpeedInput, customSpeed);
-  runtime.syncFormControl(elements.timeFluxQuickCustomSpeedInput, customSpeed);
   updateOfflineReportUi();
 }
 

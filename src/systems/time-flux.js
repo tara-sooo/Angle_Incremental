@@ -20,6 +20,10 @@ function clampTimeFluxSpeed(value) {
   );
 }
 
+function clampTimeFluxCustomSpeed(value) {
+  return Math.max(runtime.TIME_FLUX_CUSTOM_SPEED_MIN, clampTimeFluxSpeed(value));
+}
+
 function timeFluxCapacitySeconds(level = runtime.state.timeFluxCapacityLevel) {
   const safeLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(level, 0)));
   const capacity = runtime.TIME_FLUX_INITIAL_CAPACITY_SECONDS * (2 ** safeLevel);
@@ -81,6 +85,15 @@ function setTimeFluxSpeed(value) {
   return runtime.state.timeFluxSpeed;
 }
 
+function setTimeFluxCustomSpeed(value) {
+  const speed = clampTimeFluxCustomSpeed(value);
+  runtime.state.timeFluxCustomSpeed = speed;
+  runtime.state.timeFluxSpeed = speed;
+  runtime.updateUi();
+  runtime.saveGame("manual");
+  return speed;
+}
+
 function addTimeFlux(seconds) {
   const amount = Math.max(0, runtime.sanitizeNumber(seconds, 0));
   const before = runtime.state.timeFlux;
@@ -97,6 +110,7 @@ function consumeTimeFlux(seconds) {
 
 expose("clampOfflineTickCount", () => clampOfflineTickCount, (value) => { clampOfflineTickCount = value; });
 expose("clampTimeFluxSpeed", () => clampTimeFluxSpeed, (value) => { clampTimeFluxSpeed = value; });
+expose("clampTimeFluxCustomSpeed", () => clampTimeFluxCustomSpeed, (value) => { clampTimeFluxCustomSpeed = value; });
 expose("timeFluxCapacitySeconds", () => timeFluxCapacitySeconds, (value) => { timeFluxCapacitySeconds = value; });
 expose("timeFluxGainPerHour", () => timeFluxGainPerHour, (value) => { timeFluxGainPerHour = value; });
 expose("timeFluxGainUpgradeCost", () => timeFluxGainUpgradeCost, (value) => { timeFluxGainUpgradeCost = value; });
@@ -107,5 +121,6 @@ expose("timeFluxGain", () => timeFluxGain, (value) => { timeFluxGain = value; })
 expose("canBuyTimeFluxUpgrade", () => canBuyTimeFluxUpgrade, (value) => { canBuyTimeFluxUpgrade = value; });
 expose("buyTimeFluxUpgrade", () => buyTimeFluxUpgrade, (value) => { buyTimeFluxUpgrade = value; });
 expose("setTimeFluxSpeed", () => setTimeFluxSpeed, (value) => { setTimeFluxSpeed = value; });
+expose("setTimeFluxCustomSpeed", () => setTimeFluxCustomSpeed, (value) => { setTimeFluxCustomSpeed = value; });
 expose("addTimeFlux", () => addTimeFlux, (value) => { addTimeFlux = value; });
 expose("consumeTimeFlux", () => consumeTimeFlux, (value) => { consumeTimeFlux = value; });

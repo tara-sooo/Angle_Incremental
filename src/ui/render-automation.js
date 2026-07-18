@@ -2,9 +2,15 @@ import { runtime, expose } from "../runtime/shared.js";
 
 let lastInfinityRunListSignature = null;
 
+function formatInfinityRunTime(value) {
+  return value === null || value === undefined
+    ? runtime.t("unknownTime")
+    : runtime.formatLongDuration(value);
+}
+
 function infinityRunRecordText(record, index) {
   const challenge = record.challenge > 0 ? ` IC${record.challenge}` : "";
-  return `#${index + 1}${challenge} ${runtime.formatLongDuration(record.time)} / ${runtime.formatPowerOfTen(record.scoreLog10)} / +${runtime.formatUiNumber(record.ipGain)} IP`;
+  return `#${index + 1}${challenge} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.formatPowerOfTen(record.scoreLog10)} / +${runtime.formatUiNumber(record.ipGain)} IP`;
 }
 
 function updateAutomationUi() {
@@ -55,15 +61,20 @@ function infinityRunListSignature() {
     runtime.state.language,
     runtime.state.numberFormat,
     runtime.state.timeUnit,
-    records.map((record) => `${record.time}:${record.scoreLog10}:${record.ipGain}:${record.challenge}`).join(";"),
+    records.map((record) => `${record.time}:${record.realTime}:${record.scoreLog10}:${record.ipGain}:${record.challenge}`).join(";"),
   ].join("|");
 }
 
 function updateStatisticsUi() {
   if (!runtime.elements.totalPlayTime) return;
   runtime.elements.totalPlayTime.textContent = runtime.formatLongDuration(runtime.state.totalPlayTime);
+  runtime.elements.totalRealPlayTime.textContent = runtime.formatLongDuration(runtime.state.totalRealPlayTime);
   runtime.elements.currentInfinityRunTime.textContent = runtime.formatLongDuration(runtime.state.currentInfinityRunTime);
+  runtime.elements.currentInfinityRealTime.textContent = runtime.formatLongDuration(runtime.state.currentInfinityRealTime);
   runtime.elements.fastestInfinityTime.textContent = runtime.state.fastestInfinityTime > 0 ? runtime.formatLongDuration(runtime.state.fastestInfinityTime) : runtime.t("noInfinityRuns");
+  runtime.elements.fastestInfinityRealTime.textContent = runtime.state.fastestInfinityRealTime > 0
+    ? runtime.formatLongDuration(runtime.state.fastestInfinityRealTime)
+    : runtime.t("noInfinityRuns");
   const signature = infinityRunListSignature();
   if (signature === lastInfinityRunListSignature) return;
   lastInfinityRunListSignature = signature;
