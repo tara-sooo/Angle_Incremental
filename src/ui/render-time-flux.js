@@ -57,6 +57,16 @@ function updateTimeFluxUi() {
   const customSpeed = runtime.clampTimeFluxCustomSpeed(state.timeFluxCustomSpeed);
   elements.timeFluxQuickCustomSpeed.textContent = `×${customSpeed}`;
   elements.timeFluxQuickBar.hidden = !state.showTimeFluxQuickBar;
+  const quickBarOverlayTop = state.showTimeFluxQuickBar
+    ? Math.ceil(elements.timeFluxQuickBar.getBoundingClientRect().bottom + 10)
+    : 0;
+  const rootStyle = document.documentElement?.style;
+  if (typeof rootStyle?.setProperty === "function") {
+    rootStyle.setProperty(
+      "--time-flux-quickbar-overlay-top",
+      `${quickBarOverlayTop}px`,
+    );
+  }
   elements.timeFluxOfflineStatus.textContent = state.offlineProgressEnabled
     ? runtime.t("offlineProgressEnabled")
     : runtime.t("offlineProgressDisabled");

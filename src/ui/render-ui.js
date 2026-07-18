@@ -203,6 +203,13 @@ function updateUi() {
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);
   runtime.elements.fpsCounter.hidden = !runtime.state.showFps;
   if (runtime.state.showFps) runtime.elements.fpsCounter.textContent = `FPS ${Math.round(runtime.smoothedFps)}`;
+  const rootStyle = document.documentElement?.style;
+  if (typeof rootStyle?.setProperty === "function") {
+    const fpsHeight = runtime.elements.fpsCounter.hidden
+      ? 0
+      : Math.ceil(runtime.elements.fpsCounter.getBoundingClientRect().height);
+    rootStyle.setProperty("--fps-counter-height", `${fpsHeight}px`);
+  }
 }
 
 function setSaveStatus(text) {
