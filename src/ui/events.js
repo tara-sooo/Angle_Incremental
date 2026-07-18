@@ -94,6 +94,13 @@ function isEditableKeyboardTarget(target) {
   return isEditableElement(target) || isEditableElement(activeElement);
 }
 
+function applyTimeFluxCustomSpeedInput() {
+  const input = runtime.elements.timeFluxCustomSpeedInput;
+  if (!input) return;
+  input.dataset.customSpeedDirty = "false";
+  runtime.setTimeFluxCustomSpeed(input.value);
+}
+
 function bindEvents() {
   installNumericStabilityFixes();
   runtime.elements.speedUpgrade.addEventListener("click", runtime.buySpeed);
@@ -116,6 +123,15 @@ function bindEvents() {
   runtime.elements.timeFluxSpeedButtons.forEach((button) => {
     button.addEventListener("click", () => runtime.setTimeFluxSpeed(button.dataset.speed));
   });
+  runtime.elements.timeFluxCustomSpeedButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button === runtime.elements.timeFluxCustomSpeedApply) {
+        applyTimeFluxCustomSpeedInput();
+      } else {
+        runtime.setTimeFluxCustomSpeed(runtime.state.timeFluxCustomSpeed);
+      }
+    });
+  });
   runtime.elements.timeFluxOfflineToggle.addEventListener("change", () => applySetting(
     "offlineProgressEnabled",
     runtime.elements.timeFluxOfflineToggle.checked,
@@ -124,9 +140,10 @@ function bindEvents() {
     "offlineTickCount",
     runtime.elements.timeFluxTickInput.value,
   ));
-  runtime.elements.timeFluxCustomSpeedInput.addEventListener("change", () => runtime.setTimeFluxCustomSpeed(
-    runtime.elements.timeFluxCustomSpeedInput.value,
-  ));
+  runtime.elements.timeFluxCustomSpeedInput.addEventListener("input", () => {
+    runtime.elements.timeFluxCustomSpeedInput.dataset.customSpeedDirty = "true";
+    runtime.updateTimeFluxUi();
+  });
   runtime.elements.offlineReportClose.addEventListener("click", () => {
     runtime.offlineReport = null;
     runtime.updateUi();

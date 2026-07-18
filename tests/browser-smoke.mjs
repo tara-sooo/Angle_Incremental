@@ -365,6 +365,8 @@ try {
       amount: document.querySelector("#timeFluxQuickAmount")?.textContent?.trim() ?? "",
       speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
       customSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+      customButtonType: document.querySelector("#timeFluxQuickCustomSpeedButton")?.tagName ?? "",
+      customButtonPressed: document.querySelector("#timeFluxQuickCustomSpeedButton")?.getAttribute("aria-pressed") ?? "",
       customInputPresent: Boolean(document.querySelector("#timeFluxQuickCustomSpeedInput")),
     };
     document.querySelector('#timeFluxQuickBar .time-flux-speed[data-speed="2"]')?.click();
@@ -378,18 +380,34 @@ try {
     const customInput = document.querySelector("#timeFluxCustomSpeedInput");
     if (customInput) {
       customInput.value = "10";
-      customInput.dispatchEvent(new Event("change", { bubbles: true }));
+      customInput.dispatchEvent(new Event("input", { bubbles: true }));
     }
+    const customDraft = {
+      stateSpeed: state.timeFluxSpeed,
+      stateCustomSpeed: state.timeFluxCustomSpeed,
+      input: customInput?.value ?? "",
+      quickBar: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+      applyValue: document.querySelector("#timeFluxCustomSpeedApplyValue")?.textContent?.trim() ?? "",
+    };
+    document.querySelector("#timeFluxCustomSpeedApply")?.click();
     const customConfigured = {
       stateSpeed: state.timeFluxSpeed,
       stateCustomSpeed: state.timeFluxCustomSpeed,
       input: customInput?.value ?? "",
       quickBar: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+      applyPressed: document.querySelector("#timeFluxCustomSpeedApply")?.getAttribute("aria-pressed") ?? "",
     };
     document.querySelector('#timeFluxPanel .time-flux-speed[data-speed="3"]')?.click();
     const quickBarMirrored = {
       speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
       customSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+    };
+    document.querySelector("#timeFluxQuickCustomSpeedButton")?.click();
+    const quickBarCustomActivated = {
+      stateSpeed: state.timeFluxSpeed,
+      speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
+      tabSpeed: document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "",
+      customButtonPressed: document.querySelector("#timeFluxQuickCustomSpeedButton")?.getAttribute("aria-pressed") ?? "",
     };
     applySetting("showTimeFluxQuickBar", false);
     const hiddenQuickBar = document.querySelector("#timeFluxQuickBar")?.hidden === true;
@@ -445,8 +463,10 @@ try {
       quickBarInitial,
       quickBarChanged,
       tabMirrored,
+      customDraft,
       customConfigured,
       quickBarMirrored,
+      quickBarCustomActivated,
       hiddenQuickBar,
       quickBarWithHiddenTopBar,
     };
@@ -455,16 +475,28 @@ try {
   assert.match(timeFluxInitial.quickBarInitial.amount, /10秒 \/ 30分/);
   assert.equal(timeFluxInitial.quickBarInitial.speed, "×1");
   assert.equal(timeFluxInitial.quickBarInitial.customSpeed, "×4");
+  assert.equal(timeFluxInitial.quickBarInitial.customButtonType, "BUTTON", "the quick bar custom speed should be a button");
+  assert.equal(timeFluxInitial.quickBarInitial.customButtonPressed, "false");
   assert.equal(timeFluxInitial.quickBarInitial.customInputPresent, false, "the quick bar should not contain the custom-speed input");
   assert.equal(timeFluxInitial.quickBarChanged.stateSpeed, 2, "the quick bar should change the shared Time Flux speed");
   assert.equal(timeFluxInitial.quickBarChanged.speed, "×2");
   assert.equal(timeFluxInitial.tabMirrored, "×2", "the Time Flux tab should mirror quick bar speed changes");
+  assert.equal(timeFluxInitial.customDraft.stateSpeed, 2, "typing a custom speed should not change the active speed before applying");
+  assert.equal(timeFluxInitial.customDraft.stateCustomSpeed, 4, "typing a custom speed should not overwrite the saved custom speed before applying");
+  assert.equal(timeFluxInitial.customDraft.input, "10");
+  assert.equal(timeFluxInitial.customDraft.quickBar, "×4", "the quick bar should keep showing the saved custom speed while editing a draft");
+  assert.equal(timeFluxInitial.customDraft.applyValue, "×10", "the Time Flux tab button should preview the draft value");
   assert.equal(timeFluxInitial.customConfigured.stateSpeed, 10, "the TF tab input should select the custom speed");
   assert.equal(timeFluxInitial.customConfigured.stateCustomSpeed, 10, "the TF tab input should update the remembered custom speed");
   assert.equal(timeFluxInitial.customConfigured.input, "10");
   assert.equal(timeFluxInitial.customConfigured.quickBar, "×10", "the quick bar should display the configured custom speed");
+  assert.equal(timeFluxInitial.customConfigured.applyPressed, "true");
   assert.equal(timeFluxInitial.quickBarMirrored.speed, "×3", "the quick bar should mirror Time Flux tab speed changes");
   assert.equal(timeFluxInitial.quickBarMirrored.customSpeed, "×10", "preset changes should not erase the displayed custom speed");
+  assert.equal(timeFluxInitial.quickBarCustomActivated.stateSpeed, 10, "the quick bar custom button should apply the saved custom speed");
+  assert.equal(timeFluxInitial.quickBarCustomActivated.speed, "×10");
+  assert.equal(timeFluxInitial.quickBarCustomActivated.tabSpeed, "×10", "the Time Flux tab should mirror quick-bar custom speed changes");
+  assert.equal(timeFluxInitial.quickBarCustomActivated.customButtonPressed, "true");
   assert.equal(timeFluxInitial.hiddenQuickBar, true, "the quick bar visibility setting should hide only the quick bar");
   assert.equal(timeFluxInitial.quickBarWithHiddenTopBar, true, "the quick bar should be independent from top bar visibility");
   assert.equal(timeFluxInitial.initial.panelActive, true, "Time Flux should activate as an independent main tab");
@@ -903,20 +935,36 @@ try {
       const input = document.querySelector("#timeFluxCustomSpeedInput");
       if (input) {
         input.value = "12";
-        input.dispatchEvent(new Event("change", { bubbles: true }));
+        input.dispatchEvent(new Event("input", { bubbles: true }));
       }
       window.advanceTime(0);
+      const draft = {
+        stateSpeed: window.__angleDebug.state.timeFluxSpeed,
+        stateCustomSpeed: window.__angleDebug.state.timeFluxCustomSpeed,
+        quickSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+      };
+      document.querySelector("#timeFluxCustomSpeedApply")?.click();
       return {
         panelActive: document.querySelector('[data-panel="timeFlux"]')?.classList.contains("is-active") ?? false,
         customInputWidth: input?.getBoundingClientRect().width ?? 0,
         customSpeed: input?.value ?? "",
         quickSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+        customButtonType: document.querySelector("#timeFluxCustomSpeedApply")?.tagName ?? "",
+        stateSpeed: window.__angleDebug.state.timeFluxSpeed,
+        stateCustomSpeed: window.__angleDebug.state.timeFluxCustomSpeed,
+        draft,
         quickInputPresent: Boolean(document.querySelector("#timeFluxQuickCustomSpeedInput")),
       };
     });
     assert.equal(mobileTimeFlux.panelActive, true, "the Time Flux tab should activate on mobile");
+    assert.equal(mobileTimeFlux.draft.stateSpeed, 1, "mobile custom speed input should not change the active speed before applying");
+    assert.equal(mobileTimeFlux.draft.stateCustomSpeed, 4, "mobile custom speed input should not change the saved speed before applying");
+    assert.equal(mobileTimeFlux.draft.quickSpeed, "×4", "mobile quick bar should keep the saved speed while editing");
     assert.equal(mobileTimeFlux.customSpeed, "12", "the mobile Time Flux tab should accept custom speed input");
     assert.equal(mobileTimeFlux.quickSpeed, "×12", "the mobile quick bar should mirror custom speed");
+    assert.equal(mobileTimeFlux.customButtonType, "BUTTON", "the mobile Time Flux custom speed control should be a button");
+    assert.equal(mobileTimeFlux.stateSpeed, 12, "the mobile custom speed button should apply the active speed");
+    assert.equal(mobileTimeFlux.stateCustomSpeed, 12, "the mobile custom speed button should save the custom speed");
     assert.equal(mobileTimeFlux.quickInputPresent, false, "the mobile quick bar should remain read-only");
     assert.ok(mobileTimeFlux.customInputWidth > 0, "the mobile custom speed input should remain visible");
 
