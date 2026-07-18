@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.8.0";
+const EXPECTED_ASSET_VERSION = "0.8.1";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -121,13 +121,107 @@ try {
       summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.8.0 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.8.0 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /Infinity Angle/);
+  assert.equal(updateModal.visible, true, "the 0.8.1 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.8.1 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /Time Flux/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   await page.locator("#updateModalClose").click();
   await page.waitForFunction(() => document.querySelector("#updateModal")?.hidden === true);
+
+  const existingSaveFixtures = [
+    {
+      name: "0.7.0-style-v10",
+      state: {
+        generationCount: 4,
+        previousGenerationScore: 1e12,
+        previousGenerationScoreLog10: 12,
+        infiniteAngleUnlocked: true,
+        infiniteAngleSpeedLevel: 2,
+        infiniteAngleVertexLevel: 3,
+        infiniteAngleGainLevel: 1,
+        towerFloor: 2,
+        infinityPointsExact: "100000000000000000000",
+        infinityPoints: 1e20,
+        infinityPointsLog10: 20,
+      },
+      expected: {
+        generationCount: 4,
+        infiniteAngleUnlocked: true,
+        towerFloor: 2,
+        timeFlux: 0,
+        offlineProgressEnabled: true,
+        showTimeFluxQuickBar: true,
+      },
+    },
+    {
+      name: "0.8.0-v10",
+      state: {
+        generationCount: 5,
+        previousGenerationScore: 1e15,
+        previousGenerationScoreLog10: 15,
+        infiniteAngleUnlocked: true,
+        infiniteAngleSpeedLevel: 4,
+        infiniteAngleVertexLevel: 5,
+        infiniteAngleGainLevel: 2,
+        towerFloor: 3,
+        offlineProgressEnabled: true,
+        offlineTickCount: 5000,
+        timeFlux: 123,
+        timeFluxCapacityLevel: 2,
+        timeFluxGainLevel: 1,
+        timeFluxSpeed: 1,
+        showTimeFluxQuickBar: true,
+      },
+      expected: {
+        generationCount: 5,
+        infiniteAngleUnlocked: true,
+        towerFloor: 3,
+        timeFlux: 123,
+        offlineProgressEnabled: true,
+        showTimeFluxQuickBar: true,
+      },
+    },
+  ];
+  for (const fixture of existingSaveFixtures) {
+    const existingContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const existingErrors = [];
+    await existingContext.addInitScript((saveData) => {
+      localStorage.setItem("angle-incremental-save", JSON.stringify(saveData));
+      localStorage.setItem("angle-incremental-seen-version", "0.8.1");
+    }, {
+      version: 10,
+      savedAt: Date.now(),
+      state: fixture.state,
+    });
+    const existingPage = await existingContext.newPage();
+    existingPage.on("pageerror", (error) => existingErrors.push(error.message));
+    existingPage.on("console", (message) => {
+      if (message.type() === "error") existingErrors.push(message.text());
+    });
+    try {
+      await existingPage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
+      await existingPage.waitForFunction(() => (
+        typeof window.render_game_to_text === "function"
+        && Boolean(window.__angleDebug?.state)
+      ));
+      const loaded = await existingPage.evaluate(() => {
+        const { state } = window.__angleDebug;
+        return {
+          generationCount: state.generationCount,
+          infiniteAngleUnlocked: state.infiniteAngleUnlocked,
+          towerFloor: state.towerFloor,
+          timeFlux: state.timeFlux,
+          offlineProgressEnabled: state.offlineProgressEnabled,
+          showTimeFluxQuickBar: state.showTimeFluxQuickBar,
+        };
+      });
+      assert.deepEqual(loaded, fixture.expected, `${fixture.name} should load without losing progress or TF settings`);
+      assert.deepEqual(existingErrors, [], `${fixture.name} should load without browser errors`);
+    } finally {
+      await existingContext.close();
+    }
+  }
 
   const snapshot = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
   assert.equal(snapshot.vertices, 3);
@@ -773,6 +867,108 @@ try {
     1,
     "plain f outside an editable element must still toggle fullscreen",
   );
+
+  const mobileContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 1,
+    hasTouch: true,
+    isMobile: true,
+  });
+  const mobileErrors = [];
+  const mobilePage = await mobileContext.newPage();
+  mobilePage.on("pageerror", (error) => mobileErrors.push(error.message));
+  mobilePage.on("console", (message) => {
+    if (message.type() === "error") mobileErrors.push(message.text());
+  });
+  try {
+    await mobilePage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
+    await mobilePage.waitForFunction(() => (
+      typeof window.render_game_to_text === "function"
+      && Boolean(window.__angleDebug?.state)
+    ));
+    const mobileStartup = await mobilePage.evaluate(() => ({
+      updateTitle: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
+      tabCount: document.querySelectorAll(".main-tab").length,
+      quickBarVisible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
+      canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
+    }));
+    assert.equal(mobileStartup.updateTitle, "0.8.1 アップデート", "mobile startup should use the release version");
+    assert.equal(mobileStartup.tabCount, 9, "mobile startup should expose every main tab");
+    assert.equal(mobileStartup.quickBarVisible, true, "the Time Flux quick bar should be visible on mobile");
+    assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
+    await mobilePage.locator("#updateModalClose").click();
+
+    await mobilePage.locator('[data-tab="timeFlux"]').click();
+    const mobileTimeFlux = await mobilePage.evaluate(() => {
+      const input = document.querySelector("#timeFluxCustomSpeedInput");
+      if (input) {
+        input.value = "12";
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      window.advanceTime(0);
+      return {
+        panelActive: document.querySelector('[data-panel="timeFlux"]')?.classList.contains("is-active") ?? false,
+        customInputWidth: input?.getBoundingClientRect().width ?? 0,
+        customSpeed: input?.value ?? "",
+        quickSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
+        quickInputPresent: Boolean(document.querySelector("#timeFluxQuickCustomSpeedInput")),
+      };
+    });
+    assert.equal(mobileTimeFlux.panelActive, true, "the Time Flux tab should activate on mobile");
+    assert.equal(mobileTimeFlux.customSpeed, "12", "the mobile Time Flux tab should accept custom speed input");
+    assert.equal(mobileTimeFlux.quickSpeed, "×12", "the mobile quick bar should mirror custom speed");
+    assert.equal(mobileTimeFlux.quickInputPresent, false, "the mobile quick bar should remain read-only");
+    assert.ok(mobileTimeFlux.customInputWidth > 0, "the mobile custom speed input should remain visible");
+
+    await mobilePage.locator('[data-tab="statistics"]').click();
+    const mobileStatistics = await mobilePage.evaluate(() => ({
+      panelActive: document.querySelector('[data-panel="statistics"]')?.classList.contains("is-active") ?? false,
+      totalRealPlayTimeWidth: document.querySelector("#totalRealPlayTime")?.getBoundingClientRect().width ?? 0,
+      currentInfinityRealTimeWidth: document.querySelector("#currentInfinityRealTime")?.getBoundingClientRect().width ?? 0,
+    }));
+    assert.equal(mobileStatistics.panelActive, true, "the Statistics tab should activate on mobile");
+    assert.ok(mobileStatistics.totalRealPlayTimeWidth > 0, "mobile statistics should show total real play time");
+    assert.ok(mobileStatistics.currentInfinityRealTimeWidth > 0, "mobile statistics should show current real Infinity time");
+
+    const mobileInfiniteAngle = await mobilePage.evaluate(() => {
+      const { state, unlockInfiniteAngle, switchMainTab, switchInfinitySubtab, applySetting } = window.__angleDebug;
+      state.infinityPointsExact = "100000000000000000000";
+      state.infinityPoints = 1e20;
+      state.infinityPointsLog10 = 20;
+      state.infiniteAngleUnlocked = false;
+      unlockInfiniteAngle();
+      switchMainTab("infinity");
+      switchInfinitySubtab("angle");
+      applySetting("topBarMode", "hidden");
+      applySetting("showFps", true);
+      window.advanceTime(0);
+      const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+      const quickBar = rect("#timeFluxQuickBar");
+      const toasts = rect("#achievementToasts");
+      const fps = rect("#fpsCounter");
+      return {
+        panelActive: document.querySelector('[data-infinity-panel="angle"]')?.classList.contains("is-active") ?? false,
+        canvasWidth: document.querySelector("#infiniteAngleCanvas")?.getBoundingClientRect().width ?? 0,
+        quickBarBottom: quickBar?.bottom ?? 0,
+        toastTop: toasts?.top ?? 0,
+        fpsTop: fps?.top ?? 0,
+      };
+    });
+    assert.equal(mobileInfiniteAngle.panelActive, true, "the mobile IA panel should activate");
+    assert.ok(mobileInfiniteAngle.canvasWidth > 0, "the mobile IA canvas should have a rendered width");
+    assert.ok(mobileInfiniteAngle.toastTop >= mobileInfiniteAngle.quickBarBottom - 1, "mobile achievement toasts should clear the quick bar");
+    assert.ok(mobileInfiniteAngle.fpsTop >= mobileInfiniteAngle.quickBarBottom - 1, "mobile FPS should clear the quick bar");
+    assert.deepEqual(mobileErrors, [], "mobile critical paths should produce no browser errors");
+    report.mobile = {
+      viewport: "390x844",
+      startup: mobileStartup,
+      timeFlux: mobileTimeFlux,
+      statistics: mobileStatistics,
+      infiniteAngle: mobileInfiniteAngle,
+    };
+  } finally {
+    await mobileContext.close();
+  }
 
   assert.deepEqual(errors, []);
   report.result = "passed";
