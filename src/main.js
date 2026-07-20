@@ -546,9 +546,13 @@ async function handleVisibilityChange() {
   }
   if (visibilityResumeInFlight) return;
   visibilityResumeInFlight = true;
+  // Saving while the clock request is pending may rebase the shared baseline.
+  // Keep the interval that this resume began with so it cannot be discarded.
+  const resumeBaselineTimestamp = offlineBaselineTimestamp;
+  const resumeBaselineServerTimestamp = offlineBaselineServerTimestamp;
   try {
     await syncServerClock();
-    const elapsed = offlineElapsedFromSave(offlineBaselineTimestamp, offlineBaselineServerTimestamp);
+    const elapsed = offlineElapsedFromSave(resumeBaselineTimestamp, resumeBaselineServerTimestamp);
     if (elapsed.elapsedSeconds > 0 || elapsed.clockAnomaly) {
       processOfflineElapsed(elapsed.elapsedSeconds, "visibility", elapsed);
     } else {

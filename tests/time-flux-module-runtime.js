@@ -246,6 +246,9 @@ async function runTimeFluxModuleRuntimeTest() {
     resolveClockRequest = resolve;
   });
   resumeInstance.context.window.fetch = () => pendingClockRequest;
+  resumeRuntime.setOfflineBaseline(Date.now() - 60 * 1000, 0);
+  resumeDebug.state.offlineProgressEnabled = false;
+  resumeDebug.state.timeFlux = 0;
   const playTimeBeforeResume = resumeDebug.state.totalPlayTime;
   const resumePromise = resumeRuntime.handleVisibilityChange();
   await Promise.resolve();
@@ -255,11 +258,17 @@ async function runTimeFluxModuleRuntimeTest() {
     playTimeBeforeResume,
     "online simulation should pause while visibility resume synchronizes the clock",
   );
+  resumeRuntime.saveGame("manual");
   resolveClockRequest({
     ok: true,
     headers: { get: () => new Date().toUTCString() },
   });
   await resumePromise;
+  assert.ok(
+    resumeRuntime.offlineReport.elapsedSeconds >= 50,
+    "visibility resume should retain the interval captured before a pending save rebases the baseline",
+  );
+  assert.ok(resumeDebug.state.timeFlux > 0, "the retained resume interval should grant Time Flux");
 }
 
 module.exports = { runTimeFluxModuleRuntimeTest };
