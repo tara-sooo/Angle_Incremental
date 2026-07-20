@@ -105,6 +105,25 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(cappedReport.capacityReached, true, "the report should flag a full TF capacity");
   assert.equal(state.timeFlux, 1800, "TF should never exceed its capacity");
 
+  state.timeFluxCapacityLevel = 10;
+  state.timeFlux = 0;
+  const trustedCapReport = debug.processOfflineElapsed(8 * 86400, "test", { clockSource: "server" });
+  assert.equal(trustedCapReport.capped, true, "offline rewards should be capped at seven trusted days");
+  assert.equal(trustedCapReport.effectiveElapsedSeconds, 7 * 86400, "the trusted offline cap should be seven days");
+  assert.ok(state.timeFlux > 0, "a capped trusted interval should still grant its allowed reward");
+
+  const timeFluxBeforeClockAnomaly = state.timeFlux;
+  const clockAnomalyReport = debug.processOfflineElapsed(3600, "test", {
+    clockSource: "server",
+    clockAnomaly: true,
+  });
+  assert.equal(clockAnomalyReport.clockAnomaly, true, "clock anomalies should be recorded in the offline report");
+  assert.equal(clockAnomalyReport.rewardSuppressed, true, "clock anomalies should suppress offline rewards");
+  assert.equal(state.timeFlux, timeFluxBeforeClockAnomaly, "clock anomalies must not change Time Flux");
+
+  const futureSave = debug.offlineElapsedFromSave(Date.now() + 10 * 60 * 1000, 0);
+  assert.equal(futureSave.clockAnomaly, true, "a future local save timestamp should be rejected");
+
   state.offlineProgressEnabled = true;
   state.timeFlux = 123;
   state.timeFluxCapacityLevel = 2;
@@ -189,6 +208,16 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.ok(
     Math.abs(loadedInstance.debug.state.timeFlux - 360) < 0.1,
     "a saved timestamp should trigger TF accumulation when offline progress is disabled",
+  );
+  assert.equal(
+    loadedInstance.runtime.offlineReport.clockSource,
+    "local-fallback",
+    "the no-fetch harness should identify local-clock fallback processing",
+  );
+  assert.match(
+    loadedInstance.context.document.getElementById("offlineReportNote").textContent,
+    /サーバー時刻を取得できなかった/,
+    "local-clock fallback should be visible in the offline report",
   );
 }
 

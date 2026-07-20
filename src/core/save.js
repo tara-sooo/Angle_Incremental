@@ -294,21 +294,29 @@ function serializeSaveData() {
   runtime.SAVE_FIELDS.forEach((field) => {
     data[field] = runtime.state[field];
   });
-  return {
+  const savedAt = runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
+  const saveData = {
     version: runtime.SAVE_VERSION,
-    savedAt: Date.now(),
+    savedAt,
     state: data,
   };
+  // Browser storage is user-controlled, so serverSavedAt is preferred when a server clock is available.
+  if (runtime.serverClockAvailable?.() && runtime.serverClockNowMs) {
+    saveData.serverSavedAt = runtime.serverClockNowMs();
+  }
+  return saveData;
 }
 
 function saveGame(reason = "auto") {
   if (runtime.offlineProcessing) return true;
   try {
-    const savedAt = Date.now();
+    const savedAt = runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
     const saveData = serializeSaveData();
     saveData.savedAt = savedAt;
     localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(saveData));
-    if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt);
+    if (runtime.setOfflineBaseline) {
+      runtime.setOfflineBaseline(savedAt, saveData.serverSavedAt || 0);
+    }
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(reason === "auto" ? runtime.t("savedAuto") : runtime.t("savedManual"));
     return true;
@@ -352,11 +360,25 @@ function loadGame() {
 
     applySaveData(parsed.state, parsed.version);
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
-    if (savedAt > 0 && runtime.processOfflineElapsed) {
-      if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt);
-      runtime.processOfflineElapsed(Math.max(0, (Date.now() - savedAt) / 1000), "load");
+    const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);
+    const offlineElapsed = runtime.offlineElapsedFromSave
+      ? runtime.offlineElapsedFromSave(savedAt, serverSavedAt)
+      : {
+        elapsedSeconds: Math.max(0, (Date.now() - savedAt) / 1000),
+        clockSource: "local-fallback",
+        clockAnomaly: false,
+        legacyTimestampUsed: false,
+      };
+    if (
+      runtime.processOfflineElapsed
+      && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
+    ) {
+      runtime.processOfflineElapsed(offlineElapsed.elapsedSeconds, "load", offlineElapsed);
     } else if (runtime.setOfflineBaseline) {
-      runtime.setOfflineBaseline(Date.now());
+      runtime.setOfflineBaseline(
+        runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
+        runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
+      );
     }
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(runtime.t("loaded"));
@@ -371,7 +393,13 @@ function resetSave() {
   if (!confirmed) return;
   localStorage.removeItem(runtime.SAVE_KEY);
   runtime.offlineReport = null;
-  if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(Date.now());
+  if (runtime.rebaseLocalClock) runtime.rebaseLocalClock();
+  if (runtime.setOfflineBaseline) {
+    runtime.setOfflineBaseline(
+      runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
+      runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
+    );
+  }
   Object.assign(runtime.state, {
     score: 0,
     scoreLog10: -Infinity,
