@@ -43,6 +43,7 @@ let offlineBaselineServerTimestamp = 0;
 let offlineProcessing = false;
 let offlineReport = null;
 let visibilityResumeInFlight = false;
+let visibilityResumeGeneration = 0;
 let serverClockAnchor = null;
 let serverClockSyncInFlight = null;
 let serverClockSource = "local-fallback";
@@ -539,6 +540,10 @@ function setOfflineBaseline(timestamp = localClockNow(), serverTimestamp = 0) {
   offlineBaselineServerTimestamp = Number.isFinite(serverValue) && serverValue > 0 ? serverValue : 0;
 }
 
+function invalidateVisibilityResume() {
+  visibilityResumeGeneration += 1;
+}
+
 async function handleVisibilityChange() {
   if (document.hidden) {
     runtime.saveGame("auto");
@@ -550,8 +555,10 @@ async function handleVisibilityChange() {
   // Keep the interval that this resume began with so it cannot be discarded.
   const resumeBaselineTimestamp = offlineBaselineTimestamp;
   const resumeBaselineServerTimestamp = offlineBaselineServerTimestamp;
+  const resumeGeneration = visibilityResumeGeneration;
   try {
     await syncServerClock();
+    if (resumeGeneration !== visibilityResumeGeneration) return;
     const elapsed = offlineElapsedFromSave(resumeBaselineTimestamp, resumeBaselineServerTimestamp);
     if (elapsed.elapsedSeconds > 0 || elapsed.clockAnomaly) {
       processOfflineElapsed(elapsed.elapsedSeconds, "visibility", elapsed);
@@ -877,6 +884,7 @@ expose("update", () => update, (value) => { update = value; });
 expose("advanceOnlineTime", () => advanceOnlineTime, (value) => { advanceOnlineTime = value; });
 expose("processOfflineElapsed", () => processOfflineElapsed, (value) => { processOfflineElapsed = value; });
 expose("setOfflineBaseline", () => setOfflineBaseline, (value) => { setOfflineBaseline = value; });
+expose("invalidateVisibilityResume", () => invalidateVisibilityResume);
 expose("handleVisibilityChange", () => handleVisibilityChange, (value) => { handleVisibilityChange = value; });
 expose("currentFrameTime", () => currentFrameTime, (value) => { currentFrameTime = value; });
 expose("lastTime", () => lastTime, (value) => { lastTime = value; });

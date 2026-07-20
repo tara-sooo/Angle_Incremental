@@ -31,6 +31,7 @@ function ic8VertexUpgradeLevelLimit() {
 }
 
 function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
+  if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   const score = runtime.hydrateLogResource(data.score, data.scoreLog10);
   runtime.state.score = score.value;
   runtime.state.scoreLog10 = score.log;
@@ -393,6 +394,7 @@ function loadGame() {
 function resetSave() {
   const confirmed = window.confirm(runtime.t("resetConfirm"));
   if (!confirmed) return;
+  if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   localStorage.removeItem(runtime.SAVE_KEY);
   runtime.offlineReport = null;
   if (runtime.rebaseLocalClock) runtime.rebaseLocalClock();

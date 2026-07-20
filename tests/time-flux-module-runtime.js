@@ -269,6 +269,27 @@ async function runTimeFluxModuleRuntimeTest() {
     "visibility resume should retain the interval captured before a pending save rebases the baseline",
   );
   assert.ok(resumeDebug.state.timeFlux > 0, "the retained resume interval should grant Time Flux");
+
+  const resetResumeInstance = await loadRuntime(candidatePath);
+  const resetResumeDebug = resetResumeInstance.debug;
+  const resetResumeRuntime = resetResumeInstance.runtime;
+  let resolveResetClockRequest;
+  const pendingResetClockRequest = new Promise((resolve) => {
+    resolveResetClockRequest = resolve;
+  });
+  resetResumeInstance.context.window.fetch = () => pendingResetClockRequest;
+  resetResumeRuntime.setOfflineBaseline(Date.now() - 60 * 1000, 0);
+  const resetResumePromise = resetResumeRuntime.handleVisibilityChange();
+  await Promise.resolve();
+  resetResumeRuntime.resetSave();
+  resolveResetClockRequest({
+    ok: true,
+    headers: { get: () => new Date().toUTCString() },
+  });
+  await resetResumePromise;
+  assert.equal(resetResumeDebug.state.totalPlayTime, 0, "reset should not receive stale pending offline progress");
+  assert.equal(resetResumeDebug.state.timeFlux, 0, "reset should not receive stale pending Time Flux");
+  assert.equal(resetResumeRuntime.offlineReport, null, "reset should clear the pending offline report");
 }
 
 module.exports = { runTimeFluxModuleRuntimeTest };
