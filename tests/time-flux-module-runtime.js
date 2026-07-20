@@ -60,6 +60,60 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.timeFluxSpeed, 1, "speed should return to x1 when TF is depleted");
   assert.equal(state.timeFluxCustomSpeed, 4, "depletion should not erase the configured custom speed");
 
+  {
+    const batchedInstance = await loadRuntime(candidatePath);
+    const { context: batchedContext, debug: batchedDebug, runtime: batchedRuntime } = batchedInstance;
+    const batchedState = batchedDebug.state;
+    batchedState.automationEnabled = true;
+    batchedState.autoRunInfinity = true;
+    batchedState.autoInfinityPointThreshold = 1;
+    batchedState.autoInfinityPointThresholdLog10 = 0;
+    batchedState.infinityCount = 1;
+    batchedState.infinityUpgradeMask = (1 << 13) - 1;
+    batchedState.achievementMask = -1;
+    batchedState.timeFlux = 1800;
+    batchedState.timeFluxSpeed = 60;
+    const originalCanInfinity = batchedRuntime.canInfinity;
+    const originalRunInfinity = batchedRuntime.runInfinity;
+    const scoreElement = batchedRuntime.elements.scoreValue;
+    const originalScoreTextDescriptor = Object.getOwnPropertyDescriptor(scoreElement, "textContent");
+    const originalSetItem = batchedContext.localStorage.setItem;
+    let infinityRuns = 0;
+    let uiUpdates = 0;
+    let saveWrites = 0;
+    batchedRuntime.canInfinity = () => true;
+    batchedRuntime.runInfinity = (...args) => {
+      infinityRuns += 1;
+      return originalRunInfinity(...args);
+    };
+    let scoreText = originalScoreTextDescriptor.value;
+    Object.defineProperty(scoreElement, "textContent", {
+      configurable: true,
+      get: () => scoreText,
+      set: (value) => {
+        uiUpdates += 1;
+        scoreText = value;
+      },
+    });
+    batchedContext.localStorage.setItem = (key, value) => {
+      if (key === batchedRuntime.SAVE_KEY) saveWrites += 1;
+      return originalSetItem(key, value);
+    };
+    try {
+      const gameSeconds = batchedDebug.advanceOnlineTime(1);
+      assert.equal(gameSeconds, 60, "x60 should still simulate sixty game seconds");
+      assert.equal(batchedState.timeFlux, 1741, "x60 should still consume 59 TF per real second");
+      assert.ok(infinityRuns > 1000, "the simulation should preserve high-frequency auto-Infinity progression");
+      assert.equal(uiUpdates, 1, "auto-Infinity UI updates should be flushed once per simulation batch");
+      assert.equal(saveWrites, 1, "auto-Infinity saves should be flushed once per simulation batch");
+    } finally {
+      batchedRuntime.canInfinity = originalCanInfinity;
+      batchedRuntime.runInfinity = originalRunInfinity;
+      Object.defineProperty(scoreElement, "textContent", originalScoreTextDescriptor);
+      batchedContext.localStorage.setItem = originalSetItem;
+    }
+  }
+
   assert.equal(runtime.setTimeFluxCustomSpeed(99), 60, "custom speed should clamp to x60");
   assert.equal(state.timeFluxCustomSpeed, 60, "setting a custom speed should remember it separately");
   assert.equal(runtime.setTimeFluxSpeed(2), 2, "preset speed should select x2");

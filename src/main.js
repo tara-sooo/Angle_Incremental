@@ -44,6 +44,11 @@ let offlineProcessing = false;
 let offlineReport = null;
 let visibilityResumeInFlight = false;
 let visibilityResumeGeneration = 0;
+let simulationBatchDepth = 0;
+let simulationUiPending = false;
+let simulationSaveReason = "";
+let simulationFlushActive = false;
+let simulationFlushSavePerformed = false;
 let serverClockAnchor = null;
 let serverClockSyncInFlight = null;
 let serverClockSource = "local-fallback";
@@ -53,6 +58,67 @@ let localClockAnchor = null;
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
+
+const baseUpdateUi = runtime.updateUi;
+const baseSaveGame = runtime.saveGame;
+
+function simulationBatchActive() {
+  return simulationBatchDepth > 0;
+}
+
+function queueSimulationSave(reason = "auto") {
+  const normalizedReason = reason === "manual" ? "manual" : "auto";
+  if (!simulationSaveReason || normalizedReason === "manual") simulationSaveReason = normalizedReason;
+}
+
+function batchedUpdateUi(...args) {
+  if (simulationBatchActive()) {
+    simulationUiPending = true;
+    return undefined;
+  }
+  return baseUpdateUi(...args);
+}
+
+function batchedSaveGame(reason = "auto") {
+  if (simulationBatchActive()) {
+    queueSimulationSave(reason);
+    return true;
+  }
+  if (simulationFlushActive) simulationFlushSavePerformed = true;
+  return baseSaveGame(reason);
+}
+
+runtime.updateUi = batchedUpdateUi;
+runtime.saveGame = batchedSaveGame;
+
+function flushSimulationSideEffects() {
+  if (simulationBatchActive()) return;
+  const shouldUpdateUi = simulationUiPending;
+  const saveReason = simulationSaveReason;
+  simulationUiPending = false;
+  simulationSaveReason = "";
+  if (!shouldUpdateUi && !saveReason) return;
+
+  simulationFlushActive = true;
+  simulationFlushSavePerformed = false;
+  try {
+    if (shouldUpdateUi) runtime.updateUi();
+    if (saveReason && !simulationFlushSavePerformed) runtime.saveGame(saveReason);
+  } finally {
+    simulationFlushActive = false;
+    simulationFlushSavePerformed = false;
+  }
+}
+
+function runSimulationBatch(callback) {
+  simulationBatchDepth += 1;
+  try {
+    return callback();
+  } finally {
+    simulationBatchDepth -= 1;
+    if (simulationBatchDepth === 0) flushSimulationSideEffects();
+  }
+}
 
 function monotonicClockNow() {
   const performanceApi = window.performance;
@@ -439,13 +505,15 @@ function advanceOnlineTime(realSeconds) {
     runtime.state.timeFluxSpeed = 1;
   }
 
-  let remaining = gameSeconds;
-  while (remaining > 0) {
-    const step = Math.min(runtime.MAX_SIMULATION_STEP_SECONDS, remaining);
-    update(step);
-    remaining -= step;
-  }
-  runRealTimeMaintenance(realDt);
+  runSimulationBatch(() => {
+    let remaining = gameSeconds;
+    while (remaining > 0) {
+      const step = Math.min(runtime.MAX_SIMULATION_STEP_SECONDS, remaining);
+      update(step);
+      remaining -= step;
+    }
+    runRealTimeMaintenance(realDt);
+  });
   return gameSeconds;
 }
 

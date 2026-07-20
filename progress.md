@@ -108,6 +108,7 @@ Original prompt: では、中核ループを完成させてください
 - Prepared the 0.8.2 release candidate with selectable Time Flux custom-speed buttons in the quick bar and Time Flux tab while keeping SAVE_VERSION 10 unchanged.
 - Changed Time Flux custom speed controls so the saved custom speed is selectable as a button in the quick bar and the Time Flux tab, while numeric edits apply only through the tab's custom-speed button.
 - Prepared the 0.8.3 clock hotfix: offline rewards prefer the same-origin HTTP Date header, cap trusted away time at seven days, suppress inconsistent timestamps, and preserve SAVE_VERSION 10 compatibility.
+- Fixed x60 Time Flux auto-Infinity lag by batching UI refreshes and saves per online simulation batch without changing progression.
 
 ## TODO
 
