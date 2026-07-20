@@ -136,6 +136,7 @@ function runGeneration() {
   runtime.state.lastVertexIndex = 0;
   runtime.state.floatingTexts = [];
   runtime.state.currentGenerationRunTime = 0;
+  runtime.checkAchievements(true);
   runtime.updateUi();
   runtime.saveGame("manual");
 }

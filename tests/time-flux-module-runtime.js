@@ -114,6 +114,38 @@ async function runTimeFluxModuleRuntimeTest() {
     }
   }
 
+  {
+    const achievementInstance = await loadRuntime(candidatePath);
+    const { debug: achievementDebug, runtime: achievementRuntime } = achievementInstance;
+    const achievementState = achievementDebug.state;
+    const originalUpdate = achievementRuntime.update;
+    achievementState.achievementMask = 0;
+    achievementState.generationCount = 0;
+    achievementState.generationScore = Number.MAX_VALUE;
+    achievementState.generationScoreLog10 = 1e6;
+    achievementRuntime.update = () => {
+      achievementRuntime.runGeneration();
+      achievementState.score = 1e25;
+      achievementState.scoreLog10 = 25;
+      achievementRuntime.runCoreBoost();
+    };
+    try {
+      achievementDebug.advanceOnlineTime(1);
+      assert.equal(
+        achievementState.achievementMask & (1 << 1),
+        1 << 1,
+        "Generation achievement should unlock before a batched Core Boost reset",
+      );
+      assert.equal(
+        achievementState.achievementMask & (1 << 2),
+        1 << 2,
+        "Generation multiplier achievement should unlock before a batched Core Boost reset",
+      );
+    } finally {
+      achievementRuntime.update = originalUpdate;
+    }
+  }
+
   assert.equal(runtime.setTimeFluxCustomSpeed(99), 60, "custom speed should clamp to x60");
   assert.equal(state.timeFluxCustomSpeed, 60, "setting a custom speed should remember it separately");
   assert.equal(runtime.setTimeFluxSpeed(2), 2, "preset speed should select x2");

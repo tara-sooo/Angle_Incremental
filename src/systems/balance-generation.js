@@ -91,6 +91,7 @@ function balanceRunGeneration() {
   runtime.state.floatingTexts = [];
   runtime.state.currentGenerationRunTime = 0;
   balanceApplyResetStartScore();
+  runtime.checkAchievements(true);
   runtime.updateUi();
   runtime.saveGame("manual");
 }
