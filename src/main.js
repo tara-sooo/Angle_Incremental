@@ -579,7 +579,7 @@ function frame(now) {
     smoothedFps = smoothedFps === 0 ? instantFps : smoothedFps * 0.9 + instantFps * 0.1;
   }
   lastTime = now;
-  if (document.hidden) {
+  if (document.hidden || visibilityResumeInFlight) {
     requestNextFrame(frame);
     return;
   }

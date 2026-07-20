@@ -309,14 +309,14 @@ function serializeSaveData() {
 
 function saveGame(reason = "auto") {
   if (runtime.offlineProcessing) return true;
+  let savedAt = Date.now();
+  let serverSavedAt = 0;
   try {
-    const savedAt = runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
+    savedAt = runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
     const saveData = serializeSaveData();
     saveData.savedAt = savedAt;
+    serverSavedAt = saveData.serverSavedAt || 0;
     localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(saveData));
-    if (runtime.setOfflineBaseline) {
-      runtime.setOfflineBaseline(savedAt, saveData.serverSavedAt || 0);
-    }
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(reason === "auto" ? runtime.t("savedAuto") : runtime.t("savedManual"));
     return true;
@@ -324,6 +324,8 @@ function saveGame(reason = "auto") {
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(runtime.t("saveFailed"));
     return false;
+  } finally {
+    if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
   }
 }
 

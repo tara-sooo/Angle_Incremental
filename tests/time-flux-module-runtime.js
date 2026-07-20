@@ -219,6 +219,47 @@ async function runTimeFluxModuleRuntimeTest() {
     /サーバー時刻を取得できなかった/,
     "local-clock fallback should be visible in the offline report",
   );
+
+  const saveFailureInstance = await loadRuntime(candidatePath);
+  const saveFailureDebug = saveFailureInstance.debug;
+  const saveFailureRuntime = saveFailureInstance.runtime;
+  saveFailureRuntime.setOfflineBaseline(1, 0);
+  const originalSetItem = saveFailureInstance.context.localStorage.setItem;
+  saveFailureInstance.context.localStorage.setItem = () => {
+    throw new Error("storage unavailable");
+  };
+  try {
+    assert.equal(saveFailureDebug.saveGame("manual"), false, "storage failures should report a failed save");
+    assert.ok(
+      saveFailureRuntime.offlineBaselineTimestamp > 1,
+      "a failed save should still rebase the in-memory offline baseline",
+    );
+  } finally {
+    saveFailureInstance.context.localStorage.setItem = originalSetItem;
+  }
+
+  const resumeInstance = await loadRuntime(candidatePath);
+  const resumeDebug = resumeInstance.debug;
+  const resumeRuntime = resumeInstance.runtime;
+  let resolveClockRequest;
+  const pendingClockRequest = new Promise((resolve) => {
+    resolveClockRequest = resolve;
+  });
+  resumeInstance.context.window.fetch = () => pendingClockRequest;
+  const playTimeBeforeResume = resumeDebug.state.totalPlayTime;
+  const resumePromise = resumeRuntime.handleVisibilityChange();
+  await Promise.resolve();
+  resumeRuntime.frame(resumeRuntime.lastTime + 1000);
+  assert.equal(
+    resumeDebug.state.totalPlayTime,
+    playTimeBeforeResume,
+    "online simulation should pause while visibility resume synchronizes the clock",
+  );
+  resolveClockRequest({
+    ok: true,
+    headers: { get: () => new Date().toUTCString() },
+  });
+  await resumePromise;
 }
 
 module.exports = { runTimeFluxModuleRuntimeTest };
