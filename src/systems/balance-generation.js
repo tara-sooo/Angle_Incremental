@@ -75,6 +75,7 @@ function balanceRunGeneration() {
   runtime.state.generationScoreMultiplierLog10 = reward.scoreMultiplierLog10;
   runtime.state.generationScoreMultiplier = runtime.valueFromLog10(runtime.state.generationScoreMultiplierLog10);
   runtime.state.generationCostFactor = Math.max(balanceGenerationMinCostFactor(), nextCostFactor);
+  runtime.checkAchievements(true);
   runtime.state.score = 0;
   runtime.state.scoreLog10 = -Infinity;
   runtime.state.generationScore = 0;

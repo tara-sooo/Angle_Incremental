@@ -146,6 +146,41 @@ async function runTimeFluxModuleRuntimeTest() {
     }
   }
 
+  {
+    const autobuyGenerationInstance = await loadRuntime(candidatePath);
+    const { debug: autobuyGenerationDebug, runtime: autobuyGenerationRuntime } = autobuyGenerationInstance;
+    const autobuyGenerationState = autobuyGenerationDebug.state;
+    const originalUpdate = autobuyGenerationRuntime.update;
+    const normalAutobuyUpgrade = autobuyGenerationRuntime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "1-2");
+    autobuyGenerationState.infinityUpgradeMask = 1 << normalAutobuyUpgrade.bit;
+    autobuyGenerationState.automationEnabled = true;
+    autobuyGenerationState.achievementMask = 0;
+    autobuyGenerationState.generationCount = 0;
+    autobuyGenerationState.score = Number.MAX_VALUE;
+    autobuyGenerationState.scoreLog10 = 1000;
+    autobuyGenerationState.totalScore = Number.MAX_VALUE;
+    autobuyGenerationState.totalScoreLog10 = 1000;
+    autobuyGenerationState.generationScore = Number.MAX_VALUE;
+    autobuyGenerationState.generationScoreLog10 = 1000;
+    autobuyGenerationRuntime.update = () => {
+      autobuyGenerationRuntime.runAutobuyers();
+      autobuyGenerationRuntime.runGeneration();
+    };
+    try {
+      autobuyGenerationDebug.advanceOnlineTime(1);
+      for (const [id, label] of [[1, "vertex"], [5, "lap speed"], [6, "vertex count"]]) {
+        const bit = 1 << (id - 1);
+        assert.equal(
+          autobuyGenerationState.achievementMask & bit,
+          bit,
+          `${label} achievement should survive an autobuy-plus-Generation reset`,
+        );
+      }
+    } finally {
+      autobuyGenerationRuntime.update = originalUpdate;
+    }
+  }
+
   assert.equal(runtime.setTimeFluxCustomSpeed(99), 60, "custom speed should clamp to x60");
   assert.equal(state.timeFluxCustomSpeed, 60, "setting a custom speed should remember it separately");
   assert.equal(runtime.setTimeFluxSpeed(2), 2, "preset speed should select x2");
