@@ -69,13 +69,13 @@ function balanceRunGeneration() {
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = runtime.generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
+  runtime.checkAchievements(true);
   runtime.state.generationCount += 1;
   runtime.state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
   runtime.state.generationScoreMultiplierLog10 = reward.scoreMultiplierLog10;
   runtime.state.generationScoreMultiplier = runtime.valueFromLog10(runtime.state.generationScoreMultiplierLog10);
   runtime.state.generationCostFactor = Math.max(balanceGenerationMinCostFactor(), nextCostFactor);
-  runtime.checkAchievements(true);
   runtime.state.score = 0;
   runtime.state.scoreLog10 = -Infinity;
   runtime.state.generationScore = 0;

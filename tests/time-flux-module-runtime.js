@@ -181,6 +181,38 @@ async function runTimeFluxModuleRuntimeTest() {
     }
   }
 
+  {
+    const transientAchievementInstance = await loadRuntime(candidatePath);
+    const { debug: transientAchievementDebug, runtime: transientAchievementRuntime } = transientAchievementInstance;
+    const transientAchievementState = transientAchievementDebug.state;
+    const originalUpdate = transientAchievementRuntime.update;
+    transientAchievementState.achievementMask = 0;
+    transientAchievementState.generationCount = 0;
+    transientAchievementState.speedLevel = 32;
+    transientAchievementState.generationScore = 1e7;
+    transientAchievementState.generationScoreLog10 = 7;
+    assert.ok(
+      transientAchievementRuntime.lapSpeedMultiplier() < 100,
+      "the pre-Generation lap speed should remain below the achievement threshold",
+    );
+    transientAchievementRuntime.update = () => transientAchievementRuntime.runGeneration();
+    try {
+      transientAchievementDebug.advanceOnlineTime(1);
+      assert.equal(
+        transientAchievementState.achievementMask & (1 << 4),
+        0,
+        "lap speed achievement should not use the post-Generation softcap",
+      );
+      assert.equal(
+        transientAchievementState.achievementMask & (1 << 1),
+        1 << 1,
+        "Generation achievement should still unlock after the reset",
+      );
+    } finally {
+      transientAchievementRuntime.update = originalUpdate;
+    }
+  }
+
   assert.equal(runtime.setTimeFluxCustomSpeed(99), 60, "custom speed should clamp to x60");
   assert.equal(state.timeFluxCustomSpeed, 60, "setting a custom speed should remember it separately");
   assert.equal(runtime.setTimeFluxSpeed(2), 2, "preset speed should select x2");
