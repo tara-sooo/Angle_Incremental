@@ -47,7 +47,8 @@ try {
     window.requestAnimationFrame = () => 0;
   });
   await page.goto(`http://127.0.0.1:${address.port}/index.html`, { waitUntil: "networkidle" });
-  await page.waitForFunction(() => Boolean(window.__angleDebug?.state));
+  await page.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
+  await page.evaluate(() => window.__angleDebug.ready);
 
   const result = await page.evaluate(() => {
     const debug = window.__angleDebug;

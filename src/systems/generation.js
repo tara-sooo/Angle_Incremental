@@ -114,6 +114,7 @@ function runGeneration() {
   const generationScoreBeforeResetLog = runtime.currentGenerationScoreLog10();
   const reward = generationRewardForLog(generationScoreBeforeResetLog);
   const nextCostFactor = runtime.state.generationCostFactor * (1 - reward.costReduction);
+  runtime.checkAchievements(true);
   runtime.state.generationCount += 1;
   runtime.state.previousGenerationScoreLog10 = generationScoreBeforeResetLog;
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
@@ -136,6 +137,7 @@ function runGeneration() {
   runtime.state.lastVertexIndex = 0;
   runtime.state.floatingTexts = [];
   runtime.state.currentGenerationRunTime = 0;
+  runtime.checkAchievements(true);
   runtime.updateUi();
   runtime.saveGame("manual");
 }

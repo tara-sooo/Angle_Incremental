@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.8.2";
+const EXPECTED_ASSET_VERSION = "0.8.3";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -111,7 +111,9 @@ try {
   await page.waitForFunction(() => (
     typeof window.render_game_to_text === "function"
     && Boolean(window.__angleDebug?.state)
+    && Boolean(window.__angleDebug?.ready)
   ));
+  await page.evaluate(() => window.__angleDebug.ready);
 
   const updateModal = await page.evaluate(() => {
     const modal = document.querySelector("#updateModal");
@@ -121,11 +123,22 @@ try {
       summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.8.2 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.8.2 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /Time Flux/);
+  assert.equal(updateModal.visible, true, "the 0.8.3 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.8.3 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /時計対策/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
+  const serverClockProbe = await page.evaluate(async () => {
+    const response = await fetch(`version.json?clock-smoke=${Date.now()}`, { cache: "no-store" });
+    return {
+      date: response.headers.get("date"),
+      available: window.__angleDebug.serverClockAvailable(),
+      source: window.__angleDebug.serverClockSource(),
+    };
+  });
+  assert.ok(Date.parse(serverClockProbe.date) > 0, "the static host should expose a parseable HTTP Date header");
+  assert.equal(serverClockProbe.available, true, "the browser should accept the static host server clock");
+  assert.equal(serverClockProbe.source, "server", "the active clock source should be the server");
   await page.locator("#updateModalClose").click();
   await page.waitForFunction(() => document.querySelector("#updateModal")?.hidden === true);
 
@@ -221,6 +234,53 @@ try {
     } finally {
       await existingContext.close();
     }
+  }
+
+  const serverClockContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const serverClockErrors = [];
+  const serverClockSavedAt = Date.now();
+  await serverClockContext.addInitScript(({ saveData, localOffsetMs, seenVersion }) => {
+    const realNow = Date.now.bind(Date);
+    Date.now = () => realNow() + localOffsetMs;
+    localStorage.setItem("angle-incremental-save", JSON.stringify(saveData));
+    localStorage.setItem("angle-incremental-seen-version", seenVersion);
+  }, {
+    localOffsetMs: 2 * 86400 * 1000,
+    seenVersion: EXPECTED_ASSET_VERSION,
+    saveData: {
+      version: 10,
+      savedAt: serverClockSavedAt,
+      serverSavedAt: serverClockSavedAt - 3600 * 1000,
+      state: { offlineProgressEnabled: false, timeFlux: 0 },
+    },
+  });
+  const serverClockPage = await serverClockContext.newPage();
+  serverClockPage.on("pageerror", (error) => serverClockErrors.push(error.message));
+  serverClockPage.on("console", (message) => {
+    if (message.type() === "error") serverClockErrors.push(message.text());
+  });
+  try {
+    await serverClockPage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
+    await serverClockPage.waitForFunction(() => Boolean(window.__angleDebug?.ready));
+    await serverClockPage.evaluate(() => window.__angleDebug.ready);
+    const serverClockLoaded = await serverClockPage.evaluate(() => {
+      const snapshot = JSON.parse(window.render_game_to_text());
+      return {
+        timeFlux: window.__angleDebug.state.timeFlux,
+        report: snapshot.timeFlux.report,
+        persisted: JSON.parse(localStorage.getItem("angle-incremental-save")),
+      };
+    });
+    assert.ok(
+      Math.abs(serverClockLoaded.timeFlux - 360) < 2,
+      "server-based offline TF should ignore a two-day local clock offset",
+    );
+    assert.equal(serverClockLoaded.report.clockSource, "server", "server-based offline reports should identify their clock source");
+    assert.equal(serverClockLoaded.report.clockAnomaly, false, "a valid server timestamp should not be flagged as anomalous");
+    assert.ok(serverClockLoaded.persisted.serverSavedAt > 0, "loading a legacy interval should persist a server timestamp");
+    assert.deepEqual(serverClockErrors, [], "server-clock loading should produce no browser errors");
+  } finally {
+    await serverClockContext.close();
   }
 
   const snapshot = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
@@ -917,14 +977,16 @@ try {
     await mobilePage.waitForFunction(() => (
       typeof window.render_game_to_text === "function"
       && Boolean(window.__angleDebug?.state)
+      && Boolean(window.__angleDebug?.ready)
     ));
+    await mobilePage.evaluate(() => window.__angleDebug.ready);
     const mobileStartup = await mobilePage.evaluate(() => ({
       updateTitle: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
       tabCount: document.querySelectorAll(".main-tab").length,
       quickBarVisible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
-    assert.equal(mobileStartup.updateTitle, "0.8.2 アップデート", "mobile startup should use the release version");
+    assert.equal(mobileStartup.updateTitle, "0.8.3 アップデート", "mobile startup should use the release version");
     assert.equal(mobileStartup.tabCount, 9, "mobile startup should expose every main tab");
     assert.equal(mobileStartup.quickBarVisible, true, "the Time Flux quick bar should be visible on mobile");
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
