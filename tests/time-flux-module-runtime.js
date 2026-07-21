@@ -60,6 +60,159 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.timeFluxSpeed, 1, "speed should return to x1 when TF is depleted");
   assert.equal(state.timeFluxCustomSpeed, 4, "depletion should not erase the configured custom speed");
 
+  {
+    const batchedInstance = await loadRuntime(candidatePath);
+    const { context: batchedContext, debug: batchedDebug, runtime: batchedRuntime } = batchedInstance;
+    const batchedState = batchedDebug.state;
+    batchedState.automationEnabled = true;
+    batchedState.autoRunInfinity = true;
+    batchedState.autoInfinityPointThreshold = 1;
+    batchedState.autoInfinityPointThresholdLog10 = 0;
+    batchedState.infinityCount = 1;
+    batchedState.infinityUpgradeMask = (1 << 13) - 1;
+    batchedState.achievementMask = -1;
+    batchedState.timeFlux = 1800;
+    batchedState.timeFluxSpeed = 60;
+    const originalCanInfinity = batchedRuntime.canInfinity;
+    const originalRunInfinity = batchedRuntime.runInfinity;
+    const scoreElement = batchedRuntime.elements.scoreValue;
+    const originalScoreTextDescriptor = Object.getOwnPropertyDescriptor(scoreElement, "textContent");
+    const originalSetItem = batchedContext.localStorage.setItem;
+    let infinityRuns = 0;
+    let uiUpdates = 0;
+    let saveWrites = 0;
+    batchedRuntime.canInfinity = () => true;
+    batchedRuntime.runInfinity = (...args) => {
+      infinityRuns += 1;
+      return originalRunInfinity(...args);
+    };
+    let scoreText = originalScoreTextDescriptor.value;
+    Object.defineProperty(scoreElement, "textContent", {
+      configurable: true,
+      get: () => scoreText,
+      set: (value) => {
+        uiUpdates += 1;
+        scoreText = value;
+      },
+    });
+    batchedContext.localStorage.setItem = (key, value) => {
+      if (key === batchedRuntime.SAVE_KEY) saveWrites += 1;
+      return originalSetItem(key, value);
+    };
+    try {
+      const gameSeconds = batchedDebug.advanceOnlineTime(1);
+      assert.equal(gameSeconds, 60, "x60 should still simulate sixty game seconds");
+      assert.equal(batchedState.timeFlux, 1741, "x60 should still consume 59 TF per real second");
+      assert.ok(infinityRuns > 1000, "the simulation should preserve high-frequency auto-Infinity progression");
+      assert.equal(uiUpdates, 1, "auto-Infinity UI updates should be flushed once per simulation batch");
+      assert.equal(saveWrites, 1, "auto-Infinity saves should be flushed once per simulation batch");
+    } finally {
+      batchedRuntime.canInfinity = originalCanInfinity;
+      batchedRuntime.runInfinity = originalRunInfinity;
+      Object.defineProperty(scoreElement, "textContent", originalScoreTextDescriptor);
+      batchedContext.localStorage.setItem = originalSetItem;
+    }
+  }
+
+  {
+    const achievementInstance = await loadRuntime(candidatePath);
+    const { debug: achievementDebug, runtime: achievementRuntime } = achievementInstance;
+    const achievementState = achievementDebug.state;
+    const originalUpdate = achievementRuntime.update;
+    achievementState.achievementMask = 0;
+    achievementState.generationCount = 0;
+    achievementState.generationScore = Number.MAX_VALUE;
+    achievementState.generationScoreLog10 = 1e6;
+    achievementRuntime.update = () => {
+      achievementRuntime.runGeneration();
+      achievementState.score = 1e25;
+      achievementState.scoreLog10 = 25;
+      achievementRuntime.runCoreBoost();
+    };
+    try {
+      achievementDebug.advanceOnlineTime(1);
+      assert.equal(
+        achievementState.achievementMask & (1 << 1),
+        1 << 1,
+        "Generation achievement should unlock before a batched Core Boost reset",
+      );
+      assert.equal(
+        achievementState.achievementMask & (1 << 2),
+        1 << 2,
+        "Generation multiplier achievement should unlock before a batched Core Boost reset",
+      );
+    } finally {
+      achievementRuntime.update = originalUpdate;
+    }
+  }
+
+  {
+    const autobuyGenerationInstance = await loadRuntime(candidatePath);
+    const { debug: autobuyGenerationDebug, runtime: autobuyGenerationRuntime } = autobuyGenerationInstance;
+    const autobuyGenerationState = autobuyGenerationDebug.state;
+    const originalUpdate = autobuyGenerationRuntime.update;
+    const normalAutobuyUpgrade = autobuyGenerationRuntime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "1-2");
+    autobuyGenerationState.infinityUpgradeMask = 1 << normalAutobuyUpgrade.bit;
+    autobuyGenerationState.automationEnabled = true;
+    autobuyGenerationState.achievementMask = 0;
+    autobuyGenerationState.generationCount = 0;
+    autobuyGenerationState.score = Number.MAX_VALUE;
+    autobuyGenerationState.scoreLog10 = 1000;
+    autobuyGenerationState.totalScore = Number.MAX_VALUE;
+    autobuyGenerationState.totalScoreLog10 = 1000;
+    autobuyGenerationState.generationScore = Number.MAX_VALUE;
+    autobuyGenerationState.generationScoreLog10 = 1000;
+    autobuyGenerationRuntime.update = () => {
+      autobuyGenerationRuntime.runAutobuyers();
+      autobuyGenerationRuntime.runGeneration();
+    };
+    try {
+      autobuyGenerationDebug.advanceOnlineTime(1);
+      for (const [id, label] of [[1, "vertex"], [5, "lap speed"], [6, "vertex count"]]) {
+        const bit = 1 << (id - 1);
+        assert.equal(
+          autobuyGenerationState.achievementMask & bit,
+          bit,
+          `${label} achievement should survive an autobuy-plus-Generation reset`,
+        );
+      }
+    } finally {
+      autobuyGenerationRuntime.update = originalUpdate;
+    }
+  }
+
+  {
+    const transientAchievementInstance = await loadRuntime(candidatePath);
+    const { debug: transientAchievementDebug, runtime: transientAchievementRuntime } = transientAchievementInstance;
+    const transientAchievementState = transientAchievementDebug.state;
+    const originalUpdate = transientAchievementRuntime.update;
+    transientAchievementState.achievementMask = 0;
+    transientAchievementState.generationCount = 0;
+    transientAchievementState.speedLevel = 32;
+    transientAchievementState.generationScore = 1e7;
+    transientAchievementState.generationScoreLog10 = 7;
+    assert.ok(
+      transientAchievementRuntime.lapSpeedMultiplier() < 100,
+      "the pre-Generation lap speed should remain below the achievement threshold",
+    );
+    transientAchievementRuntime.update = () => transientAchievementRuntime.runGeneration();
+    try {
+      transientAchievementDebug.advanceOnlineTime(1);
+      assert.equal(
+        transientAchievementState.achievementMask & (1 << 4),
+        0,
+        "lap speed achievement should not use the post-Generation softcap",
+      );
+      assert.equal(
+        transientAchievementState.achievementMask & (1 << 1),
+        1 << 1,
+        "Generation achievement should still unlock after the reset",
+      );
+    } finally {
+      transientAchievementRuntime.update = originalUpdate;
+    }
+  }
+
   assert.equal(runtime.setTimeFluxCustomSpeed(99), 60, "custom speed should clamp to x60");
   assert.equal(state.timeFluxCustomSpeed, 60, "setting a custom speed should remember it separately");
   assert.equal(runtime.setTimeFluxSpeed(2), 2, "preset speed should select x2");
@@ -104,6 +257,25 @@ async function runTimeFluxModuleRuntimeTest() {
   const cappedReport = debug.processOfflineElapsed(3600, "test");
   assert.equal(cappedReport.capacityReached, true, "the report should flag a full TF capacity");
   assert.equal(state.timeFlux, 1800, "TF should never exceed its capacity");
+
+  state.timeFluxCapacityLevel = 10;
+  state.timeFlux = 0;
+  const trustedCapReport = debug.processOfflineElapsed(8 * 86400, "test", { clockSource: "server" });
+  assert.equal(trustedCapReport.capped, true, "offline rewards should be capped at seven trusted days");
+  assert.equal(trustedCapReport.effectiveElapsedSeconds, 7 * 86400, "the trusted offline cap should be seven days");
+  assert.ok(state.timeFlux > 0, "a capped trusted interval should still grant its allowed reward");
+
+  const timeFluxBeforeClockAnomaly = state.timeFlux;
+  const clockAnomalyReport = debug.processOfflineElapsed(3600, "test", {
+    clockSource: "server",
+    clockAnomaly: true,
+  });
+  assert.equal(clockAnomalyReport.clockAnomaly, true, "clock anomalies should be recorded in the offline report");
+  assert.equal(clockAnomalyReport.rewardSuppressed, true, "clock anomalies should suppress offline rewards");
+  assert.equal(state.timeFlux, timeFluxBeforeClockAnomaly, "clock anomalies must not change Time Flux");
+
+  const futureSave = debug.offlineElapsedFromSave(Date.now() + 10 * 60 * 1000, 0);
+  assert.equal(futureSave.clockAnomaly, true, "a future local save timestamp should be rejected");
 
   state.offlineProgressEnabled = true;
   state.timeFlux = 123;
@@ -190,6 +362,87 @@ async function runTimeFluxModuleRuntimeTest() {
     Math.abs(loadedInstance.debug.state.timeFlux - 360) < 0.1,
     "a saved timestamp should trigger TF accumulation when offline progress is disabled",
   );
+  assert.equal(
+    loadedInstance.runtime.offlineReport.clockSource,
+    "local-fallback",
+    "the no-fetch harness should identify local-clock fallback processing",
+  );
+  assert.match(
+    loadedInstance.context.document.getElementById("offlineReportNote").textContent,
+    /サーバー時刻を取得できなかった/,
+    "local-clock fallback should be visible in the offline report",
+  );
+
+  const saveFailureInstance = await loadRuntime(candidatePath);
+  const saveFailureDebug = saveFailureInstance.debug;
+  const saveFailureRuntime = saveFailureInstance.runtime;
+  saveFailureRuntime.setOfflineBaseline(1, 0);
+  const originalSetItem = saveFailureInstance.context.localStorage.setItem;
+  saveFailureInstance.context.localStorage.setItem = () => {
+    throw new Error("storage unavailable");
+  };
+  try {
+    assert.equal(saveFailureDebug.saveGame("manual"), false, "storage failures should report a failed save");
+    assert.ok(
+      saveFailureRuntime.offlineBaselineTimestamp > 1,
+      "a failed save should still rebase the in-memory offline baseline",
+    );
+  } finally {
+    saveFailureInstance.context.localStorage.setItem = originalSetItem;
+  }
+
+  const resumeInstance = await loadRuntime(candidatePath);
+  const resumeDebug = resumeInstance.debug;
+  const resumeRuntime = resumeInstance.runtime;
+  let resolveClockRequest;
+  const pendingClockRequest = new Promise((resolve) => {
+    resolveClockRequest = resolve;
+  });
+  resumeInstance.context.window.fetch = () => pendingClockRequest;
+  resumeRuntime.setOfflineBaseline(Date.now() - 60 * 1000, 0);
+  resumeDebug.state.offlineProgressEnabled = false;
+  resumeDebug.state.timeFlux = 0;
+  const playTimeBeforeResume = resumeDebug.state.totalPlayTime;
+  const resumePromise = resumeRuntime.handleVisibilityChange();
+  await Promise.resolve();
+  resumeRuntime.frame(resumeRuntime.lastTime + 1000);
+  assert.equal(
+    resumeDebug.state.totalPlayTime,
+    playTimeBeforeResume,
+    "online simulation should pause while visibility resume synchronizes the clock",
+  );
+  resumeRuntime.saveGame("manual");
+  resolveClockRequest({
+    ok: true,
+    headers: { get: () => new Date().toUTCString() },
+  });
+  await resumePromise;
+  assert.ok(
+    resumeRuntime.offlineReport.elapsedSeconds >= 50,
+    "visibility resume should retain the interval captured before a pending save rebases the baseline",
+  );
+  assert.ok(resumeDebug.state.timeFlux > 0, "the retained resume interval should grant Time Flux");
+
+  const resetResumeInstance = await loadRuntime(candidatePath);
+  const resetResumeDebug = resetResumeInstance.debug;
+  const resetResumeRuntime = resetResumeInstance.runtime;
+  let resolveResetClockRequest;
+  const pendingResetClockRequest = new Promise((resolve) => {
+    resolveResetClockRequest = resolve;
+  });
+  resetResumeInstance.context.window.fetch = () => pendingResetClockRequest;
+  resetResumeRuntime.setOfflineBaseline(Date.now() - 60 * 1000, 0);
+  const resetResumePromise = resetResumeRuntime.handleVisibilityChange();
+  await Promise.resolve();
+  resetResumeRuntime.resetSave();
+  resolveResetClockRequest({
+    ok: true,
+    headers: { get: () => new Date().toUTCString() },
+  });
+  await resetResumePromise;
+  assert.equal(resetResumeDebug.state.totalPlayTime, 0, "reset should not receive stale pending offline progress");
+  assert.equal(resetResumeDebug.state.timeFlux, 0, "reset should not receive stale pending Time Flux");
+  assert.equal(resetResumeRuntime.offlineReport, null, "reset should clear the pending offline report");
 }
 
 module.exports = { runTimeFluxModuleRuntimeTest };

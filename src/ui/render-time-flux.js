@@ -32,13 +32,19 @@ function updateOfflineReportUi() {
     report.infinityCountAfter - report.infinityCountBefore,
   )}`;
   elements.offlineReportIp.textContent = runtime.formatUiLogNumber(report.infinityPointsAfterLog10);
-  elements.offlineReportNote.textContent = report.capped
-    ? runtime.t("offlineReportCapped")
-    : report.precisionReduced
-      ? runtime.t("offlineReportPrecisionReduced")
-      : report.capacityReached
-        ? runtime.t("offlineReportCapacityReached")
-        : "";
+  elements.offlineReportNote.textContent = report.clockAnomaly
+    ? runtime.t("offlineReportClockAnomaly")
+    : report.clockSource === "local-fallback"
+      ? runtime.t("offlineReportLocalFallback")
+      : report.legacyTimestampUsed
+        ? runtime.t("offlineReportLegacyTimestamp")
+        : report.capped
+          ? runtime.t("offlineReportCapped")
+          : report.precisionReduced
+            ? runtime.t("offlineReportPrecisionReduced")
+            : report.capacityReached
+              ? runtime.t("offlineReportCapacityReached")
+              : "";
 }
 
 function updateTimeFluxUi() {

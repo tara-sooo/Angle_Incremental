@@ -271,6 +271,7 @@ async function loadRuntime(runtimePath, initialStorage) {
   if (path.resolve(runtimePath) === candidateRuntimePath) {
     const cache = await evaluateEsmRuntime(context, runtimePath);
     runtime = cache.get(sharedRuntimePath)?.namespace.runtime || null;
+    if (context.window.__angleDebug?.ready) await context.window.__angleDebug.ready;
   } else {
     const source = fs.readFileSync(runtimePath, "utf8");
     vm.runInContext(source, context, { filename: path.basename(runtimePath) });

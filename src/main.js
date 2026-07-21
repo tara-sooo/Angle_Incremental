@@ -39,11 +39,237 @@ let selectedInfinityUpgradeId = "1-1";
 let appliedLanguage = "";
 let smoothedFps = 0;
 let offlineBaselineTimestamp = Date.now();
+let offlineBaselineServerTimestamp = 0;
 let offlineProcessing = false;
 let offlineReport = null;
+let visibilityResumeInFlight = false;
+let visibilityResumeGeneration = 0;
+let simulationBatchDepth = 0;
+let simulationUiPending = false;
+let simulationSaveReason = "";
+let simulationFlushActive = false;
+let simulationFlushSavePerformed = false;
+let serverClockAnchor = null;
+let serverClockSyncInFlight = null;
+let serverClockSource = "local-fallback";
+let serverClockAnomaly = false;
+let localClockAnomaly = false;
+let localClockAnchor = null;
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
+
+const baseUpdateUi = runtime.updateUi;
+const baseSaveGame = runtime.saveGame;
+
+function simulationBatchActive() {
+  return simulationBatchDepth > 0;
+}
+
+function queueSimulationSave(reason = "auto") {
+  const normalizedReason = reason === "manual" ? "manual" : "auto";
+  if (!simulationSaveReason || normalizedReason === "manual") simulationSaveReason = normalizedReason;
+}
+
+function batchedUpdateUi(...args) {
+  if (simulationBatchActive()) {
+    simulationUiPending = true;
+    return undefined;
+  }
+  return baseUpdateUi(...args);
+}
+
+function batchedSaveGame(reason = "auto") {
+  if (simulationBatchActive()) {
+    queueSimulationSave(reason);
+    return true;
+  }
+  if (simulationFlushActive) simulationFlushSavePerformed = true;
+  return baseSaveGame(reason);
+}
+
+runtime.updateUi = batchedUpdateUi;
+runtime.saveGame = batchedSaveGame;
+
+function flushSimulationSideEffects() {
+  if (simulationBatchActive()) return;
+  const shouldUpdateUi = simulationUiPending;
+  const saveReason = simulationSaveReason;
+  simulationUiPending = false;
+  simulationSaveReason = "";
+  if (!shouldUpdateUi && !saveReason) return;
+
+  simulationFlushActive = true;
+  simulationFlushSavePerformed = false;
+  try {
+    if (shouldUpdateUi) runtime.updateUi();
+    if (saveReason && !simulationFlushSavePerformed) runtime.saveGame(saveReason);
+  } finally {
+    simulationFlushActive = false;
+    simulationFlushSavePerformed = false;
+  }
+}
+
+function runSimulationBatch(callback) {
+  simulationBatchDepth += 1;
+  try {
+    return callback();
+  } finally {
+    simulationBatchDepth -= 1;
+    if (simulationBatchDepth === 0) flushSimulationSideEffects();
+  }
+}
+
+function monotonicClockNow() {
+  const performanceApi = window.performance;
+  return performanceApi && typeof performanceApi.now === "function" ? performanceApi.now() : Date.now();
+}
+
+function localClockNow() {
+  return Date.now();
+}
+
+function finitePositiveNumber(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+}
+
+function localClockAnomalyDetected() {
+  if (!localClockAnchor) {
+    localClockAnchor = { localMs: localClockNow(), monotonicMs: monotonicClockNow() };
+    return false;
+  }
+  const currentLocalMs = localClockNow();
+  const currentMonotonicMs = monotonicClockNow();
+  const expectedLocalMs = localClockAnchor.localMs + Math.max(0, currentMonotonicMs - localClockAnchor.monotonicMs);
+  if (Math.abs(currentLocalMs - expectedLocalMs) > runtime.SERVER_CLOCK_BACKWARD_TOLERANCE_SECONDS * 1000) {
+    localClockAnomaly = true;
+  }
+  return localClockAnomaly;
+}
+
+function rebaseLocalClock() {
+  localClockAnchor = { localMs: localClockNow(), monotonicMs: monotonicClockNow() };
+  localClockAnomaly = false;
+}
+
+function estimatedServerNowMs() {
+  if (!serverClockAnchor) return 0;
+  return serverClockAnchor.serverMs + Math.max(0, monotonicClockNow() - serverClockAnchor.monotonicMs);
+}
+
+function serverClockAvailable() {
+  return serverClockSource === "server" && Boolean(serverClockAnchor) && !serverClockAnomaly;
+}
+
+function trustedClockNowMs() {
+  return serverClockAvailable() ? estimatedServerNowMs() : localClockNow();
+}
+
+async function syncServerClock() {
+  if (serverClockSyncInFlight) return serverClockSyncInFlight;
+  serverClockSyncInFlight = (async () => {
+    if (!window.fetch) {
+      serverClockSource = "local-fallback";
+      return { available: false, anomaly: false, source: serverClockSource };
+    }
+
+    const startedAt = monotonicClockNow();
+    const abortController = typeof window.AbortController === "function" ? new window.AbortController() : null;
+    const timeoutId = abortController && typeof window.setTimeout === "function"
+      ? window.setTimeout(() => abortController.abort(), runtime.SERVER_CLOCK_SYNC_TIMEOUT_MS)
+      : null;
+    try {
+      const response = await window.fetch(`${runtime.VERSION_MANIFEST_URL}?clock=${Math.floor(localClockNow())}`, {
+        cache: "no-store",
+        ...(abortController ? { signal: abortController.signal } : {}),
+      });
+      const finishedAt = monotonicClockNow();
+      if (!response.ok) throw new Error("server clock response failed");
+      // The response header is an external value; accept it only after strict date parsing.
+      const serverDateMs = Date.parse(response.headers?.get("date") || "");
+      if (!Number.isFinite(serverDateMs)) throw new Error("server clock header missing");
+
+      const estimatedAtResponse = serverDateMs + Math.max(0, finishedAt - startedAt) / 2;
+      const previousEstimate = estimatedServerNowMs();
+      if (
+        serverClockAnchor
+        && estimatedAtResponse < previousEstimate - runtime.SERVER_CLOCK_BACKWARD_TOLERANCE_SECONDS * 1000
+      ) {
+        serverClockAnomaly = true;
+        serverClockSource = "server";
+        return { available: false, anomaly: true, source: serverClockSource };
+      }
+
+      serverClockAnchor = { serverMs: estimatedAtResponse, monotonicMs: finishedAt };
+      serverClockSource = "server";
+      serverClockAnomaly = false;
+      return { available: true, anomaly: false, source: serverClockSource };
+    } catch (error) {
+      if (!serverClockAnomaly) serverClockSource = "local-fallback";
+      return { available: false, anomaly: serverClockAnomaly, source: serverClockSource };
+    } finally {
+      if (timeoutId !== null && typeof window.clearTimeout === "function") window.clearTimeout(timeoutId);
+    }
+  })();
+
+  try {
+    return await serverClockSyncInFlight;
+  } finally {
+    serverClockSyncInFlight = null;
+  }
+}
+
+function offlineElapsedFromSave(savedAt, serverSavedAt) {
+  const localSavedAt = finitePositiveNumber(savedAt);
+  const recordedServerAt = finitePositiveNumber(serverSavedAt);
+  const currentLocalAt = localClockNow();
+  const localAnomalyDetected = localClockAnomalyDetected()
+    || (localSavedAt > 0 && currentLocalAt < localSavedAt - runtime.SERVER_CLOCK_BACKWARD_TOLERANCE_SECONDS * 1000);
+
+  if (serverClockAnomaly || (localAnomalyDetected && !serverClockAvailable())) {
+    return {
+      elapsedSeconds: 0,
+      clockSource: serverClockAnomaly ? "server" : serverClockSource,
+      clockAnomaly: true,
+      legacyTimestampUsed: false,
+    };
+  }
+
+  if (serverClockAvailable() && recordedServerAt > 0) {
+    const currentServerAt = estimatedServerNowMs();
+    if (currentServerAt < recordedServerAt - runtime.SERVER_CLOCK_BACKWARD_TOLERANCE_SECONDS * 1000) {
+      return {
+        elapsedSeconds: 0,
+        clockSource: "server",
+        clockAnomaly: true,
+        legacyTimestampUsed: false,
+      };
+    }
+    return {
+      elapsedSeconds: Math.max(0, (currentServerAt - recordedServerAt) / 1000),
+      clockSource: "server",
+      clockAnomaly: false,
+      legacyTimestampUsed: false,
+    };
+  }
+
+  if (localSavedAt <= 0) {
+    return {
+      elapsedSeconds: 0,
+      clockSource: serverClockAvailable() ? "server" : "local-fallback",
+      clockAnomaly: false,
+      legacyTimestampUsed: false,
+    };
+  }
+
+  return {
+    elapsedSeconds: Math.max(0, (currentLocalAt - localSavedAt) / 1000),
+    clockSource: serverClockAvailable() ? "legacy-local" : "local-fallback",
+    clockAnomaly: false,
+    legacyTimestampUsed: serverClockAvailable(),
+  };
+}
 
 function shouldShowUpdateModal() {
   try {
@@ -261,6 +487,7 @@ function runRealTimeMaintenance(realSeconds) {
   updateCheckElapsed += realSeconds;
   if (updateCheckElapsed >= runtime.UPDATE_CHECK_INTERVAL_SECONDS) {
     updateCheckElapsed %= runtime.UPDATE_CHECK_INTERVAL_SECONDS;
+    syncServerClock();
     checkForRemoteUpdate();
   }
 }
@@ -278,13 +505,15 @@ function advanceOnlineTime(realSeconds) {
     runtime.state.timeFluxSpeed = 1;
   }
 
-  let remaining = gameSeconds;
-  while (remaining > 0) {
-    const step = Math.min(runtime.MAX_SIMULATION_STEP_SECONDS, remaining);
-    update(step);
-    remaining -= step;
-  }
-  runRealTimeMaintenance(realDt);
+  runSimulationBatch(() => {
+    let remaining = gameSeconds;
+    while (remaining > 0) {
+      const step = Math.min(runtime.MAX_SIMULATION_STEP_SECONDS, remaining);
+      update(step);
+      remaining -= step;
+    }
+    runRealTimeMaintenance(realDt);
+  });
   return gameSeconds;
 }
 
@@ -298,10 +527,14 @@ function offlineSnapshot() {
   };
 }
 
-function processOfflineElapsed(elapsedSeconds, source = "resume") {
+function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext = {}) {
   const elapsed = Math.max(0, runtime.sanitizeNumber(elapsedSeconds, 0));
-  if (elapsed <= 0) return null;
+  const clockAnomaly = Boolean(clockContext.clockAnomaly);
+  if (elapsed <= 0 && !clockAnomaly) return null;
   const before = offlineSnapshot();
+  const trustedElapsed = clockAnomaly
+    ? 0
+    : Math.min(elapsed, runtime.OFFLINE_REWARD_MAX_SECONDS);
   let simulatedSeconds = 0;
   let processedTicks = 0;
   let timeFluxGained = 0;
@@ -309,10 +542,10 @@ function processOfflineElapsed(elapsedSeconds, source = "resume") {
   let requestedTicks = 0;
   let precisionReduced = false;
 
-  if (runtime.state.offlineProgressEnabled) {
+  if (!clockAnomaly && runtime.state.offlineProgressEnabled) {
     const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
     const maximumSeconds = tickCount * runtime.OFFLINE_PROGRESS_MAX_SECONDS_PER_TICK;
-    simulatedSeconds = Math.min(elapsed, maximumSeconds);
+    simulatedSeconds = Math.min(trustedElapsed, maximumSeconds);
     requestedTicks = Math.max(
       1,
       Math.min(tickCount, Math.ceil(simulatedSeconds / runtime.MAX_SIMULATION_STEP_SECONDS)),
@@ -326,24 +559,34 @@ function processOfflineElapsed(elapsedSeconds, source = "resume") {
     } finally {
       offlineProcessing = false;
     }
-  } else {
-    const theoreticalGain = runtime.timeFluxGainPerHour() * elapsed / 3600;
+  } else if (!clockAnomaly) {
+    const theoreticalGain = runtime.timeFluxGainPerHour() * trustedElapsed / 3600;
     timeFluxGained = runtime.addTimeFlux(theoreticalGain);
     capacityReached = timeFluxGained + 1e-9 < theoreticalGain;
   }
 
   const after = offlineSnapshot();
+  const effectiveElapsedSeconds = clockAnomaly
+    ? 0
+    : runtime.state.offlineProgressEnabled
+      ? simulatedSeconds
+      : trustedElapsed;
   offlineReport = {
     source,
     elapsedSeconds: elapsed,
+    effectiveElapsedSeconds,
     simulatedSeconds,
     processedTicks,
     requestedTicks,
     precisionReduced,
-    capped: runtime.state.offlineProgressEnabled && simulatedSeconds + 1e-9 < elapsed,
+    capped: effectiveElapsedSeconds + 1e-9 < elapsed,
     offlineProgressEnabled: runtime.state.offlineProgressEnabled,
     timeFluxGained,
     capacityReached,
+    clockSource: clockContext.clockSource || (serverClockAvailable() ? "server" : "local-fallback"),
+    clockAnomaly,
+    rewardSuppressed: clockAnomaly,
+    legacyTimestampUsed: Boolean(clockContext.legacyTimestampUsed),
     infinityCountBefore: before.infinityCount,
     infinityCountAfter: after.infinityCount,
     infinityPointsBeforeLog10: before.infinityPointsLog10,
@@ -354,23 +597,48 @@ function processOfflineElapsed(elapsedSeconds, source = "resume") {
   runtime.updateUi();
   runtime.saveGame("manual");
   lastTime = currentFrameTime();
+  if (clockAnomaly) rebaseLocalClock();
   return offlineReport;
 }
 
-function setOfflineBaseline(timestamp = Date.now()) {
-  const value = runtime.sanitizeNumber(timestamp, Date.now());
-  offlineBaselineTimestamp = Number.isFinite(value) ? value : Date.now();
+function setOfflineBaseline(timestamp = localClockNow(), serverTimestamp = 0) {
+  const localValue = runtime.sanitizeNumber(timestamp, localClockNow());
+  const serverValue = runtime.sanitizeNumber(serverTimestamp, 0);
+  offlineBaselineTimestamp = Number.isFinite(localValue) ? localValue : localClockNow();
+  offlineBaselineServerTimestamp = Number.isFinite(serverValue) && serverValue > 0 ? serverValue : 0;
 }
 
-function handleVisibilityChange() {
+function invalidateVisibilityResume() {
+  visibilityResumeGeneration += 1;
+}
+
+async function handleVisibilityChange() {
   if (document.hidden) {
     runtime.saveGame("auto");
-    setOfflineBaseline(Date.now());
     return;
   }
-  const elapsed = Math.max(0, (Date.now() - offlineBaselineTimestamp) / 1000);
-  if (elapsed > 0) processOfflineElapsed(elapsed, "visibility");
-  else setOfflineBaseline(Date.now());
+  if (visibilityResumeInFlight) return;
+  visibilityResumeInFlight = true;
+  // Saving while the clock request is pending may rebase the shared baseline.
+  // Keep the interval that this resume began with so it cannot be discarded.
+  const resumeBaselineTimestamp = offlineBaselineTimestamp;
+  const resumeBaselineServerTimestamp = offlineBaselineServerTimestamp;
+  const resumeGeneration = visibilityResumeGeneration;
+  try {
+    await syncServerClock();
+    if (resumeGeneration !== visibilityResumeGeneration) return;
+    const elapsed = offlineElapsedFromSave(resumeBaselineTimestamp, resumeBaselineServerTimestamp);
+    if (elapsed.elapsedSeconds > 0 || elapsed.clockAnomaly) {
+      processOfflineElapsed(elapsed.elapsedSeconds, "visibility", elapsed);
+    } else {
+      setOfflineBaseline(
+        localClockNow(),
+        serverClockAvailable() ? estimatedServerNowMs() : 0,
+      );
+    }
+  } finally {
+    visibilityResumeInFlight = false;
+  }
 }
 
 function currentFrameTime() {
@@ -390,7 +658,7 @@ function frame(now) {
     smoothedFps = smoothedFps === 0 ? instantFps : smoothedFps * 0.9 + instantFps * 0.1;
   }
   lastTime = now;
-  if (document.hidden) {
+  if (document.hidden || visibilityResumeInFlight) {
     requestNextFrame(frame);
     return;
   }
@@ -616,6 +884,35 @@ function renderGameToText() {
   });
 }
 
+async function initializeGame() {
+  await syncServerClock();
+  runtime.bindEvents();
+  runtime.createChallengeRows();
+  runtime.createTowerChallengeRows();
+  runtime.createInfinityUpgradeRows();
+  runtime.createAchievementRows();
+  runtime.loadGame();
+  runtime.switchMainTab(activeMainTab);
+  runtime.switchInfinitySubtab(activeInfinitySubtab);
+  runtime.switchChallengeSubtab(activeChallengeSubtab);
+  runtime.resizeCanvas();
+  runtime.resizeInfiniteAngleCanvas();
+  runtime.updateUi();
+  showUpdateModalIfNeeded();
+  checkForRemoteUpdate();
+  if (document.fonts) {
+    document.fonts.ready.then(() => {
+      japaneseFontReady = true;
+      runtime.updateUi();
+      runtime.draw();
+      runtime.drawInfiniteAngle();
+    });
+  } else {
+    japaneseFontReady = true;
+  }
+  requestNextFrame(frame);
+}
+
 expose("autoSaveElapsed", () => autoSaveElapsed, (value) => { autoSaveElapsed = value; });
 expose("updateCheckElapsed", () => updateCheckElapsed, (value) => { updateCheckElapsed = value; });
 expose("updateCheckInFlight", () => updateCheckInFlight, (value) => { updateCheckInFlight = value; });
@@ -629,8 +926,17 @@ expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => 
 expose("appliedLanguage", () => appliedLanguage, (value) => { appliedLanguage = value; });
 expose("smoothedFps", () => smoothedFps, (value) => { smoothedFps = value; });
 expose("offlineBaselineTimestamp", () => offlineBaselineTimestamp, (value) => { offlineBaselineTimestamp = value; });
+expose("offlineBaselineServerTimestamp", () => offlineBaselineServerTimestamp, (value) => { offlineBaselineServerTimestamp = value; });
 expose("offlineProcessing", () => offlineProcessing, (value) => { offlineProcessing = value; });
 expose("offlineReport", () => offlineReport, (value) => { offlineReport = value; });
+expose("serverClockSource", () => serverClockSource);
+expose("serverClockAnomaly", () => serverClockAnomaly);
+expose("serverClockAvailable", () => serverClockAvailable);
+expose("serverClockNowMs", () => trustedClockNowMs);
+expose("localClockNowMs", () => localClockNow);
+expose("syncServerClock", () => syncServerClock);
+expose("offlineElapsedFromSave", () => offlineElapsedFromSave);
+expose("rebaseLocalClock", () => rebaseLocalClock);
 expose("requestNextFrame", () => requestNextFrame);
 expose("shouldShowUpdateModal", () => shouldShowUpdateModal, (value) => { shouldShowUpdateModal = value; });
 expose("closeUpdateModal", () => closeUpdateModal, (value) => { closeUpdateModal = value; });
@@ -646,6 +952,7 @@ expose("update", () => update, (value) => { update = value; });
 expose("advanceOnlineTime", () => advanceOnlineTime, (value) => { advanceOnlineTime = value; });
 expose("processOfflineElapsed", () => processOfflineElapsed, (value) => { processOfflineElapsed = value; });
 expose("setOfflineBaseline", () => setOfflineBaseline, (value) => { setOfflineBaseline = value; });
+expose("invalidateVisibilityResume", () => invalidateVisibilityResume);
 expose("handleVisibilityChange", () => handleVisibilityChange, (value) => { handleVisibilityChange = value; });
 expose("currentFrameTime", () => currentFrameTime, (value) => { currentFrameTime = value; });
 expose("lastTime", () => lastTime, (value) => { lastTime = value; });
@@ -694,30 +1001,12 @@ window.__angleDebug = {
   exportSaveCode: runtime.exportSaveCode,
   importSaveCode: runtime.importSaveCode,
   completeChallengeIfReady: runtime.completeChallengeIfReady,
+  syncServerClock,
+  offlineElapsedFromSave,
+  serverClockAvailable,
+  serverClockNowMs: trustedClockNowMs,
+  serverClockSource: () => serverClockSource,
+  ready: null,
 };
 
-runtime.bindEvents();
-runtime.createChallengeRows();
-runtime.createTowerChallengeRows();
-runtime.createInfinityUpgradeRows();
-runtime.createAchievementRows();
-runtime.loadGame();
-runtime.switchMainTab(activeMainTab);
-runtime.switchInfinitySubtab(activeInfinitySubtab);
-runtime.switchChallengeSubtab(activeChallengeSubtab);
-runtime.resizeCanvas();
-runtime.resizeInfiniteAngleCanvas();
-runtime.updateUi();
-showUpdateModalIfNeeded();
-checkForRemoteUpdate();
-if (document.fonts) {
-  document.fonts.ready.then(() => {
-    japaneseFontReady = true;
-    runtime.updateUi();
-    runtime.draw();
-    runtime.drawInfiniteAngle();
-  });
-} else {
-  japaneseFontReady = true;
-}
-requestNextFrame(frame);
+window.__angleDebug.ready = initializeGame();
