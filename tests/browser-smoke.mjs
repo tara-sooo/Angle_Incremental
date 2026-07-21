@@ -125,7 +125,7 @@ try {
   });
   assert.equal(updateModal.visible, true, "the 0.8.3 update modal should appear for a fresh browser profile");
   assert.equal(updateModal.title, "0.8.3 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /サーバー時刻/);
+  assert.match(updateModal.summary, /時計対策/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   const serverClockProbe = await page.evaluate(async () => {
