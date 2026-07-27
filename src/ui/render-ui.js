@@ -2,6 +2,9 @@ import { runtime, expose } from "../runtime/shared.js";
 
 // Shared form helpers and the UI update orchestrator.
 
+let renderedRecoveryRevision = -1;
+let renderedRecoveryLanguage = "";
+
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
   runtime.appliedLanguage = runtime.state.language;
@@ -98,12 +101,20 @@ function recoveryStateSummary(entry) {
 function updateSaveRecoveryUi() {
   const elements = runtime.elements;
   if (!elements.preImportBackupStatus || !elements.saveCheckpointList || !runtime.recoveryEntries) return;
+  const currentRevision = typeof runtime.recoveryRevision === "number" ? runtime.recoveryRevision : null;
+  if (
+    currentRevision !== null
+    && currentRevision === renderedRecoveryRevision
+    && renderedRecoveryLanguage === runtime.state.language
+  ) return;
   const recovery = runtime.recoveryEntries();
   elements.preImportBackupStatus.textContent = recovery.preImport
     ? `${runtime.t("preImportBackupAvailable")} ${formatRecoveryTimestamp(recovery.preImport.backedUpAt)}`
     : runtime.t("noPreImportBackup");
   if (elements.restorePreImportButton) elements.restorePreImportButton.hidden = !recovery.preImport;
   if (elements.restoreUndoButton) elements.restoreUndoButton.hidden = !recovery.undo;
+  renderedRecoveryRevision = currentRevision === null ? renderedRecoveryRevision : currentRevision;
+  renderedRecoveryLanguage = runtime.state.language;
   clearElement(elements.saveCheckpointList);
   if (recovery.checkpoints.length === 0) {
     elements.saveCheckpointList.textContent = runtime.t("noCheckpoints");

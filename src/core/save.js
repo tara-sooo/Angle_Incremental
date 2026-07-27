@@ -3,6 +3,7 @@ import { runtime, expose } from "../runtime/shared.js";
 // Save migration, hydration, local persistence, and reset behavior.
 
 const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
+let recoveryRevision = 0;
 
 function currentSaveTimestamp() {
   return runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
@@ -81,6 +82,7 @@ function readCheckpointEntries() {
 
 function writeRecoveryEntry(key, entry) {
   localStorage.setItem(key, JSON.stringify(entry));
+  recoveryRevision += 1;
 }
 
 function backupCurrentSave(reason = "pre-import", key = runtime.SAVE_PRE_IMPORT_KEY) {
@@ -95,7 +97,7 @@ function backupCurrentSave(reason = "pre-import", key = runtime.SAVE_PRE_IMPORT_
 }
 
 function createCheckpoint(reason = "periodic", options = {}) {
-  if (runtime.offlineProcessing) return false;
+  if (runtime.offlineProcessing && reason === "periodic") return false;
   try {
     const saveData = serializeSaveData();
     const entries = readCheckpointEntries();
@@ -712,6 +714,7 @@ expose("saveGame", () => saveGame, (value) => { saveGame = value; });
 expose("backupCurrentSave", () => backupCurrentSave, (value) => { backupCurrentSave = value; });
 expose("createCheckpoint", () => createCheckpoint, (value) => { createCheckpoint = value; });
 expose("recoveryEntries", () => recoveryEntries, (value) => { recoveryEntries = value; });
+expose("recoveryRevision", () => recoveryRevision);
 expose("restorePreImportSave", () => restorePreImportSave, (value) => { restorePreImportSave = value; });
 expose("restoreCheckpoint", () => restoreCheckpoint, (value) => { restoreCheckpoint = value; });
 expose("restoreUndoSave", () => restoreUndoSave, (value) => { restoreUndoSave = value; });

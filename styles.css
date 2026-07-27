@@ -669,6 +669,11 @@ canvas {
   padding: 0 14px 14px;
 }
 
+.settings-panel {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
 .infinity-page .page-heading {
   min-height: 70px;
   margin-bottom: 8px;
