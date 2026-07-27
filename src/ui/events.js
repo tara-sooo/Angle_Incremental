@@ -184,6 +184,12 @@ function bindEvents() {
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
+  if (runtime.elements.restorePreImportButton) runtime.elements.restorePreImportButton.addEventListener("click", runtime.restorePreImportSave);
+  if (runtime.elements.restoreUndoButton) runtime.elements.restoreUndoButton.addEventListener("click", runtime.restoreUndoSave);
+  if (runtime.elements.saveCheckpointList) runtime.elements.saveCheckpointList.addEventListener("click", (event) => {
+    const button = event.target?.closest?.("[data-checkpoint-index]");
+    if (button) runtime.restoreCheckpoint(button.dataset.checkpointIndex);
+  });
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
   if (document.addEventListener) document.addEventListener("visibilitychange", runtime.handleVisibilityChange);

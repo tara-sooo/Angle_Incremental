@@ -110,6 +110,7 @@ Original prompt: では、中核ループを完成させてください
 - Prepared the 0.8.3 release candidate: offline rewards prefer the same-origin HTTP Date header, cap trusted away time at seven days, suppress inconsistent timestamps, and preserve SAVE_VERSION 10 compatibility.
 - Fixed x60 Time Flux auto-Infinity lag by batching UI refreshes and saves per online simulation batch without changing progression.
 - Fixed achievement unlocks being lost or evaluated against transient Generation state during automated resets.
+- Added next-release save recovery: valid save-code imports now preserve the immediately previous save, and Settings can restore it or undo a restore; periodic, update-before-reload, reset-before-action, and permanent-progression checkpoints retain recoverable save generations.
 
 ## TODO
 

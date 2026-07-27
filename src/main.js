@@ -314,6 +314,10 @@ function markUpdateDeferred(targetVersion) {
 
 function reloadForRemoteUpdate(targetVersion) {
   const now = Date.now();
+  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-update", { force: true })) {
+    markUpdateDeferred(targetVersion);
+    return;
+  }
   try {
     const previousTarget = localStorage.getItem(runtime.UPDATE_RELOAD_TARGET_KEY);
     const previousTime = storedUpdateReloadTime();
@@ -996,6 +1000,12 @@ window.__angleDebug = {
   advanceOnlineTime,
   processOfflineElapsed,
   saveGame: runtime.saveGame,
+  backupCurrentSave: runtime.backupCurrentSave,
+  createCheckpoint: runtime.createCheckpoint,
+  recoveryEntries: runtime.recoveryEntries,
+  restorePreImportSave: runtime.restorePreImportSave,
+  restoreCheckpoint: runtime.restoreCheckpoint,
+  restoreUndoSave: runtime.restoreUndoSave,
   loadGame: runtime.loadGame,
   resetSave: runtime.resetSave,
   exportSaveCode: runtime.exportSaveCode,

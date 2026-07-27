@@ -80,6 +80,7 @@ function canBuildTower() {
 
 function buildTower() {
   if (!canBuildTower()) return false;
+  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-tower-build", { force: true })) return false;
   if (!runtime.spendInfinityPoints(towerNextFloorCostLog10())) return false;
   runtime.state.towerFloor = towerNextFloor();
   runtime.updateUi();

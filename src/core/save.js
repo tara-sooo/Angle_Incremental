@@ -4,6 +4,203 @@ import { runtime, expose } from "../runtime/shared.js";
 
 const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
 
+function currentSaveTimestamp() {
+  return runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
+}
+
+function normalizeStoredSave(candidate) {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+  const version = Math.floor(runtime.sanitizeNumber(candidate.version, 0));
+  if (version <= 0 || version > runtime.SAVE_VERSION || !candidate.state || typeof candidate.state !== "object" || Array.isArray(candidate.state)) {
+    return null;
+  }
+  return {
+    version,
+    savedAt: runtime.sanitizeNumber(candidate.savedAt, 0),
+    serverSavedAt: runtime.sanitizeNumber(candidate.serverSavedAt, 0),
+    state: candidate.state,
+  };
+}
+
+function recoveryEntryFromSave(saveData, reason, backedUpAt = currentSaveTimestamp()) {
+  return {
+    backedUpAt,
+    appVersion: runtime.APP_VERSION,
+    saveVersion: saveData.version,
+    savedAt: saveData.savedAt,
+    serverSavedAt: saveData.serverSavedAt || 0,
+    reason,
+    state: saveData.state,
+  };
+}
+
+function parseRecoveryEntry(candidate) {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+  const saveCandidate = candidate.save && typeof candidate.save === "object"
+    ? candidate.save
+    : {
+      version: candidate.saveVersion,
+      savedAt: candidate.savedAt,
+      serverSavedAt: candidate.serverSavedAt,
+      state: candidate.state,
+    };
+  const save = normalizeStoredSave(saveCandidate);
+  if (!save) return null;
+  return {
+    backedUpAt: runtime.sanitizeNumber(candidate.backedUpAt, save.savedAt),
+    appVersion: typeof candidate.appVersion === "string" ? candidate.appVersion : "",
+    saveVersion: save.version,
+    savedAt: save.savedAt,
+    serverSavedAt: save.serverSavedAt,
+    reason: typeof candidate.reason === "string" ? candidate.reason : "backup",
+    state: save.state,
+    save,
+  };
+}
+
+function readRecoveryEntry(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? parseRecoveryEntry(JSON.parse(raw)) : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+function readCheckpointEntries() {
+  try {
+    const raw = localStorage.getItem(runtime.SAVE_CHECKPOINTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(parseRecoveryEntry).filter(Boolean);
+  } catch (error) {
+    return [];
+  }
+}
+
+function writeRecoveryEntry(key, entry) {
+  localStorage.setItem(key, JSON.stringify(entry));
+}
+
+function backupCurrentSave(reason = "pre-import", key = runtime.SAVE_PRE_IMPORT_KEY) {
+  try {
+    const saveData = serializeSaveData();
+    writeRecoveryEntry(key, recoveryEntryFromSave(saveData, reason));
+    return true;
+  } catch (error) {
+    runtime.setSaveStatus(runtime.t("saveBackupFailed"));
+    return false;
+  }
+}
+
+function createCheckpoint(reason = "periodic", options = {}) {
+  if (runtime.offlineProcessing) return false;
+  try {
+    const saveData = serializeSaveData();
+    const entries = readCheckpointEntries();
+    const periodic = entries
+      .filter((entry) => entry.reason === "periodic")
+      .sort((left, right) => right.savedAt - left.savedAt);
+    if (
+      reason === "periodic"
+      && !options.force
+      && periodic[0]
+      && saveData.savedAt - periodic[0].savedAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS
+    ) {
+      return true;
+    }
+
+    const nextEntry = recoveryEntryFromSave(saveData, reason);
+    const nextEntries = [nextEntry, ...entries.filter((entry) => entry.reason !== reason || reason === "periodic")];
+    const periodicEntries = nextEntries
+      .filter((entry) => entry.reason === "periodic")
+      .sort((left, right) => right.savedAt - left.savedAt)
+      .slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
+    const eventEntries = nextEntries
+      .filter((entry) => entry.reason !== "periodic")
+      .sort((left, right) => right.backedUpAt - left.backedUpAt)
+      .slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS);
+    writeRecoveryEntry(runtime.SAVE_CHECKPOINTS_KEY, [...periodicEntries, ...eventEntries]);
+    return true;
+  } catch (error) {
+    runtime.setSaveStatus(runtime.t("checkpointSaveFailed"));
+    return false;
+  }
+}
+
+function recoveryEntries() {
+  return {
+    preImport: readRecoveryEntry(runtime.SAVE_PRE_IMPORT_KEY),
+    undo: readRecoveryEntry(runtime.SAVE_RESTORE_UNDO_KEY),
+    checkpoints: readCheckpointEntries(),
+  };
+}
+
+function restoreRecoveryEntry(entry, successMessage = "recoveryRestored") {
+  if (!entry?.save) {
+    runtime.setSaveStatus(runtime.t("recoveryInvalid"));
+    return false;
+  }
+  const currentSave = serializeSaveData();
+  try {
+    writeRecoveryEntry(
+      runtime.SAVE_RESTORE_UNDO_KEY,
+      recoveryEntryFromSave(currentSave, "pre-restore"),
+    );
+    applySaveData(entry.save.state, entry.save.version);
+    if (!runtime.saveGame("manual")) throw new Error("restore save failed");
+    runtime.updateUi();
+    runtime.draw();
+    runtime.setSaveStatus(runtime.t(successMessage));
+    return true;
+  } catch (error) {
+    applySaveData(currentSave.state, currentSave.version);
+    if (runtime.setOfflineBaseline) {
+      runtime.setOfflineBaseline(currentSave.savedAt, currentSave.serverSavedAt);
+    }
+    runtime.setSaveStatus(runtime.t("recoveryRestoreFailed"));
+    return false;
+  }
+}
+
+function restorePreImportSave() {
+  const entry = readRecoveryEntry(runtime.SAVE_PRE_IMPORT_KEY);
+  if (!entry) {
+    runtime.setSaveStatus(runtime.t("recoveryInvalid"));
+    return false;
+  }
+  if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(runtime.t("restorePreImportConfirm"))) {
+    return false;
+  }
+  return restoreRecoveryEntry(entry);
+}
+
+function restoreCheckpoint(index) {
+  const normalizedIndex = Math.floor(runtime.sanitizeNumber(index, -1));
+  const entry = readCheckpointEntries()[normalizedIndex];
+  if (!entry) {
+    runtime.setSaveStatus(runtime.t("recoveryInvalid"));
+    return false;
+  }
+  if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(runtime.t("restoreCheckpointConfirm"))) {
+    return false;
+  }
+  return restoreRecoveryEntry(entry);
+}
+
+function restoreUndoSave() {
+  const entry = readRecoveryEntry(runtime.SAVE_RESTORE_UNDO_KEY);
+  if (!entry) {
+    runtime.setSaveStatus(runtime.t("recoveryInvalid"));
+    return false;
+  }
+  if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(runtime.t("restoreUndoConfirm"))) {
+    return false;
+  }
+  return restoreRecoveryEntry(entry, "recoveryUndoRestored");
+}
+
 function legacyInfinityUpgradeRefundLog10(data) {
   const ipLevels = Math.floor(runtime.sanitizeNumber(data.ipGainUpgradeLevel, 0));
   const angleLevels = Math.floor(runtime.sanitizeNumber(data.infiniteAngleUpgradeLevel, 0));
@@ -319,7 +516,12 @@ function saveGame(reason = "auto") {
     serverSavedAt = saveData.serverSavedAt || 0;
     localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(saveData));
     runtime.autoSaveElapsed = 0;
-    runtime.setSaveStatus(reason === "auto" ? runtime.t("savedAuto") : runtime.t("savedManual"));
+    const checkpointSaved = createCheckpoint("periodic");
+    runtime.setSaveStatus(
+      checkpointSaved
+        ? reason === "auto" ? runtime.t("savedAuto") : runtime.t("savedManual")
+        : runtime.t("checkpointSaveFailed"),
+    );
     return true;
   } catch (error) {
     runtime.autoSaveElapsed = 0;
@@ -354,8 +556,8 @@ function loadGame() {
       return;
     }
 
-    const parsed = JSON.parse(raw);
-    if (!parsed.version || parsed.version > runtime.SAVE_VERSION || !parsed.state || typeof parsed.state !== "object") {
+    const parsed = normalizeStoredSave(JSON.parse(raw));
+    if (!parsed) {
       quarantineSave(raw);
       runtime.setSaveStatus(runtime.t("oldSave"));
       return;
@@ -394,6 +596,7 @@ function loadGame() {
 function resetSave() {
   const confirmed = window.confirm(runtime.t("resetConfirm"));
   if (!confirmed) return;
+  if (!createCheckpoint("pre-reset", { force: true })) return;
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   localStorage.removeItem(runtime.SAVE_KEY);
   runtime.offlineReport = null;
@@ -506,6 +709,12 @@ expose("legacyInfinityUpgradeRefundLog10", () => legacyInfinityUpgradeRefundLog1
 expose("applySaveData", () => applySaveData, (value) => { applySaveData = value; });
 expose("serializeSaveData", () => serializeSaveData, (value) => { serializeSaveData = value; });
 expose("saveGame", () => saveGame, (value) => { saveGame = value; });
+expose("backupCurrentSave", () => backupCurrentSave, (value) => { backupCurrentSave = value; });
+expose("createCheckpoint", () => createCheckpoint, (value) => { createCheckpoint = value; });
+expose("recoveryEntries", () => recoveryEntries, (value) => { recoveryEntries = value; });
+expose("restorePreImportSave", () => restorePreImportSave, (value) => { restorePreImportSave = value; });
+expose("restoreCheckpoint", () => restoreCheckpoint, (value) => { restoreCheckpoint = value; });
+expose("restoreUndoSave", () => restoreUndoSave, (value) => { restoreUndoSave = value; });
 expose("quarantineSave", () => quarantineSave, (value) => { quarantineSave = value; });
 expose("loadGame", () => loadGame, (value) => { loadGame = value; });
 expose("resetSave", () => resetSave, (value) => { resetSave = value; });

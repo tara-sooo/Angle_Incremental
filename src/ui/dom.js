@@ -168,6 +168,10 @@ const elements = {
   exportSaveCodeButton: document.getElementById("exportSaveCodeButton"),
   importSaveCodeButton: document.getElementById("importSaveCodeButton"),
   copySaveCodeButton: document.getElementById("copySaveCodeButton"),
+  preImportBackupStatus: document.getElementById("preImportBackupStatus"),
+  restorePreImportButton: document.getElementById("restorePreImportButton"),
+  restoreUndoButton: document.getElementById("restoreUndoButton"),
+  saveCheckpointList: document.getElementById("saveCheckpointList"),
 };
 
 expose("canvas", () => canvas);

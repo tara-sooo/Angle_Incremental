@@ -231,6 +231,12 @@ function runInfinity(forced = false) {
   const completedChallenge = runtime.state.activeChallenge;
   const noGenerationOrCoreBoost = !runtime.state.currentInfinityRunHadGeneration
     && !runtime.state.currentInfinityRunHadCoreBoost;
+  if (
+    completedChallenge > 0
+    && !isChallengeCompleted(completedChallenge)
+    && runtime.createCheckpoint
+    && !runtime.createCheckpoint("pre-infinity-challenge", { force: true })
+  ) return;
   if (completedChallenge > 0) {
     runtime.state.completedChallenges |= 1 << (completedChallenge - 1);
     runtime.state.activeChallenge = 0;
@@ -285,6 +291,7 @@ function toggleInfinityChallenge(index = nextChallengeIndex()) {
 
 function breakInfiniteCap() {
   if (!canBreakInfiniteCap()) return;
+  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-break-cap", { force: true })) return;
   runtime.state.infiniteCapBroken = true;
   runtime.updateUi();
   runtime.saveGame("manual");

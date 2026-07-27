@@ -44,6 +44,93 @@ function clearElement(element) {
   }
 }
 
+function formatRecoveryTimestamp(timestamp) {
+  const numeric = Number(timestamp);
+  if (!Number.isFinite(numeric) || numeric <= 0) return runtime.t("recoveryUnknownTime");
+  try {
+    return new Date(numeric).toLocaleString(runtime.state.language === "en" ? "en-US" : "ja-JP");
+  } catch (error) {
+    return runtime.t("recoveryUnknownTime");
+  }
+}
+
+function recoveryReasonText(reason) {
+  const reasonKeys = {
+    periodic: "checkpointReasonPeriodic",
+    "pre-import": "checkpointReasonPreImport",
+    "pre-update": "checkpointReasonPreUpdate",
+    "pre-reset": "checkpointReasonPreReset",
+    "pre-infinity-challenge": "checkpointReasonPreInfinityChallenge",
+    "pre-break-cap": "checkpointReasonPreBreakCap",
+    "pre-infinite-angle": "checkpointReasonPreInfiniteAngle",
+    "pre-tower-build": "checkpointReasonPreTowerBuild",
+    "pre-restore": "checkpointReasonPreRestore",
+  };
+  return runtime.t(reasonKeys[reason] || "checkpointReasonOther");
+}
+
+function countBits(value) {
+  let remaining = Math.max(0, Math.floor(Number(value) || 0));
+  let count = 0;
+  while (remaining > 0) {
+    remaining &= remaining - 1;
+    count += 1;
+  }
+  return count;
+}
+
+function recoveryStateSummary(entry) {
+  const state = entry?.state || {};
+  const infinityPointsLog10 = runtime.sanitizeLog10(
+    state.infinityPointsLog10,
+    runtime.log10Value(Math.max(0, Number(state.infinityPoints) || 0)),
+  );
+  return [
+    `${runtime.t("recoveryInfinity")}: ${runtime.formatUiNumber(state.infinityCount || 0)}`,
+    `${runtime.t("recoveryIp")}: ${runtime.formatUiLogNumber(infinityPointsLog10)}`,
+    `${runtime.t("recoveryChallenges")}: ${countBits(state.completedChallenges)}/${runtime.INFINITY_CHALLENGE_COUNT}`,
+    `${runtime.t("recoveryAchievements")}: ${countBits(state.achievementMask)}/${runtime.ACHIEVEMENT_COUNT}`,
+    `${runtime.t("recoveryIa")}: ${state.infiniteAngleUnlocked ? runtime.t("recoveryUnlocked") : runtime.t("recoveryLocked")}`,
+    `${runtime.t("recoveryTower")}: ${Math.max(0, Math.floor(Number(state.towerFloor) || 0))}`,
+  ].join(" · ");
+}
+
+function updateSaveRecoveryUi() {
+  const elements = runtime.elements;
+  if (!elements.preImportBackupStatus || !elements.saveCheckpointList || !runtime.recoveryEntries) return;
+  const recovery = runtime.recoveryEntries();
+  elements.preImportBackupStatus.textContent = recovery.preImport
+    ? `${runtime.t("preImportBackupAvailable")} ${formatRecoveryTimestamp(recovery.preImport.backedUpAt)}`
+    : runtime.t("noPreImportBackup");
+  if (elements.restorePreImportButton) elements.restorePreImportButton.hidden = !recovery.preImport;
+  if (elements.restoreUndoButton) elements.restoreUndoButton.hidden = !recovery.undo;
+  clearElement(elements.saveCheckpointList);
+  if (recovery.checkpoints.length === 0) {
+    elements.saveCheckpointList.textContent = runtime.t("noCheckpoints");
+    return;
+  }
+  recovery.checkpoints.forEach((entry, index) => {
+    const row = document.createElement("div");
+    row.className = "save-checkpoint-row";
+    const details = document.createElement("div");
+    details.className = "save-checkpoint-details";
+    const title = document.createElement("strong");
+    title.textContent = recoveryReasonText(entry.reason);
+    const timestamp = document.createElement("span");
+    timestamp.textContent = formatRecoveryTimestamp(entry.backedUpAt);
+    const summary = document.createElement("small");
+    summary.textContent = recoveryStateSummary(entry);
+    details.append(title, timestamp, summary);
+    const restoreButton = document.createElement("button");
+    restoreButton.type = "button";
+    restoreButton.className = "reset-button";
+    restoreButton.dataset.checkpointIndex = String(index);
+    restoreButton.textContent = runtime.t("restoreCheckpoint");
+    row.append(details, restoreButton);
+    elements.saveCheckpointList.append(row);
+  });
+}
+
 function canSpendLog(amountLog) {
   return runtime.currentScoreLog10() >= amountLog;
 }
@@ -210,6 +297,7 @@ function updateUi() {
       : Math.ceil(runtime.elements.fpsCounter.getBoundingClientRect().height);
     rootStyle.setProperty("--fps-counter-height", `${fpsHeight}px`);
   }
+  updateSaveRecoveryUi();
 }
 
 function setSaveStatus(text) {
@@ -275,6 +363,7 @@ function formatExponentPreview(current, next) {
 expose("applyLanguage", () => applyLanguage, (value) => { applyLanguage = value; });
 expose("syncFormControl", () => syncFormControl, (value) => { syncFormControl = value; });
 expose("clearElement", () => clearElement, (value) => { clearElement = value; });
+expose("updateSaveRecoveryUi", () => updateSaveRecoveryUi, (value) => { updateSaveRecoveryUi = value; });
 expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });

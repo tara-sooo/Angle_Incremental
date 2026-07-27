@@ -143,6 +143,7 @@ function resetInfiniteAnglePosition() {
 
 function unlockInfiniteAngle() {
   if (!canUnlockInfiniteAngle()) return false;
+  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-infinite-angle", { force: true })) return false;
   if (!runtime.spendInfinityPoints(infiniteAngleUnlockCostLog10())) return false;
   runtime.state.infiniteAngleUnlocked = true;
   resetInfiniteAngleRun();

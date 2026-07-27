@@ -787,6 +787,20 @@
                 <button id="importSaveCodeButton" class="reset-button" type="button" data-i18n="importSaveCode">読み込み</button>
                 <button id="copySaveCodeButton" class="reset-button" type="button" data-i18n="copySaveCode">コピー</button>
               </div>
+              <div class="save-recovery">
+                <strong class="save-recovery-title" data-i18n="saveRecovery">セーブ復旧</strong>
+                <p id="preImportBackupStatus" class="save-recovery-status"></p>
+                <div class="save-recovery-actions">
+                  <button id="restorePreImportButton" class="reset-button" type="button" data-i18n="restorePreImport" hidden>
+                    インポート前へ戻す
+                  </button>
+                  <button id="restoreUndoButton" class="reset-button" type="button" data-i18n="restoreUndo" hidden>
+                    直前の復元を取り消す
+                  </button>
+                </div>
+                <p class="save-recovery-label" data-i18n="saveCheckpoints">チェックポイント</p>
+                <div id="saveCheckpointList" class="save-checkpoint-list"></div>
+              </div>
               <button id="resetSaveButton" class="reset-button" type="button" data-i18n="resetSave">
                 セーブをリセット
               </button>
