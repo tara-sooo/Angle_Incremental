@@ -4,6 +4,7 @@ import { runtime, expose } from "../runtime/shared.js";
 
 let renderedRecoveryRevision = -1;
 let renderedRecoveryLanguage = "";
+let renderedRecoveryNumberFormat = "";
 
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
@@ -106,6 +107,7 @@ function updateSaveRecoveryUi() {
     currentRevision !== null
     && currentRevision === renderedRecoveryRevision
     && renderedRecoveryLanguage === runtime.state.language
+    && renderedRecoveryNumberFormat === runtime.state.numberFormat
   ) return;
   const recovery = runtime.recoveryEntries();
   elements.preImportBackupStatus.textContent = recovery.preImport
@@ -115,6 +117,7 @@ function updateSaveRecoveryUi() {
   if (elements.restoreUndoButton) elements.restoreUndoButton.hidden = !recovery.undo;
   renderedRecoveryRevision = currentRevision === null ? renderedRecoveryRevision : currentRevision;
   renderedRecoveryLanguage = runtime.state.language;
+  renderedRecoveryNumberFormat = runtime.state.numberFormat;
   clearElement(elements.saveCheckpointList);
   if (recovery.checkpoints.length === 0) {
     elements.saveCheckpointList.textContent = runtime.t("noCheckpoints");

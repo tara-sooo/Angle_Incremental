@@ -115,6 +115,22 @@ async function runSaveRecoveryModuleRuntimeTest() {
       "unchanged recovery data should not recreate the focused checkpoint controls",
     );
   }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infinityCount = 1234567;
+    state.infinityPoints = 1234567;
+    state.infinityPointsLog10 = Math.log10(state.infinityPoints);
+    assert.equal(debug.createCheckpoint("format-test", { force: true }), true);
+    runtime.updateUi();
+    const compactSummary = runtime.elements.saveCheckpointList.children[0].children[0].children[2].textContent;
+    state.numberFormat = "scientific";
+    runtime.updateUi();
+    const scientificSummary = runtime.elements.saveCheckpointList.children[0].children[0].children[2].textContent;
+    assert.notEqual(compactSummary, scientificSummary, "changing number format should refresh recovery summaries");
+  }
 }
 
 module.exports = { runSaveRecoveryModuleRuntimeTest };
