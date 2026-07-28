@@ -62,6 +62,10 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.deepEqual(Array.from(byId.get("12-1")?.requires || []), ["11-1", "11-2"], "IU 12-1 must require both tier 11 upgrades");
     assert.equal(byId.get("12-1")?.name.ja, "12-1 ゴールデンヘル", "IU 12-1 Japanese name must match the new upgrade");
     assert.match(byId.get("12-1")?.effect.en || "", /multiplicatively/, "IU 12-1 English effect must describe multiplicative Core Boost effects");
+    assert.equal(byId.get("13-1")?.bit, 19, "IU 13-1 must use bit 19");
+    assert.equal(byId.get("13-1")?.cost, 1e51, "IU 13-1 must cost 1e51 IP");
+    assert.deepEqual(Array.from(byId.get("13-1")?.requires || []), ["12-1"], "IU 13-1 must require IU 12-1");
+    assert.equal(byId.get("13-1")?.name.ja, "13-1 久々にここを見たなら", "IU 13-1 Japanese name must match the new upgrade");
   }
 
   {
@@ -225,6 +229,9 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     setLogResource(state, "infinityPoints", Math.log10(6660000));
     assert.equal(debug.buyInfinityUpgrade("12-1"), true, "IU 12-1 must be purchasable after both tier 11 upgrades");
     assert.equal((state.infinityUpgradeMask & (1 << 18)) !== 0, true, "IU 12-1 purchase bit must be set");
+    setLogResource(state, "infinityPoints", 51);
+    assert.equal(debug.buyInfinityUpgrade("13-1"), true, "IU 13-1 must be purchasable after IU 12-1");
+    assert.equal((state.infinityUpgradeMask & (1 << 19)) !== 0, true, "IU 13-1 purchase bit must be set");
   }
 
   {
@@ -246,6 +253,9 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 50, "IU 11-1 bonus should ignore IP past 100000");
     setLogResource(state, "infinityPoints", Math.log10(100000000));
     assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 50, "IU 11-1 bonus should not use the hotfix IP cap");
+    state.activeTowerChallenge = 1;
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 10, "TC1 should divide the IU 11-1 effective-level cap by five");
+    state.activeTowerChallenge = 0;
     setLogResource(state, "infinityPoints", Math.log10(1000000));
 
     state.speedLevel = 10;

@@ -12,6 +12,7 @@ function balancePreGenerationCostScalingLog10(kind, level) {
 }
 
 function balanceCanBuyNormalUpgrade(kind) {
+  if (runtime.state.activeTowerChallenge === 1) return false;
   const costLog = runtime.costLogs()[kind];
   if (runtime.state.activeChallenge === 7 && costLog > 30) return false;
   if (kind === "vertex" && runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;

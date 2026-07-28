@@ -21,6 +21,57 @@ const TOWER_FLOOR_COST_LOG10 = Object.freeze({
 
 const TOWER_CHALLENGE_UNLOCK_FLOORS = Object.freeze([3, 5, 8, 12]);
 
+const TOWER_CHALLENGES = Object.freeze([
+  {
+    index: 1,
+    unlockFloor: 3,
+    targetLog10: 308,
+    name: { ja: "TC1 親友より知り合い", en: "TC1 Better Acquaintances Than Friends" },
+    restriction: {
+      ja: "TAの通常強化は購入できず、IU11-1の効果上限は/5される",
+      en: "Normal The Angle upgrades cannot be purchased, and IU11-1's effect cap is divided by 5.",
+    },
+    reward: {
+      ja: "Infinity Score累乗を解放",
+      en: "Unlocks Infinity Score exponentiation.",
+    },
+    implemented: true,
+  },
+  {
+    index: 2,
+    unlockFloor: 5,
+    targetLog10: 1300,
+    name: { ja: "TC2 核家族世帯撲滅委員会", en: "TC2 Nuclear Family Eradication Committee" },
+    restriction: {
+      ja: "CBは封印され、GRのスコア倍率は^0.1、コスト倍率は×0.90を下限とする",
+      en: "Core Boost is sealed, GR's score multiplier is raised to ^0.1, and its cost factor has a hard floor of x0.90.",
+    },
+    reward: {
+      ja: "Core Boost強化を解放",
+      en: "Unlocks Core Boost enhancement.",
+    },
+    implemented: true,
+  },
+  {
+    index: 3,
+    unlockFloor: 8,
+    targetLog10: Infinity,
+    name: { ja: "TC3", en: "TC3" },
+    restriction: { ja: "内容は今後のリリースで公開", en: "Details planned for a future release." },
+    reward: { ja: "報酬は今後のリリースで公開", en: "Reward planned for a future release." },
+    implemented: false,
+  },
+  {
+    index: 4,
+    unlockFloor: 12,
+    targetLog10: Infinity,
+    name: { ja: "TC4", en: "TC4" },
+    restriction: { ja: "内容は今後のリリースで公開", en: "Details planned for a future release." },
+    reward: { ja: "報酬は今後のリリースで公開", en: "Reward planned for a future release." },
+    implemented: false,
+  },
+]);
+
 function towerFloor() {
   return Math.max(0, Math.floor(runtime.state.towerFloor));
 }
@@ -48,7 +99,7 @@ function towerScoreExponent() {
 
 function towerChallengeUnlockFloor(index) {
   const normalizedIndex = Math.floor(index) - 1;
-  return TOWER_CHALLENGE_UNLOCK_FLOORS[normalizedIndex] || Infinity;
+  return TOWER_CHALLENGES[normalizedIndex]?.unlockFloor || Infinity;
 }
 
 function towerChallengeUnlocked(index) {
@@ -56,6 +107,96 @@ function towerChallengeUnlocked(index) {
 }
 
 function towerChallengeCompleted(index) {
+  const normalizedIndex = Math.floor(index);
+  if (normalizedIndex < 1 || normalizedIndex > runtime.TOWER_CHALLENGE_COUNT) return false;
+  return (runtime.state.completedTowerChallenges & (1 << (normalizedIndex - 1))) !== 0;
+}
+
+function towerChallengeDefinition(index) {
+  const normalizedIndex = Math.floor(index);
+  return normalizedIndex >= 1 && normalizedIndex <= runtime.TOWER_CHALLENGE_COUNT
+    ? TOWER_CHALLENGES[normalizedIndex - 1]
+    : null;
+}
+
+function towerChallengeImplemented(index) {
+  return Boolean(towerChallengeDefinition(index)?.implemented);
+}
+
+function towerChallengeTargetLog10(index) {
+  return towerChallengeDefinition(index)?.targetLog10 ?? Infinity;
+}
+
+function towerChallengeText(index, field) {
+  const definition = towerChallengeDefinition(index);
+  const language = runtime.TEXT?.[runtime.state.language] ? runtime.state.language : "ja";
+  return definition?.[field]?.[language] || definition?.[field]?.ja || "";
+}
+
+function towerChallengeName(index) {
+  return towerChallengeText(index, "name");
+}
+
+function towerChallengeRestriction(index) {
+  return towerChallengeText(index, "restriction");
+}
+
+function towerChallengeReward(index) {
+  return towerChallengeText(index, "reward");
+}
+
+function towerChallengeCanComplete(index = runtime.state.activeTowerChallenge) {
+  const normalizedIndex = Math.floor(index);
+  return towerChallengeImplemented(normalizedIndex)
+    && runtime.state.activeTowerChallenge === normalizedIndex
+    && !towerChallengeCompleted(normalizedIndex)
+    && runtime.currentScoreLog10() >= towerChallengeTargetLog10(normalizedIndex);
+}
+
+function towerChallengeRewardUnlocked(index) {
+  return towerChallengeCompleted(index);
+}
+
+function toggleTowerChallenge(index) {
+  const normalizedIndex = Math.min(
+    runtime.TOWER_CHALLENGE_COUNT,
+    Math.max(1, Math.floor(index)),
+  );
+  if (!towerChallengeImplemented(normalizedIndex) || !towerChallengeUnlocked(normalizedIndex)) return false;
+  if (runtime.state.activeTowerChallenge === normalizedIndex) {
+    runtime.state.activeTowerChallenge = 0;
+    runtime.resetBelowInfinity();
+    runtime.updateUi();
+    runtime.saveGame("manual");
+    return true;
+  }
+  if (runtime.state.activeTowerChallenge > 0 || towerChallengeCompleted(normalizedIndex)) return false;
+  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-tower-challenge", { force: true })) return false;
+  runtime.state.activeTowerChallenge = normalizedIndex;
+  runtime.resetBelowInfinity();
+  runtime.updateUi();
+  runtime.saveGame("manual");
+  return true;
+}
+
+function completeTowerChallengeIfReady() {
+  const index = runtime.state.activeTowerChallenge;
+  if (!towerChallengeCanComplete(index)) return false;
+  if (index === 1) {
+    if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-tower-challenge", { force: true })) return false;
+    runtime.state.completedTowerChallenges |= 1 << (index - 1);
+    runtime.state.activeTowerChallenge = 0;
+    runtime.resetBelowInfinity();
+    runtime.state.currentInfinityRunTime = 0;
+    runtime.state.currentInfinityRealTime = 0;
+    runtime.updateUi();
+    runtime.saveGame("manual");
+    return true;
+  }
+  if (runtime.canInfinity()) {
+    runtime.runInfinity(false);
+    return runtime.state.activeTowerChallenge !== index;
+  }
   return false;
 }
 
@@ -90,6 +231,7 @@ function buildTower() {
 
 expose("TOWER_FLOOR_COST_LOG10", () => TOWER_FLOOR_COST_LOG10);
 expose("TOWER_CHALLENGE_UNLOCK_FLOORS", () => TOWER_CHALLENGE_UNLOCK_FLOORS);
+expose("TOWER_CHALLENGES", () => TOWER_CHALLENGES);
 expose("towerFloor", () => towerFloor);
 expose("towerFloorCostLog10", () => towerFloorCostLog10);
 expose("towerNextFloor", () => towerNextFloor);
@@ -98,6 +240,17 @@ expose("towerScoreExponent", () => towerScoreExponent);
 expose("towerChallengeUnlockFloor", () => towerChallengeUnlockFloor);
 expose("towerChallengeUnlocked", () => towerChallengeUnlocked);
 expose("towerChallengeCompleted", () => towerChallengeCompleted);
+expose("towerChallengeDefinition", () => towerChallengeDefinition);
+expose("towerChallengeImplemented", () => towerChallengeImplemented);
+expose("towerChallengeTargetLog10", () => towerChallengeTargetLog10);
+expose("towerChallengeText", () => towerChallengeText);
+expose("towerChallengeName", () => towerChallengeName);
+expose("towerChallengeRestriction", () => towerChallengeRestriction);
+expose("towerChallengeReward", () => towerChallengeReward);
+expose("towerChallengeCanComplete", () => towerChallengeCanComplete);
+expose("towerChallengeRewardUnlocked", () => towerChallengeRewardUnlocked);
+expose("toggleTowerChallenge", () => toggleTowerChallenge);
+expose("completeTowerChallengeIfReady", () => completeTowerChallengeIfReady);
 expose("towerGateForFloor", () => towerGateForFloor);
 expose("towerCanBuildNextFloor", () => towerCanBuildNextFloor);
 expose("canBuildTower", () => canBuildTower);

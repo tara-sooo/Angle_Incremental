@@ -111,6 +111,7 @@ Original prompt: では、中核ループを完成させてください
 - Fixed x60 Time Flux auto-Infinity lag by batching UI refreshes and saves per online simulation batch without changing progression.
 - Fixed achievement unlocks being lost or evaluated against transient Generation state during automated resets.
 - Added next-release save recovery: valid save-code imports now preserve the immediately previous save, and Settings can restore it or undo a restore; periodic, update-before-reload, reset-before-action, and permanent-progression checkpoints retain recoverable save generations.
+- Added IU 13-1 and implemented Tower Challenge 1/2: TC1 blocks normal upgrades and clears at 1e308 with a dedicated reset, while TC2 seals Core Boost and applies the GR restrictions through 1e1300; TC3/TC4 remain placeholders.
 
 ## TODO
 

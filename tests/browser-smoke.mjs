@@ -387,7 +387,9 @@ try {
       challengePanelActive: Boolean(document.querySelector('[data-challenge-panel="tc"]')?.classList.contains("is-active")),
       towerChallengeRows: document.querySelectorAll("#towerChallengeList .tower-challenge-row").length,
       towerChallengeButton: document.querySelector("#towerChallengeList .tower-challenge-row button")?.textContent?.trim() ?? "",
+      towerChallengeButtonDisabled: Boolean(document.querySelector("#towerChallengeList .tower-challenge-row button")?.disabled),
       towerChallengeRestriction: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-restriction")?.textContent?.trim() ?? "",
+      towerChallengeTarget: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-target")?.textContent?.trim() ?? "",
     };
   });
   assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
@@ -395,9 +397,45 @@ try {
   assert.match(towerInitial.towerState.cost, /1\.00e50/, "Floor 1 should display an e50 IP cost");
   assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
   assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
-  assert.equal(towerInitial.towerChallengeRows, 4, "TC placeholder rows should be visible");
-  assert.match(towerInitial.towerChallengeButton, /今後のリリース/);
-  assert.match(towerInitial.towerChallengeRestriction, /今後のリリース/);
+  assert.equal(towerInitial.towerChallengeRows, 4, "TC1-TC4 rows should be visible");
+  assert.equal(towerInitial.towerChallengeButton, "挑戦開始", "implemented TC rows should expose a start button");
+  assert.equal(towerInitial.towerChallengeButtonDisabled, true, "locked TC rows should disable their start button");
+  assert.match(towerInitial.towerChallengeRestriction, /通常強化/);
+  assert.match(towerInitial.towerChallengeTarget, /1\.00e308/);
+  const towerChallengeFlow = await page.evaluate(() => {
+    const { state, toggleTowerChallenge, completeTowerChallengeIfReady } = window.__angleDebug;
+    state.towerFloor = 3;
+    state.infinityCount = 5;
+    state.completedTowerChallenges = 0;
+    state.activeTowerChallenge = 0;
+    window.advanceTime(0);
+    const startButton = document.querySelector("#towerChallengeList .tower-challenge-row button");
+    startButton?.click();
+    const active = {
+      active: state.activeTowerChallenge,
+      button: startButton?.textContent?.trim() ?? "",
+      disabled: Boolean(startButton?.disabled),
+    };
+    state.scoreLog10 = 308;
+    state.score = Number.MAX_VALUE;
+    const completed = completeTowerChallengeIfReady();
+    const result = {
+      completed,
+      activeAfter: state.activeTowerChallenge,
+      completedMask: state.completedTowerChallenges,
+    };
+    state.towerFloor = 0;
+    state.infinityCount = 0;
+    state.score = 0;
+    state.scoreLog10 = -Infinity;
+    state.completedTowerChallenges = 0;
+    window.advanceTime(0);
+    return { active, result };
+  });
+  assert.equal(towerChallengeFlow.active.active, 1, "TC1 should become active from its UI button");
+  assert.equal(towerChallengeFlow.active.button, "挑戦中止", "an active TC should expose a stop button");
+  assert.equal(towerChallengeFlow.result.completed, true, "TC1 should complete at its displayed target");
+  assert.equal(towerChallengeFlow.result.completedMask, 1, "TC1 completion should set its reward flag");
   const timeFluxInitial = await page.evaluate(() => {
     const {
       state,

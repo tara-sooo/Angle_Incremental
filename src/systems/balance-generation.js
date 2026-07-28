@@ -75,7 +75,11 @@ function balanceRunGeneration() {
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
   runtime.state.generationScoreMultiplierLog10 = reward.scoreMultiplierLog10;
   runtime.state.generationScoreMultiplier = runtime.valueFromLog10(runtime.state.generationScoreMultiplierLog10);
-  runtime.state.generationCostFactor = Math.max(balanceGenerationMinCostFactor(), nextCostFactor);
+  runtime.state.generationCostFactor = Math.max(
+    balanceGenerationMinCostFactor(),
+    nextCostFactor,
+    runtime.state.activeTowerChallenge === 2 ? 0.90 : 0,
+  );
   runtime.state.score = 0;
   runtime.state.scoreLog10 = -Infinity;
   runtime.state.generationScore = 0;
@@ -110,11 +114,12 @@ function balanceNextGenerationValues() {
   const nextRawCostFactor = Math.max(
     balanceGenerationMinCostFactor(),
     runtime.state.generationCostFactor * (1 - reward.costReduction),
+    runtime.state.activeTowerChallenge === 2 ? 0.90 : 0,
   );
   return {
-    scoreMultiplier: runtime.valueFromLog10(runtime.applyGenerationAchievementRewardLog10(runtime.generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog))),
-    scoreMultiplierLog10: runtime.applyGenerationAchievementRewardLog10(runtime.generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog)),
-    costFactor: canonicalGenerationCostFactorWithBonuses(nextRawCostFactor),
+    scoreMultiplier: runtime.valueFromLog10(runtime.towerChallengeGenerationScoreMultiplierLog10(runtime.applyGenerationAchievementRewardLog10(runtime.generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog)))),
+    scoreMultiplierLog10: runtime.towerChallengeGenerationScoreMultiplierLog10(runtime.applyGenerationAchievementRewardLog10(runtime.generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog))),
+    costFactor: runtime.towerChallengeGenerationCostFactor(canonicalGenerationCostFactorWithBonuses(nextRawCostFactor)),
   };
 }
 

@@ -68,6 +68,7 @@ function recoveryReasonText(reason) {
     "pre-break-cap": "checkpointReasonPreBreakCap",
     "pre-infinite-angle": "checkpointReasonPreInfiniteAngle",
     "pre-tower-build": "checkpointReasonPreTowerBuild",
+    "pre-tower-challenge": "checkpointReasonPreTowerChallenge",
     "pre-restore": "checkpointReasonPreRestore",
   };
   return runtime.t(reasonKeys[reason] || "checkpointReasonOther");

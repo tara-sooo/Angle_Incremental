@@ -409,6 +409,7 @@ function runLayerAutomation() {
     && runtime.state.autoRunInfinity
     && runtime.state.infinityCount > 0
     && runtime.canInfinity()
+    && (runtime.state.activeTowerChallenge <= 0 || runtime.towerChallengeCanComplete())
     && runtime.infinityPointGainLog10() >= Math.max(
       0,
       runtime.sanitizeLog10(
@@ -473,6 +474,7 @@ function update(dt) {
       if (runtime.passVertex(vertex % vertices)) return;
     }
   }
+  if (runtime.completeTowerChallengeIfReady()) return;
   if (runtime.completeChallengeIfReady()) return;
   if (runLayerAutomation()) return;
 
@@ -820,6 +822,16 @@ function renderGameToText() {
       gate: runtime.towerGateForFloor(runtime.towerNextFloor()),
       canBuild: runtime.canBuildTower(),
       challengeCount: runtime.TOWER_CHALLENGE_COUNT,
+      activeChallenge: runtime.state.activeTowerChallenge,
+      completedChallenges: runtime.state.completedTowerChallenges,
+      challenges: runtime.TOWER_CHALLENGES.map((challenge) => ({
+        index: challenge.index,
+        name: runtime.towerChallengeName(challenge.index),
+        implemented: runtime.towerChallengeImplemented(challenge.index),
+        unlocked: runtime.towerChallengeUnlocked(challenge.index),
+        completed: runtime.towerChallengeCompleted(challenge.index),
+        targetLog10: Number.isFinite(challenge.targetLog10) ? challenge.targetLog10 : null,
+      })),
     },
     achievements: {
       unlocked: runtime.achievementCount(),
@@ -996,6 +1008,8 @@ window.__angleDebug = {
   switchInfinitySubtab: runtime.switchInfinitySubtab,
   switchChallengeSubtab: runtime.switchChallengeSubtab,
   buildTower: runtime.buildTower,
+  toggleTowerChallenge: runtime.toggleTowerChallenge,
+  completeTowerChallengeIfReady: runtime.completeTowerChallengeIfReady,
   applySetting: runtime.applySetting,
   advanceOnlineTime,
   processOfflineElapsed,

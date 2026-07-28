@@ -288,6 +288,7 @@ IUはIPで購入する恒久強化である。各IUは前提IUをすべて購入
 | 11-1 スポンサーが付く | 200000 | 10-1, 10-2 | 所持IP2000ごとに通常強化3種の効果用レベルを追加する。100000 IP以降は効果なし。 |
 | 11-2 分かりづらいよ | 400000 | 10-1, 10-2 | IU 1-1の倍率を `1.005^Infinity回数` にする。Infinity 10000以降は効果なし。 |
 | 12-1 ゴールデンヘル | 6660000 | 11-1, 11-2 | CBの効果は加算ではなく `x(1+増加分)` で計算されるようになる。 |
+| 13-1 久々にここを見たなら | `1e51` | 12-1 | Infinity Scoreは`^0.5`されてから頂点獲得量に倍率を与える。 |
 
 ## 9. Infinity Challenge
 
@@ -414,7 +415,14 @@ Floor 13より後の必要IPは、必要IPのlog10を `345 * 1.15^(階数 - 13)`
 
 ### 12.2 Tower Challengeの現行状態
 
-TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。0.8.2ではTCの具体的な制約、開始処理、完了条件、報酬は未実装であり、Challengesタブには将来実装予定のプレースホルダーを表示する。TCをクリアできない状態では、対応する次の階数を建設できない。
+TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。TC1/TC2をクリアするまで対応する次の階数を建設できない。TCはInfinity Challengeと併用でき、開始・中止時にInfinity以下をリセットする。
+
+| TC | 制約 | 目標 | 報酬 |
+| --- | --- | --- | --- |
+| TC1 親友より知り合い | TAの通常強化は購入できず、IU11-1の効果上限は`/5`される。 | `1e308 Score` | 「Infinity Score累乗」を解放。到達時はTC専用リセットを行い、IP/Infinity回数は増えない。 |
+| TC2 核家族世帯撲滅委員会 | CBは封印され、GRスコア倍率は`^0.1`、GRコスト倍率は`x0.90`を下限とする。 | `1e1300 Score` | 「Core Boost強化」を解放。通常Infinity報酬を付与する。 |
+| TC3 | 未定 | 未定 | 未定 |
+| TC4 | 未定 | 未定 | 未定 |
 
 ## 13. 実績
 
@@ -571,6 +579,8 @@ towerFloor
 infinityUpgradeMask
 activeChallenge
 completedChallenges
+activeTowerChallenge
+completedTowerChallenges
 infiniteCapBroken
 achievementMask
 totalPlayTime

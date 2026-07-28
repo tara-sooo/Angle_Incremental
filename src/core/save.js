@@ -332,12 +332,26 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.softcapUpgradeLevel = 0;
   runtime.state.activeChallenge = Math.min(runtime.INFINITY_CHALLENGE_COUNT, Math.floor(runtime.sanitizeNumber(data.activeChallenge, 0)));
   runtime.state.completedChallenges = Math.floor(runtime.sanitizeNumber(data.completedChallenges, 0));
+  runtime.state.activeTowerChallenge = Math.min(
+    runtime.TOWER_CHALLENGE_COUNT,
+    Math.floor(runtime.sanitizeNumber(data.activeTowerChallenge, 0)),
+  );
+  runtime.state.completedTowerChallenges = Math.floor(runtime.sanitizeNumber(data.completedTowerChallenges, 0))
+    & ((1 << runtime.TOWER_CHALLENGE_COUNT) - 1);
   if (saveVersion < 7) {
     if (runtime.state.activeChallenge > 0) {
       runtime.resetBelowInfinity();
       runtime.state.activeChallenge = 0;
     }
     runtime.state.completedChallenges = 0;
+  }
+  if (
+    runtime.state.activeTowerChallenge > 0
+    && (!runtime.towerChallengeImplemented?.(runtime.state.activeTowerChallenge)
+      || !runtime.towerChallengeUnlocked?.(runtime.state.activeTowerChallenge)
+      || runtime.towerChallengeCompleted?.(runtime.state.activeTowerChallenge))
+  ) {
+    runtime.state.activeTowerChallenge = 0;
   }
   runtime.state.infiniteCapBroken = Boolean(data.infiniteCapBroken);
   const loadedAchievementMask = Math.floor(runtime.sanitizeNumber(data.achievementMask, 0));
@@ -654,6 +668,8 @@ function resetSave() {
     softcapUpgradeLevel: 0,
     activeChallenge: 0,
     completedChallenges: 0,
+    activeTowerChallenge: 0,
+    completedTowerChallenges: 0,
     infiniteCapBroken: false,
     achievementMask: 0,
     totalPlayTime: 0,

@@ -141,6 +141,7 @@ function canBreakInfiniteCap() {
 
 function completeChallengeIfReady() {
   if (!runtime.state.autoCompleteChallenges || runtime.state.activeChallenge <= 0 || !canInfinity()) return false;
+  if (runtime.state.activeTowerChallenge > 0 && !runtime.towerChallengeCanComplete()) return false;
   runInfinity(false);
   return true;
 }
@@ -183,7 +184,7 @@ function resetBelowInfinity() {
 }
 
 function applyStartingCoreBoosts() {
-  if (runtime.state.activeChallenge === 5) {
+  if (runtime.state.activeChallenge === 5 || runtime.state.activeTowerChallenge === 2) {
     runtime.state.coreBoostCount = 0;
     return;
   }
@@ -226,9 +227,16 @@ function infinityCountGain() {
 function runInfinity(forced = false) {
   if (!canInfinity()) return;
   if (!forced && runtime.state.infinityCount === 0) return;
+  if (runtime.state.activeTowerChallenge === 1 && runtime.towerChallengeCanComplete()) {
+    runtime.completeTowerChallengeIfReady();
+    return;
+  }
 
   const scoreLogBeforeReset = runtime.currentScoreLog10();
   const completedChallenge = runtime.state.activeChallenge;
+  const completedTowerChallenge = runtime.towerChallengeCanComplete()
+    ? runtime.state.activeTowerChallenge
+    : 0;
   const noGenerationOrCoreBoost = !runtime.state.currentInfinityRunHadGeneration
     && !runtime.state.currentInfinityRunHadCoreBoost;
   if (
@@ -237,10 +245,19 @@ function runInfinity(forced = false) {
     && runtime.createCheckpoint
     && !runtime.createCheckpoint("pre-infinity-challenge", { force: true })
   ) return;
+  if (
+    completedTowerChallenge > 0
+    && runtime.createCheckpoint
+    && !runtime.createCheckpoint("pre-tower-challenge", { force: true })
+  ) return;
   if (completedChallenge > 0) {
     runtime.state.completedChallenges |= 1 << (completedChallenge - 1);
     runtime.state.activeChallenge = 0;
     runtime.checkAchievements(true);
+  }
+  if (completedTowerChallenge > 0) {
+    runtime.state.completedTowerChallenges |= 1 << (completedTowerChallenge - 1);
+    runtime.state.activeTowerChallenge = 0;
   }
 
   const gained = runtime.infinityPointGain();
