@@ -43,6 +43,18 @@ function switchChallengeSubtab(tab) {
   });
 }
 
+function switchStatisticsSubtab(tab) {
+  runtime.activeStatisticsSubtab = tab;
+  runtime.elements.statisticsSubtabs.forEach((button) => {
+    const active = button.dataset.statisticsTab === runtime.activeStatisticsSubtab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  runtime.elements.statisticsSubpanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.statisticsPanel === runtime.activeStatisticsSubtab);
+  });
+}
+
 function applySetting(key, value) {
   runtime.state[key] = value;
   if (key === "language") {
@@ -158,6 +170,9 @@ function bindEvents() {
   runtime.elements.challengeSubtabs.forEach((button) => {
     button.addEventListener("click", () => switchChallengeSubtab(button.dataset.challengeTab));
   });
+  runtime.elements.statisticsSubtabs.forEach((button) => {
+    button.addEventListener("click", () => switchStatisticsSubtab(button.dataset.statisticsTab));
+  });
   runtime.elements.floatingTextToggle.addEventListener("change", () => applySetting("showFloatingText", runtime.elements.floatingTextToggle.checked));
   runtime.elements.lightEffectsToggle.addEventListener("change", () => applySetting("lightEffects", runtime.elements.lightEffectsToggle.checked));
   runtime.elements.fpsToggle.addEventListener("change", () => applySetting("showFps", runtime.elements.fpsToggle.checked));
@@ -229,6 +244,7 @@ function bindEvents() {
 expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
 expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
+expose("switchStatisticsSubtab", () => switchStatisticsSubtab, (value) => { switchStatisticsSubtab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
 expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
 expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });

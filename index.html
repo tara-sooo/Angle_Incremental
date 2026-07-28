@@ -633,36 +633,62 @@
               <h1 data-i18n="statistics">統計</h1>
             </div>
           </header>
-          <section class="statistics-grid">
-            <div class="settings-card stat-card">
-              <span data-i18n="currentInfinityRun">現在のInfinity周回</span>
-              <strong id="currentInfinityRunTime">0秒</strong>
-            </div>
-            <div class="settings-card stat-card">
-              <span data-i18n="currentInfinityRealTime">現在のInfinity周回（実プレイ時間）</span>
-              <strong id="currentInfinityRealTime">0秒</strong>
-            </div>
-            <div class="settings-card stat-card">
-              <span data-i18n="totalPlayTimeLabel">総プレイ時間</span>
-              <strong id="totalPlayTime">0秒</strong>
-            </div>
-            <div class="settings-card stat-card">
-              <span data-i18n="totalRealPlayTimeLabel">総実プレイ時間</span>
-              <strong id="totalRealPlayTime">0秒</strong>
-            </div>
-            <div class="settings-card stat-card">
-              <span data-i18n="fastestInfinity">最速Infinity</span>
-              <strong id="fastestInfinityTime">記録なし</strong>
-            </div>
-            <div class="settings-card stat-card">
-              <span data-i18n="fastestInfinityRealTime">最速Infinity（実プレイ時間）</span>
-              <strong id="fastestInfinityRealTime">記録なし</strong>
-            </div>
-            <section class="settings-card run-history">
-              <h2 data-i18n="lastInfinityRunsLabel">過去10回のInfinity</h2>
-              <ol id="lastInfinityRuns"></ol>
+          <nav class="statistics-subtabs" aria-label="Statistics sub tabs">
+            <button class="statistics-subtab is-active" type="button" data-statistics-tab="overview" aria-selected="true">
+              <span>STAT</span>
+              <strong data-i18n="statisticsOverview">概要</strong>
+            </button>
+            <button class="statistics-subtab" type="button" data-statistics-tab="challenges" aria-selected="false">
+              <span>CHAL</span>
+              <strong data-i18n="statisticsChallenges">チャレンジ記録</strong>
+            </button>
+          </nav>
+          <div class="statistics-subpanels">
+            <section class="statistics-subpanel is-active" data-statistics-panel="overview">
+              <section class="statistics-grid">
+                <div class="settings-card stat-card">
+                  <span data-i18n="currentInfinityRun">現在のInfinity周回</span>
+                  <strong id="currentInfinityRunTime">0秒</strong>
+                </div>
+                <div class="settings-card stat-card">
+                  <span data-i18n="currentInfinityRealTime">現在のInfinity周回（実プレイ時間）</span>
+                  <strong id="currentInfinityRealTime">0秒</strong>
+                </div>
+                <div class="settings-card stat-card">
+                  <span data-i18n="totalPlayTimeLabel">総プレイ時間</span>
+                  <strong id="totalPlayTime">0秒</strong>
+                </div>
+                <div class="settings-card stat-card">
+                  <span data-i18n="totalRealPlayTimeLabel">総実プレイ時間</span>
+                  <strong id="totalRealPlayTime">0秒</strong>
+                </div>
+                <div class="settings-card stat-card">
+                  <span data-i18n="fastestInfinity">最速Infinity</span>
+                  <strong id="fastestInfinityTime">記録なし</strong>
+                </div>
+                <div class="settings-card stat-card">
+                  <span data-i18n="fastestInfinityRealTime">最速Infinity（実プレイ時間）</span>
+                  <strong id="fastestInfinityRealTime">記録なし</strong>
+                </div>
+                <section class="settings-card run-history">
+                  <h2 data-i18n="lastInfinityRunsLabel">過去10回のInfinity</h2>
+                  <ol id="lastInfinityRuns"></ol>
+                </section>
+              </section>
             </section>
-          </section>
+            <section class="statistics-subpanel" data-statistics-panel="challenges">
+              <div class="challenge-time-grid">
+                <section class="settings-card challenge-time-group">
+                  <h2 data-i18n="fastestInfinityChallengesLabel">Infinity Challenge最速クリア</h2>
+                  <ol id="fastestInfinityChallengeTimes"></ol>
+                </section>
+                <section class="settings-card challenge-time-group">
+                  <h2 data-i18n="fastestTowerChallengesLabel">Tower Challenge最速クリア</h2>
+                  <ol id="fastestTowerChallengeTimes"></ol>
+                </section>
+              </div>
+            </section>
+          </div>
         </section>
 
         <section class="main-panel achievements-panel" data-panel="achievements" aria-label="Achievements">

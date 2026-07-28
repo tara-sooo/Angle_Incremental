@@ -229,6 +229,11 @@ function ic8VertexUpgradeLevelLimit() {
   return runtime.MAX_GAME_VERTICES || 1_000_000_000_000;
 }
 
+function sanitizeChallengeTimes(value, count) {
+  const source = Array.isArray(value) ? value : [];
+  return Array.from({ length: count }, (_, index) => Math.max(0, runtime.sanitizeNumber(source[index], 0)));
+}
+
 function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   const score = runtime.hydrateLogResource(data.score, data.scoreLog10);
@@ -332,16 +337,27 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.softcapUpgradeLevel = 0;
   runtime.state.activeChallenge = Math.min(runtime.INFINITY_CHALLENGE_COUNT, Math.floor(runtime.sanitizeNumber(data.activeChallenge, 0)));
   runtime.state.completedChallenges = Math.floor(runtime.sanitizeNumber(data.completedChallenges, 0));
+  runtime.state.activeChallengeTime = Math.max(0, runtime.sanitizeNumber(data.activeChallengeTime, 0));
   runtime.state.activeTowerChallenge = Math.min(
     runtime.TOWER_CHALLENGE_COUNT,
     Math.floor(runtime.sanitizeNumber(data.activeTowerChallenge, 0)),
   );
   runtime.state.completedTowerChallenges = Math.floor(runtime.sanitizeNumber(data.completedTowerChallenges, 0))
     & ((1 << runtime.TOWER_CHALLENGE_COUNT) - 1);
+  runtime.state.activeTowerChallengeTime = Math.max(0, runtime.sanitizeNumber(data.activeTowerChallengeTime, 0));
+  runtime.state.fastestInfinityChallengeTimes = sanitizeChallengeTimes(
+    data.fastestInfinityChallengeTimes,
+    runtime.INFINITY_CHALLENGE_COUNT,
+  );
+  runtime.state.fastestTowerChallengeTimes = sanitizeChallengeTimes(
+    data.fastestTowerChallengeTimes,
+    runtime.TOWER_CHALLENGE_COUNT,
+  );
   if (saveVersion < 7) {
     if (runtime.state.activeChallenge > 0) {
       runtime.resetBelowInfinity();
       runtime.state.activeChallenge = 0;
+      runtime.state.activeChallengeTime = 0;
     }
     runtime.state.completedChallenges = 0;
   }
@@ -352,6 +368,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   ) {
     runtime.resetBelowInfinity();
     runtime.state.activeTowerChallenge = 0;
+    runtime.state.activeTowerChallengeTime = 0;
   }
   runtime.state.infiniteCapBroken = Boolean(data.infiniteCapBroken);
   const loadedAchievementMask = Math.floor(runtime.sanitizeNumber(data.achievementMask, 0));
@@ -668,8 +685,12 @@ function resetSave() {
     softcapUpgradeLevel: 0,
     activeChallenge: 0,
     completedChallenges: 0,
+    activeChallengeTime: 0,
     activeTowerChallenge: 0,
     completedTowerChallenges: 0,
+    activeTowerChallengeTime: 0,
+    fastestInfinityChallengeTimes: Array(8).fill(0),
+    fastestTowerChallengeTimes: Array(4).fill(0),
     infiniteCapBroken: false,
     achievementMask: 0,
     totalPlayTime: 0,

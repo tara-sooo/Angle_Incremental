@@ -35,6 +35,7 @@ let uiUpdateElapsed = 0;
 let activeMainTab = "angle";
 let activeInfinitySubtab = "upgrades";
 let activeChallengeSubtab = "ic";
+let activeStatisticsSubtab = "overview";
 let selectedInfinityUpgradeId = "1-1";
 let appliedLanguage = "";
 let smoothedFps = 0;
@@ -856,6 +857,7 @@ function renderGameToText() {
       activeMainTab,
       activeInfinitySubtab,
       activeChallengeSubtab,
+      activeStatisticsSubtab,
     },
     automation: {
       unlocked: runtime.hasInfinityUpgrade("1-2"),
@@ -883,6 +885,8 @@ function renderGameToText() {
       fastestInfinityRealTime: runtime.state.fastestInfinityRealTime > 0
         ? Number(runtime.state.fastestInfinityRealTime.toFixed(1))
         : null,
+      fastestInfinityChallengeTimes: runtime.state.fastestInfinityChallengeTimes,
+      fastestTowerChallengeTimes: runtime.state.fastestTowerChallengeTimes,
       lastInfinityRuns: runtime.state.lastInfinityRuns,
     },
     timeFlux: {
@@ -911,6 +915,7 @@ async function initializeGame() {
   runtime.switchMainTab(activeMainTab);
   runtime.switchInfinitySubtab(activeInfinitySubtab);
   runtime.switchChallengeSubtab(activeChallengeSubtab);
+  runtime.switchStatisticsSubtab(activeStatisticsSubtab);
   runtime.resizeCanvas();
   runtime.resizeInfiniteAngleCanvas();
   runtime.updateUi();
@@ -938,6 +943,7 @@ expose("uiUpdateElapsed", () => uiUpdateElapsed, (value) => { uiUpdateElapsed = 
 expose("activeMainTab", () => activeMainTab, (value) => { activeMainTab = value; });
 expose("activeInfinitySubtab", () => activeInfinitySubtab, (value) => { activeInfinitySubtab = value; });
 expose("activeChallengeSubtab", () => activeChallengeSubtab, (value) => { activeChallengeSubtab = value; });
+expose("activeStatisticsSubtab", () => activeStatisticsSubtab, (value) => { activeStatisticsSubtab = value; });
 expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => { selectedInfinityUpgradeId = value; });
 expose("appliedLanguage", () => appliedLanguage, (value) => { appliedLanguage = value; });
 expose("smoothedFps", () => smoothedFps, (value) => { smoothedFps = value; });
@@ -1007,6 +1013,7 @@ window.__angleDebug = {
   switchMainTab: runtime.switchMainTab,
   switchInfinitySubtab: runtime.switchInfinitySubtab,
   switchChallengeSubtab: runtime.switchChallengeSubtab,
+  switchStatisticsSubtab: runtime.switchStatisticsSubtab,
   buildTower: runtime.buildTower,
   toggleTowerChallenge: runtime.toggleTowerChallenge,
   completeTowerChallengeIfReady: runtime.completeTowerChallengeIfReady,

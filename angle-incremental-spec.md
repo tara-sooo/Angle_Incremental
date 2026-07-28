@@ -503,7 +503,9 @@ TF容量 = 1800 * 2^容量レベル 秒
 
 ### 統計
 
-統計タブでは、TF加速分を含むゲーム時間の統計と、オンライン中の実プレイ時間の統計を併記する。総プレイ時間、現在のInfinity周回時間、最速Infinity時間はゲーム時間として従来どおり保持し、それぞれに実プレイ時間の値を追加する。過去10回のInfinity履歴にもゲーム時間と実プレイ時間、到達スコア、獲得IP、挑戦中ICを記録する。旧セーブに実プレイ時間がない履歴は不明として表示する。
+統計タブは概要とチャレンジ記録のサブタブに分かれる。概要では、TF加速分を含むゲーム時間の統計と、オンライン中の実プレイ時間の統計を併記する。総プレイ時間、現在のInfinity周回時間、最速Infinity時間はゲーム時間として従来どおり保持し、それぞれに実プレイ時間の値を追加する。過去10回のInfinity履歴にもゲーム時間と実プレイ時間、到達スコア、獲得IP、挑戦中ICを記録する。旧セーブに実プレイ時間がない履歴は不明として表示する。
+
+チャレンジ記録ではIC1〜8とTC1〜4の最速クリアゲーム時間を表示する。クリアタイムはチャレンジ開始から測定し、TF加速およびオフライン進行で進んだゲーム時間も含める。各チャレンジの最速記録は、より短いクリアタイムでのみ更新する。未クリア・未実装のチャレンジは記録なしと表示する。
 
 ## 15. UI、ニュース、設定
 
@@ -579,8 +581,12 @@ towerFloor
 infinityUpgradeMask
 activeChallenge
 completedChallenges
+activeChallengeTime
 activeTowerChallenge
 completedTowerChallenges
+activeTowerChallengeTime
+fastestInfinityChallengeTimes
+fastestTowerChallengeTimes
 infiniteCapBroken
 achievementMask
 totalPlayTime

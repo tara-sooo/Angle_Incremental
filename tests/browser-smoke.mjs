@@ -355,7 +355,8 @@ try {
     const mainTabs = Array.from(document.querySelectorAll(".main-tab"), (button) => button.dataset.tab);
     const infinityTabs = Array.from(document.querySelectorAll(".infinity-subtab"), (button) => button.dataset.infinityTab);
     const challengeTabs = Array.from(document.querySelectorAll(".challenge-subtab"), (button) => button.dataset.challengeTab);
-    return { mainTabs, infinityTabs, challengeTabs };
+    const statisticsTabs = Array.from(document.querySelectorAll(".statistics-subtab"), (button) => button.dataset.statisticsTab);
+    return { mainTabs, infinityTabs, challengeTabs, statisticsTabs };
   });
   assert.deepEqual(
     tabStructure.mainTabs,
@@ -364,6 +365,45 @@ try {
   );
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
   assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
+  assert.deepEqual(tabStructure.statisticsTabs, ["overview", "challenges"], "Statistics subtabs should be ordered Overview, Challenge Records");
+  const desktopUiChanges = await page.evaluate(() => {
+    const { state, switchMainTab, switchInfinitySubtab, switchStatisticsSubtab } = window.__angleDebug;
+    switchMainTab("infinity");
+    switchInfinitySubtab("upgrades");
+    state.fastestInfinityChallengeTimes = [12.5, 0, 0, 0, 0, 0, 0, 0];
+    state.fastestTowerChallengeTimes = [27, 0, 0, 0];
+    window.advanceTime(0);
+    const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+    const centerDelta = (tierSelector) => {
+      const tier = rect(tierSelector);
+      const node = rect(`${tierSelector} .infinity-upgrade-node`);
+      if (!tier || !node) return null;
+      return Math.abs((tier.left + tier.width / 2) - (node.left + node.width / 2));
+    };
+    const tier12CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="12"]');
+    const tier13CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="13"]');
+    switchMainTab("statistics");
+    switchStatisticsSubtab("challenges");
+    window.advanceTime(0);
+    return {
+      statisticsPanelActive: document.querySelector('[data-statistics-panel="challenges"]')?.classList.contains("is-active") ?? false,
+      overviewPanelActive: document.querySelector('[data-statistics-panel="overview"]')?.classList.contains("is-active") ?? false,
+      infinityRows: document.querySelectorAll("#fastestInfinityChallengeTimes li").length,
+      towerRows: document.querySelectorAll("#fastestTowerChallengeTimes li").length,
+      infinityFirst: document.querySelector("#fastestInfinityChallengeTimes li")?.textContent?.trim() ?? "",
+      towerFirst: document.querySelector("#fastestTowerChallengeTimes li")?.textContent?.trim() ?? "",
+      tier12CenterDelta,
+      tier13CenterDelta,
+    };
+  });
+  assert.equal(desktopUiChanges.statisticsPanelActive, true, "Statistics challenge records subtab should activate");
+  assert.equal(desktopUiChanges.overviewPanelActive, false, "Statistics overview should deactivate when records are selected");
+  assert.equal(desktopUiChanges.infinityRows, 8, "all Infinity Challenges should have statistics rows");
+  assert.equal(desktopUiChanges.towerRows, 4, "all Tower Challenges should have statistics rows");
+  assert.match(desktopUiChanges.infinityFirst, /IC1.*12秒/);
+  assert.match(desktopUiChanges.towerFirst, /TC1.*27秒/);
+  assert.ok(desktopUiChanges.tier12CenterDelta !== null && desktopUiChanges.tier12CenterDelta < 1, "IU 12-1 should be centered");
+  assert.ok(desktopUiChanges.tier13CenterDelta !== null && desktopUiChanges.tier13CenterDelta < 1, "IU 13-1 should be centered");
   const towerInitial = await page.evaluate(() => {
     const { state, switchMainTab, switchInfinitySubtab, switchChallengeSubtab } = window.__angleDebug;
     state.towerFloor = 0;
@@ -1094,6 +1134,25 @@ try {
     assert.equal(mobileStatistics.panelActive, true, "the Statistics tab should activate on mobile");
     assert.ok(mobileStatistics.totalRealPlayTimeWidth > 0, "mobile statistics should show total real play time");
     assert.ok(mobileStatistics.currentInfinityRealTimeWidth > 0, "mobile statistics should show current real Infinity time");
+
+    const mobileUpgradeCenters = await mobilePage.evaluate(() => {
+      const { switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+      switchMainTab("infinity");
+      switchInfinitySubtab("upgrades");
+      window.advanceTime(0);
+      const centerDelta = (tierSelector) => {
+        const tier = document.querySelector(tierSelector)?.getBoundingClientRect();
+        const node = document.querySelector(`${tierSelector} .infinity-upgrade-node`)?.getBoundingClientRect();
+        if (!tier || !node) return null;
+        return Math.abs((tier.left + tier.width / 2) - (node.left + node.width / 2));
+      };
+      return {
+        tier12: centerDelta('[data-infinity-panel="upgrades"] [data-tier="12"]'),
+        tier13: centerDelta('[data-infinity-panel="upgrades"] [data-tier="13"]'),
+      };
+    });
+    assert.ok(mobileUpgradeCenters.tier12 !== null && mobileUpgradeCenters.tier12 < 1, "mobile IU 12-1 should be centered");
+    assert.ok(mobileUpgradeCenters.tier13 !== null && mobileUpgradeCenters.tier13 < 1, "mobile IU 13-1 should be centered");
 
     const mobileInfiniteAngle = await mobilePage.evaluate(() => {
       const { state, unlockInfiniteAngle, switchMainTab, switchInfinitySubtab, applySetting } = window.__angleDebug;

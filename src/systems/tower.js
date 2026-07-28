@@ -156,6 +156,19 @@ function towerChallengeRewardUnlocked(index) {
   return towerChallengeCompleted(index);
 }
 
+function recordTowerChallengeTime(index, elapsed) {
+  const normalizedIndex = Math.floor(index);
+  if (normalizedIndex < 1 || normalizedIndex > runtime.TOWER_CHALLENGE_COUNT) return;
+  const candidate = Math.max(0, runtime.sanitizeNumber(elapsed, 0));
+  if (candidate <= 0) return;
+  const recorded = Math.max(candidate, runtime.MIN_RECORDED_INFINITY_SECONDS);
+  if (!Array.isArray(runtime.state.fastestTowerChallengeTimes)) {
+    runtime.state.fastestTowerChallengeTimes = Array(runtime.TOWER_CHALLENGE_COUNT).fill(0);
+  }
+  const current = runtime.state.fastestTowerChallengeTimes[normalizedIndex - 1];
+  if (!(current > 0) || recorded < current) runtime.state.fastestTowerChallengeTimes[normalizedIndex - 1] = recorded;
+}
+
 function toggleTowerChallenge(index) {
   const normalizedIndex = Math.min(
     runtime.TOWER_CHALLENGE_COUNT,
@@ -164,6 +177,7 @@ function toggleTowerChallenge(index) {
   if (!towerChallengeImplemented(normalizedIndex) || !towerChallengeUnlocked(normalizedIndex)) return false;
   if (runtime.state.activeTowerChallenge === normalizedIndex) {
     runtime.state.activeTowerChallenge = 0;
+    runtime.state.activeTowerChallengeTime = 0;
     runtime.resetBelowInfinity();
     runtime.updateUi();
     runtime.saveGame("manual");
@@ -172,6 +186,7 @@ function toggleTowerChallenge(index) {
   if (runtime.state.activeTowerChallenge > 0) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-tower-challenge", { force: true })) return false;
   runtime.state.activeTowerChallenge = normalizedIndex;
+  runtime.state.activeTowerChallengeTime = 0;
   runtime.resetBelowInfinity();
   runtime.updateUi();
   runtime.saveGame("manual");
@@ -183,8 +198,10 @@ function completeTowerChallengeIfReady() {
   if (!towerChallengeCanComplete(index)) return false;
   if (index === 1) {
     if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-tower-challenge", { force: true })) return false;
+    recordTowerChallengeTime(index, runtime.state.activeTowerChallengeTime);
     runtime.state.completedTowerChallenges |= 1 << (index - 1);
     runtime.state.activeTowerChallenge = 0;
+    runtime.state.activeTowerChallengeTime = 0;
     runtime.resetBelowInfinity();
     runtime.state.currentInfinityRunTime = 0;
     runtime.state.currentInfinityRealTime = 0;
@@ -248,6 +265,7 @@ expose("towerChallengeRestriction", () => towerChallengeRestriction);
 expose("towerChallengeReward", () => towerChallengeReward);
 expose("towerChallengeCanComplete", () => towerChallengeCanComplete);
 expose("towerChallengeRewardUnlocked", () => towerChallengeRewardUnlocked);
+expose("recordTowerChallengeTime", () => recordTowerChallengeTime);
 expose("toggleTowerChallenge", () => toggleTowerChallenge);
 expose("completeTowerChallengeIfReady", () => completeTowerChallengeIfReady);
 expose("towerGateForFloor", () => towerGateForFloor);
