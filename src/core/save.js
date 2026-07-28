@@ -487,6 +487,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   if (runtime.state.activeChallenge > 0 && !runtime.infinityChallengesUnlocked()) {
     runtime.resetBelowInfinity();
     runtime.state.activeChallenge = 0;
+    runtime.state.activeChallengeTime = 0;
   }
   if (runtime.state.activeChallenge === 2 && runtime.state.vertices > 200) {
     runtime.state.vertices = 200;

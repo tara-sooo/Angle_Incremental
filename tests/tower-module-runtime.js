@@ -225,6 +225,14 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(invalidReloaded.debug.state.generationCount, 0, "invalid Tower Challenge progress should reset Generations");
     assert.equal(invalidReloaded.debug.state.coreBoostCount, 0, "invalid Tower Challenge progress should reset Core Boosts");
 
+    const invalidIc = await loadRuntime(candidatePath);
+    invalidIc.debug.state.activeChallenge = 1;
+    invalidIc.debug.state.activeChallengeTime = 12;
+    invalidIc.debug.saveGame("manual");
+    const invalidIcReloaded = await loadRuntime(candidatePath, invalidIc.storage);
+    assert.equal(invalidIcReloaded.debug.state.activeChallenge, 0, "a locked Infinity Challenge should be cleared on load");
+    assert.equal(invalidIcReloaded.debug.state.activeChallengeTime, 0, "an invalid Infinity Challenge should clear its timer on load");
+
     const legacy = await loadRuntime(candidatePath);
     legacy.runtime.applySaveData({ score: 0, scoreLog10: -Infinity }, 10);
     assert.equal(legacy.debug.state.towerFloor, 0, "old saves without Tower data should start at Floor 0");
