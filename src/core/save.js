@@ -348,9 +348,9 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   if (
     runtime.state.activeTowerChallenge > 0
     && (!runtime.towerChallengeImplemented?.(runtime.state.activeTowerChallenge)
-      || !runtime.towerChallengeUnlocked?.(runtime.state.activeTowerChallenge)
-      || runtime.towerChallengeCompleted?.(runtime.state.activeTowerChallenge))
+      || !runtime.towerChallengeUnlocked?.(runtime.state.activeTowerChallenge))
   ) {
+    runtime.resetBelowInfinity();
     runtime.state.activeTowerChallenge = 0;
   }
   runtime.state.infiniteCapBroken = Boolean(data.infiniteCapBroken);

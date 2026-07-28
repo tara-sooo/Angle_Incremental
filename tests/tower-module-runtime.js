@@ -65,6 +65,15 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(debug.state.infinityCount, 5, "TC1 should not grant Infinity count");
     assert.equal(runtime.currentExactInfinityPoints(), runtime.MAX_EXACT_INFINITY_POINTS, "TC1 should not grant IP");
     assert.equal(debug.state.towerFloor, 3, "TC1 should preserve Tower progress");
+    assert.equal(runtime.toggleTowerChallenge(1), true, "a cleared TC1 should be replayable");
+    assert.equal(debug.state.activeTowerChallenge, 1, "TC1 replay should become active");
+    assert.equal(runtime.canBuyNormalUpgrade("speed"), false, "TC1 restrictions should apply during a replay");
+    debug.state.scoreLog10 = 308;
+    debug.state.score = Number.MAX_VALUE;
+    assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC1 replay should complete at its target");
+    assert.equal(debug.state.completedTowerChallenges & 1, 1, "TC1 replay should preserve its reward flag");
+    assert.equal(debug.state.infinityCount, 5, "TC1 replay should not grant Infinity count");
+    assert.equal(runtime.currentExactInfinityPoints(), runtime.MAX_EXACT_INFINITY_POINTS, "TC1 replay should not grant IP");
   }
 
   {
@@ -90,6 +99,15 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(debug.state.completedTowerChallenges & 2, 2, "TC2 completion should persist its reward flag");
     assert.equal(debug.state.activeTowerChallenge, 0, "TC2 should stop after completion");
     assert.equal(debug.state.infinityCount, 6, "TC2 should grant the normal Infinity count reward");
+    const replayIpBefore = runtime.currentExactInfinityPoints();
+    assert.equal(runtime.toggleTowerChallenge(2), true, "a cleared TC2 should be replayable");
+    assert.equal(debug.state.activeTowerChallenge, 2, "TC2 replay should become active");
+    debug.state.scoreLog10 = 1300;
+    debug.state.score = Number.MAX_VALUE;
+    assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC2 replay should complete at its target");
+    assert.equal(debug.state.completedTowerChallenges & 2, 2, "TC2 replay should preserve its reward flag");
+    assert.equal(debug.state.infinityCount, 7, "TC2 replay should grant another normal Infinity count");
+    assert.ok(runtime.currentExactInfinityPoints() > replayIpBefore, "TC2 replay should grant normal Infinity points");
   }
 
   {
@@ -143,11 +161,33 @@ async function runTowerModuleRuntimeTest() {
 
     source.debug.state.towerFloor = 5;
     source.debug.state.activeTowerChallenge = 2;
-    source.debug.state.completedTowerChallenges = 1;
+    source.debug.state.completedTowerChallenges = 2;
+    source.debug.state.scoreLog10 = 123;
+    source.debug.state.score = Number.MAX_VALUE;
     source.debug.saveGame("manual");
     const challengeReloaded = await loadRuntime(candidatePath, source.storage);
-    assert.equal(challengeReloaded.debug.state.activeTowerChallenge, 2, "active Tower Challenge should survive a local save");
-    assert.equal(challengeReloaded.debug.state.completedTowerChallenges, 1, "Tower Challenge rewards should survive a local save");
+    assert.equal(challengeReloaded.debug.state.activeTowerChallenge, 2, "a replaying Tower Challenge should survive a local save");
+    assert.equal(challengeReloaded.debug.state.completedTowerChallenges, 2, "Tower Challenge rewards should survive a local save");
+    assert.equal(challengeReloaded.debug.state.scoreLog10, 123, "valid replay progress should survive a local save");
+    assert.equal(challengeReloaded.runtime.canCoreBoost(), false, "TC2 restrictions should survive a local save");
+
+    const invalid = await loadRuntime(candidatePath);
+    invalid.debug.state.towerFloor = 0;
+    invalid.debug.state.activeTowerChallenge = 1;
+    invalid.debug.state.scoreLog10 = 123;
+    invalid.debug.state.score = Number.MAX_VALUE;
+    invalid.debug.state.vertices = 100;
+    invalid.debug.state.speedLevel = 4;
+    invalid.debug.state.generationCount = 2;
+    invalid.debug.state.coreBoostCount = 3;
+    invalid.debug.saveGame("manual");
+    const invalidReloaded = await loadRuntime(candidatePath, invalid.storage);
+    assert.equal(invalidReloaded.debug.state.activeTowerChallenge, 0, "a locked Tower Challenge should be cleared on load");
+    assert.equal(invalidReloaded.debug.state.scoreLog10, -Infinity, "invalid Tower Challenge progress should reset Score");
+    assert.equal(invalidReloaded.debug.state.vertices, 3, "invalid Tower Challenge progress should reset vertices");
+    assert.equal(invalidReloaded.debug.state.speedLevel, 0, "invalid Tower Challenge progress should reset upgrades");
+    assert.equal(invalidReloaded.debug.state.generationCount, 0, "invalid Tower Challenge progress should reset Generations");
+    assert.equal(invalidReloaded.debug.state.coreBoostCount, 0, "invalid Tower Challenge progress should reset Core Boosts");
 
     const legacy = await loadRuntime(candidatePath);
     legacy.runtime.applySaveData({ score: 0, scoreLog10: -Infinity }, 10);

@@ -424,18 +424,35 @@ try {
       activeAfter: state.activeTowerChallenge,
       completedMask: state.completedTowerChallenges,
     };
+    window.advanceTime(0);
+    const replayButton = document.querySelector("#towerChallengeList .tower-challenge-row button");
+    const replayStarted = replayButton?.textContent?.trim() ?? "";
+    replayButton?.click();
+    const replay = {
+      active: state.activeTowerChallenge,
+      button: replayButton?.textContent?.trim() ?? "",
+      disabled: Boolean(replayButton?.disabled),
+    };
+    state.scoreLog10 = 308;
+    state.score = Number.MAX_VALUE;
+    const replayCompleted = completeTowerChallengeIfReady();
     state.towerFloor = 0;
     state.infinityCount = 0;
     state.score = 0;
     state.scoreLog10 = -Infinity;
     state.completedTowerChallenges = 0;
     window.advanceTime(0);
-    return { active, result };
+    return { active, result, replayStarted, replay, replayCompleted };
   });
   assert.equal(towerChallengeFlow.active.active, 1, "TC1 should become active from its UI button");
   assert.equal(towerChallengeFlow.active.button, "挑戦中止", "an active TC should expose a stop button");
   assert.equal(towerChallengeFlow.result.completed, true, "TC1 should complete at its displayed target");
   assert.equal(towerChallengeFlow.result.completedMask, 1, "TC1 completion should set its reward flag");
+  assert.equal(towerChallengeFlow.replayStarted, "再挑戦", "a cleared TC should expose a replay button");
+  assert.equal(towerChallengeFlow.replay.active, 1, "a cleared TC should become active when replayed");
+  assert.equal(towerChallengeFlow.replay.button, "挑戦中止", "a replaying TC should expose a stop button");
+  assert.equal(towerChallengeFlow.replay.disabled, false, "a replaying TC stop button should be enabled");
+  assert.equal(towerChallengeFlow.replayCompleted, true, "a replaying TC should complete at its displayed target");
   const timeFluxInitial = await page.evaluate(() => {
     const {
       state,

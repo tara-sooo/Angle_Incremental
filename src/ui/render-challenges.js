@@ -115,10 +115,10 @@ function updateTowerChallengeRows() {
     row.querySelector(".challenge-name").textContent = runtime.towerChallengeName(index) || `TC${index}`;
     row.querySelector(".challenge-state").textContent = !implemented
       ? runtime.t("towerChallengeComingSoon")
-      : completed
-        ? runtime.t("towerChallengeCompleted")
-        : active
-          ? runtime.t("towerChallengeRunning")
+      : active
+        ? runtime.t("towerChallengeRunning")
+        : completed
+          ? runtime.t("towerChallengeCompleted")
           : unlocked
             ? runtime.t("towerChallengeAvailable")
             : runtime.t("towerChallengeLocked").replace("{floor}", String(unlockFloor));
@@ -127,8 +127,12 @@ function updateTowerChallengeRows() {
       : runtime.t("towerChallengeComingSoon");
     row.querySelector(".challenge-restriction").textContent = `${runtime.t("challengeRestrictionLabel")}: ${runtime.towerChallengeRestriction(index)}`;
     row.querySelector(".challenge-reward").textContent = `${runtime.t("challengeRewardLabel")}: ${runtime.towerChallengeReward(index)}${runtime.towerChallengeRewardUnlocked(index) ? ` (${runtime.t("towerChallengeRewardUnlocked")})` : ""}`;
-    button.textContent = active ? runtime.t("towerChallengeStop") : runtime.t("towerChallengeStart");
-    button.disabled = !implemented || !unlocked || completed || (runtime.state.activeTowerChallenge > 0 && !active);
+    button.textContent = active
+      ? runtime.t("towerChallengeStop")
+      : completed
+        ? runtime.t("towerChallengeReplay")
+        : runtime.t("towerChallengeStart");
+    button.disabled = !implemented || !unlocked || (runtime.state.activeTowerChallenge > 0 && !active);
   });
 }
 

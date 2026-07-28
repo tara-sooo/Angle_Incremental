@@ -149,7 +149,6 @@ function towerChallengeCanComplete(index = runtime.state.activeTowerChallenge) {
   const normalizedIndex = Math.floor(index);
   return towerChallengeImplemented(normalizedIndex)
     && runtime.state.activeTowerChallenge === normalizedIndex
-    && !towerChallengeCompleted(normalizedIndex)
     && runtime.currentScoreLog10() >= towerChallengeTargetLog10(normalizedIndex);
 }
 
@@ -170,7 +169,7 @@ function toggleTowerChallenge(index) {
     runtime.saveGame("manual");
     return true;
   }
-  if (runtime.state.activeTowerChallenge > 0 || towerChallengeCompleted(normalizedIndex)) return false;
+  if (runtime.state.activeTowerChallenge > 0) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-tower-challenge", { force: true })) return false;
   runtime.state.activeTowerChallenge = normalizedIndex;
   runtime.resetBelowInfinity();
