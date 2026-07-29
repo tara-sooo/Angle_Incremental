@@ -301,8 +301,8 @@ try {
     saveData: {
       version: 10,
       savedAt: serverClockSavedAt,
-      serverSavedAt: serverClockSavedAt - 3600 * 1000,
-      state: { offlineProgressEnabled: false, timeFlux: 0 },
+      serverSavedAt: serverClockSavedAt - 8 * 86400 * 1000,
+      state: { offlineProgressEnabled: false, timeFlux: 0, timeFluxCapacityLevel: 30 },
     },
     checkpoints: [{
       appVersion: EXPECTED_ASSET_VERSION,
@@ -332,9 +332,11 @@ try {
       };
     });
     assert.ok(
-      Math.abs(serverClockLoaded.timeFlux - 360) < 2,
-      "server-based offline TF should ignore a two-day local clock offset",
+      serverClockLoaded.timeFlux > 7 * 24 * 360,
+      "server-based offline TF should process more than seven days despite a local clock offset",
     );
+    assert.ok(serverClockLoaded.report.elapsedSeconds > 7 * 86400, "the server-clock report should include more than seven days");
+    assert.equal(serverClockLoaded.report.capped, false, "trusted server-clock offline rewards should not be capped");
     assert.equal(serverClockLoaded.report.clockSource, "server", "server-based offline reports should identify their clock source");
     assert.equal(serverClockLoaded.report.clockAnomaly, false, "a valid server timestamp should not be flagged as anomalous");
     assert.ok(serverClockLoaded.persisted.serverSavedAt > 0, "loading a legacy interval should persist a server timestamp");

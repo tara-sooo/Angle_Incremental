@@ -285,10 +285,42 @@ async function runTimeFluxModuleRuntimeTest() {
 
   state.timeFluxCapacityLevel = 10;
   state.timeFlux = 0;
-  const trustedCapReport = debug.processOfflineElapsed(8 * 86400, "test", { clockSource: "server" });
-  assert.equal(trustedCapReport.capped, true, "offline rewards should be capped at seven trusted days");
-  assert.equal(trustedCapReport.effectiveElapsedSeconds, 7 * 86400, "the trusted offline cap should be seven days");
-  assert.ok(state.timeFlux > 0, "a capped trusted interval should still grant its allowed reward");
+  const trustedLongReport = debug.processOfflineElapsed(8 * 86400, "test", { clockSource: "server" });
+  assert.equal(trustedLongReport.capped, false, "server-clock offline rewards should not be capped at seven days");
+  assert.equal(trustedLongReport.effectiveElapsedSeconds, 8 * 86400, "trusted offline time should be processed in full");
+  assert.equal(trustedLongReport.timeFluxGained, 8 * 24 * 360, "trusted long intervals should grant the full TF reward");
+
+  state.timeFlux = 0;
+  const localCapReport = debug.processOfflineElapsed(8 * 86400, "test", { clockSource: "local-fallback" });
+  assert.equal(localCapReport.capped, true, "local-clock fallback rewards should remain capped at seven days");
+  assert.equal(localCapReport.effectiveElapsedSeconds, 7 * 86400, "local-clock fallback rewards should use the seven-day cap");
+
+  state.timeFlux = 0;
+  const legacyLocalCapReport = debug.processOfflineElapsed(8 * 86400, "test", {
+    clockSource: "legacy-local",
+    legacyTimestampUsed: true,
+  });
+  assert.equal(legacyLocalCapReport.capped, true, "legacy local timestamps should remain capped at seven days");
+  assert.equal(legacyLocalCapReport.effectiveElapsedSeconds, 7 * 86400, "legacy local timestamps should use the seven-day cap");
+
+  const originalOfflineUpdate = runtime.update;
+  let longOfflineUpdateCalls = 0;
+  runtime.update = () => {
+    longOfflineUpdateCalls += 1;
+  };
+  try {
+    state.offlineProgressEnabled = true;
+    state.offlineTickCount = runtime.OFFLINE_PROGRESS_MIN_TICKS;
+    const longProgressSeconds = runtime.OFFLINE_PROGRESS_MIN_TICKS
+      * runtime.OFFLINE_PROGRESS_APPROXIMATION_THRESHOLD_SECONDS_PER_TICK + 1;
+    const longProgressReport = debug.processOfflineElapsed(longProgressSeconds, "test", { clockSource: "server" });
+    assert.equal(longProgressReport.capped, false, "long trusted offline progress should not be capped");
+    assert.equal(longProgressReport.simulatedSeconds, longProgressSeconds, "long trusted offline progress should use all elapsed time");
+    assert.equal(longProgressReport.requestedTicks, runtime.OFFLINE_PROGRESS_MIN_TICKS, "long intervals should respect the configured tick count");
+    assert.equal(longOfflineUpdateCalls, runtime.OFFLINE_PROGRESS_MIN_TICKS, "long intervals should be distributed across configured ticks");
+  } finally {
+    runtime.update = originalOfflineUpdate;
+  }
 
   const timeFluxBeforeClockAnomaly = state.timeFlux;
   const clockAnomalyReport = debug.processOfflineElapsed(3600, "test", {
@@ -301,6 +333,12 @@ async function runTimeFluxModuleRuntimeTest() {
 
   const futureSave = debug.offlineElapsedFromSave(Date.now() + 10 * 60 * 1000, 0);
   assert.equal(futureSave.clockAnomaly, true, "a future local save timestamp should be rejected");
+
+  state.timeFlux = 123;
+  const invalidElapsedReport = debug.processOfflineElapsed(Infinity, "test", { clockSource: "server" });
+  assert.equal(invalidElapsedReport.clockAnomaly, true, "non-finite offline intervals should be treated as clock anomalies");
+  assert.equal(invalidElapsedReport.rewardSuppressed, true, "non-finite offline intervals should suppress rewards");
+  assert.equal(state.timeFlux, 123, "non-finite offline intervals must not change Time Flux");
 
   state.offlineProgressEnabled = true;
   state.timeFlux = 123;

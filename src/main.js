@@ -357,7 +357,10 @@ function offlineElapsedFromSave(savedAt, serverSavedAt) {
 
   if (serverClockAvailable() && recordedServerAt > 0) {
     const currentServerAt = estimatedServerNowMs();
-    if (currentServerAt < recordedServerAt - runtime.SERVER_CLOCK_BACKWARD_TOLERANCE_SECONDS * 1000) {
+    const elapsedMilliseconds = currentServerAt - recordedServerAt;
+    if (!Number.isFinite(currentServerAt)
+      || !Number.isFinite(elapsedMilliseconds)
+      || elapsedMilliseconds < -runtime.SERVER_CLOCK_BACKWARD_TOLERANCE_SECONDS * 1000) {
       return {
         elapsedSeconds: 0,
         clockSource: "server",
@@ -366,7 +369,7 @@ function offlineElapsedFromSave(savedAt, serverSavedAt) {
       };
     }
     return {
-      elapsedSeconds: Math.max(0, (currentServerAt - recordedServerAt) / 1000),
+      elapsedSeconds: Math.max(0, elapsedMilliseconds / 1000),
       clockSource: "server",
       clockAnomaly: false,
       legacyTimestampUsed: false,
@@ -382,8 +385,18 @@ function offlineElapsedFromSave(savedAt, serverSavedAt) {
     };
   }
 
+  const elapsedMilliseconds = currentLocalAt - localSavedAt;
+  if (!Number.isFinite(currentLocalAt) || !Number.isFinite(elapsedMilliseconds)) {
+    return {
+      elapsedSeconds: 0,
+      clockSource: serverClockAvailable() ? "legacy-local" : "local-fallback",
+      clockAnomaly: true,
+      legacyTimestampUsed: serverClockAvailable(),
+    };
+  }
+
   return {
-    elapsedSeconds: Math.max(0, (currentLocalAt - localSavedAt) / 1000),
+    elapsedSeconds: Math.max(0, elapsedMilliseconds / 1000),
     clockSource: serverClockAvailable() ? "legacy-local" : "local-fallback",
     clockAnomaly: false,
     legacyTimestampUsed: serverClockAvailable(),
@@ -586,7 +599,11 @@ function update(dt) {
   const estimatedCoreHits = vertexSteps > 0
     ? Math.ceil(vertexSteps / Math.max(3, vertices)) * runtime.coreVertexIndices().length
     : 0;
-  if (vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME || estimatedCoreHits > runtime.MAX_CORE_HITS_PER_FRAME) {
+  const useOfflineApproximation = offlineProcessing
+    && dt > runtime.OFFLINE_PROGRESS_APPROXIMATION_THRESHOLD_SECONDS_PER_TICK;
+  if (useOfflineApproximation
+    || vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME
+    || estimatedCoreHits > runtime.MAX_CORE_HITS_PER_FRAME) {
     if (runtime.processManyVertices(start, end)) return;
   } else {
     for (let vertex = start; vertex <= end; vertex += 1) {
@@ -652,14 +669,48 @@ function offlineSnapshot() {
   };
 }
 
+function offlineProgressNumericallySafe(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return false;
+  if (!Number.isFinite(runtime.state.totalPlayTime + seconds)) return false;
+  if (!Number.isFinite(runtime.state.currentInfinityRunTime + seconds)) return false;
+  if (!Number.isFinite(runtime.state.currentGenerationRunTime + seconds)) return false;
+
+  const lapDuration = runtime.lapDuration();
+  const vertices = runtime.effectiveVertexCount();
+  const progressDelta = lapDuration > 0 && vertices > 0
+    ? seconds / lapDuration * vertices
+    : NaN;
+  if (!Number.isFinite(progressDelta)
+    || !Number.isFinite(runtime.state.totalVertexProgress + progressDelta)) return false;
+
+  if (runtime.state.infiniteAngleUnlocked) {
+    const infiniteLapDuration = runtime.infiniteAngleLapDuration();
+    const infiniteVertices = runtime.infiniteAngleVertexCount();
+    const infiniteProgressDelta = infiniteLapDuration > 0 && infiniteVertices > 0
+      ? seconds / infiniteLapDuration * infiniteVertices
+      : NaN;
+    if (!Number.isFinite(infiniteProgressDelta)
+      || !Number.isFinite(runtime.state.infiniteAngleTotalVertexProgress + infiniteProgressDelta)) return false;
+  }
+
+  return true;
+}
+
 function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext = {}) {
-  const elapsed = Math.max(0, runtime.sanitizeNumber(elapsedSeconds, 0));
-  const clockAnomaly = Boolean(clockContext.clockAnomaly);
+  const numericElapsed = runtime.sanitizeNumber(elapsedSeconds, NaN);
+  const invalidElapsed = !Number.isFinite(numericElapsed);
+  const elapsed = invalidElapsed ? 0 : Math.max(0, numericElapsed);
+  const clockSource = clockContext.clockSource
+    || (serverClockAvailable() ? "server" : "local-fallback");
+  let clockAnomaly = Boolean(clockContext.clockAnomaly) || invalidElapsed;
   if (elapsed <= 0 && !clockAnomaly) return null;
   const before = offlineSnapshot();
+  const usesLocalRewardCap = clockSource !== "server";
   const trustedElapsed = clockAnomaly
     ? 0
-    : Math.min(elapsed, runtime.OFFLINE_REWARD_MAX_SECONDS);
+    : usesLocalRewardCap
+      ? Math.min(elapsed, runtime.OFFLINE_LOCAL_REWARD_MAX_SECONDS)
+      : elapsed;
   let simulatedSeconds = 0;
   let processedTicks = 0;
   let timeFluxGained = 0;
@@ -669,25 +720,36 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
 
   if (!clockAnomaly && runtime.state.offlineProgressEnabled) {
     const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
-    const maximumSeconds = tickCount * runtime.OFFLINE_PROGRESS_MAX_SECONDS_PER_TICK;
-    simulatedSeconds = Math.min(trustedElapsed, maximumSeconds);
+    simulatedSeconds = trustedElapsed;
     requestedTicks = Math.max(
       1,
       Math.min(tickCount, Math.ceil(simulatedSeconds / runtime.MAX_SIMULATION_STEP_SECONDS)),
     );
     processedTicks = Math.min(requestedTicks, runtime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS);
     precisionReduced = processedTicks < requestedTicks;
-    const tickSeconds = simulatedSeconds / processedTicks;
-    offlineProcessing = true;
-    try {
-      for (let tick = 0; tick < processedTicks; tick += 1) update(tickSeconds);
-    } finally {
-      offlineProcessing = false;
+    if (!offlineProgressNumericallySafe(simulatedSeconds)) {
+      clockAnomaly = true;
+      simulatedSeconds = 0;
+      requestedTicks = 0;
+      processedTicks = 0;
+      precisionReduced = false;
+    } else {
+      const tickSeconds = simulatedSeconds / processedTicks;
+      offlineProcessing = true;
+      try {
+        for (let tick = 0; tick < processedTicks; tick += 1) update(tickSeconds);
+      } finally {
+        offlineProcessing = false;
+      }
     }
   } else if (!clockAnomaly) {
     const theoreticalGain = runtime.timeFluxGainPerHour() * trustedElapsed / 3600;
-    timeFluxGained = runtime.addTimeFlux(theoreticalGain);
-    capacityReached = timeFluxGained + 1e-9 < theoreticalGain;
+    if (!Number.isFinite(theoreticalGain)) {
+      clockAnomaly = true;
+    } else {
+      timeFluxGained = runtime.addTimeFlux(theoreticalGain);
+      capacityReached = timeFluxGained + 1e-9 < theoreticalGain;
+    }
   }
 
   const after = offlineSnapshot();
@@ -708,7 +770,7 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
     offlineProgressEnabled: runtime.state.offlineProgressEnabled,
     timeFluxGained,
     capacityReached,
-    clockSource: clockContext.clockSource || (serverClockAvailable() ? "server" : "local-fallback"),
+    clockSource,
     clockAnomaly,
     rewardSuppressed: clockAnomaly,
     legacyTimestampUsed: Boolean(clockContext.legacyTimestampUsed),
