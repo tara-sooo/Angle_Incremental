@@ -139,7 +139,8 @@ function currentInfiniteScoreLog10() {
 
 function sponsoredNormalUpgradeBonusLevel() {
   if (!runtime.hasInfinityUpgrade("11-1")) return 0;
-  const effectiveIp = Math.min(100000, runtime.valueFromLog10(currentInfinityPointsLog10()));
+  const maximumIp = runtime.state.activeTowerChallenge === 1 ? 20000 : 100000;
+  const effectiveIp = Math.min(maximumIp, runtime.valueFromLog10(currentInfinityPointsLog10()));
   return Math.max(0, Math.floor(effectiveIp / 2000));
 }
 
@@ -364,7 +365,11 @@ function addScore(amount, amountLog10 = runtime.log10Value(amount)) {
   runtime.state.lastEarned = runtime.valueFromLog10(amountLog10);
 
   if (runtime.checkAchievements(true).length > 0) runtime.saveGame("manual");
-  if (runtime.state.infinityCount === 0 && runtime.canInfinity()) {
+  if (
+    runtime.state.infinityCount === 0
+    && runtime.canInfinity()
+    && (runtime.state.activeTowerChallenge <= 0 || runtime.towerChallengeCanComplete())
+  ) {
     runtime.runInfinity(true);
     return true;
   }
@@ -467,6 +472,7 @@ function upgradeCostLog(kind) {
 }
 
 function canBuyNormalUpgrade(kind) {
+  if (runtime.state.activeTowerChallenge === 1) return false;
   if (runtime.state.activeChallenge === 7 && currentScoreLog10() > 30) return false;
   if (kind === "vertex") {
     if (runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;

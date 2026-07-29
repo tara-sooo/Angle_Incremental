@@ -16,7 +16,7 @@ function coreBoostRequirement() {
 }
 
 function canCoreBoost() {
-  if (runtime.state.activeChallenge === 5) return false;
+  if (runtime.state.activeChallenge === 5 || runtime.state.activeTowerChallenge === 2) return false;
   return runtime.currentScoreLog10() >= coreBoostRequirementLog10();
 }
 

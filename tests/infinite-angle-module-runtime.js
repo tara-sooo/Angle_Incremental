@@ -196,6 +196,8 @@ async function runInfiniteAngleModuleRuntimeTest() {
     state.infiniteScore = 10;
     state.infiniteScoreLog10 = 1;
     assert.ok(Math.abs(runtime.infiniteAngleBoost() - 10 ** 0.3) < 1e-12, "IA boost should be Infinity Score^0.3");
+    state.infinityUpgradeMask |= 1 << 19;
+    assert.ok(Math.abs(runtime.infiniteAngleBoost() - 10 ** 0.5) < 1e-12, "IU 13-1 should replace the IA boost with Infinity Score^0.5");
 
     state.generationCount = 0;
     state.coreBoostCount = 0;

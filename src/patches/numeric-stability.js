@@ -69,8 +69,22 @@ function normalizedSavedVertices(data) {
   return Math.min(MAX_GAME_VERTICES, Math.max(3, raw));
 }
 
+function loadedTowerChallengeIsInvalid(data) {
+  const activeTowerChallenge = Math.min(
+    runtime.TOWER_CHALLENGE_COUNT || 0,
+    Math.max(0, Math.floor(runtime.sanitizeNumber(data && data.activeTowerChallenge, 0))),
+  );
+  return activeTowerChallenge > 0
+    && (!runtime.towerChallengeImplemented?.(activeTowerChallenge)
+      || !runtime.towerChallengeUnlocked?.(activeTowerChallenge));
+}
+
 function restoreVerticesAfterLoad(data) {
-  if (runtime.state.activeChallenge === 2 || runtime.state.activeChallenge === 8) return;
+  if (
+    runtime.state.activeChallenge === 2
+    || runtime.state.activeChallenge === 8
+    || loadedTowerChallengeIsInvalid(data)
+  ) return;
   runtime.state.vertices = normalizedSavedVertices(data);
   if (runtime.state.totalVertexProgress > runtime.MAX_VERTEX_PROGRESS_TRACKED) {
     runtime.normalizeVertexProgress();

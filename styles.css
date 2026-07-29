@@ -188,6 +188,7 @@ select {
 .infinity-subtabs,
 .challenge-panel,
 .challenge-subtabs,
+.statistics-subtabs,
 .achievement-overview,
 .settings-card,
 .save-panel {
@@ -669,6 +670,11 @@ canvas {
   padding: 0 14px 14px;
 }
 
+.settings-panel {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
 .infinity-page .page-heading {
   min-height: 70px;
   margin-bottom: 8px;
@@ -827,7 +833,8 @@ canvas {
   box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
 }
 
-.challenge-subtabs {
+.challenge-subtabs,
+.statistics-subtabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
@@ -835,7 +842,8 @@ canvas {
   padding: 5px;
 }
 
-.challenge-subtab {
+.challenge-subtab,
+.statistics-subtab {
   min-height: 38px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -849,7 +857,8 @@ canvas {
   cursor: pointer;
 }
 
-.challenge-subtab span {
+.challenge-subtab span,
+.statistics-subtab span {
   display: grid;
   place-items: center;
   width: 34px;
@@ -860,7 +869,8 @@ canvas {
   background: rgba(242, 184, 75, 0.08);
 }
 
-.challenge-subtab strong {
+.challenge-subtab strong,
+.statistics-subtab strong {
   color: inherit;
   font-size: 0.82rem;
   text-align: left;
@@ -868,13 +878,16 @@ canvas {
 }
 
 .challenge-subtab:hover,
-.challenge-subtab.is-active {
+.challenge-subtab.is-active,
+.statistics-subtab:hover,
+.statistics-subtab.is-active {
   color: white;
   border-color: var(--line-strong);
   filter: brightness(1.14);
 }
 
-.challenge-subtab.is-active {
+.challenge-subtab.is-active,
+.statistics-subtab.is-active {
   background: linear-gradient(180deg, #4f6fb8, #253f82);
   box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
 }
@@ -886,6 +899,14 @@ canvas {
 .challenge-subpanel.is-active {
   display: grid;
   gap: 8px;
+}
+
+.statistics-subpanel {
+  display: none;
+}
+
+.statistics-subpanel.is-active {
+  display: block;
 }
 
 .tower-panel {
@@ -1102,7 +1123,9 @@ canvas {
 .infinity-upgrade-tier[data-tier="2"] .infinity-upgrade-node,
 .infinity-upgrade-tier[data-tier="4"] .infinity-upgrade-node,
 .infinity-upgrade-tier[data-tier="8"] .infinity-upgrade-node,
-.infinity-upgrade-tier[data-tier="9"] .infinity-upgrade-node {
+.infinity-upgrade-tier[data-tier="9"] .infinity-upgrade-node,
+.infinity-upgrade-tier[data-tier="12"] .infinity-upgrade-node,
+.infinity-upgrade-tier[data-tier="13"] .infinity-upgrade-node {
   grid-column: 1 / -1;
   justify-self: center;
   width: min(360px, 100%);
@@ -1402,6 +1425,29 @@ canvas {
   align-items: start;
 }
 
+.challenge-time-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.challenge-time-group h2 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.96rem;
+}
+
+.challenge-time-group ol {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0 0;
+  padding-left: 24px;
+  color: #c7d4f2;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
 .stat-card {
   display: grid;
   gap: 8px;
@@ -1667,6 +1713,79 @@ canvas {
 .save-code-actions .reset-button {
   min-height: 38px;
   font-size: 0.82rem;
+}
+
+.save-recovery {
+  display: grid;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.save-panel > div.save-recovery {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  padding: 10px 0;
+}
+
+.save-recovery-title,
+.save-recovery-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.save-recovery-status,
+.save-recovery-label {
+  margin: 0;
+}
+
+.save-recovery-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.save-recovery-actions .reset-button {
+  min-height: 38px;
+  font-size: 0.78rem;
+}
+
+.save-checkpoint-list {
+  display: grid;
+  gap: 8px;
+}
+
+.save-checkpoint-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.save-checkpoint-details {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.save-checkpoint-details strong,
+.save-checkpoint-details span,
+.save-checkpoint-details small {
+  max-width: none;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.save-checkpoint-details span,
+.save-checkpoint-details small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
 }
 
 .reset-button {
@@ -1979,6 +2098,7 @@ canvas {
   .tower-metrics,
   .settings-grid,
   .statistics-grid,
+  .challenge-time-grid,
   .help-list,
   .time-flux-layout {
     grid-template-columns: 1fr;
@@ -2121,14 +2241,16 @@ canvas {
     white-space: nowrap;
   }
 
-  .challenge-subtabs {
+  .challenge-subtabs,
+  .statistics-subtabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
     margin-bottom: 4px;
     padding: 4px;
   }
 
-  .challenge-subtab {
+  .challenge-subtab,
+  .statistics-subtab {
     min-height: 30px;
     display: flex;
     justify-content: center;
@@ -2136,7 +2258,8 @@ canvas {
     padding: 4px 5px;
   }
 
-  .challenge-subtab span {
+  .challenge-subtab span,
+  .statistics-subtab span {
     width: auto;
     height: auto;
     min-width: 32px;
@@ -2144,7 +2267,8 @@ canvas {
     font-size: 0.72rem;
   }
 
-  .challenge-subtab strong {
+  .challenge-subtab strong,
+  .statistics-subtab strong {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -2274,7 +2398,9 @@ canvas {
   .infinity-upgrade-tier[data-tier="2"] .infinity-upgrade-node,
   .infinity-upgrade-tier[data-tier="4"] .infinity-upgrade-node,
   .infinity-upgrade-tier[data-tier="8"] .infinity-upgrade-node,
-  .infinity-upgrade-tier[data-tier="9"] .infinity-upgrade-node {
+  .infinity-upgrade-tier[data-tier="9"] .infinity-upgrade-node,
+  .infinity-upgrade-tier[data-tier="12"] .infinity-upgrade-node,
+  .infinity-upgrade-tier[data-tier="13"] .infinity-upgrade-node {
     width: min(260px, 100%);
   }
 

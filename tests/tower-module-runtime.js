@@ -23,6 +23,28 @@ async function runTowerModuleRuntimeTest() {
   {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
+    const ic1 = runtime.infinityUpgradeById("4-1");
+    debug.state.infinityUpgradeMask = 1 << ic1.bit;
+    debug.state.infinityCount = 1;
+    assert.equal(runtime.toggleInfinityChallenge(1), undefined, "IC1 should start through its existing toggle action");
+    runtime.advanceOnlineTime(2);
+    assert.equal(debug.state.activeChallengeTime, 2, "IC time should start at challenge activation");
+    debug.state.scoreLog10 = 309;
+    debug.state.score = Number.MAX_VALUE;
+    runtime.runInfinity(true);
+    assert.equal(debug.state.fastestInfinityChallengeTimes[0], 2, "IC1 should record its first clear time");
+    assert.equal(debug.state.activeChallenge, 0, "IC1 should stop after completion");
+    assert.equal(runtime.toggleInfinityChallenge(1), undefined, "completed IC1 should be replayable");
+    runtime.advanceOnlineTime(1);
+    debug.state.scoreLog10 = 309;
+    debug.state.score = Number.MAX_VALUE;
+    runtime.runInfinity(true);
+    assert.equal(debug.state.fastestInfinityChallengeTimes[0], 1, "a faster IC1 replay should replace the record");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
     setInfinityPoints(runtime, runtime.exactInfinityPointsFromCostLog10(50));
     assert.equal(debug.buildTower(), true, "Floor 1 should be purchasable with e50 IP");
     assert.equal(debug.state.towerFloor, 1, "building Tower should increase the floor");
@@ -42,6 +64,80 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(runtime.towerGateForFloor(6), 2, "Floor 6 should be gated by TC2");
     assert.equal(runtime.towerGateForFloor(9), 3, "Floor 9 should be gated by TC3");
     assert.equal(runtime.towerGateForFloor(13), 4, "Floor 13 should be gated by TC4");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    debug.state.towerFloor = 3;
+    debug.state.infinityCount = 5;
+    debug.state.infinityUpgradeMask = 1 << 16;
+    setInfinityPoints(runtime, 123n);
+    assert.equal(runtime.toggleTowerChallenge(1), true, "TC1 should start at Floor 3");
+    assert.equal(debug.state.activeTowerChallenge, 1, "TC1 should become active");
+    runtime.advanceOnlineTime(2);
+    assert.equal(debug.state.activeTowerChallengeTime, 2, "TC1 time should start at challenge activation");
+    assert.equal(runtime.canBuyNormalUpgrade("speed"), false, "TC1 should seal normal upgrades");
+    setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
+    assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 10, "TC1 should divide IU 11-1's effective-level cap by five");
+    debug.state.scoreLog10 = 308;
+    debug.state.score = Number.MAX_VALUE;
+    assert.equal(runtime.towerChallengeCanComplete(), true, "TC1 should complete at 1e308 Score");
+    assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC1 should perform its dedicated completion reset");
+    assert.equal(debug.state.completedTowerChallenges & 1, 1, "TC1 completion should persist its reward flag");
+    assert.equal(debug.state.activeTowerChallenge, 0, "TC1 should stop after completion");
+    assert.equal(debug.state.infinityCount, 5, "TC1 should not grant Infinity count");
+    assert.equal(runtime.currentExactInfinityPoints(), runtime.MAX_EXACT_INFINITY_POINTS, "TC1 should not grant IP");
+    assert.equal(debug.state.fastestTowerChallengeTimes[0], 2, "TC1 should record its first clear time");
+    assert.equal(debug.state.towerFloor, 3, "TC1 should preserve Tower progress");
+    assert.equal(runtime.toggleTowerChallenge(1), true, "a cleared TC1 should be replayable");
+    assert.equal(debug.state.activeTowerChallenge, 1, "TC1 replay should become active");
+    assert.equal(runtime.canBuyNormalUpgrade("speed"), false, "TC1 restrictions should apply during a replay");
+    runtime.advanceOnlineTime(1 / 60);
+    debug.state.scoreLog10 = 308;
+    debug.state.score = Number.MAX_VALUE;
+    assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC1 replay should complete at its target");
+    assert.equal(debug.state.completedTowerChallenges & 1, 1, "TC1 replay should preserve its reward flag");
+    assert.equal(debug.state.infinityCount, 5, "TC1 replay should not grant Infinity count");
+    assert.equal(runtime.currentExactInfinityPoints(), runtime.MAX_EXACT_INFINITY_POINTS, "TC1 replay should not grant IP");
+    assert.equal(debug.state.fastestTowerChallengeTimes[0], 1 / 60, "an immediate TC1 replay should use the minimum recorded time");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    debug.state.towerFloor = 5;
+    debug.state.infinityCount = 5;
+    debug.state.infinityUpgradeMask = 1 << 14;
+    assert.equal(runtime.toggleTowerChallenge(2), true, "TC2 should start at Floor 5");
+    assert.equal(debug.state.coreBoostCount, 0, "TC2 should suppress starting Core Boosts as well");
+    runtime.advanceOnlineTime(3);
+    debug.state.generationScoreMultiplierLog10 = 2.5;
+    debug.state.generationScoreMultiplier = 10 ** 2.5;
+    assert.equal(runtime.generationScoreMultiplierEffectLog10(), 0.5, "TC2 should raise the GR score multiplier to ^0.1");
+    debug.state.generationCostFactor = 0.1;
+    assert.equal(runtime.generationCostFactorEffect(), 0.9, "TC2 should impose a hard floor of x0.90 on GR cost");
+    debug.state.scoreLog10 = 20;
+    debug.state.score = 1e20;
+    assert.equal(runtime.canCoreBoost(), false, "TC2 should seal Core Boost");
+    debug.state.scoreLog10 = 1300;
+    debug.state.score = Number.MAX_VALUE;
+    assert.equal(runtime.towerChallengeCanComplete(), true, "TC2 should complete at 1e1300 Score");
+    assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC2 should use the normal Infinity completion path");
+    assert.equal(debug.state.completedTowerChallenges & 2, 2, "TC2 completion should persist its reward flag");
+    assert.equal(debug.state.activeTowerChallenge, 0, "TC2 should stop after completion");
+    assert.equal(debug.state.infinityCount, 6, "TC2 should grant the normal Infinity count reward");
+    const replayIpBefore = runtime.currentExactInfinityPoints();
+    assert.equal(runtime.toggleTowerChallenge(2), true, "a cleared TC2 should be replayable");
+    assert.equal(debug.state.activeTowerChallenge, 2, "TC2 replay should become active");
+    runtime.advanceOnlineTime(1);
+    debug.state.scoreLog10 = 1300;
+    debug.state.score = Number.MAX_VALUE;
+    assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC2 replay should complete at its target");
+    assert.equal(debug.state.completedTowerChallenges & 2, 2, "TC2 replay should preserve its reward flag");
+    assert.equal(debug.state.infinityCount, 7, "TC2 replay should grant another normal Infinity count");
+    assert.ok(runtime.currentExactInfinityPoints() > replayIpBefore, "TC2 replay should grant normal Infinity points");
+    assert.ok(debug.state.fastestTowerChallengeTimes[1] > 0, "TC2 should record its clear time");
   }
 
   {
@@ -93,9 +189,55 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(imported.debug.state.infiniteAngleUnlocked, true, "IA unlock should survive save-code import");
     assert.equal(imported.debug.state.infiniteScoreLog10, 123, "IA score log should survive save-code import");
 
+    source.debug.state.towerFloor = 5;
+    source.debug.state.activeTowerChallenge = 2;
+    source.debug.state.completedTowerChallenges = 2;
+    source.debug.state.activeTowerChallengeTime = 4;
+    source.debug.state.fastestInfinityChallengeTimes = [1, 2, 3, 4, 5, 6, 7, 8];
+    source.debug.state.fastestTowerChallengeTimes = [9, 10, 11, 12];
+    source.debug.state.scoreLog10 = 123;
+    source.debug.state.score = Number.MAX_VALUE;
+    source.debug.saveGame("manual");
+    const challengeReloaded = await loadRuntime(candidatePath, source.storage);
+    assert.equal(challengeReloaded.debug.state.activeTowerChallenge, 2, "a replaying Tower Challenge should survive a local save");
+    assert.equal(challengeReloaded.debug.state.completedTowerChallenges, 2, "Tower Challenge rewards should survive a local save");
+    assert.ok(challengeReloaded.debug.state.activeTowerChallengeTime >= 4, "active challenge time should survive a local save");
+    assert.deepEqual(Array.from(challengeReloaded.debug.state.fastestInfinityChallengeTimes), [1, 2, 3, 4, 5, 6, 7, 8], "IC fastest times should survive a local save");
+    assert.deepEqual(Array.from(challengeReloaded.debug.state.fastestTowerChallengeTimes), [9, 10, 11, 12], "TC fastest times should survive a local save");
+    assert.equal(challengeReloaded.debug.state.scoreLog10, 123, "valid replay progress should survive a local save");
+    assert.equal(challengeReloaded.runtime.canCoreBoost(), false, "TC2 restrictions should survive a local save");
+
+    const invalid = await loadRuntime(candidatePath);
+    invalid.debug.state.towerFloor = 0;
+    invalid.debug.state.activeTowerChallenge = 1;
+    invalid.debug.state.scoreLog10 = 123;
+    invalid.debug.state.score = Number.MAX_VALUE;
+    invalid.debug.state.vertices = 100;
+    invalid.debug.state.speedLevel = 4;
+    invalid.debug.state.generationCount = 2;
+    invalid.debug.state.coreBoostCount = 3;
+    invalid.debug.saveGame("manual");
+    const invalidReloaded = await loadRuntime(candidatePath, invalid.storage);
+    assert.equal(invalidReloaded.debug.state.activeTowerChallenge, 0, "a locked Tower Challenge should be cleared on load");
+    assert.equal(invalidReloaded.debug.state.scoreLog10, -Infinity, "invalid Tower Challenge progress should reset Score");
+    assert.equal(invalidReloaded.debug.state.vertices, 3, "invalid Tower Challenge progress should reset vertices");
+    assert.equal(invalidReloaded.debug.state.speedLevel, 0, "invalid Tower Challenge progress should reset upgrades");
+    assert.equal(invalidReloaded.debug.state.generationCount, 0, "invalid Tower Challenge progress should reset Generations");
+    assert.equal(invalidReloaded.debug.state.coreBoostCount, 0, "invalid Tower Challenge progress should reset Core Boosts");
+
+    const invalidIc = await loadRuntime(candidatePath);
+    invalidIc.debug.state.activeChallenge = 1;
+    invalidIc.debug.state.activeChallengeTime = 12;
+    invalidIc.debug.saveGame("manual");
+    const invalidIcReloaded = await loadRuntime(candidatePath, invalidIc.storage);
+    assert.equal(invalidIcReloaded.debug.state.activeChallenge, 0, "a locked Infinity Challenge should be cleared on load");
+    assert.equal(invalidIcReloaded.debug.state.activeChallengeTime, 0, "an invalid Infinity Challenge should clear its timer on load");
+
     const legacy = await loadRuntime(candidatePath);
     legacy.runtime.applySaveData({ score: 0, scoreLog10: -Infinity }, 10);
     assert.equal(legacy.debug.state.towerFloor, 0, "old saves without Tower data should start at Floor 0");
+    assert.deepEqual(Array.from(legacy.debug.state.fastestInfinityChallengeTimes), Array(8).fill(0), "old saves should default IC fastest times");
+    assert.deepEqual(Array.from(legacy.debug.state.fastestTowerChallengeTimes), Array(4).fill(0), "old saves should default TC fastest times");
   }
 
   console.log("Tower module runtime tests passed");

@@ -35,6 +35,7 @@ let uiUpdateElapsed = 0;
 let activeMainTab = "angle";
 let activeInfinitySubtab = "upgrades";
 let activeChallengeSubtab = "ic";
+let activeStatisticsSubtab = "overview";
 let selectedInfinityUpgradeId = "1-1";
 let appliedLanguage = "";
 let smoothedFps = 0;
@@ -314,6 +315,10 @@ function markUpdateDeferred(targetVersion) {
 
 function reloadForRemoteUpdate(targetVersion) {
   const now = Date.now();
+  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-update", { force: true })) {
+    markUpdateDeferred(targetVersion);
+    return;
+  }
   try {
     const previousTarget = localStorage.getItem(runtime.UPDATE_RELOAD_TARGET_KEY);
     const previousTime = storedUpdateReloadTime();
@@ -405,6 +410,7 @@ function runLayerAutomation() {
     && runtime.state.autoRunInfinity
     && runtime.state.infinityCount > 0
     && runtime.canInfinity()
+    && (runtime.state.activeTowerChallenge <= 0 || runtime.towerChallengeCanComplete())
     && runtime.infinityPointGainLog10() >= Math.max(
       0,
       runtime.sanitizeLog10(
@@ -469,6 +475,7 @@ function update(dt) {
       if (runtime.passVertex(vertex % vertices)) return;
     }
   }
+  if (runtime.completeTowerChallengeIfReady()) return;
   if (runtime.completeChallengeIfReady()) return;
   if (runLayerAutomation()) return;
 
@@ -816,6 +823,16 @@ function renderGameToText() {
       gate: runtime.towerGateForFloor(runtime.towerNextFloor()),
       canBuild: runtime.canBuildTower(),
       challengeCount: runtime.TOWER_CHALLENGE_COUNT,
+      activeChallenge: runtime.state.activeTowerChallenge,
+      completedChallenges: runtime.state.completedTowerChallenges,
+      challenges: runtime.TOWER_CHALLENGES.map((challenge) => ({
+        index: challenge.index,
+        name: runtime.towerChallengeName(challenge.index),
+        implemented: runtime.towerChallengeImplemented(challenge.index),
+        unlocked: runtime.towerChallengeUnlocked(challenge.index),
+        completed: runtime.towerChallengeCompleted(challenge.index),
+        targetLog10: Number.isFinite(challenge.targetLog10) ? challenge.targetLog10 : null,
+      })),
     },
     achievements: {
       unlocked: runtime.achievementCount(),
@@ -840,6 +857,7 @@ function renderGameToText() {
       activeMainTab,
       activeInfinitySubtab,
       activeChallengeSubtab,
+      activeStatisticsSubtab,
     },
     automation: {
       unlocked: runtime.hasInfinityUpgrade("1-2"),
@@ -867,6 +885,8 @@ function renderGameToText() {
       fastestInfinityRealTime: runtime.state.fastestInfinityRealTime > 0
         ? Number(runtime.state.fastestInfinityRealTime.toFixed(1))
         : null,
+      fastestInfinityChallengeTimes: runtime.state.fastestInfinityChallengeTimes,
+      fastestTowerChallengeTimes: runtime.state.fastestTowerChallengeTimes,
       lastInfinityRuns: runtime.state.lastInfinityRuns,
     },
     timeFlux: {
@@ -895,6 +915,7 @@ async function initializeGame() {
   runtime.switchMainTab(activeMainTab);
   runtime.switchInfinitySubtab(activeInfinitySubtab);
   runtime.switchChallengeSubtab(activeChallengeSubtab);
+  runtime.switchStatisticsSubtab(activeStatisticsSubtab);
   runtime.resizeCanvas();
   runtime.resizeInfiniteAngleCanvas();
   runtime.updateUi();
@@ -922,6 +943,7 @@ expose("uiUpdateElapsed", () => uiUpdateElapsed, (value) => { uiUpdateElapsed = 
 expose("activeMainTab", () => activeMainTab, (value) => { activeMainTab = value; });
 expose("activeInfinitySubtab", () => activeInfinitySubtab, (value) => { activeInfinitySubtab = value; });
 expose("activeChallengeSubtab", () => activeChallengeSubtab, (value) => { activeChallengeSubtab = value; });
+expose("activeStatisticsSubtab", () => activeStatisticsSubtab, (value) => { activeStatisticsSubtab = value; });
 expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => { selectedInfinityUpgradeId = value; });
 expose("appliedLanguage", () => appliedLanguage, (value) => { appliedLanguage = value; });
 expose("smoothedFps", () => smoothedFps, (value) => { smoothedFps = value; });
@@ -991,11 +1013,20 @@ window.__angleDebug = {
   switchMainTab: runtime.switchMainTab,
   switchInfinitySubtab: runtime.switchInfinitySubtab,
   switchChallengeSubtab: runtime.switchChallengeSubtab,
+  switchStatisticsSubtab: runtime.switchStatisticsSubtab,
   buildTower: runtime.buildTower,
+  toggleTowerChallenge: runtime.toggleTowerChallenge,
+  completeTowerChallengeIfReady: runtime.completeTowerChallengeIfReady,
   applySetting: runtime.applySetting,
   advanceOnlineTime,
   processOfflineElapsed,
   saveGame: runtime.saveGame,
+  backupCurrentSave: runtime.backupCurrentSave,
+  createCheckpoint: runtime.createCheckpoint,
+  recoveryEntries: runtime.recoveryEntries,
+  restorePreImportSave: runtime.restorePreImportSave,
+  restoreCheckpoint: runtime.restoreCheckpoint,
+  restoreUndoSave: runtime.restoreUndoSave,
   loadGame: runtime.loadGame,
   resetSave: runtime.resetSave,
   exportSaveCode: runtime.exportSaveCode,

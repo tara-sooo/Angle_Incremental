@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.8.3";
+const EXPECTED_ASSET_VERSION = "0.9.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -123,9 +123,9 @@ try {
       summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.8.3 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.8.3 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /時計対策/);
+  assert.equal(updateModal.visible, true, "the 0.9.0 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.9.0 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /セーブ復旧/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   const serverClockProbe = await page.evaluate(async () => {
@@ -355,7 +355,8 @@ try {
     const mainTabs = Array.from(document.querySelectorAll(".main-tab"), (button) => button.dataset.tab);
     const infinityTabs = Array.from(document.querySelectorAll(".infinity-subtab"), (button) => button.dataset.infinityTab);
     const challengeTabs = Array.from(document.querySelectorAll(".challenge-subtab"), (button) => button.dataset.challengeTab);
-    return { mainTabs, infinityTabs, challengeTabs };
+    const statisticsTabs = Array.from(document.querySelectorAll(".statistics-subtab"), (button) => button.dataset.statisticsTab);
+    return { mainTabs, infinityTabs, challengeTabs, statisticsTabs };
   });
   assert.deepEqual(
     tabStructure.mainTabs,
@@ -364,6 +365,45 @@ try {
   );
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
   assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
+  assert.deepEqual(tabStructure.statisticsTabs, ["overview", "challenges"], "Statistics subtabs should be ordered Overview, Challenge Records");
+  const desktopUiChanges = await page.evaluate(() => {
+    const { state, switchMainTab, switchInfinitySubtab, switchStatisticsSubtab } = window.__angleDebug;
+    switchMainTab("infinity");
+    switchInfinitySubtab("upgrades");
+    state.fastestInfinityChallengeTimes = [12.5, 0, 0, 0, 0, 0, 0, 0];
+    state.fastestTowerChallengeTimes = [27, 0, 0, 0];
+    window.advanceTime(0);
+    const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+    const centerDelta = (tierSelector) => {
+      const tier = rect(tierSelector);
+      const node = rect(`${tierSelector} .infinity-upgrade-node`);
+      if (!tier || !node) return null;
+      return Math.abs((tier.left + tier.width / 2) - (node.left + node.width / 2));
+    };
+    const tier12CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="12"]');
+    const tier13CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="13"]');
+    switchMainTab("statistics");
+    switchStatisticsSubtab("challenges");
+    window.advanceTime(0);
+    return {
+      statisticsPanelActive: document.querySelector('[data-statistics-panel="challenges"]')?.classList.contains("is-active") ?? false,
+      overviewPanelActive: document.querySelector('[data-statistics-panel="overview"]')?.classList.contains("is-active") ?? false,
+      infinityRows: document.querySelectorAll("#fastestInfinityChallengeTimes li").length,
+      towerRows: document.querySelectorAll("#fastestTowerChallengeTimes li").length,
+      infinityFirst: document.querySelector("#fastestInfinityChallengeTimes li")?.textContent?.trim() ?? "",
+      towerFirst: document.querySelector("#fastestTowerChallengeTimes li")?.textContent?.trim() ?? "",
+      tier12CenterDelta,
+      tier13CenterDelta,
+    };
+  });
+  assert.equal(desktopUiChanges.statisticsPanelActive, true, "Statistics challenge records subtab should activate");
+  assert.equal(desktopUiChanges.overviewPanelActive, false, "Statistics overview should deactivate when records are selected");
+  assert.equal(desktopUiChanges.infinityRows, 8, "all Infinity Challenges should have statistics rows");
+  assert.equal(desktopUiChanges.towerRows, 4, "all Tower Challenges should have statistics rows");
+  assert.match(desktopUiChanges.infinityFirst, /IC1.*12秒/);
+  assert.match(desktopUiChanges.towerFirst, /TC1.*27秒/);
+  assert.ok(desktopUiChanges.tier12CenterDelta !== null && desktopUiChanges.tier12CenterDelta < 1, "IU 12-1 should be centered");
+  assert.ok(desktopUiChanges.tier13CenterDelta !== null && desktopUiChanges.tier13CenterDelta < 1, "IU 13-1 should be centered");
   const towerInitial = await page.evaluate(() => {
     const { state, switchMainTab, switchInfinitySubtab, switchChallengeSubtab } = window.__angleDebug;
     state.towerFloor = 0;
@@ -387,7 +427,9 @@ try {
       challengePanelActive: Boolean(document.querySelector('[data-challenge-panel="tc"]')?.classList.contains("is-active")),
       towerChallengeRows: document.querySelectorAll("#towerChallengeList .tower-challenge-row").length,
       towerChallengeButton: document.querySelector("#towerChallengeList .tower-challenge-row button")?.textContent?.trim() ?? "",
+      towerChallengeButtonDisabled: Boolean(document.querySelector("#towerChallengeList .tower-challenge-row button")?.disabled),
       towerChallengeRestriction: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-restriction")?.textContent?.trim() ?? "",
+      towerChallengeTarget: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-target")?.textContent?.trim() ?? "",
     };
   });
   assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
@@ -395,9 +437,62 @@ try {
   assert.match(towerInitial.towerState.cost, /1\.00e50/, "Floor 1 should display an e50 IP cost");
   assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
   assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
-  assert.equal(towerInitial.towerChallengeRows, 4, "TC placeholder rows should be visible");
-  assert.match(towerInitial.towerChallengeButton, /今後のリリース/);
-  assert.match(towerInitial.towerChallengeRestriction, /今後のリリース/);
+  assert.equal(towerInitial.towerChallengeRows, 4, "TC1-TC4 rows should be visible");
+  assert.equal(towerInitial.towerChallengeButton, "挑戦開始", "implemented TC rows should expose a start button");
+  assert.equal(towerInitial.towerChallengeButtonDisabled, true, "locked TC rows should disable their start button");
+  assert.match(towerInitial.towerChallengeRestriction, /通常強化/);
+  assert.match(towerInitial.towerChallengeTarget, /1\.00e308/);
+  const towerChallengeFlow = await page.evaluate(() => {
+    const { state, toggleTowerChallenge, completeTowerChallengeIfReady } = window.__angleDebug;
+    state.towerFloor = 3;
+    state.infinityCount = 5;
+    state.completedTowerChallenges = 0;
+    state.activeTowerChallenge = 0;
+    window.advanceTime(0);
+    const startButton = document.querySelector("#towerChallengeList .tower-challenge-row button");
+    startButton?.click();
+    const active = {
+      active: state.activeTowerChallenge,
+      button: startButton?.textContent?.trim() ?? "",
+      disabled: Boolean(startButton?.disabled),
+    };
+    state.scoreLog10 = 308;
+    state.score = Number.MAX_VALUE;
+    const completed = completeTowerChallengeIfReady();
+    const result = {
+      completed,
+      activeAfter: state.activeTowerChallenge,
+      completedMask: state.completedTowerChallenges,
+    };
+    window.advanceTime(0);
+    const replayButton = document.querySelector("#towerChallengeList .tower-challenge-row button");
+    const replayStarted = replayButton?.textContent?.trim() ?? "";
+    replayButton?.click();
+    const replay = {
+      active: state.activeTowerChallenge,
+      button: replayButton?.textContent?.trim() ?? "",
+      disabled: Boolean(replayButton?.disabled),
+    };
+    state.scoreLog10 = 308;
+    state.score = Number.MAX_VALUE;
+    const replayCompleted = completeTowerChallengeIfReady();
+    state.towerFloor = 0;
+    state.infinityCount = 0;
+    state.score = 0;
+    state.scoreLog10 = -Infinity;
+    state.completedTowerChallenges = 0;
+    window.advanceTime(0);
+    return { active, result, replayStarted, replay, replayCompleted };
+  });
+  assert.equal(towerChallengeFlow.active.active, 1, "TC1 should become active from its UI button");
+  assert.equal(towerChallengeFlow.active.button, "挑戦中止", "an active TC should expose a stop button");
+  assert.equal(towerChallengeFlow.result.completed, true, "TC1 should complete at its displayed target");
+  assert.equal(towerChallengeFlow.result.completedMask, 1, "TC1 completion should set its reward flag");
+  assert.equal(towerChallengeFlow.replayStarted, "再挑戦", "a cleared TC should expose a replay button");
+  assert.equal(towerChallengeFlow.replay.active, 1, "a cleared TC should become active when replayed");
+  assert.equal(towerChallengeFlow.replay.button, "挑戦中止", "a replaying TC should expose a stop button");
+  assert.equal(towerChallengeFlow.replay.disabled, false, "a replaying TC stop button should be enabled");
+  assert.equal(towerChallengeFlow.replayCompleted, true, "a replaying TC should complete at its displayed target");
   const timeFluxInitial = await page.evaluate(() => {
     const {
       state,
@@ -986,7 +1081,7 @@ try {
       quickBarVisible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
-    assert.equal(mobileStartup.updateTitle, "0.8.3 アップデート", "mobile startup should use the release version");
+    assert.equal(mobileStartup.updateTitle, "0.9.0 アップデート", "mobile startup should use the release version");
     assert.equal(mobileStartup.tabCount, 9, "mobile startup should expose every main tab");
     assert.equal(mobileStartup.quickBarVisible, true, "the Time Flux quick bar should be visible on mobile");
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
@@ -1039,6 +1134,25 @@ try {
     assert.equal(mobileStatistics.panelActive, true, "the Statistics tab should activate on mobile");
     assert.ok(mobileStatistics.totalRealPlayTimeWidth > 0, "mobile statistics should show total real play time");
     assert.ok(mobileStatistics.currentInfinityRealTimeWidth > 0, "mobile statistics should show current real Infinity time");
+
+    const mobileUpgradeCenters = await mobilePage.evaluate(() => {
+      const { switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+      switchMainTab("infinity");
+      switchInfinitySubtab("upgrades");
+      window.advanceTime(0);
+      const centerDelta = (tierSelector) => {
+        const tier = document.querySelector(tierSelector)?.getBoundingClientRect();
+        const node = document.querySelector(`${tierSelector} .infinity-upgrade-node`)?.getBoundingClientRect();
+        if (!tier || !node) return null;
+        return Math.abs((tier.left + tier.width / 2) - (node.left + node.width / 2));
+      };
+      return {
+        tier12: centerDelta('[data-infinity-panel="upgrades"] [data-tier="12"]'),
+        tier13: centerDelta('[data-infinity-panel="upgrades"] [data-tier="13"]'),
+      };
+    });
+    assert.ok(mobileUpgradeCenters.tier12 !== null && mobileUpgradeCenters.tier12 < 1, "mobile IU 12-1 should be centered");
+    assert.ok(mobileUpgradeCenters.tier13 !== null && mobileUpgradeCenters.tier13 < 1, "mobile IU 13-1 should be centered");
 
     const mobileInfiniteAngle = await mobilePage.evaluate(() => {
       const { state, unlockInfiniteAngle, switchMainTab, switchInfinitySubtab, applySetting } = window.__angleDebug;

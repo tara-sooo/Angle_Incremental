@@ -12,10 +12,18 @@ function generationCostPower() {
   return 1;
 }
 
+function towerChallengeGenerationScoreMultiplierLog10(value) {
+  return runtime.state.activeTowerChallenge === 2 ? value * 0.1 : value;
+}
+
+function towerChallengeGenerationCostFactor(value) {
+  return runtime.state.activeTowerChallenge === 2 ? Math.max(0.90, value) : value;
+}
+
 function generationCostFactorWithBonuses(rawCostFactor) {
   const upgradeFactor = runtime.hasInfinityUpgrade("3-2") ? runtime.applyInfinityUpgradePower(0.95) : 1;
   const achievementFactor = runtime.isAchievementUnlocked(20) ? 0.98 : 1;
-  return Math.pow(rawCostFactor, generationCostPower()) * upgradeFactor * achievementFactor;
+  return towerChallengeGenerationCostFactor(Math.pow(rawCostFactor, generationCostPower()) * upgradeFactor * achievementFactor);
 }
 
 function currentGenerationScoreMultiplierLog10() {
@@ -48,7 +56,8 @@ function applyGenerationAchievementReward(baseMultiplier) {
 
 function generationScoreMultiplierEffectLog10(includeAchievementReward = true) {
   const baseLog = generationScoreMultiplierBaseEffectLog10();
-  return includeAchievementReward ? applyGenerationAchievementRewardLog10(baseLog) : baseLog;
+  const effectLog = includeAchievementReward ? applyGenerationAchievementRewardLog10(baseLog) : baseLog;
+  return towerChallengeGenerationScoreMultiplierLog10(effectLog);
 }
 
 function generationScoreMultiplierEffect(includeAchievementReward = true) {
@@ -98,11 +107,15 @@ function nextGenerationValues() {
 
   const reward = generationRewardForLog(runtime.currentGenerationScoreLog10());
   const nextRawScoreMultiplierLog = reward.scoreMultiplierLog10;
-  const nextRawCostFactor = Math.max(runtime.GENERATION_MIN_NEW_COST_FACTOR, runtime.state.generationCostFactor * (1 - reward.costReduction));
+  const nextRawCostFactor = Math.max(
+    runtime.GENERATION_MIN_NEW_COST_FACTOR,
+    runtime.state.generationCostFactor * (1 - reward.costReduction),
+    runtime.state.activeTowerChallenge === 2 ? 0.90 : 0,
+  );
 
   return {
-    scoreMultiplier: runtime.valueFromLog10(applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog))),
-    scoreMultiplierLog10: applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog)),
+    scoreMultiplier: runtime.valueFromLog10(towerChallengeGenerationScoreMultiplierLog10(applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog)))),
+    scoreMultiplierLog10: towerChallengeGenerationScoreMultiplierLog10(applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog))),
     costFactor: generationCostFactorWithBonuses(nextRawCostFactor),
   };
 }
@@ -120,7 +133,11 @@ function runGeneration() {
   runtime.state.previousGenerationScore = runtime.valueFromLog10(generationScoreBeforeResetLog);
   runtime.state.generationScoreMultiplierLog10 = reward.scoreMultiplierLog10;
   runtime.state.generationScoreMultiplier = runtime.valueFromLog10(runtime.state.generationScoreMultiplierLog10);
-  runtime.state.generationCostFactor = Math.max(runtime.GENERATION_MIN_NEW_COST_FACTOR, nextCostFactor);
+  runtime.state.generationCostFactor = Math.max(
+    runtime.GENERATION_MIN_NEW_COST_FACTOR,
+    nextCostFactor,
+    runtime.state.activeTowerChallenge === 2 ? 0.90 : 0,
+  );
 
   runtime.state.score = 0;
   runtime.state.scoreLog10 = -Infinity;
@@ -144,6 +161,8 @@ function runGeneration() {
 
 expose("generationScorePower", () => generationScorePower, (value) => { generationScorePower = value; });
 expose("generationCostPower", () => generationCostPower, (value) => { generationCostPower = value; });
+expose("towerChallengeGenerationScoreMultiplierLog10", () => towerChallengeGenerationScoreMultiplierLog10);
+expose("towerChallengeGenerationCostFactor", () => towerChallengeGenerationCostFactor);
 expose("currentGenerationScoreMultiplierLog10", () => currentGenerationScoreMultiplierLog10, (value) => { currentGenerationScoreMultiplierLog10 = value; });
 expose("generationScoreMultiplierBaseEffectLog10", () => generationScoreMultiplierBaseEffectLog10, (value) => { generationScoreMultiplierBaseEffectLog10 = value; });
 expose("generationScoreMultiplierBaseEffect", () => generationScoreMultiplierBaseEffect, (value) => { generationScoreMultiplierBaseEffect = value; });
