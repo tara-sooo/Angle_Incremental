@@ -216,6 +216,50 @@ async function runSaveRecoveryModuleRuntimeTest() {
       "the valid pre-rollback checkpoint should remain available after reload",
     );
 
+    const mixedNow = Date.now();
+    const mixedHistory = [
+      {
+        appVersion: "0.9.0",
+        saveVersion: 10,
+        savedAt: mixedNow - 20 * 60 * 1000,
+        serverSavedAt: mixedNow - 20 * 60 * 1000,
+        backedUpAt: mixedNow - 20 * 60 * 1000,
+        reason: "periodic",
+        state: { score: 0, scoreLog10: -Infinity, generationCount: 0 },
+      },
+      {
+        appVersion: "0.9.0",
+        saveVersion: 10,
+        savedAt: mixedNow - 5 * 60 * 1000,
+        backedUpAt: mixedNow - 5 * 60 * 1000,
+        reason: "periodic",
+        state: { score: 0, scoreLog10: -Infinity, generationCount: 1 },
+      },
+    ];
+    const mixedInstance = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save-checkpoints", JSON.stringify(mixedHistory)],
+    ]));
+    const { debug: mixedDebug, runtime: mixedRuntime } = mixedInstance;
+    Object.defineProperty(mixedRuntime, "serverClockAvailable", {
+      configurable: true,
+      value: () => true,
+    });
+    Object.defineProperty(mixedRuntime, "serverClockNowMs", {
+      configurable: true,
+      value: () => mixedNow,
+    });
+    mixedDebug.state.generationCount = 2;
+    assert.equal(
+      mixedDebug.saveGame("auto"),
+      true,
+      "server clock recovery should preserve a recent local-only checkpoint",
+    );
+    assert.equal(
+      mixedDebug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic").length,
+      2,
+      "a mixed server/local checkpoint history should not rotate before ten minutes",
+    );
+
   }
 }
 

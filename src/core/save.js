@@ -92,7 +92,8 @@ function latestPeriodicCheckpoint(saveData, periodic) {
     : 0;
   const hasServerTimestamps = currentServerSavedAt > 0
     && periodic.some((entry) => entry.serverSavedAt > 0);
-  const timestampKey = hasServerTimestamps ? "serverSavedAt" : "savedAt";
+  const hasLocalOnlyEntries = periodic.some((entry) => entry.serverSavedAt <= 0);
+  const timestampKey = hasServerTimestamps && !hasLocalOnlyEntries ? "serverSavedAt" : "savedAt";
   const currentTimestamp = timestampKey === "serverSavedAt" ? currentServerSavedAt : saveData.savedAt;
   const timestamped = periodic.filter((entry) => entry[timestampKey] > 0);
   const eligible = timestamped.filter((entry) => entry[timestampKey] <= currentTimestamp);
