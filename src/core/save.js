@@ -86,6 +86,23 @@ function writeRecoveryEntry(key, entry) {
   recoveryRevision += 1;
 }
 
+function latestPeriodicCheckpoint(saveData, periodic) {
+  const currentServerSavedAt = runtime.serverClockAvailable?.() && saveData.serverSavedAt > 0
+    ? saveData.serverSavedAt
+    : 0;
+  const hasServerTimestamps = currentServerSavedAt > 0
+    && periodic.some((entry) => entry.serverSavedAt > 0);
+  const timestampKey = hasServerTimestamps ? "serverSavedAt" : "savedAt";
+  const currentTimestamp = timestampKey === "serverSavedAt" ? currentServerSavedAt : saveData.savedAt;
+  const timestamped = periodic.filter((entry) => entry[timestampKey] > 0);
+  const eligible = timestamped.filter((entry) => entry[timestampKey] <= currentTimestamp);
+  const candidates = eligible.length > 0 ? eligible : timestamped;
+  return candidates.reduce((latest, entry) => {
+    if (!latest || entry[timestampKey] > latest[timestampKey]) return entry;
+    return latest;
+  }, null);
+}
+
 function periodicCheckpointDue(saveData, latestPeriodic) {
   const monotonicNow = runtime.monotonicClockNowMs?.();
   if (
@@ -124,11 +141,12 @@ function createCheckpoint(reason = "periodic", options = {}) {
     const periodic = entries
       .filter((entry) => entry.reason === "periodic")
       .sort((left, right) => right.savedAt - left.savedAt);
+    const latestPeriodic = latestPeriodicCheckpoint(saveData, periodic);
     if (
       reason === "periodic"
       && !options.force
-      && periodic[0]
-      && !periodicCheckpointDue(saveData, periodic[0])
+      && latestPeriodic
+      && !periodicCheckpointDue(saveData, latestPeriodic)
     ) {
       return true;
     }

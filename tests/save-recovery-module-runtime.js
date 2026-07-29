@@ -185,7 +185,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     const instance = await loadRuntime(candidatePath, new Map([
       ["angle-incremental-save-checkpoints", JSON.stringify([futureCheckpoint])],
     ]));
-    const { debug } = instance;
+    const { debug, storage } = instance;
     debug.state.generationCount = 1;
     assert.equal(debug.saveGame("auto"), true, "a clock rollback should still allow one periodic checkpoint");
     const firstPeriodic = debug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic");
@@ -194,6 +194,27 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(debug.saveGame("auto"), true, "repeated autosaves should remain successful during a clock anomaly");
     const secondPeriodic = debug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic");
     assert.equal(secondPeriodic.length, 2, "the monotonic guard should prevent rapid checkpoint rotation");
+
+    const reloadedInstance = await loadRuntime(candidatePath, new Map(storage));
+    const { debug: reloadedDebug } = reloadedInstance;
+    reloadedDebug.state.generationCount = 3;
+    assert.equal(
+      reloadedDebug.saveGame("auto"),
+      true,
+      "a reload after a clock rollback should still allow autosaves",
+    );
+    const afterReloadPeriodic = reloadedDebug.recoveryEntries().checkpoints
+      .filter((entry) => entry.reason === "periodic");
+    assert.equal(
+      afterReloadPeriodic.length,
+      2,
+      "a stale future checkpoint must not trigger rotation on every post-reload autosave",
+    );
+    assert.equal(
+      afterReloadPeriodic.some((entry) => entry.state.generationCount === 1),
+      true,
+      "the valid pre-rollback checkpoint should remain available after reload",
+    );
 
   }
 }
