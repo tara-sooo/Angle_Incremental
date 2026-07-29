@@ -265,7 +265,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
         appVersion: "0.9.0",
         saveVersion: 10,
         savedAt: mixedNow - 20 * 60 * 1000,
-        serverSavedAt: mixedNow + 60 * 60 * 1000,
+        serverSavedAt: mixedNow - 20 * 60 * 1000,
         backedUpAt: mixedNow - 20 * 60 * 1000,
         reason: "periodic",
         state: { score: 0, scoreLog10: -Infinity, generationCount: 0 },
@@ -273,10 +273,19 @@ async function runSaveRecoveryModuleRuntimeTest() {
       {
         appVersion: "0.9.0",
         saveVersion: 10,
+        savedAt: mixedNow - 15 * 60 * 1000,
+        serverSavedAt: mixedNow + 60 * 60 * 1000,
+        backedUpAt: mixedNow - 15 * 60 * 1000,
+        reason: "periodic",
+        state: { score: 0, scoreLog10: -Infinity, generationCount: 1 },
+      },
+      {
+        appVersion: "0.9.0",
+        saveVersion: 10,
         savedAt: mixedNow - 5 * 60 * 1000,
         backedUpAt: mixedNow - 5 * 60 * 1000,
         reason: "periodic",
-        state: { score: 0, scoreLog10: -Infinity, generationCount: 1 },
+        state: { score: 0, scoreLog10: -Infinity, generationCount: 2 },
       },
     ];
     const serverRollbackInstance = await loadRuntime(candidatePath, new Map([
@@ -291,12 +300,17 @@ async function runSaveRecoveryModuleRuntimeTest() {
       configurable: true,
       value: () => mixedNow,
     });
-    serverRollbackDebug.state.generationCount = 2;
+    serverRollbackDebug.state.generationCount = 3;
     assert.equal(serverRollbackDebug.saveGame("auto"), true, "a server clock rollback should create a checkpoint in a mixed history");
     assert.equal(
       serverRollbackDebug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic").length,
       3,
-      "a future server checkpoint should remain detectable despite a recent local-only checkpoint",
+      "a future server checkpoint should remain detectable alongside an eligible server entry and recent local-only checkpoint",
+    );
+    assert.equal(
+      serverRollbackDebug.recoveryEntries().checkpoints.some((entry) => entry.state.generationCount === 3),
+      true,
+      "server rollback handling should retain the newly created checkpoint after rotation",
     );
 
     const reloadedServerRollback = await loadRuntime(candidatePath, new Map(serverRollbackStorage));
@@ -309,7 +323,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       configurable: true,
       value: () => mixedNow,
     });
-    reloadedServerRollbackDebug.state.generationCount = 3;
+    reloadedServerRollbackDebug.state.generationCount = 4;
     assert.equal(reloadedServerRollbackDebug.saveGame("auto"), true, "a recovered server clock should remain throttled after reload");
     assert.equal(
       reloadedServerRollbackDebug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic").length,

@@ -108,16 +108,16 @@ function latestPeriodicCheckpoint(saveData, periodic) {
   return latestCheckpointAtTimestamp(periodic, timestampKey, currentTimestamp);
 }
 
-function latestServerPeriodicCheckpoint(saveData, periodic) {
-  if (!runtime.serverClockAvailable?.() || saveData.serverSavedAt <= 0) return null;
-  return latestCheckpointAtTimestamp(
-    periodic.filter((entry) => entry.serverSavedAt > 0),
-    "serverSavedAt",
-    saveData.serverSavedAt,
-  );
+function serverPeriodicCheckpointState(saveData, periodic) {
+  if (!runtime.serverClockAvailable?.() || saveData.serverSavedAt <= 0) {
+    return { hasFuture: false };
+  }
+  return {
+    hasFuture: periodic.some((entry) => entry.serverSavedAt > saveData.serverSavedAt),
+  };
 }
 
-function periodicCheckpointDue(saveData, latestPeriodic, latestServerPeriodic) {
+function periodicCheckpointDue(saveData, latestPeriodic, serverPeriodicState) {
   const monotonicNow = runtime.monotonicClockNowMs?.();
   if (
     Number.isFinite(monotonicNow)
@@ -127,10 +127,10 @@ function periodicCheckpointDue(saveData, latestPeriodic, latestServerPeriodic) {
     return false;
   }
 
-  if (
-    latestServerPeriodic
-    && latestServerPeriodic.serverSavedAt > saveData.serverSavedAt
-  ) {
+  const recentServerCheckpoint = latestPeriodic?.serverSavedAt > 0
+    && latestPeriodic.serverSavedAt <= saveData.serverSavedAt
+    && saveData.serverSavedAt - latestPeriodic.serverSavedAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS;
+  if (serverPeriodicState?.hasFuture && !recentServerCheckpoint) {
     return true;
   }
 
@@ -163,12 +163,12 @@ function createCheckpoint(reason = "periodic", options = {}) {
       .filter((entry) => entry.reason === "periodic")
       .sort((left, right) => right.savedAt - left.savedAt);
     const latestPeriodic = latestPeriodicCheckpoint(saveData, periodic);
-    const latestServerPeriodic = latestServerPeriodicCheckpoint(saveData, periodic);
+    const serverPeriodicState = serverPeriodicCheckpointState(saveData, periodic);
     if (
       reason === "periodic"
       && !options.force
       && latestPeriodic
-      && !periodicCheckpointDue(saveData, latestPeriodic, latestServerPeriodic)
+      && !periodicCheckpointDue(saveData, latestPeriodic, serverPeriodicState)
     ) {
       return true;
     }
