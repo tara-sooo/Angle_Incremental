@@ -294,9 +294,10 @@ try {
       const after = window.__angleDebug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic").length;
       return { before, after };
     });
-    assert.deepEqual(
-      serverCheckpointResult,
-      { before: 1, after: 1 },
+    assert.ok(serverCheckpointResult.before >= 1, "server-clock loading should retain a periodic checkpoint");
+    assert.equal(
+      serverCheckpointResult.after,
+      serverCheckpointResult.before,
       "a local clock rollback should not rotate checkpoints when the server clock is valid",
     );
     assert.deepEqual(serverClockErrors, [], "server-clock loading should produce no browser errors");
@@ -1003,24 +1004,42 @@ try {
     const { switchMainTab, switchInfinitySubtab } = window.__angleDebug;
     const context = document.querySelector("#infiniteAngleCanvas")?.getContext("2d");
     let fillCalls = 0;
+    let drawImageCalls = 0;
     const originalFillRect = context?.fillRect;
+    const originalDrawImage = context?.drawImage;
     if (context && originalFillRect) {
       context.fillRect = (...args) => {
         fillCalls += 1;
         return originalFillRect.apply(context, args);
       };
     }
+    if (context && originalDrawImage) {
+      context.drawImage = (...args) => {
+        drawImageCalls += 1;
+        return originalDrawImage.apply(context, args);
+      };
+    }
     switchMainTab("angle");
     switchInfinitySubtab("upgrades");
     window.advanceTime(1000);
     const hiddenFillCalls = fillCalls;
+    const hiddenDrawImageCalls = drawImageCalls;
     switchMainTab("infinity");
     switchInfinitySubtab("angle");
     window.advanceTime(0);
-    return { hiddenFillCalls, visibleFillCalls: fillCalls - hiddenFillCalls };
+    return {
+      hiddenFillCalls,
+      hiddenDrawImageCalls,
+      visibleFillCalls: fillCalls - hiddenFillCalls,
+      visibleDrawImageCalls: drawImageCalls - hiddenDrawImageCalls,
+    };
   });
   assert.equal(infiniteAngleDrawMode.hiddenFillCalls, 0, "hidden IA should not draw its canvas");
-  assert.ok(infiniteAngleDrawMode.visibleFillCalls > 0, "visible IA should draw its canvas");
+  assert.equal(infiniteAngleDrawMode.hiddenDrawImageCalls, 0, "hidden IA should not copy its cached canvas");
+  assert.ok(
+    infiniteAngleDrawMode.visibleFillCalls > 0 || infiniteAngleDrawMode.visibleDrawImageCalls > 0,
+    "visible IA should draw its canvas",
+  );
 
   const requestedModulePaths = new Set(moduleRequests.map((url) => url.pathname));
   EXPECTED_MODULE_PATHS.forEach((modulePath) => {

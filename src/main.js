@@ -39,6 +39,12 @@ let activeStatisticsSubtab = "overview";
 let selectedInfinityUpgradeId = "1-1";
 let appliedLanguage = "";
 let smoothedFps = 0;
+let renderQualityLevel = "high";
+let renderQualityOverride = "";
+let renderCostEma = 0;
+let renderPressureFrames = 0;
+let renderRecoveryFrames = 0;
+let lastRenderedFrameAt = -Infinity;
 let offlineBaselineTimestamp = Date.now();
 let offlineBaselineServerTimestamp = 0;
 let offlineProcessing = false;
@@ -59,6 +65,12 @@ let localClockAnchor = null;
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
+
+const RENDER_QUALITY_PROFILES = Object.freeze({
+  high: Object.freeze({ devicePixelRatio: 2, vertexLimit: 720, frameIntervalMs: 0 }),
+  balanced: Object.freeze({ devicePixelRatio: 1.5, vertexLimit: 360, frameIntervalMs: 1000 / 30 }),
+  low: Object.freeze({ devicePixelRatio: 1, vertexLimit: 180, frameIntervalMs: 1000 / 30 }),
+});
 
 const baseUpdateUi = runtime.updateUi;
 const baseSaveGame = runtime.saveGame;
@@ -124,6 +136,112 @@ function runSimulationBatch(callback) {
 function monotonicClockNow() {
   const performanceApi = window.performance;
   return performanceApi && typeof performanceApi.now === "function" ? performanceApi.now() : Date.now();
+}
+
+function renderQualityProfile() {
+  return RENDER_QUALITY_PROFILES[renderQualityOverride || renderQualityLevel] || RENDER_QUALITY_PROFILES.high;
+}
+
+function renderVertexLimit() {
+  return renderQualityProfile().vertexLimit;
+}
+
+function renderDevicePixelRatio() {
+  return Math.min(window.devicePixelRatio || 1, renderQualityProfile().devicePixelRatio);
+}
+
+function renderFrameIntervalMs() {
+  return renderQualityProfile().frameIntervalMs;
+}
+
+function resetRenderQualityCounters() {
+  renderCostEma = 0;
+  renderPressureFrames = 0;
+  renderRecoveryFrames = 0;
+  lastRenderedFrameAt = -Infinity;
+}
+
+function setRenderQualityLevel(level) {
+  if (!RENDER_QUALITY_PROFILES[level] || level === renderQualityLevel) return false;
+  renderQualityLevel = level;
+  resetRenderQualityCounters();
+  if (runtime.resizeCanvas) runtime.resizeCanvas();
+  if (runtime.resizeInfiniteAngleCanvas) runtime.resizeInfiniteAngleCanvas();
+  return true;
+}
+
+function updateRenderQuality(renderCostMs) {
+  if (renderQualityOverride) return;
+  renderCostEma = renderCostEma === 0
+    ? renderCostMs
+    : renderCostEma * 0.9 + renderCostMs * 0.1;
+  const pressured = (smoothedFps > 0 && smoothedFps < 45) || renderCostEma > 20;
+  if (pressured) {
+    renderPressureFrames += 1;
+    renderRecoveryFrames = 0;
+    if (renderPressureFrames >= 30) {
+      if (renderQualityLevel === "high") setRenderQualityLevel("balanced");
+      else if (renderQualityLevel === "balanced") setRenderQualityLevel("low");
+    }
+    return;
+  }
+  renderPressureFrames = 0;
+  if (smoothedFps > 55 && renderCostEma < 12) {
+    renderRecoveryFrames += 1;
+    if (renderRecoveryFrames >= 120) {
+      if (renderQualityLevel === "low") setRenderQualityLevel("balanced");
+      else if (renderQualityLevel === "balanced") setRenderQualityLevel("high");
+    }
+  } else {
+    renderRecoveryFrames = 0;
+  }
+}
+
+function shouldRenderFrame(now) {
+  const interval = renderFrameIntervalMs();
+  if (interval <= 0 || now - lastRenderedFrameAt >= interval) {
+    lastRenderedFrameAt = now;
+    return true;
+  }
+  return false;
+}
+
+function renderQualityState() {
+  const profile = renderQualityProfile();
+  return {
+    level: renderQualityOverride || renderQualityLevel,
+    automaticLevel: renderQualityLevel,
+    devicePixelRatio: profile.devicePixelRatio,
+    vertexLimit: profile.vertexLimit,
+    frameIntervalMs: profile.frameIntervalMs,
+    renderCostEma,
+  };
+}
+
+function setRenderQualityForTest(level) {
+  if (level === "auto") {
+    renderQualityOverride = "";
+    renderQualityLevel = "high";
+    resetRenderQualityCounters();
+    if (runtime.resizeCanvas) runtime.resizeCanvas();
+    if (runtime.resizeInfiniteAngleCanvas) runtime.resizeInfiniteAngleCanvas();
+    return true;
+  }
+  if (!RENDER_QUALITY_PROFILES[level]) return false;
+  renderQualityOverride = level;
+  renderQualityLevel = level;
+  resetRenderQualityCounters();
+  if (runtime.resizeCanvas) runtime.resizeCanvas();
+  if (runtime.resizeInfiniteAngleCanvas) runtime.resizeInfiniteAngleCanvas();
+  return true;
+}
+
+function updateRenderQualityForTest(renderCostMs, fps) {
+  const previousFps = smoothedFps;
+  if (Number.isFinite(fps)) smoothedFps = fps;
+  updateRenderQuality(renderCostMs);
+  smoothedFps = previousFps;
+  return renderQualityState();
 }
 
 function localClockNow() {
@@ -680,7 +798,11 @@ function frame(now) {
     uiUpdateElapsed %= runtime.UI_UPDATE_INTERVAL_SECONDS;
     runtime.updateUi();
   }
-  drawActiveView();
+  const renderStartedAt = monotonicClockNow();
+  if (shouldRenderFrame(now)) {
+    drawActiveView();
+    updateRenderQuality(Math.max(0, monotonicClockNow() - renderStartedAt));
+  }
   requestNextFrame(frame);
 }
 
@@ -947,6 +1069,11 @@ expose("activeStatisticsSubtab", () => activeStatisticsSubtab, (value) => { acti
 expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => { selectedInfinityUpgradeId = value; });
 expose("appliedLanguage", () => appliedLanguage, (value) => { appliedLanguage = value; });
 expose("smoothedFps", () => smoothedFps, (value) => { smoothedFps = value; });
+expose("renderQualityState", () => renderQualityState);
+expose("renderVertexLimit", () => renderVertexLimit);
+expose("renderDevicePixelRatio", () => renderDevicePixelRatio);
+expose("renderFrameIntervalMs", () => renderFrameIntervalMs);
+expose("setRenderQualityForTest", () => setRenderQualityForTest);
 expose("offlineBaselineTimestamp", () => offlineBaselineTimestamp, (value) => { offlineBaselineTimestamp = value; });
 expose("offlineBaselineServerTimestamp", () => offlineBaselineServerTimestamp, (value) => { offlineBaselineServerTimestamp = value; });
 expose("offlineProcessing", () => offlineProcessing, (value) => { offlineProcessing = value; });
@@ -1035,6 +1162,10 @@ window.__angleDebug = {
   completeChallengeIfReady: runtime.completeChallengeIfReady,
   syncServerClock,
   offlineElapsedFromSave,
+  renderQualityState,
+  setRenderQualityForTest,
+  updateRenderQualityForTest,
+  canvasCacheStats: runtime.canvasCacheStats,
   serverClockAvailable,
   serverClockNowMs: trustedClockNowMs,
   serverClockSource: () => serverClockSource,

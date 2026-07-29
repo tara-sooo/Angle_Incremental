@@ -2,6 +2,67 @@ import { runtime, expose } from "../runtime/shared.js";
 
 // Canvas drawing and resize behavior live here so the composition root only schedules frames.
 
+function createCanvasCache() {
+  return {
+    layer: null,
+    layerCtx: null,
+    signature: "",
+    width: 0,
+    height: 0,
+    cssHeight: 0,
+    geometry: null,
+    compact: false,
+    buildCount: 0,
+  };
+}
+
+const angleCache = createCanvasCache();
+const infiniteAngleCache = createCanvasCache();
+
+function renderVertexLimit() {
+  return runtime.renderVertexLimit ? runtime.renderVertexLimit() : runtime.MAX_DRAW_VERTICES;
+}
+
+function ensureCacheLayer(cache) {
+  if (cache.layer && cache.layerCtx) return true;
+  if (typeof document === "undefined" || typeof document.createElement !== "function") return false;
+  const layer = document.createElement("canvas");
+  const layerCtx = layer.getContext?.("2d");
+  if (!layerCtx) return false;
+  cache.layer = layer;
+  cache.layerCtx = layerCtx;
+  return true;
+}
+
+function cacheMetrics(cache, canvas, rect = null, compactThreshold = 260) {
+  const cssHeight = Number.isFinite(rect?.height) && rect.height > 0
+    ? rect.height
+    : cache.cssHeight > 0 ? cache.cssHeight : canvas.height;
+  if (
+    cache.width !== canvas.width
+    || cache.height !== canvas.height
+    || !cache.geometry
+  ) {
+    cache.width = canvas.width;
+    cache.height = canvas.height;
+    cache.geometry = canvasGeometry(canvas);
+  }
+  cache.cssHeight = cssHeight;
+  cache.compact = cssHeight < compactThreshold;
+}
+
+function cacheSignature(cache, canvas, vertices, canDrawJapanese) {
+  return [
+    canvas.width,
+    canvas.height,
+    vertices,
+    renderVertexLimit(),
+    runtime.state.language,
+    canDrawJapanese,
+    cache.compact,
+  ].join("|");
+}
+
 function canvasGeometry(canvas = runtime.canvas) {
   const width = canvas.width;
   const height = canvas.height;
@@ -23,7 +84,7 @@ function vertexPoint(index, total = runtime.effectiveVertexCount(), geometry = c
 }
 
 function polygonPoints(vertices = runtime.effectiveVertexCount(), geometry = canvasGeometry()) {
-  const drawCount = Math.min(vertices, runtime.MAX_DRAW_VERTICES);
+  const drawCount = Math.min(vertices, renderVertexLimit());
   return Array.from(
     { length: drawCount },
     (_, index) => vertexPoint((index / drawCount) * vertices, vertices, geometry),
@@ -66,44 +127,109 @@ function drawBackground() {
   drawBackgroundFor(runtime.ctx, runtime.canvas);
 }
 
-function draw() {
-  drawBackground();
-  const vertices = runtime.effectiveVertexCount();
-  const geometry = canvasGeometry();
+function drawStaticFigure(ctx, vertices, geometry, canDrawJapanese, options) {
   const points = polygonPoints(vertices, geometry);
-  const point = pointPosition(vertices, geometry);
   const corePoint = vertexPoint(0, vertices, geometry);
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  points.forEach((p, index) => {
+    if (index === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.closePath();
+  ctx.fillStyle = options.polygonFill;
+  ctx.fill();
+  ctx.strokeStyle = options.polygonStroke;
+  ctx.lineWidth = options.polygonLineWidth;
+  ctx.stroke();
+
+  points.forEach((p, index) => {
+    if (vertices > renderVertexLimit() && index % 12 !== 0) return;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, options.vertexRadius, 0, runtime.TAU);
+    ctx.fillStyle = options.vertexFill;
+    ctx.fill();
+  });
+
+  ctx.beginPath();
+  ctx.arc(corePoint.x, corePoint.y, options.coreRadius, 0, runtime.TAU);
+  ctx.fillStyle = "#ff7659";
+  ctx.fill();
+
+  ctx.textAlign = "center";
+  if (canDrawJapanese) {
+    ctx.font = options.coreFont;
+    ctx.fillStyle = "#eef4ff";
+    ctx.fillText(runtime.t("core"), corePoint.x, corePoint.y - options.coreLabelOffset);
+  }
+  ctx.restore();
+}
+
+function prepareCanvas(cache, canvas, ctx, vertices, canDrawJapanese, compactThreshold, options) {
+  cacheMetrics(cache, canvas, null, compactThreshold);
+  const signature = cacheSignature(cache, canvas, vertices, canDrawJapanese);
+  const canUseCache = ensureCacheLayer(cache);
+  if (canUseCache && cache.signature !== signature) {
+    cache.layer.width = canvas.width;
+    cache.layer.height = canvas.height;
+    cache.layerCtx.setTransform(1, 0, 0, 1, 0, 0);
+    drawBackgroundFor(cache.layerCtx, cache.layer);
+    drawStaticFigure(cache.layerCtx, vertices, cache.geometry, canDrawJapanese, options);
+    cache.signature = signature;
+    cache.buildCount += 1;
+  }
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (canUseCache) {
+    ctx.drawImage(cache.layer, 0, 0);
+    return true;
+  }
+  drawBackgroundFor(ctx, canvas);
+  drawStaticFigure(ctx, vertices, cache.geometry, canDrawJapanese, options);
+  return false;
+}
+
+const ANGLE_STATIC_OPTIONS = Object.freeze({
+  polygonFill: "rgba(84, 130, 206, 0.16)",
+  polygonStroke: "#dbe7ff",
+  polygonLineWidth: 5,
+  vertexRadius: 5,
+  vertexFill: "#55d5ee",
+  coreRadius: 11,
+  coreFont: "700 16px 'Noto Sans JP', sans-serif",
+  coreLabelOffset: 22,
+});
+
+const INFINITE_ANGLE_STATIC_OPTIONS = Object.freeze({
+  polygonFill: "rgba(124, 91, 206, 0.20)",
+  polygonStroke: "#e4d8ff",
+  polygonLineWidth: 4,
+  vertexRadius: 4,
+  vertexFill: "#c4a7ff",
+  coreRadius: 10,
+  coreFont: "700 14px 'Noto Sans JP', sans-serif",
+  coreLabelOffset: 20,
+});
+
+function draw() {
+  const vertices = runtime.effectiveVertexCount();
   const canDrawJapanese = runtime.japaneseFontReady || !document.fonts;
-  const compactCanvas = runtime.canvas.getBoundingClientRect().height < 260;
+  prepareCanvas(
+    angleCache,
+    runtime.canvas,
+    runtime.ctx,
+    vertices,
+    canDrawJapanese,
+    260,
+    ANGLE_STATIC_OPTIONS,
+  );
+  const compactCanvas = angleCache.compact;
+  const geometry = angleCache.geometry;
+  const point = pointPosition(vertices, geometry);
 
   runtime.ctx.save();
-  runtime.ctx.lineJoin = "round";
-  runtime.ctx.lineCap = "round";
-  runtime.ctx.beginPath();
-  points.forEach((p, index) => {
-    if (index === 0) runtime.ctx.moveTo(p.x, p.y);
-    else runtime.ctx.lineTo(p.x, p.y);
-  });
-  runtime.ctx.closePath();
-  runtime.ctx.fillStyle = "rgba(84, 130, 206, 0.16)";
-  runtime.ctx.fill();
-  runtime.ctx.strokeStyle = "#dbe7ff";
-  runtime.ctx.lineWidth = 5;
-  runtime.ctx.stroke();
-
-  points.forEach((p, index) => {
-    if (vertices > runtime.MAX_DRAW_VERTICES && index % 12 !== 0) return;
-    runtime.ctx.beginPath();
-    runtime.ctx.arc(p.x, p.y, 5, 0, runtime.TAU);
-    runtime.ctx.fillStyle = "#55d5ee";
-    runtime.ctx.fill();
-  });
-
-  runtime.ctx.beginPath();
-  runtime.ctx.arc(corePoint.x, corePoint.y, 11, 0, runtime.TAU);
-  runtime.ctx.fillStyle = "#ff7659";
-  runtime.ctx.fill();
-
   runtime.ctx.beginPath();
   runtime.ctx.arc(point.x, point.y, 10, 0, runtime.TAU);
   runtime.ctx.fillStyle = "#f2b84b";
@@ -113,12 +239,6 @@ function draw() {
   runtime.ctx.stroke();
 
   runtime.ctx.textAlign = "center";
-  if (canDrawJapanese) {
-    runtime.ctx.font = "700 16px 'Noto Sans JP', sans-serif";
-    runtime.ctx.fillStyle = "#eef4ff";
-    runtime.ctx.fillText(runtime.t("core"), corePoint.x, corePoint.y - 22);
-  }
-
   if (!compactCanvas) {
     runtime.ctx.font = "800 28px 'Noto Sans JP', sans-serif";
     runtime.ctx.fillStyle = "#f2b84b";
@@ -148,9 +268,10 @@ function draw() {
 
 function resizeCanvas() {
   const rect = runtime.canvas.getBoundingClientRect();
-  const scale = window.devicePixelRatio || 1;
+  const scale = runtime.renderDevicePixelRatio ? runtime.renderDevicePixelRatio() : Math.min(window.devicePixelRatio || 1, 2);
   const width = Math.max(1, Math.floor(rect.width * scale));
   const height = Math.max(1, Math.floor(rect.height * scale));
+  cacheMetrics(angleCache, runtime.canvas, rect, 260);
   if (runtime.canvas.width === width && runtime.canvas.height === height) {
     draw();
     return;
@@ -171,47 +292,28 @@ function drawInfiniteAngle() {
     || runtime.activeInfinitySubtab !== "angle"
   ) return;
   if (!runtime.state.infiniteAngleUnlocked) {
+    cacheMetrics(infiniteAngleCache, canvas, null, 180);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackgroundFor(ctx, canvas);
     return;
   }
 
-  drawBackgroundFor(ctx, canvas);
   const vertices = runtime.infiniteAngleVertexCount();
-  const geometry = canvasGeometry(canvas);
-  const points = polygonPoints(vertices, geometry);
-  const point = pointPosition(vertices, geometry, runtime.state.infiniteAnglePointProgress);
-  const corePoint = vertexPoint(0, vertices, geometry);
   const canDrawJapanese = runtime.japaneseFontReady || !document.fonts;
-  const compactCanvas = canvas.getBoundingClientRect().height < 180;
+  prepareCanvas(
+    infiniteAngleCache,
+    canvas,
+    ctx,
+    vertices,
+    canDrawJapanese,
+    180,
+    INFINITE_ANGLE_STATIC_OPTIONS,
+  );
+  const compactCanvas = infiniteAngleCache.compact;
+  const geometry = infiniteAngleCache.geometry;
+  const point = pointPosition(vertices, geometry, runtime.state.infiniteAnglePointProgress);
 
   ctx.save();
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  points.forEach((p, index) => {
-    if (index === 0) ctx.moveTo(p.x, p.y);
-    else ctx.lineTo(p.x, p.y);
-  });
-  ctx.closePath();
-  ctx.fillStyle = "rgba(124, 91, 206, 0.20)";
-  ctx.fill();
-  ctx.strokeStyle = "#e4d8ff";
-  ctx.lineWidth = 4;
-  ctx.stroke();
-
-  points.forEach((p, index) => {
-    if (vertices > runtime.MAX_DRAW_VERTICES && index % 12 !== 0) return;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 4, 0, runtime.TAU);
-    ctx.fillStyle = "#c4a7ff";
-    ctx.fill();
-  });
-
-  ctx.beginPath();
-  ctx.arc(corePoint.x, corePoint.y, 10, 0, runtime.TAU);
-  ctx.fillStyle = "#ff7659";
-  ctx.fill();
-
   ctx.beginPath();
   ctx.arc(point.x, point.y, 9, 0, runtime.TAU);
   ctx.fillStyle = "#f2b84b";
@@ -221,11 +323,6 @@ function drawInfiniteAngle() {
   ctx.stroke();
 
   ctx.textAlign = "center";
-  if (canDrawJapanese) {
-    ctx.font = "700 14px 'Noto Sans JP', sans-serif";
-    ctx.fillStyle = "#eef4ff";
-    ctx.fillText(runtime.t("core"), corePoint.x, corePoint.y - 20);
-  }
 
   if (!compactCanvas) {
     ctx.font = "800 24px 'Noto Sans JP', sans-serif";
@@ -245,9 +342,10 @@ function resizeInfiniteAngleCanvas() {
   const ctx = runtime.infiniteAngleCtx;
   if (!canvas || !ctx) return;
   const rect = canvas.getBoundingClientRect();
-  const scale = window.devicePixelRatio || 1;
+  const scale = runtime.renderDevicePixelRatio ? runtime.renderDevicePixelRatio() : Math.min(window.devicePixelRatio || 1, 2);
   const width = Math.max(1, Math.floor(rect.width * scale));
   const height = Math.max(1, Math.floor(rect.height * scale));
+  cacheMetrics(infiniteAngleCache, canvas, rect, 180);
   if (canvas.width === width && canvas.height === height) {
     drawInfiniteAngle();
     return;
@@ -257,6 +355,13 @@ function resizeInfiniteAngleCanvas() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawInfiniteAngle();
 }
+
+function canvasCacheStats() {
+  return {
+    angleBuilds: angleCache.buildCount,
+    infiniteAngleBuilds: infiniteAngleCache.buildCount,
+  };
+}
 expose("vertexPoint", () => vertexPoint, (value) => { vertexPoint = value; });
 expose("polygonPoints", () => polygonPoints, (value) => { polygonPoints = value; });
 expose("pointPosition", () => pointPosition, (value) => { pointPosition = value; });
@@ -265,3 +370,4 @@ expose("draw", () => draw, (value) => { draw = value; });
 expose("resizeCanvas", () => resizeCanvas, (value) => { resizeCanvas = value; });
 expose("drawInfiniteAngle", () => drawInfiniteAngle, (value) => { drawInfiniteAngle = value; });
 expose("resizeInfiniteAngleCanvas", () => resizeInfiniteAngleCanvas, (value) => { resizeInfiniteAngleCanvas = value; });
+expose("canvasCacheStats", () => canvasCacheStats);
