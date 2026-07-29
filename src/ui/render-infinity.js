@@ -18,6 +18,7 @@ function createInfinityUpgradeRows() {
     ["10-1", "10-2"],
     ["11-1", "11-2"],
     ["12-1"],
+    ["13-1"],
   ];
 
   upgradeRows.forEach((rowIds, rowIndex) => {

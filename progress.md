@@ -110,6 +110,11 @@ Original prompt: では、中核ループを完成させてください
 - Prepared the 0.8.3 release candidate: offline rewards prefer the same-origin HTTP Date header, cap trusted away time at seven days, suppress inconsistent timestamps, and preserve SAVE_VERSION 10 compatibility.
 - Fixed x60 Time Flux auto-Infinity lag by batching UI refreshes and saves per online simulation batch without changing progression.
 - Fixed achievement unlocks being lost or evaluated against transient Generation state during automated resets.
+- Added next-release save recovery: valid save-code imports now preserve the immediately previous save, and Settings can restore it or undo a restore; periodic, update-before-reload, reset-before-action, and permanent-progression checkpoints retain recoverable save generations.
+- Added IU 13-1 and implemented Tower Challenge 1/2: TC1 blocks normal upgrades and clears at 1e308 with a dedicated reset, while TC2 seals Core Boost and applies the GR restrictions through 1e1300; TC3/TC4 remain placeholders.
+- Made cleared Tower Challenges replayable: permanent rewards remain first-clear-only, TC1 replays use its dedicated reset, and TC2 replays retain normal Infinity rewards.
+- Centered IU 12-1 and 13-1 in the Infinity Upgrade tree and added Statistics sub-tabs with persistent fastest game-time records for all IC and TC entries.
+- Prepared the 0.9.0 release candidate with save recovery checkpoints, IU 13-1, Tower Challenges 1/2 and replay support, persistent IC/TC fastest clear times, and invalid-challenge timer cleanup while keeping SAVE_VERSION 10 unchanged; TC3/TC4 remain deferred.
 
 ## TODO
 

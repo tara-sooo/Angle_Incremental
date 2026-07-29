@@ -143,6 +143,7 @@ function resetInfiniteAnglePosition() {
 
 function unlockInfiniteAngle() {
   if (!canUnlockInfiniteAngle()) return false;
+  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-infinite-angle", { force: true })) return false;
   if (!runtime.spendInfinityPoints(infiniteAngleUnlockCostLog10())) return false;
   runtime.state.infiniteAngleUnlocked = true;
   resetInfiniteAngleRun();
@@ -218,10 +219,14 @@ function buyAllInfiniteAngleUpgrades(options = {}) {
   return purchases;
 }
 
+function infiniteAngleScorePower() {
+  return runtime.hasInfinityUpgrade("13-1") ? 0.5 : runtime.INFINITE_ANGLE_SCORE_POWER;
+}
+
 function infiniteAngleBoostLog10() {
   const scoreLog10 = runtime.currentInfiniteScoreLog10();
   if (scoreLog10 === -Infinity) return 0;
-  return runtime.clampLog10(Math.max(0, scoreLog10 * runtime.INFINITE_ANGLE_SCORE_POWER));
+  return runtime.clampLog10(Math.max(0, scoreLog10 * infiniteAngleScorePower()));
 }
 
 function infiniteAngleBoost() {
@@ -327,5 +332,6 @@ expose("buyInfiniteAngleUpgrade", () => buyInfiniteAngleUpgrade);
 expose("buyAllInfiniteAngleUpgrades", () => buyAllInfiniteAngleUpgrades);
 expose("infiniteAngleBoostLog10", () => infiniteAngleBoostLog10);
 expose("infiniteAngleBoost", () => infiniteAngleBoost);
+expose("infiniteAngleScorePower", () => infiniteAngleScorePower);
 expose("resetInfiniteAngleRun", () => resetInfiniteAngleRun);
 expose("updateInfiniteAngle", () => updateInfiniteAngle);

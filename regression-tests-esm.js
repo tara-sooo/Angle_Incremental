@@ -11,6 +11,7 @@ async function main() {
   await require("./tests/new-infinity-upgrades-module-runtime.js").runNewInfinityUpgradesModuleRuntimeTest();
   await require("./tests/infinite-angle-module-runtime.js").runInfiniteAngleModuleRuntimeTest();
   await require("./tests/tower-module-runtime.js").runTowerModuleRuntimeTest();
+  await require("./tests/save-recovery-module-runtime.js").runSaveRecoveryModuleRuntimeTest();
   await require("./tests/time-flux-module-runtime.js").runTimeFluxModuleRuntimeTest();
 }
 

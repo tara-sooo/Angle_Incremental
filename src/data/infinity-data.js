@@ -282,6 +282,17 @@ const BALANCE_INFINITY_UPGRADES = [
       en: "Core Boost effects are calculated multiplicatively by x(1 + increase) instead of additively.",
     },
   },
+  {
+    id: "13-1",
+    bit: 19,
+    cost: 1e51,
+    requires: ["12-1"],
+    name: { ja: "13-1 久々にここを見たなら", en: "13-1 If You Came Back After A While" },
+    effect: {
+      ja: "Infinity Scoreは^0.5されてから頂点獲得量に倍率を与える",
+      en: "Infinity Score is raised to ^0.5 before multiplying gain per vertex.",
+    },
+  },
 ];
 
 expose("INFINITY_CHALLENGES", () => INFINITY_CHALLENGES);

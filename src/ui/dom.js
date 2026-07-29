@@ -24,6 +24,8 @@ const elements = {
   infinitySubpanels: Array.from(document.querySelectorAll(".infinity-subpanel")),
   challengeSubtabs: Array.from(document.querySelectorAll(".challenge-subtab")),
   challengeSubpanels: Array.from(document.querySelectorAll(".challenge-subpanel")),
+  statisticsSubtabs: Array.from(document.querySelectorAll(".statistics-subtab")),
+  statisticsSubpanels: Array.from(document.querySelectorAll(".statistics-subpanel")),
   timeFluxPanel: document.getElementById("timeFluxPanel"),
   timeFluxAmount: document.getElementById("timeFluxAmount"),
   timeFluxGain: document.getElementById("timeFluxGain"),
@@ -164,10 +166,16 @@ const elements = {
   fastestInfinityTime: document.getElementById("fastestInfinityTime"),
   fastestInfinityRealTime: document.getElementById("fastestInfinityRealTime"),
   lastInfinityRuns: document.getElementById("lastInfinityRuns"),
+  fastestInfinityChallengeTimes: document.getElementById("fastestInfinityChallengeTimes"),
+  fastestTowerChallengeTimes: document.getElementById("fastestTowerChallengeTimes"),
   saveCodeArea: document.getElementById("saveCodeArea"),
   exportSaveCodeButton: document.getElementById("exportSaveCodeButton"),
   importSaveCodeButton: document.getElementById("importSaveCodeButton"),
   copySaveCodeButton: document.getElementById("copySaveCodeButton"),
+  preImportBackupStatus: document.getElementById("preImportBackupStatus"),
+  restorePreImportButton: document.getElementById("restorePreImportButton"),
+  restoreUndoButton: document.getElementById("restoreUndoButton"),
+  saveCheckpointList: document.getElementById("saveCheckpointList"),
 };
 
 expose("canvas", () => canvas);

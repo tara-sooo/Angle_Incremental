@@ -1,6 +1,7 @@
 import { runtime, expose } from "../runtime/shared.js";
 
 let lastInfinityRunListSignature = null;
+let lastChallengeTimeSignature = null;
 
 function formatInfinityRunTime(value) {
   return value === null || value === undefined
@@ -65,6 +66,44 @@ function infinityRunListSignature() {
   ].join("|");
 }
 
+function challengeTimeSignature() {
+  return [
+    runtime.state.language,
+    runtime.state.timeUnit,
+    (runtime.state.fastestInfinityChallengeTimes || []).join(","),
+    (runtime.state.fastestTowerChallengeTimes || []).join(","),
+  ].join("|");
+}
+
+function updateChallengeTimeList(container, count, nameForIndex, times) {
+  if (!container) return;
+  container.innerHTML = "";
+  for (let index = 1; index <= count; index += 1) {
+    const row = document.createElement("li");
+    const time = times[index - 1] || 0;
+    row.textContent = `${nameForIndex(index)}: ${time > 0 ? runtime.formatLongDuration(time) : runtime.t("noInfinityRuns")}`;
+    container.append(row);
+  }
+}
+
+function updateChallengeTimeLists() {
+  const signature = challengeTimeSignature();
+  if (signature === lastChallengeTimeSignature) return;
+  lastChallengeTimeSignature = signature;
+  updateChallengeTimeList(
+    runtime.elements.fastestInfinityChallengeTimes,
+    runtime.INFINITY_CHALLENGE_COUNT,
+    runtime.challengeName,
+    runtime.state.fastestInfinityChallengeTimes || [],
+  );
+  updateChallengeTimeList(
+    runtime.elements.fastestTowerChallengeTimes,
+    runtime.TOWER_CHALLENGE_COUNT,
+    runtime.towerChallengeName,
+    runtime.state.fastestTowerChallengeTimes || [],
+  );
+}
+
 function updateStatisticsUi() {
   if (!runtime.elements.totalPlayTime) return;
   runtime.elements.totalPlayTime.textContent = runtime.formatLongDuration(runtime.state.totalPlayTime);
@@ -75,6 +114,7 @@ function updateStatisticsUi() {
   runtime.elements.fastestInfinityRealTime.textContent = runtime.state.fastestInfinityRealTime > 0
     ? runtime.formatLongDuration(runtime.state.fastestInfinityRealTime)
     : runtime.t("noInfinityRuns");
+  updateChallengeTimeLists();
   const signature = infinityRunListSignature();
   if (signature === lastInfinityRunListSignature) return;
   lastInfinityRunListSignature = signature;

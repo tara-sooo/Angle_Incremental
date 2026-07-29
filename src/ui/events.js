@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.8.3";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.9.0";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
@@ -40,6 +40,18 @@ function switchChallengeSubtab(tab) {
   });
   runtime.elements.challengeSubpanels.forEach((panel) => {
     panel.classList.toggle("is-active", panel.dataset.challengePanel === runtime.activeChallengeSubtab);
+  });
+}
+
+function switchStatisticsSubtab(tab) {
+  runtime.activeStatisticsSubtab = tab;
+  runtime.elements.statisticsSubtabs.forEach((button) => {
+    const active = button.dataset.statisticsTab === runtime.activeStatisticsSubtab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  runtime.elements.statisticsSubpanels.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.statisticsPanel === runtime.activeStatisticsSubtab);
   });
 }
 
@@ -158,6 +170,9 @@ function bindEvents() {
   runtime.elements.challengeSubtabs.forEach((button) => {
     button.addEventListener("click", () => switchChallengeSubtab(button.dataset.challengeTab));
   });
+  runtime.elements.statisticsSubtabs.forEach((button) => {
+    button.addEventListener("click", () => switchStatisticsSubtab(button.dataset.statisticsTab));
+  });
   runtime.elements.floatingTextToggle.addEventListener("change", () => applySetting("showFloatingText", runtime.elements.floatingTextToggle.checked));
   runtime.elements.lightEffectsToggle.addEventListener("change", () => applySetting("lightEffects", runtime.elements.lightEffectsToggle.checked));
   runtime.elements.fpsToggle.addEventListener("change", () => applySetting("showFps", runtime.elements.fpsToggle.checked));
@@ -184,6 +199,12 @@ function bindEvents() {
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
+  if (runtime.elements.restorePreImportButton) runtime.elements.restorePreImportButton.addEventListener("click", runtime.restorePreImportSave);
+  if (runtime.elements.restoreUndoButton) runtime.elements.restoreUndoButton.addEventListener("click", runtime.restoreUndoSave);
+  if (runtime.elements.saveCheckpointList) runtime.elements.saveCheckpointList.addEventListener("click", (event) => {
+    const button = event.target?.closest?.("[data-checkpoint-index]");
+    if (button) runtime.restoreCheckpoint(button.dataset.checkpointIndex);
+  });
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
   if (document.addEventListener) document.addEventListener("visibilitychange", runtime.handleVisibilityChange);
@@ -223,6 +244,7 @@ function bindEvents() {
 expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
 expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
+expose("switchStatisticsSubtab", () => switchStatisticsSubtab, (value) => { switchStatisticsSubtab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
 expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
 expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });

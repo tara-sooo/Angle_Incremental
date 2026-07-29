@@ -141,12 +141,31 @@ function canBreakInfiniteCap() {
 
 function completeChallengeIfReady() {
   if (!runtime.state.autoCompleteChallenges || runtime.state.activeChallenge <= 0 || !canInfinity()) return false;
+  if (runtime.state.activeTowerChallenge > 0 && !runtime.towerChallengeCanComplete()) return false;
   runInfinity(false);
   return true;
 }
 
 function updateChallengeTimers(dt) {
+  const delta = Math.max(0, runtime.sanitizeNumber(dt, 0));
+  if (runtime.state.activeChallenge > 0) runtime.state.activeChallengeTime += delta;
+  else runtime.state.activeChallengeTime = 0;
+  if (runtime.state.activeTowerChallenge > 0) runtime.state.activeTowerChallengeTime += delta;
+  else runtime.state.activeTowerChallengeTime = 0;
   if (runtime.state.activeChallenge !== 8) runtime.state.ic8VertexDecayElapsed = 0;
+}
+
+function recordInfinityChallengeTime(index, elapsed) {
+  const normalizedIndex = Math.floor(index);
+  if (normalizedIndex < 1 || normalizedIndex > runtime.INFINITY_CHALLENGE_COUNT) return;
+  const candidate = Math.max(0, runtime.sanitizeNumber(elapsed, 0));
+  if (candidate <= 0) return;
+  const recorded = Math.max(candidate, runtime.MIN_RECORDED_INFINITY_SECONDS);
+  if (!Array.isArray(runtime.state.fastestInfinityChallengeTimes)) {
+    runtime.state.fastestInfinityChallengeTimes = Array(runtime.INFINITY_CHALLENGE_COUNT).fill(0);
+  }
+  const current = runtime.state.fastestInfinityChallengeTimes[normalizedIndex - 1];
+  if (!(current > 0) || recorded < current) runtime.state.fastestInfinityChallengeTimes[normalizedIndex - 1] = recorded;
 }
 
 function resetBelowInfinity() {
@@ -183,7 +202,7 @@ function resetBelowInfinity() {
 }
 
 function applyStartingCoreBoosts() {
-  if (runtime.state.activeChallenge === 5) {
+  if (runtime.state.activeChallenge === 5 || runtime.state.activeTowerChallenge === 2) {
     runtime.state.coreBoostCount = 0;
     return;
   }
@@ -226,15 +245,45 @@ function infinityCountGain() {
 function runInfinity(forced = false) {
   if (!canInfinity()) return;
   if (!forced && runtime.state.infinityCount === 0) return;
+  if (runtime.state.activeTowerChallenge === 1 && runtime.towerChallengeCanComplete()) {
+    runtime.completeTowerChallengeIfReady();
+    return;
+  }
 
   const scoreLogBeforeReset = runtime.currentScoreLog10();
   const completedChallenge = runtime.state.activeChallenge;
+  const completedChallengeTime = runtime.state.activeChallengeTime;
+  const completedTowerChallenge = runtime.towerChallengeCanComplete()
+    ? runtime.state.activeTowerChallenge
+    : 0;
+  const completedTowerChallengeTime = completedTowerChallenge > 0
+    ? runtime.state.activeTowerChallengeTime
+    : 0;
   const noGenerationOrCoreBoost = !runtime.state.currentInfinityRunHadGeneration
     && !runtime.state.currentInfinityRunHadCoreBoost;
+  if (
+    completedChallenge > 0
+    && !isChallengeCompleted(completedChallenge)
+    && runtime.createCheckpoint
+    && !runtime.createCheckpoint("pre-infinity-challenge", { force: true })
+  ) return;
+  if (
+    completedTowerChallenge > 0
+    && runtime.createCheckpoint
+    && !runtime.createCheckpoint("pre-tower-challenge", { force: true })
+  ) return;
   if (completedChallenge > 0) {
+    recordInfinityChallengeTime(completedChallenge, completedChallengeTime);
     runtime.state.completedChallenges |= 1 << (completedChallenge - 1);
     runtime.state.activeChallenge = 0;
+    runtime.state.activeChallengeTime = 0;
     runtime.checkAchievements(true);
+  }
+  if (completedTowerChallenge > 0) {
+    runtime.recordTowerChallengeTime(completedTowerChallenge, completedTowerChallengeTime);
+    runtime.state.completedTowerChallenges |= 1 << (completedTowerChallenge - 1);
+    runtime.state.activeTowerChallenge = 0;
+    runtime.state.activeTowerChallengeTime = 0;
   }
 
   const gained = runtime.infinityPointGain();
@@ -264,11 +313,13 @@ function toggleInfinityChallenge(index = nextChallengeIndex()) {
   if (!infinityChallengesUnlocked()) return;
   if (runtime.state.activeChallenge === index) {
     runtime.state.activeChallenge = 0;
+    runtime.state.activeChallengeTime = 0;
     resetBelowInfinity();
   } else if (runtime.state.activeChallenge > 0) {
     return;
   } else {
     runtime.state.activeChallenge = Math.min(runtime.INFINITY_CHALLENGE_COUNT, Math.max(1, Math.floor(index)));
+    runtime.state.activeChallengeTime = 0;
     resetBelowInfinity();
     if (runtime.state.activeChallenge === 2) {
       runtime.state.vertices = Math.min(runtime.state.vertices, 200);
@@ -285,6 +336,7 @@ function toggleInfinityChallenge(index = nextChallengeIndex()) {
 
 function breakInfiniteCap() {
   if (!canBreakInfiniteCap()) return;
+  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-break-cap", { force: true })) return;
   runtime.state.infiniteCapBroken = true;
   runtime.updateUi();
   runtime.saveGame("manual");
@@ -316,6 +368,7 @@ expose("spendInfinityPoints", () => spendInfinityPoints, (value) => { spendInfin
 expose("canBreakInfiniteCap", () => canBreakInfiniteCap, (value) => { canBreakInfiniteCap = value; });
 expose("completeChallengeIfReady", () => completeChallengeIfReady, (value) => { completeChallengeIfReady = value; });
 expose("updateChallengeTimers", () => updateChallengeTimers, (value) => { updateChallengeTimers = value; });
+expose("recordInfinityChallengeTime", () => recordInfinityChallengeTime, (value) => { recordInfinityChallengeTime = value; });
 expose("resetBelowInfinity", () => resetBelowInfinity, (value) => { resetBelowInfinity = value; });
 expose("applyStartingCoreBoosts", () => applyStartingCoreBoosts, (value) => { applyStartingCoreBoosts = value; });
 expose("recordInfinityRun", () => recordInfinityRun, (value) => { recordInfinityRun = value; });
