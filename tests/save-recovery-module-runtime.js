@@ -331,6 +331,54 @@ async function runSaveRecoveryModuleRuntimeTest() {
       "a handled server rollback should not rotate repeatedly after reload",
     );
 
+    const recentServerHistory = [
+      {
+        appVersion: "0.9.0",
+        saveVersion: 10,
+        savedAt: mixedNow - 5 * 60 * 1000,
+        serverSavedAt: mixedNow - 5 * 60 * 1000,
+        backedUpAt: mixedNow - 5 * 60 * 1000,
+        reason: "periodic",
+        state: { score: 0, scoreLog10: -Infinity, generationCount: 0 },
+      },
+      {
+        appVersion: "0.9.0",
+        saveVersion: 10,
+        savedAt: mixedNow - 4 * 60 * 1000,
+        serverSavedAt: mixedNow + 60 * 60 * 1000,
+        backedUpAt: mixedNow - 4 * 60 * 1000,
+        reason: "periodic",
+        state: { score: 0, scoreLog10: -Infinity, generationCount: 1 },
+      },
+      {
+        appVersion: "0.9.0",
+        saveVersion: 10,
+        savedAt: mixedNow - 1 * 60 * 1000,
+        backedUpAt: mixedNow - 1 * 60 * 1000,
+        reason: "periodic",
+        state: { score: 0, scoreLog10: -Infinity, generationCount: 2 },
+      },
+    ];
+    const recentServerInstance = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save-checkpoints", JSON.stringify(recentServerHistory)],
+    ]));
+    const { debug: recentServerDebug, runtime: recentServerRuntime } = recentServerInstance;
+    Object.defineProperty(recentServerRuntime, "serverClockAvailable", {
+      configurable: true,
+      value: () => true,
+    });
+    Object.defineProperty(recentServerRuntime, "serverClockNowMs", {
+      configurable: true,
+      value: () => mixedNow,
+    });
+    recentServerDebug.state.generationCount = 3;
+    assert.equal(recentServerDebug.saveGame("auto"), true, "a recent server checkpoint should throttle a mixed rollback history");
+    assert.equal(
+      recentServerDebug.recoveryEntries().checkpoints.some((entry) => entry.state.generationCount === 3),
+      false,
+      "a future server timestamp must not bypass a recent eligible server checkpoint",
+    );
+
   }
 }
 

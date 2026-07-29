@@ -86,14 +86,24 @@ function writeRecoveryEntry(key, entry) {
   recoveryRevision += 1;
 }
 
+function latestEligibleCheckpointAtTimestamp(entries, timestampKey, currentTimestamp) {
+  return entries
+    .filter((entry) => entry[timestampKey] > 0 && entry[timestampKey] <= currentTimestamp)
+    .reduce((latest, entry) => {
+      if (!latest || entry[timestampKey] > latest[timestampKey]) return entry;
+      return latest;
+    }, null);
+}
+
 function latestCheckpointAtTimestamp(entries, timestampKey, currentTimestamp) {
-  const timestamped = entries.filter((entry) => entry[timestampKey] > 0);
-  const eligible = timestamped.filter((entry) => entry[timestampKey] <= currentTimestamp);
-  const candidates = eligible.length > 0 ? eligible : timestamped;
-  return candidates.reduce((latest, entry) => {
-    if (!latest || entry[timestampKey] > latest[timestampKey]) return entry;
-    return latest;
-  }, null);
+  const latestEligible = latestEligibleCheckpointAtTimestamp(entries, timestampKey, currentTimestamp);
+  if (latestEligible) return latestEligible;
+  return entries
+    .filter((entry) => entry[timestampKey] > 0)
+    .reduce((latest, entry) => {
+      if (!latest || entry[timestampKey] > latest[timestampKey]) return entry;
+      return latest;
+    }, null);
 }
 
 function latestPeriodicCheckpoint(saveData, periodic) {
@@ -112,8 +122,14 @@ function serverPeriodicCheckpointState(saveData, periodic) {
   if (!runtime.serverClockAvailable?.() || saveData.serverSavedAt <= 0) {
     return { hasFuture: false };
   }
+  const serverTimestamped = periodic.filter((entry) => entry.serverSavedAt > 0);
   return {
-    hasFuture: periodic.some((entry) => entry.serverSavedAt > saveData.serverSavedAt),
+    latestEligible: latestEligibleCheckpointAtTimestamp(
+      serverTimestamped,
+      "serverSavedAt",
+      saveData.serverSavedAt,
+    ),
+    hasFuture: serverTimestamped.some((entry) => entry.serverSavedAt > saveData.serverSavedAt),
   };
 }
 
@@ -127,9 +143,9 @@ function periodicCheckpointDue(saveData, latestPeriodic, serverPeriodicState) {
     return false;
   }
 
-  const recentServerCheckpoint = latestPeriodic?.serverSavedAt > 0
-    && latestPeriodic.serverSavedAt <= saveData.serverSavedAt
-    && saveData.serverSavedAt - latestPeriodic.serverSavedAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS;
+  const latestEligibleServerCheckpoint = serverPeriodicState?.latestEligible;
+  const recentServerCheckpoint = latestEligibleServerCheckpoint?.serverSavedAt > 0
+    && saveData.serverSavedAt - latestEligibleServerCheckpoint.serverSavedAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS;
   if (serverPeriodicState?.hasFuture && !recentServerCheckpoint) {
     return true;
   }
