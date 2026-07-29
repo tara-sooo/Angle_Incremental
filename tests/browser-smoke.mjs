@@ -239,10 +239,11 @@ try {
   const serverClockContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const serverClockErrors = [];
   const serverClockSavedAt = Date.now();
-  await serverClockContext.addInitScript(({ saveData, localOffsetMs, seenVersion }) => {
+  await serverClockContext.addInitScript(({ saveData, checkpoints, localOffsetMs, seenVersion }) => {
     const realNow = Date.now.bind(Date);
     Date.now = () => realNow() + localOffsetMs;
     localStorage.setItem("angle-incremental-save", JSON.stringify(saveData));
+    localStorage.setItem("angle-incremental-save-checkpoints", JSON.stringify(checkpoints));
     localStorage.setItem("angle-incremental-seen-version", seenVersion);
   }, {
     localOffsetMs: 2 * 86400 * 1000,
@@ -253,6 +254,15 @@ try {
       serverSavedAt: serverClockSavedAt - 3600 * 1000,
       state: { offlineProgressEnabled: false, timeFlux: 0 },
     },
+    checkpoints: [{
+      appVersion: EXPECTED_ASSET_VERSION,
+      saveVersion: 10,
+      savedAt: serverClockSavedAt + 3 * 86400 * 1000,
+      serverSavedAt: serverClockSavedAt,
+      backedUpAt: serverClockSavedAt + 3 * 86400 * 1000,
+      reason: "periodic",
+      state: { offlineProgressEnabled: false, timeFlux: 0 },
+    }],
   });
   const serverClockPage = await serverClockContext.newPage();
   serverClockPage.on("pageerror", (error) => serverClockErrors.push(error.message));
@@ -278,6 +288,17 @@ try {
     assert.equal(serverClockLoaded.report.clockSource, "server", "server-based offline reports should identify their clock source");
     assert.equal(serverClockLoaded.report.clockAnomaly, false, "a valid server timestamp should not be flagged as anomalous");
     assert.ok(serverClockLoaded.persisted.serverSavedAt > 0, "loading a legacy interval should persist a server timestamp");
+    const serverCheckpointResult = await serverClockPage.evaluate(() => {
+      const before = window.__angleDebug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic").length;
+      window.__angleDebug.saveGame("auto");
+      const after = window.__angleDebug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic").length;
+      return { before, after };
+    });
+    assert.deepEqual(
+      serverCheckpointResult,
+      { before: 1, after: 1 },
+      "a local clock rollback should not rotate checkpoints when the server clock is valid",
+    );
     assert.deepEqual(serverClockErrors, [], "server-clock loading should produce no browser errors");
   } finally {
     await serverClockContext.close();

@@ -956,6 +956,7 @@ expose("serverClockAnomaly", () => serverClockAnomaly);
 expose("serverClockAvailable", () => serverClockAvailable);
 expose("serverClockNowMs", () => trustedClockNowMs);
 expose("localClockNowMs", () => localClockNow);
+expose("monotonicClockNowMs", () => monotonicClockNow);
 expose("syncServerClock", () => syncServerClock);
 expose("offlineElapsedFromSave", () => offlineElapsedFromSave);
 expose("rebaseLocalClock", () => rebaseLocalClock);

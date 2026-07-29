@@ -4,6 +4,7 @@ import { runtime, expose } from "../runtime/shared.js";
 
 const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
 let recoveryRevision = 0;
+let lastPeriodicCheckpointMonotonicAt = null;
 
 function currentSaveTimestamp() {
   return runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
@@ -85,6 +86,25 @@ function writeRecoveryEntry(key, entry) {
   recoveryRevision += 1;
 }
 
+function periodicCheckpointDue(saveData, latestPeriodic) {
+  const monotonicNow = runtime.monotonicClockNowMs?.();
+  if (
+    Number.isFinite(monotonicNow)
+    && Number.isFinite(lastPeriodicCheckpointMonotonicAt)
+    && monotonicNow - lastPeriodicCheckpointMonotonicAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS
+  ) {
+    return false;
+  }
+
+  const currentServerSavedAt = runtime.serverClockAvailable?.() && saveData.serverSavedAt > 0
+    ? saveData.serverSavedAt
+    : 0;
+  const elapsed = currentServerSavedAt > 0 && latestPeriodic.serverSavedAt > 0
+    ? currentServerSavedAt - latestPeriodic.serverSavedAt
+    : saveData.savedAt - latestPeriodic.savedAt;
+  return elapsed < 0 || elapsed >= runtime.SAVE_CHECKPOINT_INTERVAL_MS;
+}
+
 function backupCurrentSave(reason = "pre-import", key = runtime.SAVE_PRE_IMPORT_KEY) {
   try {
     const saveData = serializeSaveData();
@@ -108,7 +128,7 @@ function createCheckpoint(reason = "periodic", options = {}) {
       reason === "periodic"
       && !options.force
       && periodic[0]
-      && saveData.savedAt - periodic[0].savedAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS
+      && !periodicCheckpointDue(saveData, periodic[0])
     ) {
       return true;
     }
@@ -124,6 +144,10 @@ function createCheckpoint(reason = "periodic", options = {}) {
       .sort((left, right) => right.backedUpAt - left.backedUpAt)
       .slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS);
     writeRecoveryEntry(runtime.SAVE_CHECKPOINTS_KEY, [...periodicEntries, ...eventEntries]);
+    if (reason === "periodic") {
+      const monotonicNow = runtime.monotonicClockNowMs?.();
+      lastPeriodicCheckpointMonotonicAt = Number.isFinite(monotonicNow) ? monotonicNow : null;
+    }
     return true;
   } catch (error) {
     runtime.setSaveStatus(runtime.t("checkpointSaveFailed"));

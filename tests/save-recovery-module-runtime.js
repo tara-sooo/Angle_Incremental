@@ -172,6 +172,30 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(debug.state.towerFloor, 0, "legacy checkpoint migration should supply newer defaults");
     assert.equal(debug.state.activeChallenge, 0, "legacy checkpoint migration should clear unavailable challenge state");
   }
+
+  {
+    const futureCheckpoint = {
+      appVersion: "0.9.0",
+      saveVersion: 10,
+      savedAt: Date.now() + 60 * 60 * 1000,
+      backedUpAt: Date.now() + 60 * 60 * 1000,
+      reason: "periodic",
+      state: { score: 0, scoreLog10: -Infinity },
+    };
+    const instance = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save-checkpoints", JSON.stringify([futureCheckpoint])],
+    ]));
+    const { debug } = instance;
+    debug.state.generationCount = 1;
+    assert.equal(debug.saveGame("auto"), true, "a clock rollback should still allow one periodic checkpoint");
+    const firstPeriodic = debug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic");
+    assert.equal(firstPeriodic.length, 2, "a clock rollback should append a recovery point instead of stopping checkpoints");
+    debug.state.generationCount = 2;
+    assert.equal(debug.saveGame("auto"), true, "repeated autosaves should remain successful during a clock anomaly");
+    const secondPeriodic = debug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic");
+    assert.equal(secondPeriodic.length, 2, "the monotonic guard should prevent rapid checkpoint rotation");
+
+  }
 }
 
 module.exports = { runSaveRecoveryModuleRuntimeTest };
