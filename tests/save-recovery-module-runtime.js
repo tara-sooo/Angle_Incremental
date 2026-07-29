@@ -106,6 +106,21 @@ async function runSaveRecoveryModuleRuntimeTest() {
     const event = debug.recoveryEntries().checkpoints.find((entry) => entry.reason === "pre-tower-build");
     assert.equal(event.state.generationCount, 40, "event checkpoints should retain the pre-action state");
 
+    const restoreTargetIndex = debug.recoveryEntries().checkpoints.findIndex((entry) => entry.reason === "pre-tower-build");
+    state.generationCount = 99;
+    assert.equal(debug.restoreCheckpoint(restoreTargetIndex), true, "a checkpoint should be restorable from the recovery list");
+    assert.equal(state.generationCount, 40, "checkpoint restoration should apply the selected state");
+    assert.equal(debug.restoreUndoSave(), true, "checkpoint restoration should expose an undo action");
+    assert.equal(state.generationCount, 99, "checkpoint undo should recover the pre-restore state");
+
+    state.generationCount = 41;
+    assert.equal(runtime.reloadForRemoteUpdate("0.9.1"), undefined, "a remote update reload should be deferred by the test location");
+    assert.equal(
+      debug.recoveryEntries().checkpoints.some((entry) => entry.reason === "pre-update"),
+      true,
+      "a remote update should create a pre-update checkpoint",
+    );
+
     runtime.updateUi();
     const firstCheckpointRow = runtime.elements.saveCheckpointList.children[0];
     runtime.updateUi();
@@ -130,6 +145,32 @@ async function runSaveRecoveryModuleRuntimeTest() {
     runtime.updateUi();
     const scientificSummary = runtime.elements.saveCheckpointList.children[0].children[0].children[2].textContent;
     assert.notEqual(compactSummary, scientificSummary, "changing number format should refresh recovery summaries");
+  }
+
+  {
+    const legacyCheckpoint = {
+      appVersion: "0.7.0",
+      saveVersion: 7,
+      savedAt: 1,
+      backedUpAt: 1,
+      reason: "legacy-checkpoint",
+      state: {
+        score: 0,
+        scoreLog10: -Infinity,
+        infinityCount: 2,
+        infinityPoints: 0,
+        infinityPointsLog10: -Infinity,
+      },
+    };
+    const instance = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save-checkpoints", JSON.stringify([legacyCheckpoint])],
+    ]));
+    const { context, debug } = instance;
+    context.window.confirm = () => true;
+    assert.equal(debug.restoreCheckpoint(0), true, "a legacy checkpoint should be restorable");
+    assert.equal(debug.state.infinityCount, 2, "legacy checkpoint state should be migrated before restore");
+    assert.equal(debug.state.towerFloor, 0, "legacy checkpoint migration should supply newer defaults");
+    assert.equal(debug.state.activeChallenge, 0, "legacy checkpoint migration should clear unavailable challenge state");
   }
 }
 
