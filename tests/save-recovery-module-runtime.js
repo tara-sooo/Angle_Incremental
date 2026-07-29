@@ -260,6 +260,63 @@ async function runSaveRecoveryModuleRuntimeTest() {
       "a mixed server/local checkpoint history should not rotate before ten minutes",
     );
 
+    const serverRollbackHistory = [
+      {
+        appVersion: "0.9.0",
+        saveVersion: 10,
+        savedAt: mixedNow - 20 * 60 * 1000,
+        serverSavedAt: mixedNow + 60 * 60 * 1000,
+        backedUpAt: mixedNow - 20 * 60 * 1000,
+        reason: "periodic",
+        state: { score: 0, scoreLog10: -Infinity, generationCount: 0 },
+      },
+      {
+        appVersion: "0.9.0",
+        saveVersion: 10,
+        savedAt: mixedNow - 5 * 60 * 1000,
+        backedUpAt: mixedNow - 5 * 60 * 1000,
+        reason: "periodic",
+        state: { score: 0, scoreLog10: -Infinity, generationCount: 1 },
+      },
+    ];
+    const serverRollbackInstance = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save-checkpoints", JSON.stringify(serverRollbackHistory)],
+    ]));
+    const { debug: serverRollbackDebug, runtime: serverRollbackRuntime, storage: serverRollbackStorage } = serverRollbackInstance;
+    Object.defineProperty(serverRollbackRuntime, "serverClockAvailable", {
+      configurable: true,
+      value: () => true,
+    });
+    Object.defineProperty(serverRollbackRuntime, "serverClockNowMs", {
+      configurable: true,
+      value: () => mixedNow,
+    });
+    serverRollbackDebug.state.generationCount = 2;
+    assert.equal(serverRollbackDebug.saveGame("auto"), true, "a server clock rollback should create a checkpoint in a mixed history");
+    assert.equal(
+      serverRollbackDebug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic").length,
+      3,
+      "a future server checkpoint should remain detectable despite a recent local-only checkpoint",
+    );
+
+    const reloadedServerRollback = await loadRuntime(candidatePath, new Map(serverRollbackStorage));
+    const { debug: reloadedServerRollbackDebug, runtime: reloadedServerRollbackRuntime } = reloadedServerRollback;
+    Object.defineProperty(reloadedServerRollbackRuntime, "serverClockAvailable", {
+      configurable: true,
+      value: () => true,
+    });
+    Object.defineProperty(reloadedServerRollbackRuntime, "serverClockNowMs", {
+      configurable: true,
+      value: () => mixedNow,
+    });
+    reloadedServerRollbackDebug.state.generationCount = 3;
+    assert.equal(reloadedServerRollbackDebug.saveGame("auto"), true, "a recovered server clock should remain throttled after reload");
+    assert.equal(
+      reloadedServerRollbackDebug.recoveryEntries().checkpoints.filter((entry) => entry.reason === "periodic").length,
+      3,
+      "a handled server rollback should not rotate repeatedly after reload",
+    );
+
   }
 }
 

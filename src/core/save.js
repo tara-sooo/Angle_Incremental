@@ -86,6 +86,16 @@ function writeRecoveryEntry(key, entry) {
   recoveryRevision += 1;
 }
 
+function latestCheckpointAtTimestamp(entries, timestampKey, currentTimestamp) {
+  const timestamped = entries.filter((entry) => entry[timestampKey] > 0);
+  const eligible = timestamped.filter((entry) => entry[timestampKey] <= currentTimestamp);
+  const candidates = eligible.length > 0 ? eligible : timestamped;
+  return candidates.reduce((latest, entry) => {
+    if (!latest || entry[timestampKey] > latest[timestampKey]) return entry;
+    return latest;
+  }, null);
+}
+
 function latestPeriodicCheckpoint(saveData, periodic) {
   const currentServerSavedAt = runtime.serverClockAvailable?.() && saveData.serverSavedAt > 0
     ? saveData.serverSavedAt
@@ -95,16 +105,19 @@ function latestPeriodicCheckpoint(saveData, periodic) {
   const hasLocalOnlyEntries = periodic.some((entry) => entry.serverSavedAt <= 0);
   const timestampKey = hasServerTimestamps && !hasLocalOnlyEntries ? "serverSavedAt" : "savedAt";
   const currentTimestamp = timestampKey === "serverSavedAt" ? currentServerSavedAt : saveData.savedAt;
-  const timestamped = periodic.filter((entry) => entry[timestampKey] > 0);
-  const eligible = timestamped.filter((entry) => entry[timestampKey] <= currentTimestamp);
-  const candidates = eligible.length > 0 ? eligible : timestamped;
-  return candidates.reduce((latest, entry) => {
-    if (!latest || entry[timestampKey] > latest[timestampKey]) return entry;
-    return latest;
-  }, null);
+  return latestCheckpointAtTimestamp(periodic, timestampKey, currentTimestamp);
 }
 
-function periodicCheckpointDue(saveData, latestPeriodic) {
+function latestServerPeriodicCheckpoint(saveData, periodic) {
+  if (!runtime.serverClockAvailable?.() || saveData.serverSavedAt <= 0) return null;
+  return latestCheckpointAtTimestamp(
+    periodic.filter((entry) => entry.serverSavedAt > 0),
+    "serverSavedAt",
+    saveData.serverSavedAt,
+  );
+}
+
+function periodicCheckpointDue(saveData, latestPeriodic, latestServerPeriodic) {
   const monotonicNow = runtime.monotonicClockNowMs?.();
   if (
     Number.isFinite(monotonicNow)
@@ -112,6 +125,13 @@ function periodicCheckpointDue(saveData, latestPeriodic) {
     && monotonicNow - lastPeriodicCheckpointMonotonicAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS
   ) {
     return false;
+  }
+
+  if (
+    latestServerPeriodic
+    && latestServerPeriodic.serverSavedAt > saveData.serverSavedAt
+  ) {
+    return true;
   }
 
   const currentServerSavedAt = runtime.serverClockAvailable?.() && saveData.serverSavedAt > 0
@@ -143,11 +163,12 @@ function createCheckpoint(reason = "periodic", options = {}) {
       .filter((entry) => entry.reason === "periodic")
       .sort((left, right) => right.savedAt - left.savedAt);
     const latestPeriodic = latestPeriodicCheckpoint(saveData, periodic);
+    const latestServerPeriodic = latestServerPeriodicCheckpoint(saveData, periodic);
     if (
       reason === "periodic"
       && !options.force
       && latestPeriodic
-      && !periodicCheckpointDue(saveData, latestPeriodic)
+      && !periodicCheckpointDue(saveData, latestPeriodic, latestServerPeriodic)
     ) {
       return true;
     }
