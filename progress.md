@@ -114,6 +114,7 @@ Original prompt: では、中核ループを完成させてください
 - Added IU 13-1 and implemented Tower Challenge 1/2: TC1 blocks normal upgrades and clears at 1e308 with a dedicated reset, while TC2 seals Core Boost and applies the GR restrictions through 1e1300; TC3/TC4 remain placeholders.
 - Made cleared Tower Challenges replayable: permanent rewards remain first-clear-only, TC1 replays use its dedicated reset, and TC2 replays retain normal Infinity rewards.
 - Centered IU 12-1 and 13-1 in the Infinity Upgrade tree and added Statistics sub-tabs with persistent fastest game-time records for all IC and TC entries.
+- Prepared the 0.9.0 release candidate with save recovery checkpoints, IU 13-1, Tower Challenges 1/2 and replay support, persistent IC/TC fastest clear times, and invalid-challenge timer cleanup while keeping SAVE_VERSION 10 unchanged; TC3/TC4 remain deferred.
 
 ## TODO
 

@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.8.3";
+const EXPECTED_ASSET_VERSION = "0.9.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -123,9 +123,9 @@ try {
       summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.8.3 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.8.3 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /時計対策/);
+  assert.equal(updateModal.visible, true, "the 0.9.0 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.9.0 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /セーブ復旧/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   const serverClockProbe = await page.evaluate(async () => {
@@ -1081,7 +1081,7 @@ try {
       quickBarVisible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
-    assert.equal(mobileStartup.updateTitle, "0.8.3 アップデート", "mobile startup should use the release version");
+    assert.equal(mobileStartup.updateTitle, "0.9.0 アップデート", "mobile startup should use the release version");
     assert.equal(mobileStartup.tabCount, 9, "mobile startup should expose every main tab");
     assert.equal(mobileStartup.quickBarVisible, true, "the Time Flux quick bar should be visible on mobile");
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
