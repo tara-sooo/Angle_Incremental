@@ -24,10 +24,15 @@ function clampTimeFluxCustomSpeed(value) {
   return Math.max(runtime.TIME_FLUX_CUSTOM_SPEED_MIN, clampTimeFluxSpeed(value));
 }
 
+function clampTimeFluxCapacityLevel(value) {
+  return Math.min(
+    runtime.TIME_FLUX_MAX_CAPACITY_LEVEL,
+    Math.max(0, Math.floor(runtime.sanitizeNumber(value, 0))),
+  );
+}
+
 function timeFluxCapacitySeconds(level = runtime.state.timeFluxCapacityLevel) {
-  const safeLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(level, 0)));
-  const capacity = runtime.TIME_FLUX_INITIAL_CAPACITY_SECONDS * (2 ** safeLevel);
-  return Number.isFinite(capacity) ? Math.min(Number.MAX_SAFE_INTEGER, capacity) : Number.MAX_SAFE_INTEGER;
+  return runtime.TIME_FLUX_CAPACITY_SECONDS_BY_LEVEL[clampTimeFluxCapacityLevel(level)];
 }
 
 function timeFluxGainPerHour(level = runtime.state.timeFluxGainLevel) {
@@ -42,7 +47,9 @@ function timeFluxGainUpgradeCost(level = runtime.state.timeFluxGainLevel) {
 }
 
 function timeFluxCapacityUpgradeCost(level = runtime.state.timeFluxCapacityLevel) {
-  return timeFluxCapacitySeconds(level) * runtime.TIME_FLUX_CAPACITY_COST_FACTOR;
+  const safeLevel = clampTimeFluxCapacityLevel(level);
+  if (safeLevel >= runtime.TIME_FLUX_MAX_CAPACITY_LEVEL) return Infinity;
+  return timeFluxCapacitySeconds(safeLevel) * runtime.TIME_FLUX_CAPACITY_COST_FACTOR;
 }
 
 function timeFluxUpgradeCost(kind) {
@@ -60,9 +67,10 @@ function timeFluxGain() {
 }
 
 function canBuyTimeFluxUpgrade(kind) {
+  if (kind === "capacity" && clampTimeFluxCapacityLevel(runtime.state.timeFluxCapacityLevel)
+    >= runtime.TIME_FLUX_MAX_CAPACITY_LEVEL) return false;
   const cost = timeFluxUpgradeCost(kind);
   if (!Number.isFinite(cost) || cost <= 0 || runtime.state.timeFlux < cost) return false;
-  if (kind === "capacity" && timeFluxCapacitySeconds() >= Number.MAX_SAFE_INTEGER) return false;
   return kind === "gain" || kind === "capacity";
 }
 
@@ -111,6 +119,7 @@ function consumeTimeFlux(seconds) {
 expose("clampOfflineTickCount", () => clampOfflineTickCount, (value) => { clampOfflineTickCount = value; });
 expose("clampTimeFluxSpeed", () => clampTimeFluxSpeed, (value) => { clampTimeFluxSpeed = value; });
 expose("clampTimeFluxCustomSpeed", () => clampTimeFluxCustomSpeed, (value) => { clampTimeFluxCustomSpeed = value; });
+expose("clampTimeFluxCapacityLevel", () => clampTimeFluxCapacityLevel, (value) => { clampTimeFluxCapacityLevel = value; });
 expose("timeFluxCapacitySeconds", () => timeFluxCapacitySeconds, (value) => { timeFluxCapacitySeconds = value; });
 expose("timeFluxGainPerHour", () => timeFluxGainPerHour, (value) => { timeFluxGainPerHour = value; });
 expose("timeFluxGainUpgradeCost", () => timeFluxGainUpgradeCost, (value) => { timeFluxGainUpgradeCost = value; });

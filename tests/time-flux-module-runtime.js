@@ -21,6 +21,31 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(runtime.timeFluxGain(), 360, "initial Time Flux gain should be six minutes per hour");
   assert.equal(runtime.timeFluxGainUpgradeCost(), 1800, "the first gain upgrade should cost 30 minutes");
   assert.equal(runtime.timeFluxCapacityUpgradeCost(), 1350, "the first capacity upgrade should cost 22.5 minutes");
+  assert.equal(runtime.TIME_FLUX_MAX_CAPACITY_LEVEL, 59, "Time Flux capacity should have 60 staged levels");
+  assert.equal(runtime.timeFluxCapacitySeconds(7), 172800, "capacity level 7 should be 48 hours");
+  assert.equal(runtime.timeFluxCapacitySeconds(14), 460800, "capacity level 14 should be 128 hours");
+  assert.equal(runtime.timeFluxCapacitySeconds(19), 604800, "capacity level 19 should be seven days");
+  assert.equal(runtime.timeFluxCapacitySeconds(59), 1209600, "capacity level 59 should be fourteen days");
+  assert.equal(runtime.timeFluxCapacitySeconds(60), 1209600, "capacity should clamp above the maximum level");
+  assert.equal(runtime.timeFluxCapacityUpgradeCost(59), Infinity, "the maximum capacity should have no upgrade cost");
+
+  state.timeFluxCapacityLevel = runtime.TIME_FLUX_MAX_CAPACITY_LEVEL;
+  state.timeFlux = 1209600;
+  assert.equal(runtime.canBuyTimeFluxUpgrade("capacity"), false, "the maximum capacity should not be purchasable");
+  assert.equal(debug.buyTimeFluxUpgrade("capacity"), false, "buying at maximum capacity should be rejected");
+  runtime.updateUi();
+  assert.equal(
+    instance.context.document.getElementById("timeFluxCapacityLevel").textContent,
+    "MAX",
+    "the capacity level UI should show MAX",
+  );
+  assert.equal(
+    instance.context.document.getElementById("timeFluxCapacityCost").textContent,
+    "MAX",
+    "the capacity cost UI should show MAX",
+  );
+  state.timeFluxCapacityLevel = 0;
+  state.timeFlux = 0;
 
   state.timeFlux = 1350;
   assert.equal(debug.buyTimeFluxUpgrade("capacity"), true, "capacity upgrade should spend TF");
@@ -310,6 +335,13 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.totalRealPlayTime, 0, "old saves should default to zero real play time");
   assert.equal(state.currentInfinityRealTime, 0, "old saves should default to zero real Infinity time");
   assert.equal(state.fastestInfinityRealTime, 0, "old saves should default to no fastest real Infinity time");
+
+  runtime.applySaveData({ timeFluxCapacityLevel: 8, timeFlux: 123 }, 10);
+  assert.equal(state.timeFluxCapacityLevel, 8, "legacy capacity levels within the table should be preserved");
+  assert.equal(state.timeFlux, 123, "legacy TF below the new capacity should be preserved");
+  runtime.applySaveData({ timeFluxCapacityLevel: 60, timeFlux: 1500000 }, 10);
+  assert.equal(state.timeFluxCapacityLevel, 59, "legacy capacity levels above MAX should clamp to MAX");
+  assert.equal(state.timeFlux, 1209600, "legacy TF above the new capacity should clamp to fourteen days");
 
   runtime.applySaveData({
     lastInfinityRuns: [{ time: 4, scoreLog10: 3, ipGain: 2, challenge: 0 }],

@@ -476,7 +476,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.OFFLINE_PROGRESS_DEFAULT_ENABLED,
   );
   runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
-  runtime.state.timeFluxCapacityLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxCapacityLevel, 0)));
+  runtime.state.timeFluxCapacityLevel = runtime.clampTimeFluxCapacityLevel(data.timeFluxCapacityLevel);
   runtime.state.timeFluxGainLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxGainLevel, 0)));
   runtime.state.timeFlux = Math.min(
     runtime.timeFluxCapacitySeconds(),
