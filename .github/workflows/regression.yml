@@ -1,6 +1,9 @@
 name: Rescope PR 69
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - "release/0.9.1"
