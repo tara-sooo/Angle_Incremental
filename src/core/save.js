@@ -187,6 +187,36 @@ function latestCheckpointAtTimestamp(entries, timestampKey, currentTimestamp) {
     }, null);
 }
 
+function periodicCheckpointTimestamp(entry, saveData) {
+  const useServerTimestamp = runtime.serverClockAvailable?.()
+    && saveData.serverSavedAt > 0
+    && entry.serverSavedAt > 0;
+  return {
+    value: useServerTimestamp ? entry.serverSavedAt : entry.savedAt,
+    current: useServerTimestamp ? saveData.serverSavedAt : saveData.savedAt,
+  };
+}
+
+function retainPeriodicCheckpoints(entries, nextEntry, saveData) {
+  const existing = entries.filter((entry) => entry !== nextEntry);
+  const eligible = existing
+    .filter((entry) => {
+      const timestamp = periodicCheckpointTimestamp(entry, saveData);
+      return timestamp.value > 0 && timestamp.value <= timestamp.current;
+    })
+    .sort((left, right) => (
+      periodicCheckpointTimestamp(right, saveData).value
+      - periodicCheckpointTimestamp(left, saveData).value
+    ));
+  const future = existing
+    .filter((entry) => !eligible.includes(entry))
+    .sort((left, right) => (
+      periodicCheckpointTimestamp(right, saveData).value
+      - periodicCheckpointTimestamp(left, saveData).value
+    ));
+  return [nextEntry, ...eligible, ...future].slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
+}
+
 function latestPeriodicCheckpoint(saveData, periodic) {
   const currentServerSavedAt = runtime.serverClockAvailable?.() && saveData.serverSavedAt > 0
     ? saveData.serverSavedAt
@@ -273,10 +303,11 @@ function createCheckpoint(reason = "periodic", options = {}) {
 
     const nextEntry = recoveryEntryFromSave(saveData, reason);
     const nextEntries = [nextEntry, ...entries.filter((entry) => entry.reason !== reason || reason === "periodic")];
-    const periodicEntries = nextEntries
-      .filter((entry) => entry.reason === "periodic")
-      .sort((left, right) => right.savedAt - left.savedAt)
-      .slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
+    const periodicEntries = retainPeriodicCheckpoints(
+      nextEntries.filter((entry) => entry.reason === "periodic"),
+      nextEntry,
+      saveData,
+    );
     const eventEntries = nextEntries
       .filter((entry) => entry.reason !== "periodic")
       .sort((left, right) => right.backedUpAt - left.backedUpAt)
@@ -408,7 +439,27 @@ function sanitizeChallengeTimes(value, count) {
   return Array.from({ length: count }, (_, index) => Math.max(0, runtime.sanitizeNumber(source[index], 0)));
 }
 
-function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
+function cloneStateValue(value) {
+  if (Array.isArray(value)) return value.map(cloneStateValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, cloneStateValue(entry)]));
+  }
+  return value;
+}
+
+function snapshotRuntimeState() {
+  return Object.fromEntries(
+    Object.entries(runtime.state).map(([key, value]) => [key, cloneStateValue(value)]),
+  );
+}
+
+function restoreRuntimeState(snapshot) {
+  Object.entries(snapshot).forEach(([key, value]) => {
+    runtime.state[key] = cloneStateValue(value);
+  });
+}
+
+function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   const score = runtime.hydrateLogResource(data.score, data.scoreLog10);
   runtime.state.score = score.value;
@@ -693,6 +744,16 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.floatingTexts = [];
 }
 
+function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
+  const snapshot = snapshotRuntimeState();
+  try {
+    applySaveDataUnsafe(data, saveVersion);
+  } catch (error) {
+    restoreRuntimeState(snapshot);
+    throw error;
+  }
+}
+
 function serializeSaveData() {
   runtime.normalizeInfinityPointState();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
@@ -851,6 +912,13 @@ function loadGame(options = {}) {
           runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
         );
       }
+      if (offlineProcessed) {
+        loadTransactionActive = false;
+        loadRecoveryMode = false;
+        if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) {
+          throw new Error("offline progress save failed");
+        }
+      }
     } catch (error) {
       try {
         applySaveData(parsed.state, parsed.version);
@@ -860,6 +928,7 @@ function loadGame(options = {}) {
       runtime.offlineReport = null;
       if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
       loadRecoveryMode = true;
+      runtime.autoSaveElapsed = 0;
       writeLoadFailure("offline", error, parsed);
       runtime.setSaveStatus(runtime.t("loadFailed"));
       return false;
@@ -868,8 +937,6 @@ function loadGame(options = {}) {
     loadRecoveryMode = false;
     clearLoadFailure();
     runtime.autoSaveElapsed = 0;
-    loadTransactionActive = false;
-    if (offlineProcessed) runtime.saveGame("manual", { allowDuringLoadRecovery: true });
     runtime.setSaveStatus(runtime.t("loaded"));
     return true;
   } catch (error) {

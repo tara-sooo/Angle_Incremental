@@ -121,11 +121,13 @@ try {
       visible: Boolean(modal && !modal.hidden),
       title: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
       summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
+      canvas: modal?.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
     };
   });
   assert.equal(updateModal.visible, true, "the 0.9.1 update modal should appear for a fresh browser profile");
   assert.equal(updateModal.title, "0.9.1 アップデート", "the update modal should show the current Japanese version");
   assert.match(updateModal.summary, /セーブ保護/);
+  assert.match(updateModal.canvas, /既存セーブでは容量や残高が減少/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   const serverClockProbe = await page.evaluate(async () => {

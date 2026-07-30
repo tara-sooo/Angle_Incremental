@@ -69,6 +69,43 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.score = 123;
+    state.scoreLog10 = Math.log10(123);
+    state.generationCount = 41;
+    state.lastInfinityRuns = [{ time: 3, realTime: 2, scoreLog10: 1, ipGain: 4, challenge: 0 }];
+    const before = {
+      score: state.score,
+      scoreLog10: state.scoreLog10,
+      generationCount: state.generationCount,
+      lastInfinityRuns: state.lastInfinityRuns.map((run) => ({ ...run })),
+    };
+    const originalSanitizeInfinityRunRecords = runtime.sanitizeInfinityRunRecords;
+    runtime.sanitizeInfinityRunRecords = () => {
+      throw new Error("test partial apply failure");
+    };
+    try {
+      assert.throws(
+        () => runtime.applySaveData({ score: 999, scoreLog10: 999, generationCount: 99 }, 10),
+        /test partial apply failure/,
+        "a partial save-data application should surface its error",
+      );
+    } finally {
+      runtime.sanitizeInfinityRunRecords = originalSanitizeInfinityRunRecords;
+    }
+    assert.equal(state.score, before.score, "a partial apply failure must restore the score");
+    assert.equal(state.scoreLog10, before.scoreLog10, "a partial apply failure must restore score log data");
+    assert.equal(state.generationCount, before.generationCount, "a partial apply failure must restore generation state");
+    assert.equal(
+      JSON.stringify(state.lastInfinityRuns),
+      JSON.stringify(before.lastInfinityRuns),
+      "a partial apply failure must restore nested state",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { debug, runtime, storage } = instance;
     const originalSave = runtime.serializeSaveData();
     originalSave.savedAt = Date.now();
@@ -97,6 +134,50 @@ async function runSaveRecoveryModuleRuntimeTest() {
       assert.equal(failure.stage, "offline", "offline failures should be diagnosed separately");
     } finally {
       runtime.processOfflineElapsed = originalProcessOfflineElapsed;
+    }
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { context, debug, runtime, storage } = instance;
+    const { state } = debug;
+    state.generationCount = 8;
+    const originalSave = runtime.serializeSaveData();
+    originalSave.savedAt = Date.now();
+    const rawSave = JSON.stringify(originalSave);
+    const originalProcessOfflineElapsed = runtime.processOfflineElapsed;
+    const originalOfflineElapsedFromSave = runtime.offlineElapsedFromSave;
+    const originalSetItem = context.localStorage.setItem;
+    storage.set(runtime.SAVE_KEY, rawSave);
+    runtime.offlineElapsedFromSave = () => ({
+      elapsedSeconds: 60,
+      clockSource: "local-fallback",
+      clockAnomaly: false,
+      legacyTimestampUsed: false,
+    });
+    runtime.processOfflineElapsed = () => {
+      runtime.state.generationCount += 1;
+    };
+    context.localStorage.setItem = (key, value) => {
+      if (key === runtime.SAVE_KEY) throw new Error("storage full");
+      return originalSetItem(key, value);
+    };
+    try {
+      assert.equal(debug.loadGame(), false, "offline progress must fail when the post-progress save fails");
+      assert.equal(state.generationCount, 8, "a failed post-offline save must roll back the applied reward");
+      assert.equal(storage.get(runtime.SAVE_KEY), rawSave, "a failed post-offline save must keep the original save");
+      assert.equal(runtime.loadRecoveryMode, true, "a failed post-offline save must require recovery");
+      const failure = JSON.parse(storage.get(runtime.SAVE_LOAD_FAILURE_KEY));
+      assert.equal(failure.stage, "offline", "post-offline save failures should use offline diagnostics");
+
+      context.localStorage.setItem = originalSetItem;
+      assert.equal(debug.retryLoad(), true, "retry should succeed after the storage failure is removed");
+      assert.equal(state.generationCount, 9, "retry should apply the offline reward exactly once");
+      assert.equal(JSON.parse(storage.get(runtime.SAVE_KEY)).state.generationCount, 9, "retry should persist the applied reward");
+    } finally {
+      context.localStorage.setItem = originalSetItem;
+      runtime.processOfflineElapsed = originalProcessOfflineElapsed;
+      runtime.offlineElapsedFromSave = originalOfflineElapsedFromSave;
     }
   }
 
@@ -322,6 +403,34 @@ async function runSaveRecoveryModuleRuntimeTest() {
       afterReloadPeriodic.some((entry) => entry.state.generationCount === 1),
       true,
       "the valid pre-rollback checkpoint should remain available after reload",
+    );
+
+    const fullFutureNow = Date.now() + 60 * 60 * 1000;
+    const fullFutureHistory = [1, 2, 3].map((generationCount, index) => ({
+      appVersion: "0.9.0",
+      saveVersion: 10,
+      savedAt: fullFutureNow + (index + 1) * 60 * 60 * 1000,
+      backedUpAt: fullFutureNow + (index + 1) * 60 * 60 * 1000,
+      reason: "periodic",
+      state: { score: 0, scoreLog10: -Infinity, generationCount },
+    }));
+    const fullFutureInstance = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save-checkpoints", JSON.stringify(fullFutureHistory)],
+    ]));
+    const { debug: fullFutureDebug } = fullFutureInstance;
+    fullFutureDebug.state.generationCount = 4;
+    assert.equal(
+      fullFutureDebug.saveGame("auto"),
+      true,
+      "a rollback should still write a checkpoint when future entries already fill the limit",
+    );
+    const fullFuturePeriodic = fullFutureDebug.recoveryEntries().checkpoints
+      .filter((entry) => entry.reason === "periodic");
+    assert.equal(fullFuturePeriodic.length, 3, "future checkpoint histories should keep the periodic limit");
+    assert.equal(
+      fullFuturePeriodic.some((entry) => entry.state.generationCount === 4),
+      true,
+      "the newly created rollback recovery point must survive periodic rotation",
     );
 
     const mixedNow = Date.now();
