@@ -21,10 +21,16 @@ jobs:
           node-version: 22
       - name: Apply rescope patch
         run: |
-          base64 --decode .github/pr69-rescope.patch.gz.b64 | gzip --decompress > /tmp/pr69-rescope.patch
+          cat .github/pr69-rescope.patch.part00 \
+              .github/pr69-rescope.patch.part01 \
+              .github/pr69-rescope.patch.part02 \
+              .github/pr69-rescope.patch.part03 \
+              .github/pr69-rescope.patch.part04 \
+            | base64 --decode \
+            | gzip --decompress > /tmp/pr69-rescope.patch
           git apply --check --exclude=.github/workflows/regression.yml /tmp/pr69-rescope.patch
           git apply --exclude=.github/workflows/regression.yml /tmp/pr69-rescope.patch
-          rm .github/pr69-rescope.patch.gz.b64
+          rm -f .github/pr69-rescope.patch.gz.b64 .github/pr69-rescope.patch.part*
           cat > .github/workflows/regression.yml <<'YAML'
           name: Regression Suite
 
