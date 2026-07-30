@@ -352,7 +352,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(state.generationCount, 99, "checkpoint undo should recover the pre-restore state");
 
     state.generationCount = 41;
-    assert.equal(runtime.reloadForRemoteUpdate("0.9.1"), undefined, "a remote update reload should be deferred by the test location");
+    assert.equal(runtime.reloadForRemoteUpdate("test-update"), undefined, "a remote update reload should be deferred by the test location");
     assert.equal(
       debug.recoveryEntries().checkpoints.some((entry) => entry.reason === "pre-update"),
       true,

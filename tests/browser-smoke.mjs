@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.9.1";
+const EXPECTED_ASSET_VERSION = "0.9.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -124,10 +124,10 @@ try {
       canvas: modal?.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.9.1 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.9.1 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /セーブ保護/);
-  assert.match(updateModal.canvas, /既存セーブでは容量や残高が減少/);
+  assert.equal(updateModal.visible, true, "the 0.9.0 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.9.0 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /セーブ復旧/);
+  assert.match(updateModal.canvas, /Tower Challenge/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   const serverClockProbe = await page.evaluate(async () => {
@@ -236,56 +236,6 @@ try {
     } finally {
       await existingContext.close();
     }
-  }
-
-  const maxCapacityContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const maxCapacityErrors = [];
-  await maxCapacityContext.addInitScript((saveData) => {
-    localStorage.setItem("angle-incremental-save", JSON.stringify(saveData));
-    localStorage.setItem("angle-incremental-seen-version", "0.9.1");
-  }, {
-    version: 10,
-    savedAt: Date.now(),
-    state: {
-      offlineProgressEnabled: true,
-      timeFlux: 1500000,
-      timeFluxCapacityLevel: 60,
-    },
-  });
-  const maxCapacityPage = await maxCapacityContext.newPage();
-  maxCapacityPage.on("pageerror", (error) => maxCapacityErrors.push(error.message));
-  maxCapacityPage.on("console", (message) => {
-    if (message.type() === "error") maxCapacityErrors.push(message.text());
-  });
-  try {
-    await maxCapacityPage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
-    await maxCapacityPage.waitForFunction(() => Boolean(window.__angleDebug?.ready));
-    await maxCapacityPage.evaluate(() => window.__angleDebug.ready);
-    const maxCapacityLoaded = await maxCapacityPage.evaluate(() => {
-      window.__angleDebug.switchMainTab("timeFlux");
-      window.advanceTime(0);
-      return {
-        capacityLevel: window.__angleDebug.state.timeFluxCapacityLevel,
-        timeFlux: window.__angleDebug.state.timeFlux,
-        levelText: document.querySelector("#timeFluxCapacityLevel")?.textContent?.trim() ?? "",
-        costText: document.querySelector("#timeFluxCapacityCost")?.textContent?.trim() ?? "",
-        disabled: document.querySelector("#timeFluxCapacityUpgrade")?.disabled ?? false,
-      };
-    });
-    assert.deepEqual(
-      maxCapacityLoaded,
-      {
-        capacityLevel: 59,
-        timeFlux: 1209600,
-        levelText: "MAX",
-        costText: "MAX",
-        disabled: true,
-      },
-      "over-limit saves should clamp and render the Time Flux capacity MAX state",
-    );
-    assert.deepEqual(maxCapacityErrors, [], "the maximum Time Flux capacity save should load without browser errors");
-  } finally {
-    await maxCapacityContext.close();
   }
 
   const serverClockContext = await browser.newContext({ viewport: { width: 1280, height: 800 } });
@@ -1215,7 +1165,7 @@ try {
       quickBarVisible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
-    assert.equal(mobileStartup.updateTitle, "0.9.1 アップデート", "mobile startup should use the release version");
+    assert.equal(mobileStartup.updateTitle, "0.9.0 アップデート", "mobile startup should use the release version");
     assert.equal(mobileStartup.tabCount, 9, "mobile startup should expose every main tab");
     assert.equal(mobileStartup.quickBarVisible, true, "the Time Flux quick bar should be visible on mobile");
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
