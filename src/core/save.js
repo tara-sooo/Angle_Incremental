@@ -716,6 +716,7 @@ function serializeSaveData() {
 function saveGame(reason = "auto", options = {}) {
   if (loadTransactionActive) return true;
   if (loadRecoveryMode && !options.allowDuringLoadRecovery) {
+    runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
     return false;
   }
@@ -747,6 +748,7 @@ function saveGame(reason = "auto", options = {}) {
 
 function quarantineSave(raw, details = {}, options = {}) {
   let changed = false;
+  let quarantined = false;
   try {
     if (raw) {
       const error = errorDetails(details.error);
@@ -760,11 +762,12 @@ function quarantineSave(raw, details = {}, options = {}) {
         raw,
       }));
       changed = true;
+      quarantined = true;
     }
   } catch (error) {
     // Quarantine failure should not prevent the game from opening.
   }
-  if (options.removeSave) {
+  if (options.removeSave && quarantined) {
     try {
       localStorage.removeItem(runtime.SAVE_KEY);
       changed = true;

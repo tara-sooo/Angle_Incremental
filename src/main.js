@@ -623,8 +623,12 @@ function update(dt) {
 
 function runRealTimeMaintenance(realSeconds) {
   if (offlineProcessing || realSeconds <= 0) return;
-  autoSaveElapsed += realSeconds;
-  if (autoSaveElapsed >= 5) runtime.saveGame("auto");
+  if (runtime.loadRecoveryMode) {
+    autoSaveElapsed = 0;
+  } else {
+    autoSaveElapsed += realSeconds;
+    if (autoSaveElapsed >= 5) runtime.saveGame("auto");
+  }
 
   updateCheckElapsed += realSeconds;
   if (updateCheckElapsed >= runtime.UPDATE_CHECK_INTERVAL_SECONDS) {

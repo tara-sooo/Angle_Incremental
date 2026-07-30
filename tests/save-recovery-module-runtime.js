@@ -56,6 +56,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       const failure = JSON.parse(storage.get(runtime.SAVE_LOAD_FAILURE_KEY));
       assert.equal(failure.stage, "apply", "apply failures should be diagnosed separately");
       assert.equal(debug.saveGame("auto"), false, "regular saves must stop until recovery succeeds");
+      assert.equal(runtime.autoSaveElapsed, 0, "a blocked autosave should consume its timer");
       runtime.updateUi();
       assert.equal(runtime.elements.retryLoadButton.hidden, false, "the recovery UI should offer a retry");
     } finally {
@@ -111,6 +112,24 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(storage.has(runtime.SAVE_LOAD_FAILURE_KEY), false, "format failures should use quarantine without load diagnostics");
     runtime.updateUi();
     assert.equal(storage.has(runtime.SAVE_KEY), false, "the initial state must not be autosaved after a format failure");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { context, debug, runtime, storage } = instance;
+    const invalidRaw = "{quota-failure";
+    storage.set(runtime.SAVE_KEY, invalidRaw);
+    const originalSetItem = context.localStorage.setItem;
+    context.localStorage.setItem = (key, value) => {
+      if (key === runtime.SAVE_QUARANTINE_KEY) throw new Error("storage full");
+      return originalSetItem(key, value);
+    };
+    assert.equal(debug.loadGame(), false, "a format failure should still fail when quarantine storage is full");
+    assert.equal(
+      storage.get(runtime.SAVE_KEY),
+      invalidRaw,
+      "a quarantine storage failure must keep the original save",
+    );
   }
 
   {
