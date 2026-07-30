@@ -115,10 +115,10 @@ Original prompt: では、中核ループを完成させてください
 - Made cleared Tower Challenges replayable: permanent rewards remain first-clear-only, TC1 replays use its dedicated reset, and TC2 replays retain normal Infinity rewards.
 - Centered IU 12-1 and 13-1 in the Infinity Upgrade tree and added Statistics sub-tabs with persistent fastest game-time records for all IC and TC entries.
 - Prepared the 0.9.0 release candidate with save recovery checkpoints, IU 13-1, Tower Challenges 1/2 and replay support, persistent IC/TC fastest clear times, and invalid-challenge timer cleanup while keeping SAVE_VERSION 10 unchanged; TC3/TC4 remain deferred.
+- Prepared the 0.9.1 release candidate with checkpoint clock-rollback fixes, staged Time Flux capacity, unrestricted trusted-clock offline progress, and load-failure save protection while keeping SAVE_VERSION 10 unchanged; TC3/TC4 and official IC6-IC8 designs remain deferred.
 
 ## TODO
 
-- Verify the new save-code controls, IC auto-complete toggle, and updated IC formula display in Firefox/Playwright on desktop and mobile before release.
 - Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: playtest the tuned Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle upgrade curve.

@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.9.0";
+const EXPECTED_ASSET_VERSION = "0.9.1";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -123,9 +123,9 @@ try {
       summary: modal?.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.9.0 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.9.0 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /セーブ復旧/);
+  assert.equal(updateModal.visible, true, "the 0.9.1 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.9.1 アップデート", "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /セーブ保護/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   const serverClockProbe = await page.evaluate(async () => {
@@ -240,7 +240,7 @@ try {
   const maxCapacityErrors = [];
   await maxCapacityContext.addInitScript((saveData) => {
     localStorage.setItem("angle-incremental-save", JSON.stringify(saveData));
-    localStorage.setItem("angle-incremental-seen-version", "0.9.0");
+    localStorage.setItem("angle-incremental-seen-version", "0.9.1");
   }, {
     version: 10,
     savedAt: Date.now(),
@@ -1130,6 +1130,46 @@ try {
     "typing f in the save-code area must not toggle fullscreen",
   );
 
+  await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    state.generationCount = 7;
+    state.previousGenerationScore = 1e12;
+    state.previousGenerationScoreLog10 = 12;
+    window.advanceTime(0);
+  });
+  await page.locator("#exportSaveCodeButton").click();
+  await page.waitForFunction(() => document.querySelector("#saveCodeArea")?.value.startsWith("ANGLE_SAVE_V2:"));
+  const exportedSaveCodeLength = await saveCodeArea.inputValue().then((value) => value.length);
+  await page.evaluate(() => {
+    window.__angleDebug.state.generationCount = 99;
+  });
+  await page.locator("#importSaveCodeButton").click();
+  await page.waitForFunction(() => window.__angleDebug.state.generationCount === 7);
+  assert.ok(exportedSaveCodeLength > 20, "save-code export should populate the textarea");
+  assert.equal(
+    await page.evaluate(() => window.__angleDebug.state.previousGenerationScoreLog10),
+    12,
+    "save-code import should restore the exported state",
+  );
+
+  await page.locator('[data-tab="automation"]').click();
+  await page.evaluate(() => {
+    window.__angleDebug.state.infinityCount = Math.max(1, window.__angleDebug.state.infinityCount);
+    window.__angleDebug.state.infinityUpgradeMask |= 1 << 5;
+    window.advanceTime(0);
+  });
+  const autoCompleteToggle = page.locator("#autoCompleteChallengesToggle");
+  await autoCompleteToggle.check();
+  assert.equal(
+    await page.evaluate(() => window.__angleDebug.state.autoCompleteChallenges),
+    true,
+    "the IC auto-complete setting should persist through its UI toggle",
+  );
+
+  await page.locator('[data-tab="challenges"]').click();
+  const firstChallengeRestriction = await page.locator("#challengeList .challenge-restriction").first().textContent();
+  assert.match(firstChallengeRestriction ?? "", /基礎獲得式/, "the IC formula restriction should be visible");
+
   const angleTab = page.locator('[data-tab="angle"]');
   await angleTab.click();
   await angleTab.focus();
@@ -1173,7 +1213,7 @@ try {
       quickBarVisible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
-    assert.equal(mobileStartup.updateTitle, "0.9.0 アップデート", "mobile startup should use the release version");
+    assert.equal(mobileStartup.updateTitle, "0.9.1 アップデート", "mobile startup should use the release version");
     assert.equal(mobileStartup.tabCount, 9, "mobile startup should expose every main tab");
     assert.equal(mobileStartup.quickBarVisible, true, "the Time Flux quick bar should be visible on mobile");
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");

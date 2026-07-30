@@ -156,7 +156,7 @@ try {
       const page = await context.newPage();
       await page.addInitScript(() => {
         window.requestAnimationFrame = () => 0;
-        localStorage.setItem("angle-incremental-seen-version", "0.9.0");
+        localStorage.setItem("angle-incremental-seen-version", "0.9.1");
       });
       await page.goto(`http://127.0.0.1:${address.port}/index.html`, { waitUntil: "networkidle" });
       await page.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
