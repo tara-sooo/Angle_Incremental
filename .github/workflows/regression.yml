@@ -1,81 +1,25 @@
-name: Rescope PR 69
+name: Regression Suite
 
 on:
   pull_request:
     branches:
       - main
+      - next
+      - "release/**"
   push:
     branches:
-      - "release/0.9.1"
-
-permissions:
-  contents: write
+      - main
+      - next
+      - "release/**"
 
 jobs:
-  rescope:
+  regression:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: release/0.9.1
-          fetch-depth: 1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Restore normal workflow and rescope PR
-        run: |
-          cat > .github/workflows/regression.yml <<'YAML'
-          name: Regression Suite
-
-          on:
-            pull_request:
-              branches:
-                - main
-                - next
-                - "release/**"
-            push:
-              branches:
-                - main
-                - next
-                - "release/**"
-
-          jobs:
-            regression:
-              runs-on: ubuntu-latest
-              steps:
-                - uses: actions/checkout@v4
-                - uses: actions/setup-node@v4
-                  with:
-                    node-version: 22
-                - name: Verify ESM entrypoint order
-                  run: node scripts/check-runtime-esm-loader-order.js
-                - name: Check syntax
-                  run: |
-                    node --check regression-tests-esm.js
-                    find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check
-                - name: Run ESM regression suite
-                  run: node --experimental-vm-modules regression-tests-esm.js
-                - name: Install Chromium for browser smoke test
-                  run: |
-                    npm install --no-save --ignore-scripts playwright
-                    npx playwright install --with-deps chromium
-                - name: Run browser ESM smoke test
-                  run: node tests/browser-smoke.mjs
-                - name: Run performance smoke test
-                  run: node tests/performance-smoke.mjs
-                - name: Upload test diagnostics
-                  if: always()
-                  uses: actions/upload-artifact@v4
-                  with:
-                    name: test-diagnostics
-                    path: |
-                      browser-smoke-report.json
-                      output/performance-smoke.json
-                      regression-failure.txt
-                    if-no-files-found: warn
-          YAML
-          python .github/pr69_rescope.py
-          git diff --check
       - name: Verify ESM entrypoint order
         run: node scripts/check-runtime-esm-loader-order.js
       - name: Check syntax
@@ -92,10 +36,13 @@ jobs:
         run: node tests/browser-smoke.mjs
       - name: Run performance smoke test
         run: node tests/performance-smoke.mjs
-      - name: Commit rescope
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Rescope PR as infrastructure improvements"
-          git push origin HEAD:release/0.9.1
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-diagnostics
+          path: |
+            browser-smoke-report.json
+            output/performance-smoke.json
+            regression-failure.txt
+          if-no-files-found: warn
