@@ -308,7 +308,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
     const rollbackNow = Date.now();
     const fullEventHistory = Array.from(
-      { length: runtime.MAX_EVENT_SAVE_CHECKPOINTS - 1 },
+      { length: runtime.MAX_EVENT_SAVE_CHECKPOINTS },
       (_, index) => ({
         appVersion: "0.9.0",
         saveVersion: 10,
