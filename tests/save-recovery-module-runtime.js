@@ -40,6 +40,95 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { debug, runtime, storage } = instance;
+    const originalSave = runtime.serializeSaveData();
+    originalSave.savedAt = Date.now();
+    const rawSave = JSON.stringify(originalSave);
+    storage.set(runtime.SAVE_KEY, rawSave);
+    const originalApply = runtime.applySaveData;
+    runtime.applySaveData = () => {
+      throw new Error("test apply failure");
+    };
+    try {
+      assert.equal(debug.loadGame(), false, "an apply failure should fail the load transaction");
+      assert.equal(storage.get(runtime.SAVE_KEY), rawSave, "an apply failure must keep the normal save");
+      assert.equal(storage.has(runtime.SAVE_QUARANTINE_KEY), false, "an apply failure must not quarantine the save");
+      const failure = JSON.parse(storage.get(runtime.SAVE_LOAD_FAILURE_KEY));
+      assert.equal(failure.stage, "apply", "apply failures should be diagnosed separately");
+      assert.equal(debug.saveGame("auto"), false, "regular saves must stop until recovery succeeds");
+      runtime.updateUi();
+      assert.equal(runtime.elements.retryLoadButton.hidden, false, "the recovery UI should offer a retry");
+    } finally {
+      runtime.applySaveData = originalApply;
+    }
+    assert.equal(debug.retryLoad(), true, "a successful retry should finish the load recovery");
+    assert.equal(runtime.loadRecoveryMode, false, "successful retry should resume normal saving");
+    assert.equal(storage.has(runtime.SAVE_LOAD_FAILURE_KEY), false, "successful retry should clear the diagnostic");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime, storage } = instance;
+    const originalSave = runtime.serializeSaveData();
+    originalSave.savedAt = Date.now();
+    const rawSave = JSON.stringify(originalSave);
+    storage.set(runtime.SAVE_KEY, rawSave);
+    const originalProcessOfflineElapsed = runtime.processOfflineElapsed;
+    runtime.processOfflineElapsed = () => {
+      throw new Error("test offline failure");
+    };
+    try {
+      const originalOfflineElapsedFromSave = runtime.offlineElapsedFromSave;
+      runtime.offlineElapsedFromSave = () => ({
+        elapsedSeconds: 60,
+        clockSource: "local-fallback",
+        clockAnomaly: false,
+        legacyTimestampUsed: false,
+      });
+      try {
+        assert.equal(debug.loadGame(), false, "an offline failure should fail the load transaction");
+      } finally {
+        runtime.offlineElapsedFromSave = originalOfflineElapsedFromSave;
+      }
+      assert.equal(storage.get(runtime.SAVE_KEY), rawSave, "an offline failure must keep the normal save");
+      assert.equal(storage.has(runtime.SAVE_QUARANTINE_KEY), false, "an offline failure must not quarantine the save");
+      const failure = JSON.parse(storage.get(runtime.SAVE_LOAD_FAILURE_KEY));
+      assert.equal(failure.stage, "offline", "offline failures should be diagnosed separately");
+    } finally {
+      runtime.processOfflineElapsed = originalProcessOfflineElapsed;
+    }
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime, storage } = instance;
+    const invalidRaw = "{not-json";
+    storage.set(runtime.SAVE_KEY, invalidRaw);
+    assert.equal(debug.loadGame(), false, "invalid JSON should fail the load");
+    assert.equal(storage.has(runtime.SAVE_KEY), false, "invalid JSON should remove the normal save after quarantine");
+    const quarantine = JSON.parse(storage.get(runtime.SAVE_QUARANTINE_KEY));
+    assert.equal(quarantine.raw, invalidRaw, "invalid JSON should be preserved verbatim");
+    assert.equal(storage.has(runtime.SAVE_LOAD_FAILURE_KEY), false, "format failures should use quarantine without load diagnostics");
+    runtime.updateUi();
+    assert.equal(storage.has(runtime.SAVE_KEY), false, "the initial state must not be autosaved after a format failure");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime, storage } = instance;
+    const recoverableRaw = JSON.stringify(runtime.serializeSaveData());
+    storage.set(runtime.SAVE_QUARANTINE_KEY, JSON.stringify({
+      quarantinedAt: Date.now(),
+      appVersion: runtime.APP_VERSION,
+      raw: recoverableRaw,
+    }));
+    assert.equal(debug.restoreQuarantineSave(), true, "a quarantined valid save should be restorable");
+    assert.equal(storage.has(runtime.SAVE_QUARANTINE_KEY), false, "successful quarantine restore should consume the quarantine copy");
+    assert.equal(storage.has(runtime.SAVE_KEY), true, "successful quarantine restore should write the normal save");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     const { state } = debug;
     const originalLapDuration = runtime.lapDuration;

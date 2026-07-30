@@ -5,6 +5,7 @@ import { runtime, expose } from "../runtime/shared.js";
 let renderedRecoveryRevision = -1;
 let renderedRecoveryLanguage = "";
 let renderedRecoveryNumberFormat = "";
+let renderedLoadRecoveryMode = false;
 
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
@@ -109,16 +110,37 @@ function updateSaveRecoveryUi() {
     && currentRevision === renderedRecoveryRevision
     && renderedRecoveryLanguage === runtime.state.language
     && renderedRecoveryNumberFormat === runtime.state.numberFormat
+    && renderedLoadRecoveryMode === Boolean(runtime.loadRecoveryMode)
   ) return;
   const recovery = runtime.recoveryEntries();
   elements.preImportBackupStatus.textContent = recovery.preImport
     ? `${runtime.t("preImportBackupAvailable")} ${formatRecoveryTimestamp(recovery.preImport.backedUpAt)}`
     : runtime.t("noPreImportBackup");
+  if (elements.loadFailureStatus) {
+    const failure = recovery.loadFailure;
+    if (failure) {
+      const stageText = runtime.t(failure.stage === "offline" ? "loadFailureOffline" : "loadFailureApply");
+      const detail = failure.errorMessage ? `: ${failure.errorMessage}` : "";
+      elements.loadFailureStatus.textContent = `${runtime.t("loadFailureDetected")} ${stageText}${detail}`;
+    } else {
+      elements.loadFailureStatus.textContent = runtime.loadRecoveryMode
+        ? runtime.t("loadRecoveryRequired")
+        : "";
+    }
+  }
+  if (elements.quarantineStatus) {
+    elements.quarantineStatus.textContent = recovery.quarantine
+      ? `${runtime.t("quarantineAvailable")} ${formatRecoveryTimestamp(recovery.quarantine.quarantinedAt)}`
+      : "";
+  }
+  if (elements.retryLoadButton) elements.retryLoadButton.hidden = !runtime.loadRecoveryMode;
+  if (elements.restoreQuarantineButton) elements.restoreQuarantineButton.hidden = !recovery.quarantine;
   if (elements.restorePreImportButton) elements.restorePreImportButton.hidden = !recovery.preImport;
   if (elements.restoreUndoButton) elements.restoreUndoButton.hidden = !recovery.undo;
   renderedRecoveryRevision = currentRevision === null ? renderedRecoveryRevision : currentRevision;
   renderedRecoveryLanguage = runtime.state.language;
   renderedRecoveryNumberFormat = runtime.state.numberFormat;
+  renderedLoadRecoveryMode = Boolean(runtime.loadRecoveryMode);
   clearElement(elements.saveCheckpointList);
   if (recovery.checkpoints.length === 0) {
     elements.saveCheckpointList.textContent = runtime.t("noCheckpoints");

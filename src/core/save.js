@@ -5,6 +5,8 @@ import { runtime, expose } from "../runtime/shared.js";
 const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
 let recoveryRevision = 0;
 let lastPeriodicCheckpointMonotonicAt = null;
+let loadTransactionActive = false;
+let loadRecoveryMode = false;
 
 function currentSaveTimestamp() {
   return runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
@@ -66,6 +68,85 @@ function readRecoveryEntry(key) {
     return raw ? parseRecoveryEntry(JSON.parse(raw)) : null;
   } catch (error) {
     return null;
+  }
+}
+
+function readQuarantineEntry() {
+  try {
+    const raw = localStorage.getItem(runtime.SAVE_QUARANTINE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || typeof parsed.raw !== "string") return null;
+    return {
+      quarantinedAt: runtime.sanitizeNumber(parsed.quarantinedAt, 0),
+      appVersion: typeof parsed.appVersion === "string" ? parsed.appVersion : "",
+      saveVersion: Math.floor(runtime.sanitizeNumber(parsed.saveVersion, 0)),
+      stage: typeof parsed.stage === "string" ? parsed.stage : "format",
+      errorName: typeof parsed.errorName === "string" ? parsed.errorName : "",
+      errorMessage: typeof parsed.errorMessage === "string" ? parsed.errorMessage : "",
+      raw: parsed.raw,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function readLoadFailure() {
+  try {
+    const raw = localStorage.getItem(runtime.SAVE_LOAD_FAILURE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return {
+      failedAt: runtime.sanitizeNumber(parsed.failedAt, 0),
+      appVersion: typeof parsed.appVersion === "string" ? parsed.appVersion : "",
+      saveVersion: Math.floor(runtime.sanitizeNumber(parsed.saveVersion, 0)),
+      savedAt: runtime.sanitizeNumber(parsed.savedAt, 0),
+      serverSavedAt: runtime.sanitizeNumber(parsed.serverSavedAt, 0),
+      stage: parsed.stage === "offline" ? "offline" : "apply",
+      errorName: typeof parsed.errorName === "string" ? parsed.errorName : "Error",
+      errorMessage: typeof parsed.errorMessage === "string" ? parsed.errorMessage : "",
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function errorDetails(error) {
+  const errorName = typeof error?.name === "string" && error.name ? error.name : "Error";
+  const errorMessage = String(error?.message || error || "").slice(0, 500);
+  return {
+    errorName: errorName.slice(0, 100),
+    errorMessage,
+  };
+}
+
+function writeLoadFailure(stage, error, parsed = null) {
+  try {
+    const details = errorDetails(error);
+    localStorage.setItem(runtime.SAVE_LOAD_FAILURE_KEY, JSON.stringify({
+      failedAt: currentSaveTimestamp(),
+      appVersion: runtime.APP_VERSION,
+      saveVersion: parsed?.version || 0,
+      savedAt: parsed?.savedAt || 0,
+      serverSavedAt: parsed?.serverSavedAt || 0,
+      stage,
+      ...details,
+    }));
+    recoveryRevision += 1;
+  } catch (writeError) {
+    // The recovery mode still protects the save when diagnostics cannot be stored.
+  }
+}
+
+function clearLoadFailure() {
+  try {
+    if (localStorage.getItem(runtime.SAVE_LOAD_FAILURE_KEY) !== null) {
+      localStorage.removeItem(runtime.SAVE_LOAD_FAILURE_KEY);
+      recoveryRevision += 1;
+    }
+  } catch (error) {
+    // A stale diagnostic is harmless when the save itself is healthy.
   }
 }
 
@@ -171,6 +252,7 @@ function backupCurrentSave(reason = "pre-import", key = runtime.SAVE_PRE_IMPORT_
 }
 
 function createCheckpoint(reason = "periodic", options = {}) {
+  if (loadRecoveryMode && !options.allowDuringLoadRecovery) return false;
   if (runtime.offlineProcessing && reason === "periodic") return false;
   try {
     const saveData = serializeSaveData();
@@ -216,7 +298,14 @@ function recoveryEntries() {
     preImport: readRecoveryEntry(runtime.SAVE_PRE_IMPORT_KEY),
     undo: readRecoveryEntry(runtime.SAVE_RESTORE_UNDO_KEY),
     checkpoints: readCheckpointEntries(),
+    quarantine: readQuarantineEntry(),
+    loadFailure: readLoadFailure(),
   };
+}
+
+function finishLoadRecovery() {
+  loadRecoveryMode = false;
+  clearLoadFailure();
 }
 
 function restoreRecoveryEntry(entry, successMessage = "recoveryRestored") {
@@ -231,13 +320,18 @@ function restoreRecoveryEntry(entry, successMessage = "recoveryRestored") {
       recoveryEntryFromSave(currentSave, "pre-restore"),
     );
     applySaveData(entry.save.state, entry.save.version);
-    if (!runtime.saveGame("manual")) throw new Error("restore save failed");
+    if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) throw new Error("restore save failed");
+    finishLoadRecovery();
     runtime.updateUi();
     runtime.draw();
     runtime.setSaveStatus(runtime.t(successMessage));
     return true;
   } catch (error) {
-    applySaveData(currentSave.state, currentSave.version);
+    try {
+      applySaveData(currentSave.state, currentSave.version);
+    } catch (restoreError) {
+      // Keep the recovery mode active if the in-memory rollback is also unavailable.
+    }
     if (runtime.setOfflineBaseline) {
       runtime.setOfflineBaseline(currentSave.savedAt, currentSave.serverSavedAt);
     }
@@ -619,7 +713,12 @@ function serializeSaveData() {
   return saveData;
 }
 
-function saveGame(reason = "auto") {
+function saveGame(reason = "auto", options = {}) {
+  if (loadTransactionActive) return true;
+  if (loadRecoveryMode && !options.allowDuringLoadRecovery) {
+    runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
+    return false;
+  }
   if (runtime.offlineProcessing) return true;
   let savedAt = Date.now();
   let serverSavedAt = 0;
@@ -646,71 +745,180 @@ function saveGame(reason = "auto") {
   }
 }
 
-function quarantineSave(raw) {
+function quarantineSave(raw, details = {}, options = {}) {
+  let changed = false;
   try {
     if (raw) {
+      const error = errorDetails(details.error);
       localStorage.setItem(runtime.SAVE_QUARANTINE_KEY, JSON.stringify({
-        quarantinedAt: Date.now(),
+        quarantinedAt: currentSaveTimestamp(),
         appVersion: runtime.APP_VERSION,
+        saveVersion: details.saveVersion || 0,
+        stage: details.stage || "format",
+        errorName: error.errorName,
+        errorMessage: error.errorMessage,
         raw,
       }));
+      changed = true;
     }
-    localStorage.removeItem(runtime.SAVE_KEY);
   } catch (error) {
     // Quarantine failure should not prevent the game from opening.
   }
+  if (options.removeSave) {
+    try {
+      localStorage.removeItem(runtime.SAVE_KEY);
+      changed = true;
+    } catch (error) {
+      // The original save is still preferable to an in-memory replacement.
+    }
+  }
+  if (changed) recoveryRevision += 1;
 }
 
-function loadGame() {
+function loadGame(options = {}) {
+  const allowDuringLoadRecovery = Boolean(options.allowDuringLoadRecovery);
+  if (loadRecoveryMode && !allowDuringLoadRecovery) {
+    runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
+    return false;
+  }
   let raw = null;
+  let parsed = null;
+  let offlineProcessed = false;
+  loadTransactionActive = true;
   try {
     raw = localStorage.getItem(runtime.SAVE_KEY);
     if (!raw) {
       runtime.setSaveStatus(runtime.t("noSave"));
-      return;
+      return false;
     }
 
-    const parsed = normalizeStoredSave(JSON.parse(raw));
+    let candidate;
+    try {
+      candidate = JSON.parse(raw);
+    } catch (error) {
+      loadRecoveryMode = true;
+      clearLoadFailure();
+      quarantineSave(raw, { stage: "parse", error }, { removeSave: true });
+      runtime.setSaveStatus(runtime.t("loadFailed"));
+      return false;
+    }
+
+    parsed = normalizeStoredSave(candidate);
     if (!parsed) {
-      quarantineSave(raw);
+      loadRecoveryMode = true;
+      clearLoadFailure();
+      quarantineSave(
+        raw,
+        { stage: "normalize", error: new Error("invalid save format") },
+        { removeSave: true },
+      );
       runtime.setSaveStatus(runtime.t("oldSave"));
-      return;
+      return false;
     }
 
-    applySaveData(parsed.state, parsed.version);
+    try {
+      applySaveData(parsed.state, parsed.version);
+    } catch (error) {
+      loadRecoveryMode = true;
+      writeLoadFailure("apply", error, parsed);
+      runtime.setSaveStatus(runtime.t("loadFailed"));
+      return false;
+    }
+
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
     const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);
-    const offlineElapsed = runtime.offlineElapsedFromSave
-      ? runtime.offlineElapsedFromSave(savedAt, serverSavedAt)
-      : {
-        elapsedSeconds: Math.max(0, (Date.now() - savedAt) / 1000),
-        clockSource: "local-fallback",
-        clockAnomaly: false,
-        legacyTimestampUsed: false,
-      };
-    if (
-      runtime.processOfflineElapsed
-      && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
-    ) {
-      runtime.processOfflineElapsed(offlineElapsed.elapsedSeconds, "load", offlineElapsed);
-    } else if (runtime.setOfflineBaseline) {
-      runtime.setOfflineBaseline(
-        runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
-        runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
-      );
+    try {
+      const offlineElapsed = runtime.offlineElapsedFromSave
+        ? runtime.offlineElapsedFromSave(savedAt, serverSavedAt)
+        : {
+          elapsedSeconds: Math.max(0, (Date.now() - savedAt) / 1000),
+          clockSource: "local-fallback",
+          clockAnomaly: false,
+          legacyTimestampUsed: false,
+        };
+      if (
+        runtime.processOfflineElapsed
+        && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
+      ) {
+        runtime.processOfflineElapsed(offlineElapsed.elapsedSeconds, "load", offlineElapsed);
+        offlineProcessed = true;
+      } else if (runtime.setOfflineBaseline) {
+        runtime.setOfflineBaseline(
+          runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
+          runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
+        );
+      }
+    } catch (error) {
+      try {
+        applySaveData(parsed.state, parsed.version);
+      } catch (restoreError) {
+        // The persisted save remains authoritative even if the in-memory rollback fails.
+      }
+      runtime.offlineReport = null;
+      if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
+      loadRecoveryMode = true;
+      writeLoadFailure("offline", error, parsed);
+      runtime.setSaveStatus(runtime.t("loadFailed"));
+      return false;
     }
+
+    loadRecoveryMode = false;
+    clearLoadFailure();
     runtime.autoSaveElapsed = 0;
+    loadTransactionActive = false;
+    if (offlineProcessed) runtime.saveGame("manual", { allowDuringLoadRecovery: true });
     runtime.setSaveStatus(runtime.t("loaded"));
+    return true;
   } catch (error) {
-    quarantineSave(raw);
+    loadRecoveryMode = true;
+    writeLoadFailure("apply", error, parsed);
     runtime.setSaveStatus(runtime.t("loadFailed"));
+    return false;
+  } finally {
+    loadTransactionActive = false;
   }
+}
+
+function retryLoad() {
+  return loadGame({ allowDuringLoadRecovery: true });
+}
+
+function restoreQuarantineSave() {
+  const entry = readQuarantineEntry();
+  if (!entry?.raw) {
+    runtime.setSaveStatus(runtime.t("recoveryInvalid"));
+    return false;
+  }
+  if (
+    typeof window !== "undefined"
+    && typeof window.confirm === "function"
+    && !window.confirm(runtime.t("restoreQuarantineConfirm"))
+  ) return false;
+  if (!backupCurrentSave("pre-quarantine-restore", runtime.SAVE_RESTORE_UNDO_KEY)) return false;
+  try {
+    localStorage.setItem(runtime.SAVE_KEY, entry.raw);
+  } catch (error) {
+    runtime.setSaveStatus(runtime.t("recoveryRestoreFailed"));
+    return false;
+  }
+  const restored = loadGame({ allowDuringLoadRecovery: true });
+  if (!restored) return false;
+  try {
+    localStorage.removeItem(runtime.SAVE_QUARANTINE_KEY);
+    recoveryRevision += 1;
+  } catch (error) {
+    // Keeping the quarantine copy is safer than losing a recovery option.
+  }
+  runtime.setSaveStatus(runtime.t("quarantineRestored"));
+  return true;
 }
 
 function resetSave() {
   const confirmed = window.confirm(runtime.t("resetConfirm"));
   if (!confirmed) return;
-  if (!createCheckpoint("pre-reset", { force: true })) return;
+  if (!createCheckpoint("pre-reset", { force: true, allowDuringLoadRecovery: true })) return;
+  loadRecoveryMode = false;
+  clearLoadFailure();
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   localStorage.removeItem(runtime.SAVE_KEY);
   runtime.offlineReport = null;
@@ -833,9 +1041,13 @@ expose("backupCurrentSave", () => backupCurrentSave, (value) => { backupCurrentS
 expose("createCheckpoint", () => createCheckpoint, (value) => { createCheckpoint = value; });
 expose("recoveryEntries", () => recoveryEntries, (value) => { recoveryEntries = value; });
 expose("recoveryRevision", () => recoveryRevision);
+expose("loadRecoveryMode", () => loadRecoveryMode);
+expose("finishLoadRecovery", () => finishLoadRecovery);
 expose("restorePreImportSave", () => restorePreImportSave, (value) => { restorePreImportSave = value; });
 expose("restoreCheckpoint", () => restoreCheckpoint, (value) => { restoreCheckpoint = value; });
 expose("restoreUndoSave", () => restoreUndoSave, (value) => { restoreUndoSave = value; });
 expose("quarantineSave", () => quarantineSave, (value) => { quarantineSave = value; });
 expose("loadGame", () => loadGame, (value) => { loadGame = value; });
+expose("retryLoad", () => retryLoad, (value) => { retryLoad = value; });
+expose("restoreQuarantineSave", () => restoreQuarantineSave, (value) => { restoreQuarantineSave = value; });
 expose("resetSave", () => resetSave, (value) => { resetSave = value; });

@@ -816,7 +816,15 @@
               <div class="save-recovery">
                 <strong class="save-recovery-title" data-i18n="saveRecovery">セーブ復旧</strong>
                 <p id="preImportBackupStatus" class="save-recovery-status"></p>
+                <p id="loadFailureStatus" class="save-recovery-status"></p>
+                <p id="quarantineStatus" class="save-recovery-status"></p>
                 <div class="save-recovery-actions">
+                  <button id="retryLoadButton" class="reset-button" type="button" data-i18n="retryLoad" hidden>
+                    再試行
+                  </button>
+                  <button id="restoreQuarantineButton" class="reset-button" type="button" data-i18n="restoreQuarantine" hidden>
+                    隔離データを復元して再読み込み
+                  </button>
                   <button id="restorePreImportButton" class="reset-button" type="button" data-i18n="restorePreImport" hidden>
                     インポート前へ戻す
                   </button>

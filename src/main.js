@@ -92,13 +92,13 @@ function batchedUpdateUi(...args) {
   return baseUpdateUi(...args);
 }
 
-function batchedSaveGame(reason = "auto") {
+function batchedSaveGame(reason = "auto", options = {}) {
   if (simulationBatchActive()) {
     queueSimulationSave(reason);
     return true;
   }
   if (simulationFlushActive) simulationFlushSavePerformed = true;
-  return baseSaveGame(reason);
+  return baseSaveGame(reason, options);
 }
 
 runtime.updateUi = batchedUpdateUi;
@@ -1217,6 +1217,8 @@ window.__angleDebug = {
   restorePreImportSave: runtime.restorePreImportSave,
   restoreCheckpoint: runtime.restoreCheckpoint,
   restoreUndoSave: runtime.restoreUndoSave,
+  retryLoad: runtime.retryLoad,
+  restoreQuarantineSave: runtime.restoreQuarantineSave,
   loadGame: runtime.loadGame,
   resetSave: runtime.resetSave,
   exportSaveCode: runtime.exportSaveCode,
