@@ -292,8 +292,19 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
     state.generationCount = 40;
     assert.equal(debug.createCheckpoint("pre-tower-build", { force: true }), true, "event checkpoints should be writable");
-    const event = debug.recoveryEntries().checkpoints.find((entry) => entry.reason === "pre-tower-build");
+    const checkpointsAfterEvent = debug.recoveryEntries().checkpoints;
+    const event = checkpointsAfterEvent.find((entry) => entry.reason === "pre-tower-build");
     assert.equal(event.state.generationCount, 40, "event checkpoints should retain the pre-action state");
+    assert.equal(
+      checkpointsAfterEvent.filter((entry) => entry.reason === "periodic").length,
+      3,
+      "event checkpoints must not displace periodic recovery points",
+    );
+    assert.equal(
+      checkpointsAfterEvent.filter((entry) => entry.reason === "pre-tower-build").length,
+      1,
+      "event checkpoints must be stored only once",
+    );
 
     const restoreTargetIndex = debug.recoveryEntries().checkpoints.findIndex((entry) => entry.reason === "pre-tower-build");
     state.generationCount = 99;

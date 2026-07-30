@@ -303,11 +303,13 @@ function createCheckpoint(reason = "periodic", options = {}) {
 
     const nextEntry = recoveryEntryFromSave(saveData, reason);
     const nextEntries = [nextEntry, ...entries.filter((entry) => entry.reason !== reason || reason === "periodic")];
-    const periodicEntries = retainPeriodicCheckpoints(
-      nextEntries.filter((entry) => entry.reason === "periodic"),
-      nextEntry,
-      saveData,
-    );
+    const periodicEntries = reason === "periodic"
+      ? retainPeriodicCheckpoints(
+        nextEntries.filter((entry) => entry.reason === "periodic"),
+        nextEntry,
+        saveData,
+      )
+      : periodic.slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
     const eventEntries = nextEntries
       .filter((entry) => entry.reason !== "periodic")
       .sort((left, right) => right.backedUpAt - left.backedUpAt)
