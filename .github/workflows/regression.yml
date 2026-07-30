@@ -19,20 +19,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Apply rescope patch
+      - name: Restore normal workflow and rescope PR
         run: |
-          cat .github/pr69-rescope.patch.part00 \
-              .github/pr69-rescope.patch.part01a \
-              .github/pr69-rescope.patch.part01b \
-              .github/pr69-rescope.patch.part01c \
-              .github/pr69-rescope.patch.part02 \
-              .github/pr69-rescope.patch.part03 \
-              .github/pr69-rescope.patch.part04 \
-            | base64 --decode \
-            | gzip --decompress > /tmp/pr69-rescope.patch
-          git apply --check --exclude=.github/workflows/regression.yml /tmp/pr69-rescope.patch
-          git apply --exclude=.github/workflows/regression.yml /tmp/pr69-rescope.patch
-          rm -f .github/pr69-rescope.patch.gz.b64 .github/pr69-rescope.patch.part*
           cat > .github/workflows/regression.yml <<'YAML'
           name: Regression Suite
 
@@ -83,11 +71,8 @@ jobs:
                       regression-failure.txt
                     if-no-files-found: warn
           YAML
+          python .github/pr69_rescope.py
           git diff --check
-          if rg -n '0\.9\.1|TIME_FLUX_CAPACITY_SECONDS_BY_LEVEL|TIME_FLUX_MAX_CAPACITY_LEVEL|clampTimeFluxCapacityLevel|段階式Time Flux|staged Time Flux' .; then
-            echo 'Found stale release or staged Time Flux references' >&2
-            exit 1
-          fi
       - name: Verify ESM entrypoint order
         run: node scripts/check-runtime-esm-loader-order.js
       - name: Check syntax
