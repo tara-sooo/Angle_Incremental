@@ -600,6 +600,67 @@ async function runTimeFluxModuleRuntimeTest() {
     visibilitySaveFailureInstance.context.localStorage.removeItem = visibilitySaveFailureOriginalRemoveItem;
   }
 
+  const concurrentSaveInstance = await loadRuntime(candidatePath);
+  const concurrentSaveDebug = concurrentSaveInstance.debug;
+  const concurrentSaveRuntime = concurrentSaveInstance.runtime;
+  concurrentSaveDebug.state.offlineProgressEnabled = false;
+  concurrentSaveDebug.state.timeFlux = 0;
+  assert.equal(concurrentSaveRuntime.saveGame("manual"), true, "the concurrent-save test should seed a save");
+  const concurrentSaveBaseline = Date.now() - 60 * 1000;
+  concurrentSaveRuntime.setOfflineBaseline(concurrentSaveBaseline, 0);
+  let resolveConcurrentClockRequest;
+  const pendingConcurrentClockRequest = new Promise((resolve) => {
+    resolveConcurrentClockRequest = resolve;
+  });
+  concurrentSaveInstance.context.window.fetch = () => pendingConcurrentClockRequest;
+  const concurrentSaveOriginalSetItem = concurrentSaveInstance.context.localStorage.setItem;
+  const concurrentResumePromise = concurrentSaveRuntime.handleVisibilityChange();
+  await Promise.resolve();
+  const replacementSave = JSON.parse(
+    concurrentSaveInstance.context.localStorage.getItem(concurrentSaveRuntime.SAVE_KEY),
+  );
+  replacementSave.savedAt = Date.now() - 1000;
+  replacementSave.state.timeFlux = 120;
+  concurrentSaveOriginalSetItem.call(
+    concurrentSaveInstance.context.localStorage,
+    concurrentSaveRuntime.SAVE_KEY,
+    JSON.stringify(replacementSave),
+  );
+  concurrentSaveInstance.context.localStorage.setItem = (key, value) => {
+    if (key === concurrentSaveRuntime.SAVE_KEY) throw new Error("save storage unavailable");
+    return concurrentSaveOriginalSetItem(key, value);
+  };
+  try {
+    resolveConcurrentClockRequest({
+      ok: true,
+      headers: { get: () => new Date().toUTCString() },
+    });
+    await concurrentResumePromise;
+    concurrentSaveInstance.context.localStorage.setItem = concurrentSaveOriginalSetItem;
+    let retryBaselineAfterReplacement;
+    const concurrentSaveOriginalProcess = concurrentSaveRuntime.processOfflineElapsed;
+    concurrentSaveRuntime.processOfflineElapsed = (elapsed, source, clockContext) => {
+      retryBaselineAfterReplacement = clockContext?.retryBaseline;
+      return concurrentSaveOriginalProcess(elapsed, source, clockContext);
+    };
+    try {
+      assert.equal(
+        concurrentSaveDebug.retryLoad(),
+        true,
+        "a concurrent save replacement should remain recoverable",
+      );
+    } finally {
+      concurrentSaveRuntime.processOfflineElapsed = concurrentSaveOriginalProcess;
+    }
+    assert.equal(
+      retryBaselineAfterReplacement?.savedAt,
+      replacementSave.savedAt,
+      "a concurrent save replacement must invalidate the old visibility baseline",
+    );
+  } finally {
+    concurrentSaveInstance.context.localStorage.setItem = concurrentSaveOriginalSetItem;
+  }
+
   const automationRollbackInstance = await loadRuntime(candidatePath);
   const automationRollbackDebug = automationRollbackInstance.debug;
   const automationRollbackRuntime = automationRollbackInstance.runtime;

@@ -713,9 +713,14 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
   const previousNormalAutobuyElapsed = normalAutobuyElapsed;
   const previousBaselineTimestamp = offlineBaselineTimestamp;
   const previousBaselineServerTimestamp = offlineBaselineServerTimestamp;
-  const retryBaseline = clockContext.retryBaseline || {
-    savedAt: previousBaselineTimestamp,
-    serverSavedAt: previousBaselineServerTimestamp,
+  const retryBaseline = {
+    savedAt: clockContext.retryBaseline?.savedAt ?? previousBaselineTimestamp,
+    serverSavedAt: clockContext.retryBaseline?.serverSavedAt ?? previousBaselineServerTimestamp,
+    saveFingerprint: clockContext.retryBaseline
+      ? typeof clockContext.retryBaseline.saveFingerprint === "string"
+        ? clockContext.retryBaseline.saveFingerprint
+        : ""
+      : runtime.currentSaveFingerprint?.() || "",
   };
   const before = offlineSnapshot();
   const usesLocalRewardCap = clockSource !== "server";
@@ -839,6 +844,8 @@ async function handleVisibilityChange() {
   // Keep the interval that this resume began with so it cannot be discarded.
   const resumeBaselineTimestamp = offlineBaselineTimestamp;
   const resumeBaselineServerTimestamp = offlineBaselineServerTimestamp;
+  const resumeBaselineSaveFingerprint = runtime.currentSaveFingerprint?.() || "";
+  const resumeBaselineSaveRevision = runtime.saveRevision;
   const resumeGeneration = visibilityResumeGeneration;
   try {
     await syncServerClock();
@@ -850,6 +857,9 @@ async function handleVisibilityChange() {
         retryBaseline: {
           savedAt: resumeBaselineTimestamp,
           serverSavedAt: resumeBaselineServerTimestamp,
+          saveFingerprint: runtime.saveRevision !== resumeBaselineSaveRevision
+            ? runtime.currentSaveFingerprint?.() || ""
+            : resumeBaselineSaveFingerprint,
         },
       });
     } else {

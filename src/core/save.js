@@ -4,6 +4,7 @@ import { runtime, expose } from "../runtime/shared.js";
 
 const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
 let recoveryRevision = 0;
+let saveRevision = 0;
 let lastPeriodicCheckpointMonotonicAt = null;
 let loadTransactionActive = false;
 let loadRecoveryMode = false;
@@ -150,11 +151,8 @@ function writeLoadFailure(stage, error, parsed = null, retryBaseline = null) {
     const retrySavedAt = runtime.sanitizeNumber(retryBaseline?.savedAt, 0);
     const retryServerSavedAt = runtime.sanitizeNumber(retryBaseline?.serverSavedAt, 0);
     const retrySaveFingerprint = typeof retryBaseline?.saveFingerprint === "string"
-      && retryBaseline.saveFingerprint
       ? retryBaseline.saveFingerprint
-      : retryBaseline
-        ? currentSaveFingerprint()
-        : "";
+      : "";
     localStorage.setItem(runtime.SAVE_LOAD_FAILURE_KEY, JSON.stringify({
       failedAt: currentSaveTimestamp(),
       appVersion: runtime.APP_VERSION,
@@ -841,6 +839,7 @@ function saveGame(reason = "auto", options = {}) {
     saveData.savedAt = savedAt;
     serverSavedAt = saveData.serverSavedAt || 0;
     localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(saveData));
+    saveRevision += 1;
     runtime.autoSaveElapsed = 0;
     const checkpointSaved = createCheckpoint("periodic");
     runtime.setSaveStatus(
@@ -946,13 +945,7 @@ function loadGame(options = {}) {
     const previousLoadFailure = readLoadFailure();
     const retryMetadataMatchesSave = previousLoadFailure?.stage === "offline"
       && previousLoadFailure.offlineRetrySavedAt > 0
-      && (
-        previousLoadFailure.offlineRetrySaveFingerprint
-          ? previousLoadFailure.offlineRetrySaveFingerprint === loadedSaveFingerprint
-          : previousLoadFailure.savedAt > 0
-            && previousLoadFailure.savedAt === savedAt
-            && previousLoadFailure.serverSavedAt === serverSavedAt
-      );
+      && previousLoadFailure.offlineRetrySaveFingerprint === loadedSaveFingerprint;
     const retryBaseline = retryMetadataMatchesSave
       ? {
         savedAt: previousLoadFailure.offlineRetrySavedAt,
@@ -1185,8 +1178,10 @@ expose("backupCurrentSave", () => backupCurrentSave, (value) => { backupCurrentS
 expose("createCheckpoint", () => createCheckpoint, (value) => { createCheckpoint = value; });
 expose("recoveryEntries", () => recoveryEntries, (value) => { recoveryEntries = value; });
 expose("recoveryRevision", () => recoveryRevision);
+expose("saveRevision", () => saveRevision);
 expose("loadRecoveryMode", () => loadRecoveryMode);
 expose("finishLoadRecovery", () => finishLoadRecovery);
+expose("currentSaveFingerprint", () => currentSaveFingerprint);
 expose("enterLoadRecovery", () => enterLoadRecovery);
 expose("snapshotRuntimeState", () => snapshotRuntimeState);
 expose("restoreRuntimeState", () => restoreRuntimeState);
