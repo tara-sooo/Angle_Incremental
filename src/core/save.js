@@ -26,6 +26,24 @@ function normalizeStoredSave(candidate) {
   };
 }
 
+function saveFingerprint(raw) {
+  let hash = 2166136261;
+  for (let index = 0; index < raw.length; index += 1) {
+    hash ^= raw.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${raw.length}:${hash >>> 0}`;
+}
+
+function currentSaveFingerprint() {
+  try {
+    const raw = localStorage.getItem(runtime.SAVE_KEY);
+    return raw ? saveFingerprint(raw) : "";
+  } catch (error) {
+    return "";
+  }
+}
+
 function recoveryEntryFromSave(saveData, reason, backedUpAt = currentSaveTimestamp()) {
   return {
     backedUpAt,
@@ -105,6 +123,9 @@ function readLoadFailure() {
       serverSavedAt: runtime.sanitizeNumber(parsed.serverSavedAt, 0),
       offlineRetrySavedAt: runtime.sanitizeNumber(parsed.offlineRetrySavedAt, 0),
       offlineRetryServerSavedAt: runtime.sanitizeNumber(parsed.offlineRetryServerSavedAt, 0),
+      offlineRetrySaveFingerprint: typeof parsed.offlineRetrySaveFingerprint === "string"
+        ? parsed.offlineRetrySaveFingerprint
+        : "",
       stage: parsed.stage === "offline" ? "offline" : "apply",
       errorName: typeof parsed.errorName === "string" ? parsed.errorName : "Error",
       errorMessage: typeof parsed.errorMessage === "string" ? parsed.errorMessage : "",
@@ -128,6 +149,12 @@ function writeLoadFailure(stage, error, parsed = null, retryBaseline = null) {
     const details = errorDetails(error);
     const retrySavedAt = runtime.sanitizeNumber(retryBaseline?.savedAt, 0);
     const retryServerSavedAt = runtime.sanitizeNumber(retryBaseline?.serverSavedAt, 0);
+    const retrySaveFingerprint = typeof retryBaseline?.saveFingerprint === "string"
+      && retryBaseline.saveFingerprint
+      ? retryBaseline.saveFingerprint
+      : retryBaseline
+        ? currentSaveFingerprint()
+        : "";
     localStorage.setItem(runtime.SAVE_LOAD_FAILURE_KEY, JSON.stringify({
       failedAt: currentSaveTimestamp(),
       appVersion: runtime.APP_VERSION,
@@ -136,6 +163,7 @@ function writeLoadFailure(stage, error, parsed = null, retryBaseline = null) {
       serverSavedAt: parsed?.serverSavedAt || 0,
       offlineRetrySavedAt: retrySavedAt,
       offlineRetryServerSavedAt: retryServerSavedAt,
+      offlineRetrySaveFingerprint: retrySaveFingerprint,
       stage,
       ...details,
     }));
@@ -914,14 +942,24 @@ function loadGame(options = {}) {
 
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
     const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);
+    const loadedSaveFingerprint = saveFingerprint(raw);
     const previousLoadFailure = readLoadFailure();
-    const retryBaseline = previousLoadFailure?.stage === "offline"
+    const retryMetadataMatchesSave = previousLoadFailure?.stage === "offline"
       && previousLoadFailure.offlineRetrySavedAt > 0
+      && (
+        previousLoadFailure.offlineRetrySaveFingerprint
+          ? previousLoadFailure.offlineRetrySaveFingerprint === loadedSaveFingerprint
+          : previousLoadFailure.savedAt > 0
+            && previousLoadFailure.savedAt === savedAt
+            && previousLoadFailure.serverSavedAt === serverSavedAt
+      );
+    const retryBaseline = retryMetadataMatchesSave
       ? {
         savedAt: previousLoadFailure.offlineRetrySavedAt,
         serverSavedAt: previousLoadFailure.offlineRetryServerSavedAt,
+        saveFingerprint: loadedSaveFingerprint,
       }
-      : { savedAt, serverSavedAt };
+      : { savedAt, serverSavedAt, saveFingerprint: loadedSaveFingerprint };
     try {
       const offlineElapsed = runtime.offlineElapsedFromSave
         ? runtime.offlineElapsedFromSave(retryBaseline.savedAt, retryBaseline.serverSavedAt)

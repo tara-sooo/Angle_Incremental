@@ -506,6 +506,7 @@ async function runTimeFluxModuleRuntimeTest() {
   visibilitySaveFailureDebug.state.offlineProgressEnabled = false;
   visibilitySaveFailureDebug.state.timeFlux = 0;
   const visibilitySaveFailureOriginalSetItem = visibilitySaveFailureInstance.context.localStorage.setItem;
+  const visibilitySaveFailureOriginalRemoveItem = visibilitySaveFailureInstance.context.localStorage.removeItem;
   try {
     const visibilitySaveFailurePromise = visibilitySaveFailureRuntime.handleVisibilityChange();
     await Promise.resolve();
@@ -557,6 +558,12 @@ async function runTimeFluxModuleRuntimeTest() {
       "save recovery should preserve the visibility interval baseline for retry",
     );
     visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
+    visibilitySaveFailureInstance.context.localStorage.removeItem = (key) => {
+      if (key === visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY) {
+        throw new Error("recovery diagnostic removal unavailable");
+      }
+      return visibilitySaveFailureOriginalRemoveItem(key);
+    };
     assert.equal(
       visibilitySaveFailureDebug.retryLoad(),
       true,
@@ -566,8 +573,31 @@ async function runTimeFluxModuleRuntimeTest() {
       visibilitySaveFailureDebug.state.timeFlux > 0,
       "retry should restore the offline reward from the captured visibility interval",
     );
+    const recoveredSave = JSON.parse(
+      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY),
+    );
+    const originalProcessOfflineElapsed = visibilitySaveFailureRuntime.processOfflineElapsed;
+    let reloadRetryBaseline;
+    visibilitySaveFailureRuntime.processOfflineElapsed = (elapsed, source, clockContext) => {
+      reloadRetryBaseline = clockContext?.retryBaseline;
+      return originalProcessOfflineElapsed(elapsed, source, clockContext);
+    };
+    try {
+      assert.equal(
+        visibilitySaveFailureDebug.loadGame(),
+        true,
+        "a successful recovery should remain loadable when its diagnostic cannot be removed",
+      );
+    } finally {
+      visibilitySaveFailureRuntime.processOfflineElapsed = originalProcessOfflineElapsed;
+    }
+    assert.ok(
+      !reloadRetryBaseline || reloadRetryBaseline.savedAt === recoveredSave.savedAt,
+      "a stale retry baseline must not be reused after a successful recovery",
+    );
   } finally {
     visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
+    visibilitySaveFailureInstance.context.localStorage.removeItem = visibilitySaveFailureOriginalRemoveItem;
   }
 
   const automationRollbackInstance = await loadRuntime(candidatePath);
