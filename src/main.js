@@ -708,6 +708,10 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
     || (serverClockAvailable() ? "server" : "local-fallback");
   let clockAnomaly = Boolean(clockContext.clockAnomaly) || invalidElapsed;
   if (elapsed <= 0 && !clockAnomaly) return null;
+  const stateSnapshot = runtime.snapshotRuntimeState();
+  const previousOfflineReport = offlineReport;
+  const previousBaselineTimestamp = offlineBaselineTimestamp;
+  const previousBaselineServerTimestamp = offlineBaselineServerTimestamp;
   const before = offlineSnapshot();
   const usesLocalRewardCap = clockSource !== "server";
   const trustedElapsed = clockAnomaly
@@ -786,7 +790,16 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
     infiniteScoreAfterLog10: after.infiniteScoreLog10,
   };
   runtime.updateUi();
-  runtime.saveGame("manual");
+  if (!runtime.saveGame("manual")) {
+    runtime.restoreRuntimeState(stateSnapshot);
+    offlineReport = previousOfflineReport;
+    setOfflineBaseline(previousBaselineTimestamp, previousBaselineServerTimestamp);
+    runtime.enterLoadRecovery("offline", new Error("offline progress save failed"));
+    runtime.autoSaveElapsed = 0;
+    runtime.updateUi();
+    lastTime = currentFrameTime();
+    return null;
+  }
   lastTime = currentFrameTime();
   if (clockAnomaly) rebaseLocalClock();
   return offlineReport;
@@ -809,6 +822,7 @@ async function handleVisibilityChange() {
     return;
   }
   if (visibilityResumeInFlight) return;
+  if (runtime.loadRecoveryMode) return;
   visibilityResumeInFlight = true;
   // Saving while the clock request is pending may rebase the shared baseline.
   // Keep the interval that this resume began with so it cannot be discarded.

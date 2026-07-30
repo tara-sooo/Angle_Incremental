@@ -150,6 +150,12 @@ function clearLoadFailure() {
   }
 }
 
+function enterLoadRecovery(stage = "apply", error = new Error("load recovery required"), parsed = null) {
+  loadRecoveryMode = true;
+  writeLoadFailure(stage, error, parsed);
+  runtime.setSaveStatus(runtime.t("loadFailed"));
+}
+
 function readCheckpointEntries() {
   try {
     const raw = localStorage.getItem(runtime.SAVE_CHECKPOINTS_KEY);
@@ -910,7 +916,8 @@ function loadGame(options = {}) {
         runtime.processOfflineElapsed
         && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
       ) {
-        runtime.processOfflineElapsed(offlineElapsed.elapsedSeconds, "load", offlineElapsed);
+        const offlineResult = runtime.processOfflineElapsed(offlineElapsed.elapsedSeconds, "load", offlineElapsed);
+        if (offlineResult === null) throw new Error("offline progress save failed");
         offlineProcessed = true;
       } else if (runtime.setOfflineBaseline) {
         runtime.setOfflineBaseline(
@@ -1119,6 +1126,9 @@ expose("recoveryEntries", () => recoveryEntries, (value) => { recoveryEntries = 
 expose("recoveryRevision", () => recoveryRevision);
 expose("loadRecoveryMode", () => loadRecoveryMode);
 expose("finishLoadRecovery", () => finishLoadRecovery);
+expose("enterLoadRecovery", () => enterLoadRecovery);
+expose("snapshotRuntimeState", () => snapshotRuntimeState);
+expose("restoreRuntimeState", () => restoreRuntimeState);
 expose("restorePreImportSave", () => restorePreImportSave, (value) => { restorePreImportSave = value; });
 expose("restoreCheckpoint", () => restoreCheckpoint, (value) => { restoreCheckpoint = value; });
 expose("restoreUndoSave", () => restoreUndoSave, (value) => { restoreUndoSave = value; });

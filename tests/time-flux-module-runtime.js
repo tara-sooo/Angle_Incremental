@@ -493,6 +493,60 @@ async function runTimeFluxModuleRuntimeTest() {
   );
   assert.ok(resumeDebug.state.timeFlux > 0, "the retained resume interval should grant Time Flux");
 
+  const visibilitySaveFailureInstance = await loadRuntime(candidatePath);
+  const visibilitySaveFailureDebug = visibilitySaveFailureInstance.debug;
+  const visibilitySaveFailureRuntime = visibilitySaveFailureInstance.runtime;
+  const visibilitySaveFailureBaseline = Date.now() - 60 * 1000;
+  let resolveVisibilitySaveFailureClockRequest;
+  const pendingVisibilitySaveFailureClockRequest = new Promise((resolve) => {
+    resolveVisibilitySaveFailureClockRequest = resolve;
+  });
+  visibilitySaveFailureInstance.context.window.fetch = () => pendingVisibilitySaveFailureClockRequest;
+  visibilitySaveFailureRuntime.setOfflineBaseline(visibilitySaveFailureBaseline, 0);
+  visibilitySaveFailureDebug.state.offlineProgressEnabled = false;
+  visibilitySaveFailureDebug.state.timeFlux = 0;
+  const visibilitySaveFailureOriginalSetItem = visibilitySaveFailureInstance.context.localStorage.setItem;
+  visibilitySaveFailureInstance.context.localStorage.setItem = (key, value) => {
+    if (key === visibilitySaveFailureRuntime.SAVE_KEY) throw new Error("save storage unavailable");
+    return visibilitySaveFailureOriginalSetItem(key, value);
+  };
+  try {
+    const visibilitySaveFailurePromise = visibilitySaveFailureRuntime.handleVisibilityChange();
+    await Promise.resolve();
+    resolveVisibilitySaveFailureClockRequest({
+      ok: true,
+      headers: { get: () => new Date().toUTCString() },
+    });
+    await visibilitySaveFailurePromise;
+    assert.equal(
+      visibilitySaveFailureDebug.state.timeFlux,
+      0,
+      "a failed visibility save should roll back offline rewards",
+    );
+    assert.equal(
+      visibilitySaveFailureRuntime.offlineReport,
+      null,
+      "a failed visibility save should clear the offline report",
+    );
+    assert.equal(
+      visibilitySaveFailureRuntime.offlineBaselineTimestamp,
+      visibilitySaveFailureBaseline,
+      "a failed visibility save should restore the previous offline baseline",
+    );
+    assert.equal(
+      visibilitySaveFailureRuntime.loadRecoveryMode,
+      true,
+      "a failed visibility save should require save recovery",
+    );
+    assert.equal(
+      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY),
+      null,
+      "a failed visibility save should not create a partial save",
+    );
+  } finally {
+    visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
+  }
+
   const resetResumeInstance = await loadRuntime(candidatePath);
   const resetResumeDebug = resetResumeInstance.debug;
   const resetResumeRuntime = resetResumeInstance.runtime;
