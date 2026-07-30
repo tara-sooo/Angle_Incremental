@@ -22,7 +22,9 @@ jobs:
       - name: Apply rescope patch
         run: |
           cat .github/pr69-rescope.patch.part00 \
-              .github/pr69-rescope.patch.part01 \
+              .github/pr69-rescope.patch.part01a \
+              .github/pr69-rescope.patch.part01b \
+              .github/pr69-rescope.patch.part01c \
               .github/pr69-rescope.patch.part02 \
               .github/pr69-rescope.patch.part03 \
               .github/pr69-rescope.patch.part04 \
