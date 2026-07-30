@@ -306,6 +306,44 @@ async function runSaveRecoveryModuleRuntimeTest() {
       "event checkpoints must be stored only once",
     );
 
+    const rollbackNow = Date.now();
+    const fullEventHistory = Array.from(
+      { length: runtime.MAX_EVENT_SAVE_CHECKPOINTS - 1 },
+      (_, index) => ({
+        appVersion: "0.9.0",
+        saveVersion: 10,
+        savedAt: rollbackNow + (index + 1) * 60 * 1000,
+        backedUpAt: rollbackNow + (index + 1) * 60 * 1000,
+        reason: `pre-event-${index}`,
+        state: { score: 0, scoreLog10: -Infinity, generationCount: index },
+      }),
+    );
+    const rollbackEventInstance = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save-checkpoints", JSON.stringify(fullEventHistory)],
+    ]));
+    const { debug: rollbackEventDebug, runtime: rollbackEventRuntime } = rollbackEventInstance;
+    Object.defineProperty(rollbackEventRuntime, "localClockNowMs", {
+      configurable: true,
+      value: () => rollbackNow,
+    });
+    rollbackEventDebug.state.generationCount = 99;
+    assert.equal(
+      rollbackEventDebug.createCheckpoint("pre-tower-build", { force: true }),
+      true,
+      "a new event checkpoint should be writable after a local clock rollback",
+    );
+    const rollbackEventEntries = rollbackEventDebug.recoveryEntries().checkpoints;
+    assert.equal(
+      rollbackEventEntries.filter((entry) => entry.reason === "pre-tower-build").length,
+      1,
+      "a rolled-back event checkpoint must not be discarded or duplicated",
+    );
+    assert.equal(
+      rollbackEventEntries.length,
+      rollbackEventRuntime.MAX_EVENT_SAVE_CHECKPOINTS,
+      "event retention should remain capped after pinning the new checkpoint",
+    );
+
     const restoreTargetIndex = debug.recoveryEntries().checkpoints.findIndex((entry) => entry.reason === "pre-tower-build");
     state.generationCount = 99;
     assert.equal(debug.restoreCheckpoint(restoreTargetIndex), true, "a checkpoint should be restorable from the recovery list");

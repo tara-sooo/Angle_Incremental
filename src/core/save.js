@@ -310,11 +310,15 @@ function createCheckpoint(reason = "periodic", options = {}) {
         saveData,
       )
       : periodic.slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
-    const eventEntries = nextEntries
-      .filter((entry) => entry.reason !== "periodic")
-      .sort((left, right) => right.backedUpAt - left.backedUpAt)
-      .slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS);
-    writeRecoveryEntry(runtime.SAVE_CHECKPOINTS_KEY, [...periodicEntries, ...eventEntries]);
+    const eventCandidates = reason === "periodic"
+      ? nextEntries.filter((entry) => entry.reason !== "periodic")
+      : [nextEntry, ...nextEntries.filter((entry) => entry !== nextEntry && entry.reason !== "periodic")];
+    const eventEntries = eventCandidates.sort((left, right) => right.backedUpAt - left.backedUpAt);
+    const retainedEventEntries = reason === "periodic"
+      ? eventEntries.slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS)
+      : [nextEntry, ...eventEntries.filter((entry) => entry !== nextEntry)]
+        .slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS);
+    writeRecoveryEntry(runtime.SAVE_CHECKPOINTS_KEY, [...periodicEntries, ...retainedEventEntries]);
     if (reason === "periodic") {
       const monotonicNow = runtime.monotonicClockNowMs?.();
       lastPeriodicCheckpointMonotonicAt = Number.isFinite(monotonicNow) ? monotonicNow : null;
