@@ -5,6 +5,7 @@ import { runtime, expose } from "../runtime/shared.js";
 const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
 let recoveryRevision = 0;
 let saveRevision = 0;
+let lastLocalSaveFingerprint = "";
 let lastPeriodicCheckpointMonotonicAt = null;
 let loadTransactionActive = false;
 let loadRecoveryMode = false;
@@ -838,7 +839,9 @@ function saveGame(reason = "auto", options = {}) {
     const saveData = serializeSaveData();
     saveData.savedAt = savedAt;
     serverSavedAt = saveData.serverSavedAt || 0;
-    localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(saveData));
+    const serializedSave = JSON.stringify(saveData);
+    localStorage.setItem(runtime.SAVE_KEY, serializedSave);
+    lastLocalSaveFingerprint = saveFingerprint(serializedSave);
     saveRevision += 1;
     runtime.autoSaveElapsed = 0;
     const checkpointSaved = createCheckpoint("periodic");
@@ -1179,6 +1182,7 @@ expose("createCheckpoint", () => createCheckpoint, (value) => { createCheckpoint
 expose("recoveryEntries", () => recoveryEntries, (value) => { recoveryEntries = value; });
 expose("recoveryRevision", () => recoveryRevision);
 expose("saveRevision", () => saveRevision);
+expose("lastLocalSaveFingerprint", () => lastLocalSaveFingerprint);
 expose("loadRecoveryMode", () => loadRecoveryMode);
 expose("finishLoadRecovery", () => finishLoadRecovery);
 expose("currentSaveFingerprint", () => currentSaveFingerprint);

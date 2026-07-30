@@ -296,6 +296,53 @@ async function runTimeFluxModuleRuntimeTest() {
     runtime.update = originalOfflineUpdate;
   }
 
+  const extremeServerInstance = await loadRuntime(candidatePath);
+  const extremeServerDebug = extremeServerInstance.debug;
+  const extremeServerRuntime = extremeServerInstance.runtime;
+  extremeServerInstance.context.window.fetch = async () => ({
+    ok: true,
+    headers: { get: () => new Date().toUTCString() },
+  });
+  await extremeServerRuntime.syncServerClock();
+  const ancientServerSavedAt = Date.now() - 1e12;
+  const extremeServerElapsed = extremeServerRuntime.offlineElapsedFromSave(
+    Date.now(),
+    ancientServerSavedAt,
+  );
+  assert.equal(extremeServerElapsed.clockSource, "server", "an available server clock should be used for ancient saves");
+  assert.ok(extremeServerElapsed.elapsedSeconds > 1e8, "the trusted server interval should remain unlimited");
+  extremeServerDebug.state.offlineProgressEnabled = true;
+  extremeServerRuntime.state.offlineTickCount = extremeServerRuntime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS;
+  const originalExtremeServerUpdate = extremeServerRuntime.update;
+  let extremeServerUpdateCalls = 0;
+  extremeServerRuntime.update = () => {
+    extremeServerUpdateCalls += 1;
+  };
+  try {
+    const extremeServerReport = extremeServerDebug.processOfflineElapsed(
+      extremeServerElapsed.elapsedSeconds,
+      "test",
+      extremeServerElapsed,
+    );
+    assert.equal(extremeServerReport.capped, false, "ancient trusted server intervals should not use a duration cap");
+    assert.equal(
+      extremeServerReport.effectiveElapsedSeconds,
+      extremeServerElapsed.elapsedSeconds,
+      "ancient trusted server intervals should retain their full duration",
+    );
+    assert.ok(
+      extremeServerReport.processedTicks <= extremeServerRuntime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS,
+      "ancient trusted server intervals should use bounded processing",
+    );
+    assert.equal(
+      extremeServerUpdateCalls,
+      extremeServerReport.processedTicks,
+      "bounded offline processing should not expand with the interval duration",
+    );
+  } finally {
+    extremeServerRuntime.update = originalExtremeServerUpdate;
+  }
+
   const timeFluxBeforeClockAnomaly = state.timeFlux;
   const clockAnomalyReport = debug.processOfflineElapsed(3600, "test", {
     clockSource: "server",
@@ -464,6 +511,63 @@ async function runTimeFluxModuleRuntimeTest() {
   );
   assert.ok(resumeDebug.state.timeFlux > 0, "the retained resume interval should grant Time Flux");
 
+  const visibilityExceptionInstance = await loadRuntime(candidatePath);
+  const visibilityExceptionDebug = visibilityExceptionInstance.debug;
+  const visibilityExceptionRuntime = visibilityExceptionInstance.runtime;
+  const visibilityExceptionBaseline = Date.now() - 60 * 1000;
+  visibilityExceptionRuntime.setOfflineBaseline(visibilityExceptionBaseline, 0);
+  visibilityExceptionRuntime.normalAutobuyElapsed = 0.37;
+  visibilityExceptionRuntime.autoSaveElapsed = 1.25;
+  const previousVisibilityExceptionReport = { source: "before-resume" };
+  visibilityExceptionRuntime.offlineReport = previousVisibilityExceptionReport;
+  const visibilityExceptionState = visibilityExceptionRuntime.snapshotRuntimeState();
+  const visibilityExceptionNormalAutobuyElapsed = visibilityExceptionRuntime.normalAutobuyElapsed;
+  const visibilityExceptionLastTime = visibilityExceptionRuntime.lastTime;
+  const visibilityExceptionOriginalUpdate = visibilityExceptionRuntime.update;
+  let visibilityExceptionUpdateCount = 0;
+  visibilityExceptionRuntime.update = (...args) => {
+    visibilityExceptionUpdateCount += 1;
+    const result = visibilityExceptionOriginalUpdate(...args);
+    if (visibilityExceptionUpdateCount === 1) throw new Error("injected visibility update failure");
+    return result;
+  };
+  visibilityExceptionInstance.context.window.fetch = async () => ({
+    ok: true,
+    headers: { get: () => new Date().toUTCString() },
+  });
+  try {
+    await assert.doesNotReject(
+      visibilityExceptionRuntime.handleVisibilityChange(),
+      "visibility resume failures should be converted into recovery mode",
+    );
+  } finally {
+    visibilityExceptionRuntime.update = visibilityExceptionOriginalUpdate;
+  }
+  assert.deepEqual(
+    visibilityExceptionRuntime.snapshotRuntimeState(),
+    visibilityExceptionState,
+    "a visibility resume exception should restore the complete game state",
+  );
+  assert.equal(
+    visibilityExceptionRuntime.normalAutobuyElapsed,
+    visibilityExceptionNormalAutobuyElapsed,
+    "a visibility resume exception should restore the normal autobuy timer",
+  );
+  assert.equal(
+    visibilityExceptionRuntime.offlineBaselineTimestamp,
+    visibilityExceptionBaseline,
+    "a visibility resume exception should restore the local baseline",
+  );
+  assert.equal(
+    visibilityExceptionRuntime.offlineReport,
+    previousVisibilityExceptionReport,
+    "a visibility resume exception should restore the previous report",
+  );
+  assert.equal(visibilityExceptionRuntime.offlineProcessing, false, "offline processing should always be cleared");
+  assert.equal(visibilityExceptionRuntime.autoSaveElapsed, 0, "recovery should consume the autosave timer");
+  assert.equal(visibilityExceptionRuntime.lastTime, visibilityExceptionLastTime, "resume rollback should restore frame timing");
+  assert.equal(visibilityExceptionRuntime.loadRecoveryMode, true, "a visibility resume exception should enter recovery mode");
+
   const visibilitySaveFailureInstance = await loadRuntime(candidatePath);
   const visibilitySaveFailureDebug = visibilitySaveFailureInstance.debug;
   const visibilitySaveFailureRuntime = visibilitySaveFailureInstance.runtime;
@@ -591,42 +695,41 @@ async function runTimeFluxModuleRuntimeTest() {
     concurrentSaveInstance.context.localStorage.getItem(concurrentSaveRuntime.SAVE_KEY),
   );
   replacementSave.savedAt = Date.now() - 1000;
+  replacementSave.state.totalPlayTime = 9876;
   replacementSave.state.timeFlux = 120;
   concurrentSaveOriginalSetItem.call(
     concurrentSaveInstance.context.localStorage,
     concurrentSaveRuntime.SAVE_KEY,
     JSON.stringify(replacementSave),
   );
-  concurrentSaveInstance.context.localStorage.setItem = (key, value) => {
-    if (key === concurrentSaveRuntime.SAVE_KEY) throw new Error("save storage unavailable");
-    return concurrentSaveOriginalSetItem(key, value);
-  };
   try {
     resolveConcurrentClockRequest({
       ok: true,
       headers: { get: () => new Date().toUTCString() },
     });
     await concurrentResumePromise;
-    concurrentSaveInstance.context.localStorage.setItem = concurrentSaveOriginalSetItem;
-    let retryBaselineAfterReplacement;
-    const concurrentSaveOriginalProcess = concurrentSaveRuntime.processOfflineElapsed;
-    concurrentSaveRuntime.processOfflineElapsed = (elapsed, source, clockContext) => {
-      retryBaselineAfterReplacement = clockContext?.retryBaseline;
-      return concurrentSaveOriginalProcess(elapsed, source, clockContext);
-    };
-    try {
-      assert.equal(
-        concurrentSaveDebug.retryLoad(),
-        true,
-        "a concurrent save replacement should remain recoverable",
-      );
-    } finally {
-      concurrentSaveRuntime.processOfflineElapsed = concurrentSaveOriginalProcess;
-    }
     assert.equal(
-      retryBaselineAfterReplacement?.savedAt,
-      replacementSave.savedAt,
-      "a concurrent save replacement must invalidate the old visibility baseline",
+      concurrentSaveRuntime.loadRecoveryMode,
+      false,
+      "a concurrent save replacement should reload without entering recovery",
+    );
+    assert.equal(
+      concurrentSaveDebug.state.totalPlayTime,
+      replacementSave.state.totalPlayTime,
+      "a concurrent save replacement should preserve the newer tab's state",
+    );
+    assert.equal(
+      concurrentSaveDebug.state.timeFlux >= replacementSave.state.timeFlux,
+      true,
+      "a concurrent save replacement should not restore the old tab's Time Flux",
+    );
+    const persistedAfterConcurrentResume = JSON.parse(
+      concurrentSaveInstance.context.localStorage.getItem(concurrentSaveRuntime.SAVE_KEY),
+    );
+    assert.equal(
+      persistedAfterConcurrentResume.state.totalPlayTime,
+      replacementSave.state.totalPlayTime,
+      "the old tab must not overwrite a concurrent save replacement",
     );
   } finally {
     concurrentSaveInstance.context.localStorage.setItem = concurrentSaveOriginalSetItem;

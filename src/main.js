@@ -700,125 +700,164 @@ function offlineProgressNumericallySafe(seconds) {
   return true;
 }
 
-function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext = {}) {
-  const numericElapsed = runtime.sanitizeNumber(elapsedSeconds, NaN);
-  const invalidElapsed = !Number.isFinite(numericElapsed);
-  const elapsed = invalidElapsed ? 0 : Math.max(0, numericElapsed);
-  const clockSource = clockContext.clockSource
-    || (serverClockAvailable() ? "server" : "local-fallback");
-  let clockAnomaly = Boolean(clockContext.clockAnomaly) || invalidElapsed;
-  if (elapsed <= 0 && !clockAnomaly) return null;
-  const stateSnapshot = runtime.snapshotRuntimeState();
-  const previousOfflineReport = offlineReport;
-  const previousNormalAutobuyElapsed = normalAutobuyElapsed;
-  const previousBaselineTimestamp = offlineBaselineTimestamp;
-  const previousBaselineServerTimestamp = offlineBaselineServerTimestamp;
-  const retryBaseline = {
-    savedAt: clockContext.retryBaseline?.savedAt ?? previousBaselineTimestamp,
-    serverSavedAt: clockContext.retryBaseline?.serverSavedAt ?? previousBaselineServerTimestamp,
-    saveFingerprint: clockContext.retryBaseline
-      ? typeof clockContext.retryBaseline.saveFingerprint === "string"
-        ? clockContext.retryBaseline.saveFingerprint
-        : ""
-      : runtime.currentSaveFingerprint?.() || "",
+function snapshotOfflineTransaction() {
+  return {
+    state: runtime.snapshotRuntimeState(),
+    normalAutobuyElapsed,
+    autoSaveElapsed,
+    offlineBaselineTimestamp,
+    offlineBaselineServerTimestamp,
+    offlineReport,
+    lastTime,
   };
-  const before = offlineSnapshot();
-  const usesLocalRewardCap = clockSource !== "server";
-  const trustedElapsed = clockAnomaly
-    ? 0
-    : usesLocalRewardCap
-      ? Math.min(elapsed, runtime.OFFLINE_LOCAL_REWARD_MAX_SECONDS)
-      : elapsed;
-  let simulatedSeconds = 0;
-  let processedTicks = 0;
-  let timeFluxGained = 0;
-  let capacityReached = false;
-  let requestedTicks = 0;
-  let precisionReduced = false;
+}
 
-  if (!clockAnomaly && runtime.state.offlineProgressEnabled) {
-    const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
-    simulatedSeconds = trustedElapsed;
-    requestedTicks = Math.max(
-      1,
-      Math.min(tickCount, Math.ceil(simulatedSeconds / runtime.MAX_SIMULATION_STEP_SECONDS)),
-    );
-    processedTicks = Math.min(requestedTicks, runtime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS);
-    precisionReduced = processedTicks < requestedTicks;
-    if (!offlineProgressNumericallySafe(simulatedSeconds)) {
-      clockAnomaly = true;
-      simulatedSeconds = 0;
-      requestedTicks = 0;
-      processedTicks = 0;
-      precisionReduced = false;
-    } else {
-      const tickSeconds = simulatedSeconds / processedTicks;
-      offlineProcessing = true;
-      try {
-        for (let tick = 0; tick < processedTicks; tick += 1) update(tickSeconds);
-      } finally {
-        offlineProcessing = false;
+function restoreOfflineTransaction(snapshot, error, retryBaseline) {
+  try {
+    runtime.restoreRuntimeState(snapshot.state);
+  } catch (restoreError) {
+    // Recovery mode still prevents further writes when in-memory restoration fails.
+  }
+  normalAutobuyElapsed = snapshot.normalAutobuyElapsed;
+  offlineReport = snapshot.offlineReport;
+  offlineProcessing = false;
+  try {
+    setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
+  } catch (baselineError) {
+    offlineBaselineTimestamp = snapshot.offlineBaselineTimestamp;
+    offlineBaselineServerTimestamp = snapshot.offlineBaselineServerTimestamp;
+  }
+  autoSaveElapsed = 0;
+  lastTime = snapshot.lastTime;
+  try {
+    runtime.enterLoadRecovery("offline", error, null, retryBaseline);
+  } catch (recoveryError) {
+    // The save module sets recovery mode before reporting the diagnostic.
+  }
+  try {
+    runtime.updateUi();
+  } catch (updateError) {
+    // Recovery must not turn a handled save failure into an unhandled resume error.
+  }
+}
+
+function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext = {}) {
+  const transactionSnapshot = snapshotOfflineTransaction();
+  let retryBaseline = {
+    savedAt: transactionSnapshot.offlineBaselineTimestamp,
+    serverSavedAt: transactionSnapshot.offlineBaselineServerTimestamp,
+    saveFingerprint: "",
+  };
+  try {
+    const numericElapsed = runtime.sanitizeNumber(elapsedSeconds, NaN);
+    const invalidElapsed = !Number.isFinite(numericElapsed);
+    const elapsed = invalidElapsed ? 0 : Math.max(0, numericElapsed);
+    const clockSource = clockContext.clockSource
+      || (serverClockAvailable() ? "server" : "local-fallback");
+    let clockAnomaly = Boolean(clockContext.clockAnomaly) || invalidElapsed;
+    if (elapsed <= 0 && !clockAnomaly) return null;
+    retryBaseline = {
+      savedAt: clockContext.retryBaseline?.savedAt ?? transactionSnapshot.offlineBaselineTimestamp,
+      serverSavedAt: clockContext.retryBaseline?.serverSavedAt ?? transactionSnapshot.offlineBaselineServerTimestamp,
+      saveFingerprint: clockContext.retryBaseline
+        ? typeof clockContext.retryBaseline.saveFingerprint === "string"
+          ? clockContext.retryBaseline.saveFingerprint
+          : ""
+        : runtime.currentSaveFingerprint?.() || "",
+    };
+    const before = offlineSnapshot();
+    const usesLocalRewardCap = clockSource !== "server";
+    const trustedElapsed = clockAnomaly
+      ? 0
+      : usesLocalRewardCap
+        ? Math.min(elapsed, runtime.OFFLINE_LOCAL_REWARD_MAX_SECONDS)
+        : elapsed;
+    let simulatedSeconds = 0;
+    let processedTicks = 0;
+    let timeFluxGained = 0;
+    let capacityReached = false;
+    let requestedTicks = 0;
+    let precisionReduced = false;
+
+    if (!clockAnomaly && runtime.state.offlineProgressEnabled) {
+      const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
+      simulatedSeconds = trustedElapsed;
+      requestedTicks = Math.max(
+        1,
+        Math.min(tickCount, Math.ceil(simulatedSeconds / runtime.MAX_SIMULATION_STEP_SECONDS)),
+      );
+      processedTicks = Math.min(requestedTicks, runtime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS);
+      precisionReduced = processedTicks < requestedTicks;
+      if (!offlineProgressNumericallySafe(simulatedSeconds)) {
+        clockAnomaly = true;
+        simulatedSeconds = 0;
+        requestedTicks = 0;
+        processedTicks = 0;
+        precisionReduced = false;
+      } else {
+        const tickSeconds = simulatedSeconds / processedTicks;
+        offlineProcessing = true;
+        try {
+          for (let tick = 0; tick < processedTicks; tick += 1) update(tickSeconds);
+        } finally {
+          offlineProcessing = false;
+        }
+      }
+    } else if (!clockAnomaly) {
+      const theoreticalGain = runtime.timeFluxGainPerHour() * trustedElapsed / 3600;
+      if (!Number.isFinite(theoreticalGain)) {
+        clockAnomaly = true;
+      } else {
+        timeFluxGained = runtime.addTimeFlux(theoreticalGain);
+        capacityReached = timeFluxGained + 1e-9 < theoreticalGain;
       }
     }
-  } else if (!clockAnomaly) {
-    const theoreticalGain = runtime.timeFluxGainPerHour() * trustedElapsed / 3600;
-    if (!Number.isFinite(theoreticalGain)) {
-      clockAnomaly = true;
-    } else {
-      timeFluxGained = runtime.addTimeFlux(theoreticalGain);
-      capacityReached = timeFluxGained + 1e-9 < theoreticalGain;
-    }
-  }
 
-  const after = offlineSnapshot();
-  const effectiveElapsedSeconds = clockAnomaly
-    ? 0
-    : runtime.state.offlineProgressEnabled
-      ? simulatedSeconds
-      : trustedElapsed;
-  offlineReport = {
-    source,
-    elapsedSeconds: elapsed,
-    effectiveElapsedSeconds,
-    simulatedSeconds,
-    processedTicks,
-    requestedTicks,
-    precisionReduced,
-    capped: effectiveElapsedSeconds + 1e-9 < elapsed,
-    offlineProgressEnabled: runtime.state.offlineProgressEnabled,
-    timeFluxGained,
-    capacityReached,
-    clockSource,
-    clockAnomaly,
-    rewardSuppressed: clockAnomaly,
-    legacyTimestampUsed: Boolean(clockContext.legacyTimestampUsed),
-    infinityCountBefore: before.infinityCount,
-    infinityCountAfter: after.infinityCount,
-    infinityPointsBeforeLog10: before.infinityPointsLog10,
-    infinityPointsAfterLog10: after.infinityPointsLog10,
-    infiniteScoreBeforeLog10: before.infiniteScoreLog10,
-    infiniteScoreAfterLog10: after.infiniteScoreLog10,
-  };
-  runtime.updateUi();
-  if (!runtime.saveGame("manual")) {
-    runtime.restoreRuntimeState(stateSnapshot);
-    normalAutobuyElapsed = previousNormalAutobuyElapsed;
-    offlineReport = previousOfflineReport;
-    setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
-    runtime.enterLoadRecovery(
-      "offline",
-      new Error("offline progress save failed"),
-      null,
-      retryBaseline,
-    );
-    runtime.autoSaveElapsed = 0;
+    const after = offlineSnapshot();
+    const effectiveElapsedSeconds = clockAnomaly
+      ? 0
+      : runtime.state.offlineProgressEnabled
+        ? simulatedSeconds
+        : trustedElapsed;
+    offlineReport = {
+      source,
+      elapsedSeconds: elapsed,
+      effectiveElapsedSeconds,
+      simulatedSeconds,
+      processedTicks,
+      requestedTicks,
+      precisionReduced,
+      capped: effectiveElapsedSeconds + 1e-9 < elapsed,
+      offlineProgressEnabled: runtime.state.offlineProgressEnabled,
+      timeFluxGained,
+      capacityReached,
+      clockSource,
+      clockAnomaly,
+      rewardSuppressed: clockAnomaly,
+      legacyTimestampUsed: Boolean(clockContext.legacyTimestampUsed),
+      infinityCountBefore: before.infinityCount,
+      infinityCountAfter: after.infinityCount,
+      infinityPointsBeforeLog10: before.infinityPointsLog10,
+      infinityPointsAfterLog10: after.infinityPointsLog10,
+      infiniteScoreBeforeLog10: before.infiniteScoreLog10,
+      infiniteScoreAfterLog10: after.infiniteScoreLog10,
+    };
     runtime.updateUi();
+    if (!runtime.saveGame("manual")) {
+      restoreOfflineTransaction(
+        transactionSnapshot,
+        new Error("offline progress save failed"),
+        retryBaseline,
+      );
+      return null;
+    }
     lastTime = currentFrameTime();
+    if (clockAnomaly) rebaseLocalClock();
+    return offlineReport;
+  } catch (error) {
+    restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
     return null;
   }
-  lastTime = currentFrameTime();
-  if (clockAnomaly) rebaseLocalClock();
-  return offlineReport;
 }
 
 function setOfflineBaseline(timestamp = localClockNow(), serverTimestamp = 0) {
@@ -834,12 +873,23 @@ function invalidateVisibilityResume() {
 
 async function handleVisibilityChange() {
   if (document.hidden) {
-    runtime.saveGame("auto");
+    const transactionSnapshot = snapshotOfflineTransaction();
+    const retryBaseline = {
+      savedAt: offlineBaselineTimestamp,
+      serverSavedAt: offlineBaselineServerTimestamp,
+      saveFingerprint: runtime.currentSaveFingerprint?.() || "",
+    };
+    try {
+      runtime.saveGame("auto");
+    } catch (error) {
+      restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
+    }
     return;
   }
   if (visibilityResumeInFlight) return;
   if (runtime.loadRecoveryMode) return;
   visibilityResumeInFlight = true;
+  const transactionSnapshot = snapshotOfflineTransaction();
   // Saving while the clock request is pending may rebase the shared baseline.
   // Keep the interval that this resume began with so it cannot be discarded.
   const resumeBaselineTimestamp = offlineBaselineTimestamp;
@@ -847,20 +897,34 @@ async function handleVisibilityChange() {
   const resumeBaselineSaveFingerprint = runtime.currentSaveFingerprint?.() || "";
   const resumeBaselineSaveRevision = runtime.saveRevision;
   const resumeGeneration = visibilityResumeGeneration;
+  const retryBaseline = {
+    savedAt: resumeBaselineTimestamp,
+    serverSavedAt: resumeBaselineServerTimestamp,
+    saveFingerprint: resumeBaselineSaveFingerprint,
+  };
   try {
     await syncServerClock();
     if (resumeGeneration !== visibilityResumeGeneration) return;
+
+    const expectedSaveFingerprint = runtime.saveRevision !== resumeBaselineSaveRevision
+      ? runtime.lastLocalSaveFingerprint || ""
+      : resumeBaselineSaveFingerprint;
+    const currentFingerprint = runtime.currentSaveFingerprint?.() || "";
+    if (currentFingerprint !== expectedSaveFingerprint) {
+      offlineReport = null;
+      if (!runtime.loadGame({ allowDuringLoadRecovery: true })) {
+        throw new Error("save changed during visibility resume and could not be reloaded");
+      }
+      runtime.updateUi();
+      drawActiveView();
+      return;
+    }
+
     const elapsed = offlineElapsedFromSave(resumeBaselineTimestamp, resumeBaselineServerTimestamp);
     if (elapsed.elapsedSeconds > 0 || elapsed.clockAnomaly) {
       processOfflineElapsed(elapsed.elapsedSeconds, "visibility", {
         ...elapsed,
-        retryBaseline: {
-          savedAt: resumeBaselineTimestamp,
-          serverSavedAt: resumeBaselineServerTimestamp,
-          saveFingerprint: runtime.saveRevision !== resumeBaselineSaveRevision
-            ? runtime.currentSaveFingerprint?.() || ""
-            : resumeBaselineSaveFingerprint,
-        },
+        retryBaseline,
       });
     } else {
       setOfflineBaseline(
@@ -868,6 +932,8 @@ async function handleVisibilityChange() {
         serverClockAvailable() ? estimatedServerNowMs() : 0,
       );
     }
+  } catch (error) {
+    restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
   } finally {
     visibilityResumeInFlight = false;
   }
