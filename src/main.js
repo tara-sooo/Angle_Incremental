@@ -710,8 +710,13 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
   if (elapsed <= 0 && !clockAnomaly) return null;
   const stateSnapshot = runtime.snapshotRuntimeState();
   const previousOfflineReport = offlineReport;
+  const previousNormalAutobuyElapsed = normalAutobuyElapsed;
   const previousBaselineTimestamp = offlineBaselineTimestamp;
   const previousBaselineServerTimestamp = offlineBaselineServerTimestamp;
+  const retryBaseline = clockContext.retryBaseline || {
+    savedAt: previousBaselineTimestamp,
+    serverSavedAt: previousBaselineServerTimestamp,
+  };
   const before = offlineSnapshot();
   const usesLocalRewardCap = clockSource !== "server";
   const trustedElapsed = clockAnomaly
@@ -792,9 +797,15 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
   runtime.updateUi();
   if (!runtime.saveGame("manual")) {
     runtime.restoreRuntimeState(stateSnapshot);
+    normalAutobuyElapsed = previousNormalAutobuyElapsed;
     offlineReport = previousOfflineReport;
-    setOfflineBaseline(previousBaselineTimestamp, previousBaselineServerTimestamp);
-    runtime.enterLoadRecovery("offline", new Error("offline progress save failed"));
+    setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
+    runtime.enterLoadRecovery(
+      "offline",
+      new Error("offline progress save failed"),
+      null,
+      retryBaseline,
+    );
     runtime.autoSaveElapsed = 0;
     runtime.updateUi();
     lastTime = currentFrameTime();
@@ -834,7 +845,13 @@ async function handleVisibilityChange() {
     if (resumeGeneration !== visibilityResumeGeneration) return;
     const elapsed = offlineElapsedFromSave(resumeBaselineTimestamp, resumeBaselineServerTimestamp);
     if (elapsed.elapsedSeconds > 0 || elapsed.clockAnomaly) {
-      processOfflineElapsed(elapsed.elapsedSeconds, "visibility", elapsed);
+      processOfflineElapsed(elapsed.elapsedSeconds, "visibility", {
+        ...elapsed,
+        retryBaseline: {
+          savedAt: resumeBaselineTimestamp,
+          serverSavedAt: resumeBaselineServerTimestamp,
+        },
+      });
     } else {
       setOfflineBaseline(
         localClockNow(),

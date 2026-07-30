@@ -103,6 +103,8 @@ function readLoadFailure() {
       saveVersion: Math.floor(runtime.sanitizeNumber(parsed.saveVersion, 0)),
       savedAt: runtime.sanitizeNumber(parsed.savedAt, 0),
       serverSavedAt: runtime.sanitizeNumber(parsed.serverSavedAt, 0),
+      offlineRetrySavedAt: runtime.sanitizeNumber(parsed.offlineRetrySavedAt, 0),
+      offlineRetryServerSavedAt: runtime.sanitizeNumber(parsed.offlineRetryServerSavedAt, 0),
       stage: parsed.stage === "offline" ? "offline" : "apply",
       errorName: typeof parsed.errorName === "string" ? parsed.errorName : "Error",
       errorMessage: typeof parsed.errorMessage === "string" ? parsed.errorMessage : "",
@@ -121,15 +123,19 @@ function errorDetails(error) {
   };
 }
 
-function writeLoadFailure(stage, error, parsed = null) {
+function writeLoadFailure(stage, error, parsed = null, retryBaseline = null) {
   try {
     const details = errorDetails(error);
+    const retrySavedAt = runtime.sanitizeNumber(retryBaseline?.savedAt, 0);
+    const retryServerSavedAt = runtime.sanitizeNumber(retryBaseline?.serverSavedAt, 0);
     localStorage.setItem(runtime.SAVE_LOAD_FAILURE_KEY, JSON.stringify({
       failedAt: currentSaveTimestamp(),
       appVersion: runtime.APP_VERSION,
       saveVersion: parsed?.version || 0,
       savedAt: parsed?.savedAt || 0,
       serverSavedAt: parsed?.serverSavedAt || 0,
+      offlineRetrySavedAt: retrySavedAt,
+      offlineRetryServerSavedAt: retryServerSavedAt,
       stage,
       ...details,
     }));
@@ -150,9 +156,14 @@ function clearLoadFailure() {
   }
 }
 
-function enterLoadRecovery(stage = "apply", error = new Error("load recovery required"), parsed = null) {
+function enterLoadRecovery(
+  stage = "apply",
+  error = new Error("load recovery required"),
+  parsed = null,
+  retryBaseline = null,
+) {
   loadRecoveryMode = true;
-  writeLoadFailure(stage, error, parsed);
+  writeLoadFailure(stage, error, parsed, retryBaseline);
   runtime.setSaveStatus(runtime.t("loadFailed"));
 }
 
@@ -903,11 +914,19 @@ function loadGame(options = {}) {
 
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
     const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);
+    const previousLoadFailure = readLoadFailure();
+    const retryBaseline = previousLoadFailure?.stage === "offline"
+      && previousLoadFailure.offlineRetrySavedAt > 0
+      ? {
+        savedAt: previousLoadFailure.offlineRetrySavedAt,
+        serverSavedAt: previousLoadFailure.offlineRetryServerSavedAt,
+      }
+      : { savedAt, serverSavedAt };
     try {
       const offlineElapsed = runtime.offlineElapsedFromSave
-        ? runtime.offlineElapsedFromSave(savedAt, serverSavedAt)
+        ? runtime.offlineElapsedFromSave(retryBaseline.savedAt, retryBaseline.serverSavedAt)
         : {
-          elapsedSeconds: Math.max(0, (Date.now() - savedAt) / 1000),
+          elapsedSeconds: Math.max(0, (Date.now() - retryBaseline.savedAt) / 1000),
           clockSource: "local-fallback",
           clockAnomaly: false,
           legacyTimestampUsed: false,
@@ -916,7 +935,11 @@ function loadGame(options = {}) {
         runtime.processOfflineElapsed
         && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
       ) {
-        const offlineResult = runtime.processOfflineElapsed(offlineElapsed.elapsedSeconds, "load", offlineElapsed);
+        const offlineResult = runtime.processOfflineElapsed(
+          offlineElapsed.elapsedSeconds,
+          "load",
+          { ...offlineElapsed, retryBaseline },
+        );
         if (offlineResult === null) throw new Error("offline progress save failed");
         offlineProcessed = true;
       } else if (runtime.setOfflineBaseline) {
@@ -939,10 +962,10 @@ function loadGame(options = {}) {
         // The persisted save remains authoritative even if the in-memory rollback fails.
       }
       runtime.offlineReport = null;
-      if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
+      if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
       loadRecoveryMode = true;
       runtime.autoSaveElapsed = 0;
-      writeLoadFailure("offline", error, parsed);
+      writeLoadFailure("offline", error, parsed, retryBaseline);
       runtime.setSaveStatus(runtime.t("loadFailed"));
       return false;
     }

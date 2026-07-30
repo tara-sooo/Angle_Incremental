@@ -506,13 +506,25 @@ async function runTimeFluxModuleRuntimeTest() {
   visibilitySaveFailureDebug.state.offlineProgressEnabled = false;
   visibilitySaveFailureDebug.state.timeFlux = 0;
   const visibilitySaveFailureOriginalSetItem = visibilitySaveFailureInstance.context.localStorage.setItem;
-  visibilitySaveFailureInstance.context.localStorage.setItem = (key, value) => {
-    if (key === visibilitySaveFailureRuntime.SAVE_KEY) throw new Error("save storage unavailable");
-    return visibilitySaveFailureOriginalSetItem(key, value);
-  };
   try {
     const visibilitySaveFailurePromise = visibilitySaveFailureRuntime.handleVisibilityChange();
     await Promise.resolve();
+    assert.equal(
+      visibilitySaveFailureRuntime.saveGame("manual"),
+      true,
+      "a save during clock synchronization should succeed before the resume save fails",
+    );
+    const pendingResumeSave = JSON.parse(
+      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY),
+    );
+    assert.ok(
+      pendingResumeSave.savedAt > visibilitySaveFailureBaseline,
+      "the pending resume save should advance the persisted timestamp",
+    );
+    visibilitySaveFailureInstance.context.localStorage.setItem = (key, value) => {
+      if (key === visibilitySaveFailureRuntime.SAVE_KEY) throw new Error("save storage unavailable");
+      return visibilitySaveFailureOriginalSetItem(key, value);
+    };
     resolveVisibilitySaveFailureClockRequest({
       ok: true,
       headers: { get: () => new Date().toUTCString() },
@@ -539,12 +551,52 @@ async function runTimeFluxModuleRuntimeTest() {
       "a failed visibility save should require save recovery",
     );
     assert.equal(
-      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY),
-      null,
-      "a failed visibility save should not create a partial save",
+      JSON.parse(visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY))
+        .offlineRetrySavedAt,
+      visibilitySaveFailureBaseline,
+      "save recovery should preserve the visibility interval baseline for retry",
+    );
+    visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
+    assert.equal(
+      visibilitySaveFailureDebug.retryLoad(),
+      true,
+      "retry should apply the captured visibility interval after the save failure",
+    );
+    assert.ok(
+      visibilitySaveFailureDebug.state.timeFlux > 0,
+      "retry should restore the offline reward from the captured visibility interval",
     );
   } finally {
     visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
+  }
+
+  const automationRollbackInstance = await loadRuntime(candidatePath);
+  const automationRollbackDebug = automationRollbackInstance.debug;
+  const automationRollbackRuntime = automationRollbackInstance.runtime;
+  const autoBuySpeedUpgrade = automationRollbackRuntime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "1-2");
+  automationRollbackDebug.state.infinityUpgradeMask = 1 << autoBuySpeedUpgrade.bit;
+  automationRollbackDebug.state.automationEnabled = true;
+  automationRollbackDebug.state.offlineProgressEnabled = true;
+  automationRollbackRuntime.normalAutobuyElapsed = 0.02;
+  const normalAutobuyElapsedBeforeFailure = automationRollbackRuntime.normalAutobuyElapsed;
+  const automationRollbackOriginalSetItem = automationRollbackInstance.context.localStorage.setItem;
+  automationRollbackInstance.context.localStorage.setItem = (key, value) => {
+    if (key === automationRollbackRuntime.SAVE_KEY) throw new Error("save storage unavailable");
+    return automationRollbackOriginalSetItem(key, value);
+  };
+  try {
+    assert.equal(
+      automationRollbackDebug.processOfflineElapsed(0.01, "test", { clockSource: "server" }),
+      null,
+      "an automation save failure should abort offline processing",
+    );
+    assert.equal(
+      automationRollbackRuntime.normalAutobuyElapsed,
+      normalAutobuyElapsedBeforeFailure,
+      "a failed offline save should roll back the normal autobuy timer",
+    );
+  } finally {
+    automationRollbackInstance.context.localStorage.setItem = automationRollbackOriginalSetItem;
   }
 
   const resetResumeInstance = await loadRuntime(candidatePath);
