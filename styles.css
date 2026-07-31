@@ -1819,6 +1819,9 @@ canvas {
   .offline-report {
     bottom: calc(72px + env(safe-area-inset-bottom));
     width: min(600px, calc(100vw - 24px));
+    max-height: calc(100svh - 84px - env(safe-area-inset-bottom));
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .top-bar-hidden .achievement-toasts {

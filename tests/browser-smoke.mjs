@@ -598,6 +598,27 @@ try {
       `offline report should not change ${key}`,
     );
   }
+  await page.setViewportSize({ width: 640, height: 360 });
+  const shortMobileOfflineReport = await page.evaluate(() => {
+    const panel = document.querySelector("#offlineReportPanel");
+    const heading = panel?.querySelector(".panel-heading")?.getBoundingClientRect();
+    const rect = panel?.getBoundingClientRect();
+    const style = panel ? getComputedStyle(panel) : null;
+    return {
+      top: rect?.top ?? -Infinity,
+      bottom: rect?.bottom ?? Infinity,
+      headingTop: heading?.top ?? -Infinity,
+      maxHeight: Number.parseFloat(style?.maxHeight ?? "NaN"),
+      overflowY: style?.overflowY ?? "",
+      viewportHeight: window.innerHeight,
+    };
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  assert.ok(shortMobileOfflineReport.top >= 0, "short mobile offline reports should stay within the viewport at the top");
+  assert.ok(shortMobileOfflineReport.bottom <= shortMobileOfflineReport.viewportHeight, "short mobile offline reports should stay within the viewport at the bottom");
+  assert.ok(shortMobileOfflineReport.headingTop >= 0, "short mobile offline report headings should remain visible");
+  assert.ok(shortMobileOfflineReport.maxHeight <= shortMobileOfflineReport.viewportHeight - 84, "short mobile reports should use a viewport-relative max height");
+  assert.equal(shortMobileOfflineReport.overflowY, "auto", "short mobile reports should scroll internally");
   assert.ok(Math.abs(timeFluxRemoval.totalPlayTime - 2) < 1e-9, "offline processing should advance normal game time");
   assert.ok(Math.abs(timeFluxRemoval.totalRealPlayTime - 1) < 1e-9, "offline processing should not add real play time");
   assert.equal(timeFluxRemoval.timeFlux, 123456, "offline processing should not change dormant Time Flux");
