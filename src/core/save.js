@@ -6,6 +6,7 @@ const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
 let recoveryRevision = 0;
 let saveRevision = 0;
 let lastLocalSaveFingerprint = "";
+let lastKnownSaveFingerprint = "";
 let lastPeriodicCheckpointMonotonicAt = null;
 let loadTransactionActive = false;
 let loadRecoveryMode = false;
@@ -58,6 +59,10 @@ function currentSaveFingerprint() {
   } catch (error) {
     return "";
   }
+}
+
+function saveSourceIsCurrent() {
+  return currentSaveFingerprint() === lastKnownSaveFingerprint;
 }
 
 function recoveryEntryFromSave(saveData, reason, backedUpAt = currentSaveTimestamp()) {
@@ -849,6 +854,11 @@ function saveGame(reason = "auto", options = {}) {
     return false;
   }
   if (runtime.offlineProcessing) return true;
+  if (!saveSourceIsCurrent()) {
+    runtime.autoSaveElapsed = 0;
+    runtime.setSaveStatus(runtime.t("saveFailed"));
+    return false;
+  }
   let savedAt = Date.now();
   let serverSavedAt = 0;
   let savePersisted = false;
@@ -861,6 +871,7 @@ function saveGame(reason = "auto", options = {}) {
     localStorage.setItem(runtime.SAVE_KEY, serializedSave);
     savePersisted = true;
     lastLocalSaveFingerprint = saveFingerprint(serializedSave);
+    lastKnownSaveFingerprint = lastLocalSaveFingerprint;
     saveRevision += 1;
     runtime.autoSaveElapsed = 0;
     const checkpointSaved = createCheckpoint("periodic");
@@ -961,9 +972,10 @@ function loadGame(options = {}) {
       return false;
     }
 
+    const loadedSaveFingerprint = saveFingerprint(raw);
+    lastKnownSaveFingerprint = loadedSaveFingerprint;
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
     const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);
-    const loadedSaveFingerprint = saveFingerprint(raw);
     const previousLoadFailure = readLoadFailure();
     const retryMetadataMatchesSave = previousLoadFailure?.stage === "offline"
       && previousLoadFailure.offlineRetrySavedAt > 0
@@ -1025,6 +1037,9 @@ function loadGame(options = {}) {
 
     loadRecoveryMode = false;
     clearLoadFailure();
+    lastKnownSaveFingerprint = offlineProcessed
+      ? currentSaveFingerprint()
+      : loadedSaveFingerprint;
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(runtime.t("loaded"));
     return true;
@@ -1080,6 +1095,8 @@ function resetSave() {
   clearLoadFailure();
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   localStorage.removeItem(runtime.SAVE_KEY);
+  lastKnownSaveFingerprint = "";
+  lastLocalSaveFingerprint = "";
   runtime.offlineReport = null;
   if (runtime.rebaseLocalClock) runtime.rebaseLocalClock();
   if (runtime.setOfflineBaseline) {
@@ -1204,9 +1221,11 @@ expose("recoveryEntries", () => recoveryEntries, (value) => { recoveryEntries = 
 expose("recoveryRevision", () => recoveryRevision);
 expose("saveRevision", () => saveRevision);
 expose("lastLocalSaveFingerprint", () => lastLocalSaveFingerprint);
+expose("lastKnownSaveFingerprint", () => lastKnownSaveFingerprint);
 expose("loadRecoveryMode", () => loadRecoveryMode);
 expose("finishLoadRecovery", () => finishLoadRecovery);
 expose("currentSaveFingerprint", () => currentSaveFingerprint);
+expose("saveSourceIsCurrent", () => saveSourceIsCurrent);
 expose("enterLoadRecovery", () => enterLoadRecovery);
 expose("snapshotRuntimeState", () => snapshotRuntimeState);
 expose("restoreRuntimeState", () => restoreRuntimeState);

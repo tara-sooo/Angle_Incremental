@@ -169,12 +169,18 @@ function setRenderQualityLevel(level) {
   return true;
 }
 
-function updateRenderQuality(renderCostMs) {
-  if (renderQualityOverride) return;
+function observedFrameBudgetMs() {
+  return smoothedFps > 0 && Number.isFinite(smoothedFps) ? 1000 / smoothedFps : 1000 / 60;
+}
+
+function updateRenderQuality(renderCostMs, canvasRendered = true) {
+  if (!canvasRendered || renderQualityOverride) return;
+  const measuredCostMs = Number.isFinite(renderCostMs) ? Math.max(0, renderCostMs) : 0;
   renderCostEma = renderCostEma === 0
-    ? renderCostMs
-    : renderCostEma * 0.9 + renderCostMs * 0.1;
-  const pressured = (smoothedFps > 0 && smoothedFps < 45) || renderCostEma > 20;
+    ? measuredCostMs
+    : renderCostEma * 0.9 + measuredCostMs * 0.1;
+  const frameBudgetMs = observedFrameBudgetMs();
+  const pressured = renderCostEma > frameBudgetMs;
   if (pressured) {
     renderPressureFrames += 1;
     renderRecoveryFrames = 0;
@@ -185,7 +191,7 @@ function updateRenderQuality(renderCostMs) {
     return;
   }
   renderPressureFrames = 0;
-  if (smoothedFps > 55 && renderCostEma < 12) {
+  if (renderCostEma < frameBudgetMs * 0.75) {
     renderRecoveryFrames += 1;
     if (renderRecoveryFrames >= 120) {
       if (renderQualityLevel === "low") setRenderQualityLevel("balanced");
@@ -235,10 +241,10 @@ function setRenderQualityForTest(level) {
   return true;
 }
 
-function updateRenderQualityForTest(renderCostMs, fps) {
+function updateRenderQualityForTest(renderCostMs, fps, canvasRendered = true) {
   const previousFps = smoothedFps;
   if (Number.isFinite(fps)) smoothedFps = fps;
-  updateRenderQuality(renderCostMs);
+  updateRenderQuality(renderCostMs, canvasRendered);
   smoothedFps = previousFps;
   return renderQualityState();
 }
@@ -851,15 +857,32 @@ function invalidateVisibilityResume() {
   visibilityResumeGeneration += 1;
 }
 
+function saveSourceIsCurrent() {
+  return runtime.saveSourceIsCurrent ? runtime.saveSourceIsCurrent() : true;
+}
+
+function reloadAfterSaveConflict() {
+  offlineReport = null;
+  if (!runtime.loadGame({ allowDuringLoadRecovery: true })) {
+    throw new Error("save changed during visibility transition and could not be reloaded");
+  }
+  runtime.updateUi();
+  drawActiveView();
+}
+
 async function handleVisibilityChange() {
   if (document.hidden) {
     const transactionSnapshot = snapshotOfflineTransaction();
     const retryBaseline = {
       savedAt: offlineBaselineTimestamp,
       serverSavedAt: offlineBaselineServerTimestamp,
-      saveFingerprint: runtime.currentSaveFingerprint?.() || "",
+      saveFingerprint: runtime.lastKnownSaveFingerprint || "",
     };
     try {
+      if (!saveSourceIsCurrent()) {
+        reloadAfterSaveConflict();
+        return;
+      }
       const saved = runtime.saveGame("auto");
       if (!saved) {
         restoreOfflineTransaction(
@@ -881,7 +904,7 @@ async function handleVisibilityChange() {
   // Keep the interval that this resume began with so it cannot be discarded.
   const resumeBaselineTimestamp = offlineBaselineTimestamp;
   const resumeBaselineServerTimestamp = offlineBaselineServerTimestamp;
-  const resumeBaselineSaveFingerprint = runtime.currentSaveFingerprint?.() || "";
+  const resumeBaselineSaveFingerprint = runtime.lastKnownSaveFingerprint || "";
   const resumeBaselineSaveRevision = runtime.saveRevision;
   const resumeGeneration = visibilityResumeGeneration;
   const retryBaseline = {
@@ -890,11 +913,15 @@ async function handleVisibilityChange() {
     saveFingerprint: resumeBaselineSaveFingerprint,
   };
   try {
+    if (!saveSourceIsCurrent()) {
+      reloadAfterSaveConflict();
+      return;
+    }
     await syncServerClock();
     if (resumeGeneration !== visibilityResumeGeneration) return;
 
     const expectedSaveFingerprint = runtime.saveRevision !== resumeBaselineSaveRevision
-      ? runtime.lastLocalSaveFingerprint || ""
+      ? runtime.lastLocalSaveFingerprint || runtime.lastKnownSaveFingerprint || ""
       : resumeBaselineSaveFingerprint;
     const currentFingerprint = runtime.currentSaveFingerprint?.() || "";
     if (currentFingerprint !== expectedSaveFingerprint) {
@@ -934,8 +961,15 @@ function currentFrameTime() {
 }
 
 function drawActiveView() {
-  if (runtime.activeMainTab === "angle") runtime.draw();
-  if (runtime.activeMainTab === "infinity" && runtime.activeInfinitySubtab === "angle") runtime.drawInfiniteAngle();
+  if (runtime.activeMainTab === "angle") {
+    runtime.draw();
+    return true;
+  }
+  if (runtime.activeMainTab === "infinity" && runtime.activeInfinitySubtab === "angle") {
+    runtime.drawInfiniteAngle();
+    return true;
+  }
+  return false;
 }
 
 let lastTime = currentFrameTime();
@@ -963,8 +997,8 @@ function frame(now) {
   }
   const renderStartedAt = monotonicClockNow();
   if (shouldRenderFrame(now)) {
-    drawActiveView();
-    updateRenderQuality(Math.max(0, monotonicClockNow() - renderStartedAt));
+    const canvasRendered = drawActiveView();
+    if (canvasRendered) updateRenderQuality(Math.max(0, monotonicClockNow() - renderStartedAt));
   }
   requestNextFrame(frame);
 }

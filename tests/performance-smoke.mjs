@@ -111,11 +111,17 @@ function collectQualityViolations(report) {
       }
     });
     const automaticTransitions = result.automaticTransitions;
+    if (automaticTransitions?.idleThirtyFps?.level !== "high") {
+      violations.push(`${prefix}/automatic quality degraded at 30 FPS with a 5ms render cost`);
+    }
     if (automaticTransitions?.afterBalanced?.level !== "balanced") {
       violations.push(`${prefix}/automatic quality did not degrade high -> balanced`);
     }
     if (automaticTransitions?.afterLow?.level !== "low") {
       violations.push(`${prefix}/automatic quality did not degrade balanced -> low`);
+    }
+    if (automaticTransitions?.hiddenCanvas?.level !== "low") {
+      violations.push(`${prefix}/hidden canvas unexpectedly advanced quality recovery`);
     }
     if (automaticTransitions?.recoveredBalanced?.level !== "balanced") {
       violations.push(`${prefix}/automatic quality did not recover low -> balanced`);
@@ -293,13 +299,17 @@ try {
         const automaticTransitions = {
           initial: debug.renderQualityState(),
         };
-        for (let index = 0; index < 30; index += 1) debug.updateRenderQualityForTest(25, 30);
+        for (let index = 0; index < 120; index += 1) debug.updateRenderQualityForTest(5, 30, true);
+        automaticTransitions.idleThirtyFps = debug.renderQualityState();
+        for (let index = 0; index < 60; index += 1) debug.updateRenderQualityForTest(40, 30, true);
         automaticTransitions.afterBalanced = debug.renderQualityState();
-        for (let index = 0; index < 30; index += 1) debug.updateRenderQualityForTest(25, 30);
+        for (let index = 0; index < 60; index += 1) debug.updateRenderQualityForTest(40, 30, true);
         automaticTransitions.afterLow = debug.renderQualityState();
-        for (let index = 0; index < 120; index += 1) debug.updateRenderQualityForTest(5, 60);
+        for (let index = 0; index < 120; index += 1) debug.updateRenderQualityForTest(5, 30, false);
+        automaticTransitions.hiddenCanvas = debug.renderQualityState();
+        for (let index = 0; index < 240; index += 1) debug.updateRenderQualityForTest(5, 30, true);
         automaticTransitions.recoveredBalanced = debug.renderQualityState();
-        for (let index = 0; index < 120; index += 1) debug.updateRenderQualityForTest(5, 60);
+        for (let index = 0; index < 240; index += 1) debug.updateRenderQualityForTest(5, 30, true);
         automaticTransitions.recoveredHigh = debug.renderQualityState();
         debug.setRenderQualityForTest("auto");
 

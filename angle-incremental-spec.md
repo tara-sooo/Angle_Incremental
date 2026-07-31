@@ -1,6 +1,6 @@
 # Angle Incremental 開発仕様書
 
-対象状態: **開発中（次期リリース未定）**
+対象リリース: **0.10.0**
 
 この文書は、現行公開版のゲーム仕様と実装基準をまとめる。プレイヤー向けの遊び方は [angle-incremental-guide.md](angle-incremental-guide.md) を参照する。
 

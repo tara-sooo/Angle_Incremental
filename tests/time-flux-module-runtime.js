@@ -313,6 +313,79 @@ async function runTimeFluxModuleRuntimeTest() {
     visibilitySaveFailureInstance.context.localStorage.removeItem = visibilitySaveFailureOriginalRemoveItem;
   }
 
+  const preResumeConcurrentInstance = await loadRuntime(candidatePath);
+  const preResumeConcurrentDebug = preResumeConcurrentInstance.debug;
+  const preResumeConcurrentRuntime = preResumeConcurrentInstance.runtime;
+  preResumeConcurrentDebug.state.timeFlux = 120;
+  assert.equal(preResumeConcurrentRuntime.saveGame("manual"), true, "the pre-resume concurrency test should seed a save");
+  preResumeConcurrentRuntime.setOfflineBaseline(Date.now() - 60 * 1000, 0);
+  const preResumeReplacement = JSON.parse(
+    preResumeConcurrentInstance.context.localStorage.getItem(preResumeConcurrentRuntime.SAVE_KEY),
+  );
+  preResumeReplacement.savedAt = Date.now();
+  preResumeReplacement.state.totalPlayTime = 9876;
+  preResumeReplacement.state.timeFlux = 120;
+  preResumeConcurrentInstance.context.localStorage.setItem(
+    preResumeConcurrentRuntime.SAVE_KEY,
+    JSON.stringify(preResumeReplacement),
+  );
+  await preResumeConcurrentRuntime.handleVisibilityChange();
+  assert.equal(preResumeConcurrentRuntime.loadRecoveryMode, false, "a save replaced before resume should reload normally");
+  assert.ok(
+    preResumeConcurrentDebug.state.totalPlayTime >= preResumeReplacement.state.totalPlayTime,
+    "a save replaced before resume should become the recovery base",
+  );
+  assert.ok(
+    preResumeConcurrentDebug.state.totalPlayTime < preResumeReplacement.state.totalPlayTime + 10,
+    "resume must not replay the old tab's captured interval after a replacement",
+  );
+  const persistedPreResumeReplacement = JSON.parse(
+    preResumeConcurrentInstance.context.localStorage.getItem(preResumeConcurrentRuntime.SAVE_KEY),
+  );
+  assert.ok(
+    persistedPreResumeReplacement.state.totalPlayTime >= preResumeReplacement.state.totalPlayTime,
+    "resume must not overwrite a replacement that already existed before it started",
+  );
+
+  const hiddenConcurrentInstance = await loadRuntime(candidatePath);
+  const hiddenConcurrentDebug = hiddenConcurrentInstance.debug;
+  const hiddenConcurrentRuntime = hiddenConcurrentInstance.runtime;
+  hiddenConcurrentDebug.state.timeFlux = 120;
+  assert.equal(hiddenConcurrentRuntime.saveGame("manual"), true, "the hidden concurrency test should seed a save");
+  hiddenConcurrentRuntime.setOfflineBaseline(Date.now() - 60 * 1000, 0);
+  const hiddenReplacement = JSON.parse(
+    hiddenConcurrentInstance.context.localStorage.getItem(hiddenConcurrentRuntime.SAVE_KEY),
+  );
+  hiddenReplacement.savedAt = Date.now();
+  hiddenReplacement.state.totalPlayTime = 5432;
+  hiddenReplacement.state.timeFlux = 120;
+  hiddenConcurrentInstance.context.localStorage.setItem(
+    hiddenConcurrentRuntime.SAVE_KEY,
+    JSON.stringify(hiddenReplacement),
+  );
+  hiddenConcurrentInstance.context.document.hidden = true;
+  try {
+    await hiddenConcurrentRuntime.handleVisibilityChange();
+  } finally {
+    hiddenConcurrentInstance.context.document.hidden = false;
+  }
+  assert.equal(hiddenConcurrentRuntime.loadRecoveryMode, false, "a save replaced before hiding should reload normally");
+  assert.ok(
+    hiddenConcurrentDebug.state.totalPlayTime >= hiddenReplacement.state.totalPlayTime,
+    "a save replaced before hiding should become the save base",
+  );
+  assert.ok(
+    hiddenConcurrentDebug.state.totalPlayTime < hiddenReplacement.state.totalPlayTime + 10,
+    "hidden save must not replay the old tab's interval after a replacement",
+  );
+  const persistedHiddenReplacement = JSON.parse(
+    hiddenConcurrentInstance.context.localStorage.getItem(hiddenConcurrentRuntime.SAVE_KEY),
+  );
+  assert.ok(
+    persistedHiddenReplacement.state.totalPlayTime >= hiddenReplacement.state.totalPlayTime,
+    "hidden save must not overwrite a replacement that already existed",
+  );
+
   const concurrentSaveInstance = await loadRuntime(candidatePath);
   const concurrentSaveDebug = concurrentSaveInstance.debug;
   const concurrentSaveRuntime = concurrentSaveInstance.runtime;
