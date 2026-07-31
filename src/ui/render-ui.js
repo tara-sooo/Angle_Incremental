@@ -240,6 +240,8 @@ function updateUi() {
 
   runtime.elements.coreBoostCount.textContent = String(runtime.state.coreBoostCount);
   runtime.elements.coreBoostRequirement.textContent = runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10());
+  runtime.elements.coreBoostRequirementGrowthPowerRaw.textContent = `^${runtime.coreBoostRequirementRawGrowthPower().toFixed(3)}`;
+  runtime.elements.coreBoostRequirementGrowthPower.textContent = `^${runtime.coreBoostRequirementGrowthPower().toFixed(3)}`;
   const nextCoreBoost = runtime.nextCoreBoostValues();
   runtime.elements.coreBoostGainBoost.textContent = formatMultiplierPreview(runtime.coreBoostGainIncreaseMultiplier(), nextCoreBoost.gainMultiplier);
   runtime.elements.coreBoostExponent.textContent = formatExponentPreview(runtime.coreBoostGainExponent(), nextCoreBoost.gainExponent);
@@ -306,6 +308,12 @@ function updateUi() {
   runtime.elements.towerFloorHeading.textContent = `Floor ${currentTowerFloor}`;
   runtime.elements.towerFloorValue.textContent = String(currentTowerFloor);
   runtime.elements.towerScoreExponentValue.textContent = `^${runtime.towerScoreExponent().toFixed(2)}`;
+  const towerChallenge1ScorePowerBase = runtime.hasInfinityUpgrade("13-1") ? 0.5 : runtime.INFINITE_ANGLE_SCORE_POWER;
+  const towerChallenge1ScorePowerBonus = runtime.towerChallenge1InfinityScorePowerBonus();
+  const towerChallenge1ScorePowerTotal = runtime.infiniteAngleScorePower();
+  runtime.elements.towerChallenge1ScorePowerBase.textContent = `^${towerChallenge1ScorePowerBase.toFixed(3)}`;
+  runtime.elements.towerChallenge1ScorePowerBonus.textContent = `+^${towerChallenge1ScorePowerBonus.toFixed(3)}`;
+  runtime.elements.towerChallenge1ScorePowerTotal.textContent = `^${towerChallenge1ScorePowerTotal.toFixed(3)}`;
   runtime.elements.towerNextCost.textContent = `${runtime.formatUiLogNumber(nextTowerCostLog10)} IP`;
   runtime.elements.towerGateStatus.textContent = !towerGateReady
     ? runtime.t("towerNeedChallenge").replace("{index}", String(towerGate))

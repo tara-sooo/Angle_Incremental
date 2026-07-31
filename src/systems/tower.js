@@ -20,6 +20,7 @@ const TOWER_FLOOR_COST_LOG10 = Object.freeze({
 });
 
 const TOWER_CHALLENGE_UNLOCK_FLOORS = Object.freeze([3, 5, 8, 12]);
+const TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP = 0.077;
 
 const TOWER_CHALLENGES = Object.freeze([
   {
@@ -32,23 +33,23 @@ const TOWER_CHALLENGES = Object.freeze([
       en: "Normal The Angle upgrades cannot be purchased, and IU11-1's effect cap is divided by 5.",
     },
     reward: {
-      ja: "Infinity Score累乗を解放",
-      en: "Unlocks Infinity Score exponentiation.",
+      ja: "Infinity Score累乗を解放。Floor 3以降の追加階層ごとに指数を+0.077する",
+      en: "Unlocks Infinity Score exponentiation and adds 0.077 per floor after Floor 3.",
     },
     implemented: true,
   },
   {
     index: 2,
     unlockFloor: 5,
-    targetLog10: 1300,
+    targetLog10: 1555,
     name: { ja: "TC2 核家族世帯撲滅委員会", en: "TC2 Nuclear Family Eradication Committee" },
     restriction: {
       ja: "CBは封印され、GRのスコア倍率は^0.1、コスト倍率は×0.90を下限とする",
       en: "Core Boost is sealed, GR's score multiplier is raised to ^0.1, and its cost factor has a hard floor of x0.90.",
     },
     reward: {
-      ja: "Core Boost強化を解放",
-      en: "Unlocks Core Boost enhancement.",
+      ja: "Core Boost要求量増加指数を強化。Floor 5以降の追加階層で生指数を下げ、1.50未満ではソフトキャップする",
+      en: "Improves Core Boost requirement growth. Additional floors after Floor 5 lower the raw power, with a soft cap below 1.50.",
     },
     implemented: true,
   },
@@ -95,6 +96,11 @@ function towerNextFloorCostLog10() {
 
 function towerScoreExponent() {
   return 1 + towerFloor() * runtime.TOWER_SCORE_EXPONENT_STEP;
+}
+
+function towerChallenge1InfinityScorePowerBonus() {
+  if (!towerChallengeCompleted(1)) return 0;
+  return Math.max(0, towerFloor() - 3) * TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP;
 }
 
 function towerChallengeUnlockFloor(index) {
@@ -247,12 +253,14 @@ function buildTower() {
 
 expose("TOWER_FLOOR_COST_LOG10", () => TOWER_FLOOR_COST_LOG10);
 expose("TOWER_CHALLENGE_UNLOCK_FLOORS", () => TOWER_CHALLENGE_UNLOCK_FLOORS);
+expose("TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP", () => TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP);
 expose("TOWER_CHALLENGES", () => TOWER_CHALLENGES);
 expose("towerFloor", () => towerFloor);
 expose("towerFloorCostLog10", () => towerFloorCostLog10);
 expose("towerNextFloor", () => towerNextFloor);
 expose("towerNextFloorCostLog10", () => towerNextFloorCostLog10);
 expose("towerScoreExponent", () => towerScoreExponent);
+expose("towerChallenge1InfinityScorePowerBonus", () => towerChallenge1InfinityScorePowerBonus);
 expose("towerChallengeUnlockFloor", () => towerChallengeUnlockFloor);
 expose("towerChallengeUnlocked", () => towerChallengeUnlocked);
 expose("towerChallengeCompleted", () => towerChallengeCompleted);

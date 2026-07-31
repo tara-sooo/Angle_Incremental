@@ -574,6 +574,10 @@ try {
       panelActive: Boolean(towerPanel?.classList.contains("is-active")),
       floor: document.querySelector("#towerFloorValue")?.textContent?.trim() ?? "",
       cost: document.querySelector("#towerNextCost")?.textContent?.trim() ?? "",
+      scoreExponent: document.querySelector("#towerScoreExponentValue")?.textContent?.trim() ?? "",
+      tc1Base: document.querySelector("#towerChallenge1ScorePowerBase")?.textContent?.trim() ?? "",
+      tc1Bonus: document.querySelector("#towerChallenge1ScorePowerBonus")?.textContent?.trim() ?? "",
+      tc1Total: document.querySelector("#towerChallenge1ScorePowerTotal")?.textContent?.trim() ?? "",
       buildDisabled: Boolean(document.querySelector("#towerBuildButton")?.disabled),
     };
     switchMainTab("challenges");
@@ -586,6 +590,7 @@ try {
       towerChallengeButtonDisabled: Boolean(document.querySelector("#towerChallengeList .tower-challenge-row button")?.disabled),
       towerChallengeRestriction: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-restriction")?.textContent?.trim() ?? "",
       towerChallengeTarget: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-target")?.textContent?.trim() ?? "",
+      towerChallenge2Target: document.querySelector('#towerChallengeList [data-tower-challenge="2"] .challenge-target')?.textContent?.trim() ?? "",
     };
   });
   assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
@@ -598,6 +603,11 @@ try {
   assert.equal(towerInitial.towerChallengeButtonDisabled, true, "locked TC rows should disable their start button");
   assert.match(towerInitial.towerChallengeRestriction, /通常強化/);
   assert.match(towerInitial.towerChallengeTarget, /1\.00e308/);
+  assert.match(towerInitial.towerChallenge2Target, /1\.00e1,555/);
+  assert.equal(towerInitial.towerState.scoreExponent, "^1.00");
+  assert.equal(towerInitial.towerState.tc1Base, "^0.300");
+  assert.equal(towerInitial.towerState.tc1Bonus, "+^0.000");
+  assert.equal(towerInitial.towerState.tc1Total, "^0.300");
   const towerChallengeFlow = await page.evaluate(() => {
     const { state, toggleTowerChallenge, completeTowerChallengeIfReady } = window.__angleDebug;
     state.towerFloor = 3;
@@ -649,6 +659,44 @@ try {
   assert.equal(towerChallengeFlow.replay.button, "挑戦中止", "a replaying TC should expose a stop button");
   assert.equal(towerChallengeFlow.replay.disabled, false, "a replaying TC stop button should be enabled");
   assert.equal(towerChallengeFlow.replayCompleted, true, "a replaying TC should complete at its displayed target");
+  const towerRewardDisplay = await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    const original = {
+      completedTowerChallenges: state.completedTowerChallenges,
+      language: state.language,
+      towerFloor: state.towerFloor,
+    };
+    state.completedTowerChallenges = 3;
+    state.towerFloor = 5;
+    window.advanceTime(0);
+    const tc1 = {
+      base: document.querySelector("#towerChallenge1ScorePowerBase")?.textContent?.trim() ?? "",
+      bonus: document.querySelector("#towerChallenge1ScorePowerBonus")?.textContent?.trim() ?? "",
+      total: document.querySelector("#towerChallenge1ScorePowerTotal")?.textContent?.trim() ?? "",
+    };
+    state.towerFloor = 22;
+    window.advanceTime(0);
+    const tc2 = {
+      raw: document.querySelector("#coreBoostRequirementGrowthPowerRaw")?.textContent?.trim() ?? "",
+      effective: document.querySelector("#coreBoostRequirementGrowthPower")?.textContent?.trim() ?? "",
+    };
+    state.language = "en";
+    window.advanceTime(0);
+    const englishLabels = {
+      tc1Base: document.querySelector('[data-i18n="towerChallenge1ScorePowerBase"]')?.textContent?.trim() ?? "",
+      tc2Effective: document.querySelector('[data-i18n="coreBoostGrowthPower"]')?.textContent?.trim() ?? "",
+    };
+    Object.assign(state, original);
+    window.advanceTime(0);
+    return { tc1, tc2, englishLabels };
+  });
+  assert.equal(towerRewardDisplay.tc1.base, "^0.300", "TC1 should expose its base exponent in the Tower panel");
+  assert.equal(towerRewardDisplay.tc1.bonus, "+^0.154", "TC1 should expose its floor-scaled bonus in the Tower panel");
+  assert.equal(towerRewardDisplay.tc1.total, "^0.454", "TC1 should expose the combined exponent in the Tower panel");
+  assert.equal(towerRewardDisplay.tc2.raw, "^1.490", "TC2 should expose the raw requirement growth power");
+  assert.equal(towerRewardDisplay.tc2.effective, "^1.499", "TC2 should expose the soft-capped requirement growth power");
+  assert.equal(towerRewardDisplay.englishLabels.tc1Base, "TC1 base exponent", "TC1 exponent labels should be translated to English");
+  assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth (effective)", "TC2 exponent labels should be translated to English");
   const timeFluxRemoval = await page.evaluate(() => {
     const { state, advanceOnlineTime, processOfflineElapsed } = window.__angleDebug;
     state.totalPlayTime = 0;

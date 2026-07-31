@@ -1048,6 +1048,8 @@ function renderGameToText() {
       requirement: runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10()),
       requirementLog10: runtime.coreBoostRequirementLog10(),
       requirementText: runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10()),
+      requirementGrowthPowerRaw: runtime.coreBoostRequirementRawGrowthPower(),
+      requirementGrowthPower: runtime.coreBoostRequirementGrowthPower(),
       gainIncreaseMultiplier: Number(runtime.coreBoostGainIncreaseMultiplier().toFixed(2)),
       gainExponent: Number(runtime.coreBoostGainExponent().toFixed(2)),
     },
@@ -1103,6 +1105,9 @@ function renderGameToText() {
     tower: {
       floor: runtime.towerFloor(),
       scoreExponent: Number(runtime.towerScoreExponent().toFixed(4)),
+      challenge1ScorePowerBase: runtime.hasInfinityUpgrade("13-1") ? 0.5 : runtime.INFINITE_ANGLE_SCORE_POWER,
+      challenge1ScorePowerBonus: runtime.towerChallenge1InfinityScorePowerBonus(),
+      challenge1ScorePower: runtime.infiniteAngleScorePower(),
       nextFloor: runtime.towerNextFloor(),
       nextCostLog10: Number(runtime.towerNextFloorCostLog10().toPrecision(6)),
       gate: runtime.towerGateForFloor(runtime.towerNextFloor()),
