@@ -597,6 +597,7 @@ async function runTimeFluxModuleRuntimeTest() {
       pendingResumeSave.savedAt > visibilitySaveFailureBaseline,
       "the pending resume save should advance the persisted timestamp",
     );
+    const pendingResumeSaveFingerprint = visibilitySaveFailureRuntime.currentSaveFingerprint();
     visibilitySaveFailureInstance.context.localStorage.setItem = (key, value) => {
       if (key === visibilitySaveFailureRuntime.SAVE_KEY) throw new Error("save storage unavailable");
       return visibilitySaveFailureOriginalSetItem(key, value);
@@ -626,11 +627,18 @@ async function runTimeFluxModuleRuntimeTest() {
       true,
       "a failed visibility save should require save recovery",
     );
+    const visibilitySaveFailureDiagnostic = JSON.parse(
+      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY),
+    );
     assert.equal(
-      JSON.parse(visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY))
-        .offlineRetrySavedAt,
+      visibilitySaveFailureDiagnostic.offlineRetrySavedAt,
       visibilitySaveFailureBaseline,
       "save recovery should preserve the visibility interval baseline for retry",
+    );
+    assert.equal(
+      visibilitySaveFailureDiagnostic.offlineRetrySaveFingerprint,
+      pendingResumeSaveFingerprint,
+      "save recovery should fingerprint the latest local save for retry",
     );
     visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
     visibilitySaveFailureInstance.context.localStorage.removeItem = (key) => {

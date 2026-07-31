@@ -919,6 +919,9 @@ async function handleVisibilityChange() {
       drawActiveView();
       return;
     }
+    // A successful local save may have rebased SAVE_KEY while the clock request was pending.
+    // Retry the captured interval against that latest local save, not its old fingerprint.
+    retryBaseline.saveFingerprint = expectedSaveFingerprint;
 
     const elapsed = offlineElapsedFromSave(resumeBaselineTimestamp, resumeBaselineServerTimestamp);
     if (elapsed.elapsedSeconds > 0 || elapsed.clockAnomaly) {
