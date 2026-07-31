@@ -715,22 +715,23 @@
           </div>
         </section>
       </div>
-      <section id="offlineReportPanel" class="offline-report" role="dialog" aria-live="polite" hidden>
-        <div class="panel-heading">
-          <span data-i18n="offlineReportTitle">離席中の進行</span>
-          <strong id="offlineReportMode">オフライン進行</strong>
-        </div>
-        <div class="offline-report-grid">
-          <div><span data-i18n="offlineReportElapsedLabel">離席時間</span><strong id="offlineReportElapsed">0秒</strong></div>
-          <div><span data-i18n="offlineReportEffectiveLabel">処理時間</span><strong id="offlineReportEffective">0秒</strong></div>
-          <div><span data-i18n="offlineReportTicksLabel">ティック数</span><strong id="offlineReportTicks">-</strong></div>
-          <div><span data-i18n="offlineReportInfinityLabel">Infinity増加</span><strong id="offlineReportInfinity">+0</strong></div>
-          <div><span data-i18n="offlineReportIpLabel">現在IP</span><strong id="offlineReportIp">0</strong></div>
-        </div>
-        <p id="offlineReportNote"></p>
-        <button id="offlineReportClose" class="reset-button" type="button" data-i18n="offlineReportClose">閉じる</button>
-      </section>
     </main>
+
+    <section id="offlineReportPanel" class="offline-report" role="dialog" aria-live="polite" hidden>
+      <div class="panel-heading">
+        <span data-i18n="offlineReportTitle">離席中の進行</span>
+        <strong id="offlineReportMode">オフライン進行</strong>
+      </div>
+      <div class="offline-report-grid">
+        <div><span data-i18n="offlineReportElapsedLabel">離席時間</span><strong id="offlineReportElapsed">0秒</strong></div>
+        <div><span data-i18n="offlineReportEffectiveLabel">処理時間</span><strong id="offlineReportEffective">0秒</strong></div>
+        <div><span data-i18n="offlineReportTicksLabel">ティック数</span><strong id="offlineReportTicks">-</strong></div>
+        <div><span data-i18n="offlineReportInfinityLabel">Infinity増加</span><strong id="offlineReportInfinity">+0</strong></div>
+        <div><span data-i18n="offlineReportIpLabel">現在IP</span><strong id="offlineReportIp">0</strong></div>
+      </div>
+      <p id="offlineReportNote"></p>
+      <button id="offlineReportClose" class="reset-button" type="button" data-i18n="offlineReportClose">閉じる</button>
+    </section>
 
     <div id="achievementToasts" class="achievement-toasts" aria-live="polite"></div>
     <div id="fpsCounter" class="fps-counter" hidden>FPS 0</div>

@@ -1493,13 +1493,19 @@ canvas {
 }
 
 .offline-report {
+  position: fixed;
+  z-index: 120;
+  left: 50%;
+  bottom: 18px;
+  width: min(680px, calc(100vw - 36px));
   display: grid;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 0;
   padding: 12px;
   border: 2px solid var(--gold);
   background: linear-gradient(180deg, rgba(47, 40, 26, 0.98), rgba(16, 19, 29, 0.98));
   box-shadow: 0 18px 46px rgba(0, 0, 0, 0.3), inset 0 -3px 0 var(--gold);
+  transform: translateX(-50%);
 }
 
 .offline-report[hidden] {
@@ -1808,6 +1814,11 @@ canvas {
     bottom: 84px;
     right: 12px;
     width: min(300px, calc(100vw - 24px));
+  }
+
+  .offline-report {
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    width: min(600px, calc(100vw - 24px));
   }
 
   .top-bar-hidden .achievement-toasts {

@@ -546,13 +546,29 @@ try {
       currentInfinityRealTime: state.currentInfinityRealTime,
       timeFlux: state.timeFlux,
     };
+    const layoutRect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+    const layoutBefore = {
+      shellHeight: layoutRect("#shell")?.height ?? 0,
+      mainTabsHeight: layoutRect(".main-tabs")?.height ?? 0,
+      mainPanelsHeight: layoutRect(".main-panels")?.height ?? 0,
+    };
     const report = processOfflineElapsed(1, "test", { clockSource: "server" });
+    const reportPanel = document.querySelector("#offlineReportPanel");
+    const layoutAfter = {
+      shellHeight: layoutRect("#shell")?.height ?? 0,
+      mainTabsHeight: layoutRect(".main-tabs")?.height ?? 0,
+      mainPanelsHeight: layoutRect(".main-panels")?.height ?? 0,
+    };
     return {
       ui,
       online,
       report,
       reportVisible: document.querySelector("#offlineReportPanel")?.hidden === false,
       reportMode: document.querySelector("#offlineReportMode")?.textContent?.trim() ?? "",
+      reportOutsideShell: reportPanel?.closest("#shell") === null,
+      reportPosition: reportPanel ? getComputedStyle(reportPanel).position : "",
+      layoutBefore,
+      layoutAfter,
       totalPlayTime: state.totalPlayTime,
       totalRealPlayTime: state.totalRealPlayTime,
       timeFlux: state.timeFlux,
@@ -574,6 +590,14 @@ try {
   assert.equal(timeFluxRemoval.report.timeFluxGained, undefined, "normal offline reports should not grant dormant Time Flux");
   assert.equal(timeFluxRemoval.reportVisible, true, "normal offline processing should show the report");
   assert.equal(timeFluxRemoval.reportMode, "オフライン進行", "the report should identify normal offline progress");
+  assert.equal(timeFluxRemoval.reportOutsideShell, true, "the offline report should not participate in the shell grid");
+  assert.equal(timeFluxRemoval.reportPosition, "fixed", "the offline report should render as an overlay");
+  for (const key of ["shellHeight", "mainTabsHeight", "mainPanelsHeight"]) {
+    assert.ok(
+      Math.abs(timeFluxRemoval.layoutAfter[key] - timeFluxRemoval.layoutBefore[key]) < 0.1,
+      `offline report should not change ${key}`,
+    );
+  }
   assert.ok(Math.abs(timeFluxRemoval.totalPlayTime - 2) < 1e-9, "offline processing should advance normal game time");
   assert.ok(Math.abs(timeFluxRemoval.totalRealPlayTime - 1) < 1e-9, "offline processing should not add real play time");
   assert.equal(timeFluxRemoval.timeFlux, 123456, "offline processing should not change dormant Time Flux");
