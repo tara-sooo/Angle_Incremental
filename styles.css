@@ -1498,6 +1498,7 @@ canvas {
   left: 50%;
   bottom: 18px;
   width: min(680px, calc(100vw - 36px));
+  max-height: calc(100svh - 36px);
   display: grid;
   gap: 10px;
   margin-top: 0;
@@ -1506,6 +1507,8 @@ canvas {
   background: linear-gradient(180deg, rgba(47, 40, 26, 0.98), rgba(16, 19, 29, 0.98));
   box-shadow: 0 18px 46px rgba(0, 0, 0, 0.3), inset 0 -3px 0 var(--gold);
   transform: translateX(-50%);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .offline-report[hidden] {
@@ -1820,8 +1823,6 @@ canvas {
     bottom: calc(72px + env(safe-area-inset-bottom));
     width: min(600px, calc(100vw - 24px));
     max-height: calc(100svh - 84px - env(safe-area-inset-bottom));
-    overflow-y: auto;
-    overscroll-behavior: contain;
   }
 
   .top-bar-hidden .achievement-toasts {
