@@ -14,6 +14,20 @@ function currentSaveTimestamp() {
   return runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
 }
 
+function dormantTimeFluxValue(value, fallback) {
+  return runtime.sanitizeNumber(value, fallback);
+}
+
+function clampOfflineTickCount(value) {
+  return Math.min(
+    runtime.OFFLINE_PROGRESS_MAX_TICKS,
+    Math.max(runtime.OFFLINE_PROGRESS_MIN_TICKS, Math.floor(runtime.sanitizeNumber(
+      value,
+      runtime.OFFLINE_PROGRESS_DEFAULT_TICKS,
+    ))),
+  );
+}
+
 function normalizeStoredSave(candidate) {
   if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
   const version = Math.floor(runtime.sanitizeNumber(candidate.version, 0));
@@ -666,21 +680,16 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.fastestInfinityTime = runtime.sanitizeNumber(data.fastestInfinityTime, 0);
   runtime.state.fastestInfinityRealTime = runtime.sanitizeNumber(data.fastestInfinityRealTime, 0);
   runtime.state.lastInfinityRuns = runtime.sanitizeInfinityRunRecords(data.lastInfinityRuns);
-  runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(
-    data.offlineProgressEnabled,
-    runtime.OFFLINE_PROGRESS_DEFAULT_ENABLED,
-  );
+  runtime.state.offlineProgressEnabled = true;
   runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
-  runtime.state.timeFluxCapacityLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxCapacityLevel, 0)));
-  runtime.state.timeFluxGainLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxGainLevel, 0)));
-  runtime.state.timeFlux = Math.min(
-    runtime.timeFluxCapacitySeconds(),
-    Math.max(0, runtime.sanitizeNumber(data.timeFlux, 0)),
-  );
-  const loadedTimeFluxSpeed = runtime.clampTimeFluxSpeed(data.timeFluxSpeed);
+  runtime.state.timeFluxCapacityLevel = dormantTimeFluxValue(data.timeFluxCapacityLevel, 0);
+  runtime.state.timeFluxGainLevel = dormantTimeFluxValue(data.timeFluxGainLevel, 0);
+  runtime.state.timeFlux = dormantTimeFluxValue(data.timeFlux, 0);
+  const loadedTimeFluxSpeed = dormantTimeFluxValue(data.timeFluxSpeed, 1);
   const hasCustomTimeFluxSpeed = Object.prototype.hasOwnProperty.call(data, "timeFluxCustomSpeed");
-  const loadedCustomTimeFluxSpeed = runtime.clampTimeFluxCustomSpeed(
+  const loadedCustomTimeFluxSpeed = dormantTimeFluxValue(
     hasCustomTimeFluxSpeed ? data.timeFluxCustomSpeed : Math.max(4, loadedTimeFluxSpeed),
+    4,
   );
   runtime.state.timeFluxSpeed = loadedTimeFluxSpeed;
   runtime.state.timeFluxCustomSpeed = loadedCustomTimeFluxSpeed;
@@ -805,6 +814,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
 }
 
 function serializeSaveData() {
+  runtime.state.offlineProgressEnabled = true;
   runtime.normalizeInfinityPointState();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
   const data = {};
@@ -1176,6 +1186,7 @@ function resetSave() {
 }
 
 expose("legacyInfinityUpgradeRefundLog10", () => legacyInfinityUpgradeRefundLog10, (value) => { legacyInfinityUpgradeRefundLog10 = value; });
+expose("clampOfflineTickCount", () => clampOfflineTickCount, (value) => { clampOfflineTickCount = value; });
 expose("applySaveData", () => applySaveData, (value) => { applySaveData = value; });
 expose("serializeSaveData", () => serializeSaveData, (value) => { serializeSaveData = value; });
 expose("saveGame", () => saveGame, (value) => { saveGame = value; });

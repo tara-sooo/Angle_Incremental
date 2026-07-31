@@ -15,14 +15,13 @@ import "./ui/render-challenges.js";
 import "./ui/render-infinity.js";
 import "./ui/render-achievements.js";
 import "./ui/render-automation.js";
-import "./ui/render-time-flux.js";
+import "./ui/render-offline-report.js";
 import "./ui/render-ui.js";
 import "./systems/angle.js";
 import "./systems/generation.js";
 import "./systems/core-boost.js";
 import "./systems/infinity.js";
 import "./systems/infinite-angle.js";
-import "./systems/time-flux.js";
 import "./ui/events.js";
 import "./systems/balance.js";
 
@@ -643,13 +642,7 @@ function advanceOnlineTime(realSeconds) {
   if (realDt <= 0) return 0;
   runtime.state.totalRealPlayTime += realDt;
   runtime.state.currentInfinityRealTime += realDt;
-  const selectedSpeed = runtime.clampTimeFluxSpeed(runtime.state.timeFluxSpeed);
-  const requestedExtra = realDt * Math.max(0, selectedSpeed - 1);
-  const consumed = runtime.consumeTimeFlux(requestedExtra);
-  const gameSeconds = realDt + consumed;
-  if (consumed + 1e-12 < requestedExtra || (selectedSpeed > 1 && runtime.state.timeFlux <= 1e-12)) {
-    runtime.state.timeFluxSpeed = 1;
-  }
+  const gameSeconds = realDt;
 
   runSimulationBatch(() => {
     let remaining = gameSeconds;
@@ -774,12 +767,11 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
         : elapsed;
     let simulatedSeconds = 0;
     let processedTicks = 0;
-    let timeFluxGained = 0;
-    let capacityReached = false;
     let requestedTicks = 0;
     let precisionReduced = false;
 
-    if (!clockAnomaly && runtime.state.offlineProgressEnabled) {
+    runtime.state.offlineProgressEnabled = true;
+    if (!clockAnomaly) {
       const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
       simulatedSeconds = trustedElapsed;
       requestedTicks = Math.max(
@@ -803,22 +795,12 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
           offlineProcessing = false;
         }
       }
-    } else if (!clockAnomaly) {
-      const theoreticalGain = runtime.timeFluxGainPerHour() * trustedElapsed / 3600;
-      if (!Number.isFinite(theoreticalGain)) {
-        clockAnomaly = true;
-      } else {
-        timeFluxGained = runtime.addTimeFlux(theoreticalGain);
-        capacityReached = timeFluxGained + 1e-9 < theoreticalGain;
-      }
     }
 
     const after = offlineSnapshot();
     const effectiveElapsedSeconds = clockAnomaly
       ? 0
-      : runtime.state.offlineProgressEnabled
-        ? simulatedSeconds
-        : trustedElapsed;
+      : simulatedSeconds;
     offlineReport = {
       source,
       elapsedSeconds: elapsed,
@@ -828,9 +810,7 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
       requestedTicks,
       precisionReduced,
       capped: effectiveElapsedSeconds + 1e-9 < elapsed,
-      offlineProgressEnabled: runtime.state.offlineProgressEnabled,
-      timeFluxGained,
-      capacityReached,
+      offlineProgressEnabled: true,
       clockSource,
       clockAnomaly,
       rewardSuppressed: clockAnomaly,
@@ -1195,14 +1175,13 @@ function renderGameToText() {
       lastInfinityRuns: runtime.state.lastInfinityRuns,
     },
     timeFlux: {
-      amount: Number(runtime.state.timeFlux.toPrecision(6)),
-      capacity: Number(runtime.timeFluxCapacity().toPrecision(6)),
-      gainPerHour: Number(runtime.timeFluxGain().toPrecision(6)),
+      dormant: true,
+      amount: runtime.state.timeFlux,
       capacityLevel: runtime.state.timeFluxCapacityLevel,
       gainLevel: runtime.state.timeFluxGainLevel,
       speed: runtime.state.timeFluxSpeed,
       customSpeed: runtime.state.timeFluxCustomSpeed,
-      offlineProgressEnabled: runtime.state.offlineProgressEnabled,
+      offlineProgressEnabled: true,
       offlineTickCount: runtime.state.offlineTickCount,
       report: offlineReport,
     },
@@ -1314,9 +1293,6 @@ window.__angleDebug = {
   unlockInfiniteAngle: runtime.unlockInfiniteAngle,
   buyInfiniteAngleUpgrade: runtime.buyInfiniteAngleUpgrade,
   buyAllInfiniteAngleUpgrades: runtime.buyAllInfiniteAngleUpgrades,
-  buyTimeFluxUpgrade: runtime.buyTimeFluxUpgrade,
-  setTimeFluxSpeed: runtime.setTimeFluxSpeed,
-  setTimeFluxCustomSpeed: runtime.setTimeFluxCustomSpeed,
   updateInfiniteAngle: runtime.updateInfiniteAngle,
   toggleInfinityChallenge: runtime.toggleInfinityChallenge,
   breakInfiniteCap: runtime.breakInfiniteCap,
