@@ -176,6 +176,13 @@ function canSpend(amount) {
   return canSpendLog(runtime.log10Value(amount));
 }
 
+function formatVertexGainIncrease(log10Value) {
+  if (typeof log10Value !== "number" || Number.isNaN(log10Value) || log10Value === -Infinity) return "0";
+  if (log10Value === Infinity || log10Value === Number.MAX_VALUE) return "∞";
+  if (log10Value < 3) return runtime.formatSmallDecimal(runtime.valueFromLog10(log10Value));
+  return runtime.formatUiLogNumber(log10Value);
+}
+
 function updateUi() {
   if (runtime.offlineProcessing) return;
   const currentCostLogs = runtime.costLogs();
@@ -187,10 +194,7 @@ function updateUi() {
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());
   const vertexGainIncreaseLog10 = runtime.vertexGainIncreaseLog10();
-  const vertexGainIncreaseText = vertexGainIncreaseLog10 > 308
-    ? runtime.formatUiLogNumber(vertexGainIncreaseLog10)
-    : runtime.formatSmallDecimal(runtime.valueFromLog10(vertexGainIncreaseLog10));
-  runtime.elements.vertexGainValue.textContent = `+${vertexGainIncreaseText}`;
+  runtime.elements.vertexGainValue.textContent = `+${formatVertexGainIncrease(vertexGainIncreaseLog10)}`;
   runtime.elements.lapValue.textContent = runtime.formatDuration(runtime.lapDuration());
   runtime.elements.lapSpeedValue.textContent = runtime.isLapSpeedSoftcapped()
     ? `${formatMultiplierLog(runtime.effectiveLapSpeedLog10())} ${runtime.t("lapSpeedSoftcapped")} / raw ${formatMultiplierLog(runtime.rawLapSpeedLog10())}`
@@ -403,6 +407,7 @@ expose("clearElement", () => clearElement, (value) => { clearElement = value; })
 expose("updateSaveRecoveryUi", () => updateSaveRecoveryUi, (value) => { updateSaveRecoveryUi = value; });
 expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
+expose("formatVertexGainIncrease", () => formatVertexGainIncrease, (value) => { formatVertexGainIncrease = value; });
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });
 expose("setSaveStatus", () => setSaveStatus, (value) => { setSaveStatus = value; });
 expose("gainExpressionConfig", () => gainExpressionConfig, (value) => { gainExpressionConfig = value; });
