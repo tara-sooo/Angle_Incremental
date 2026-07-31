@@ -351,6 +351,68 @@ try {
   assert.equal(generationPreview.scientific, "1.00e9", "the previous GR score should respect scientific formatting");
   assert.equal(generationPreview.compact, "1.00B", "the previous GR score should respect compact formatting");
 
+  const vertexGainDisplay = await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    const original = {
+      activeChallenge: state.activeChallenge,
+      achievementMask: state.achievementMask,
+      coreBoostCount: state.coreBoostCount,
+      gainLevel: state.gainLevel,
+      ic8VertexUpgradeLevel: state.ic8VertexUpgradeLevel,
+      infiniteAngleUnlocked: state.infiniteAngleUnlocked,
+      infinityScore: state.infiniteScore,
+      infinityScoreLog10: state.infiniteScoreLog10,
+      infinityUpgradeMask: state.infinityUpgradeMask,
+      numberFormat: state.numberFormat,
+    };
+    state.achievementMask = 0;
+    state.coreBoostCount = 0;
+    state.ic8VertexUpgradeLevel = 0;
+    state.infiniteAngleUnlocked = false;
+    state.infiniteScore = 0;
+    state.infiniteScoreLog10 = -Infinity;
+    state.infinityUpgradeMask = 0;
+    state.numberFormat = "compact";
+    state.activeChallenge = 6;
+    window.advanceTime(0);
+    const small = document.querySelector("#vertexGainValue")?.textContent?.trim() ?? "";
+    state.activeChallenge = 0;
+    state.gainLevel = 99999;
+    window.advanceTime(0);
+    const compactBoundary = document.querySelector("#vertexGainValue")?.textContent?.trim() ?? "";
+    state.numberFormat = "scientific";
+    window.advanceTime(0);
+    const scientificBoundary = document.querySelector("#vertexGainValue")?.textContent?.trim() ?? "";
+    state.gainLevel = 99999999;
+    state.numberFormat = "compact";
+    window.advanceTime(0);
+    const compactMillion = document.querySelector("#vertexGainValue")?.textContent?.trim() ?? "";
+    state.numberFormat = "scientific";
+    window.advanceTime(0);
+    const scientificMillion = document.querySelector("#vertexGainValue")?.textContent?.trim() ?? "";
+    const value = document.querySelector("#vertexGainValue");
+    const metric = value?.closest(".metric");
+    const metricRect = metric?.getBoundingClientRect();
+    const layout = {
+      metricWidth: metricRect?.width ?? 0,
+      metricClientWidth: metric?.clientWidth ?? 0,
+      metricScrollWidth: metric?.scrollWidth ?? 0,
+    };
+    Object.assign(state, original);
+    window.advanceTime(0);
+    return { small, compactBoundary, scientificBoundary, compactMillion, scientificMillion, layout };
+  });
+  assert.equal(vertexGainDisplay.small, "+0.001", "the vertex gain display should preserve IC6 precision");
+  assert.equal(vertexGainDisplay.compactBoundary, "+1,000", "compact vertex gain display should use the shared formatter at 1000");
+  assert.equal(vertexGainDisplay.scientificBoundary, "+1.00e3", "scientific vertex gain display should use exponent notation at 1000");
+  assert.equal(vertexGainDisplay.compactMillion, "+1.00M", "compact vertex gain display should use suffix notation at 1e6");
+  assert.equal(vertexGainDisplay.scientificMillion, "+1.00e6", "scientific vertex gain display should use exponent notation at 1e6");
+  assert.ok(vertexGainDisplay.layout.metricWidth > 0, "the desktop vertex gain metric should have a rendered width");
+  assert.ok(
+    vertexGainDisplay.layout.metricScrollWidth <= vertexGainDisplay.layout.metricClientWidth + 1,
+    "the desktop vertex gain display should not overflow its metric",
+  );
+
   const infinityAutomationThreshold = await page.evaluate(() => {
     const { state, applySetting, switchMainTab } = window.__angleDebug;
     switchMainTab("automation");
@@ -1210,6 +1272,51 @@ try {
     assert.equal(mobileAchievements.count, 37, "the mobile Achievements panel should render 37 rows");
     assert.equal(mobileAchievements.lastTitle, "物騒な名前", "the mobile Achievements panel should keep the final row visible");
     assert.ok(mobileAchievements.listWidth > 0, "the mobile achievement list should have a visible layout");
+
+    const mobileVertexGainDisplay = await mobilePage.evaluate(() => {
+      const { state } = window.__angleDebug;
+      const original = {
+        achievementMask: state.achievementMask,
+        achievementMaskHigh: state.achievementMaskHigh,
+        coreBoostCount: state.coreBoostCount,
+        gainLevel: state.gainLevel,
+        ic8VertexUpgradeLevel: state.ic8VertexUpgradeLevel,
+        infiniteAngleUnlocked: state.infiniteAngleUnlocked,
+        infiniteScore: state.infiniteScore,
+        infiniteScoreLog10: state.infiniteScoreLog10,
+        infinityUpgradeMask: state.infinityUpgradeMask,
+        numberFormat: state.numberFormat,
+      };
+      state.achievementMask = 0;
+      state.achievementMaskHigh = 0;
+      state.coreBoostCount = 0;
+      state.gainLevel = 99999999;
+      state.ic8VertexUpgradeLevel = 0;
+      state.infiniteAngleUnlocked = false;
+      state.infiniteScore = 0;
+      state.infiniteScoreLog10 = -Infinity;
+      state.infinityUpgradeMask = 0;
+      state.numberFormat = "compact";
+      window.advanceTime(0);
+      const value = document.querySelector("#vertexGainValue");
+      const metric = value?.closest(".metric");
+      const metricRect = metric?.getBoundingClientRect();
+      const result = {
+        text: value?.textContent?.trim() ?? "",
+        metricWidth: metricRect?.width ?? 0,
+        metricClientWidth: metric?.clientWidth ?? 0,
+        metricScrollWidth: metric?.scrollWidth ?? 0,
+      };
+      Object.assign(state, original);
+      window.advanceTime(0);
+      return result;
+    });
+    assert.equal(mobileVertexGainDisplay.text, "+1.00M", "mobile compact vertex gain display should use suffix notation at 1e6");
+    assert.ok(mobileVertexGainDisplay.metricWidth > 0, "the mobile vertex gain metric should have a rendered width");
+    assert.ok(
+      mobileVertexGainDisplay.metricScrollWidth <= mobileVertexGainDisplay.metricClientWidth + 1,
+      "the mobile vertex gain display should not overflow its metric",
+    );
 
     await mobilePage.locator('[data-tab="statistics"]').click();
     const mobileStatistics = await mobilePage.evaluate(() => ({

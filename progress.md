@@ -118,6 +118,7 @@ Original prompt: では、中核ループを完成させてください
 - Temporarily removed Time Flux gameplay and UI for #70: offline progress is always normal progression, the offline tick setting lives in Settings, and dormant Time Flux save fields remain compatible without active effects.
 - Added achievements 32-37 for Infinite Angle and Tower progression, with a separate high achievement mask that preserves SAVE_VERSION 10 compatibility.
 - Added IU14-1 after IU13-1, extending IU11-2's Infinity-count hard cap from 10000 to 30000 while preserving SAVE_VERSION 10 compatibility.
+- Unified the vertex gain increase display with the shared number formatter at 1000 and above while preserving small values and IC6's 0.001 precision.
 
 ## TODO
 
