@@ -408,6 +408,9 @@ try {
     };
     const tier12CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="12"]');
     const tier13CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="13"]');
+    const tier14CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="14"]');
+    document.querySelector('[data-infinity-panel="upgrades"] [data-upgrade="14-1"]')?.click();
+    window.advanceTime(0);
     switchMainTab("statistics");
     switchStatisticsSubtab("challenges");
     window.advanceTime(0);
@@ -420,6 +423,11 @@ try {
       towerFirst: document.querySelector("#fastestTowerChallengeTimes li")?.textContent?.trim() ?? "",
       tier12CenterDelta,
       tier13CenterDelta,
+      tier14CenterDelta,
+      tier14Name: document.querySelector("#infinityUpgradeDetailName")?.textContent?.trim() ?? "",
+      tier14Effect: document.querySelector("#infinityUpgradeDetailEffect")?.textContent?.trim() ?? "",
+      tier14Requires: document.querySelector("#infinityUpgradeDetailRequires")?.textContent?.trim() ?? "",
+      tier14Cost: document.querySelector("#infinityUpgradeDetailCost")?.textContent?.trim() ?? "",
     };
   });
   assert.equal(desktopUiChanges.statisticsPanelActive, true, "Statistics challenge records subtab should activate");
@@ -430,6 +438,11 @@ try {
   assert.match(desktopUiChanges.towerFirst, /TC1.*27秒/);
   assert.ok(desktopUiChanges.tier12CenterDelta !== null && desktopUiChanges.tier12CenterDelta < 1, "IU 12-1 should be centered");
   assert.ok(desktopUiChanges.tier13CenterDelta !== null && desktopUiChanges.tier13CenterDelta < 1, "IU 13-1 should be centered");
+  assert.ok(desktopUiChanges.tier14CenterDelta !== null && desktopUiChanges.tier14CenterDelta < 1, "IU 14-1 should be centered");
+  assert.equal(desktopUiChanges.tier14Name, "14-1 ペナルティは遅れてやってくる", "IU 14-1 should render its Japanese name");
+  assert.equal(desktopUiChanges.tier14Effect, "IU11-2のハードキャップを×3遅らせる", "IU 14-1 should render its Japanese effect");
+  assert.match(desktopUiChanges.tier14Requires, /13-1/, "IU 14-1 should render its prerequisite");
+  assert.match(desktopUiChanges.tier14Cost, /e80/, "IU 14-1 should render its 1e80 cost");
   const towerInitial = await page.evaluate(() => {
     const { state, switchMainTab, switchInfinitySubtab, switchChallengeSubtab } = window.__angleDebug;
     state.towerFloor = 0;
@@ -1233,10 +1246,12 @@ try {
       return {
         tier12: centerDelta('[data-infinity-panel="upgrades"] [data-tier="12"]'),
         tier13: centerDelta('[data-infinity-panel="upgrades"] [data-tier="13"]'),
+        tier14: centerDelta('[data-infinity-panel="upgrades"] [data-tier="14"]'),
       };
     });
     assert.ok(mobileUpgradeCenters.tier12 !== null && mobileUpgradeCenters.tier12 < 1, "mobile IU 12-1 should be centered");
     assert.ok(mobileUpgradeCenters.tier13 !== null && mobileUpgradeCenters.tier13 < 1, "mobile IU 13-1 should be centered");
+    assert.ok(mobileUpgradeCenters.tier14 !== null && mobileUpgradeCenters.tier14 < 1, "mobile IU 14-1 should be centered");
 
     const mobileInfiniteAngle = await mobilePage.evaluate(() => {
       const { state, unlockInfiniteAngle, switchMainTab, switchInfinitySubtab, applySetting } = window.__angleDebug;

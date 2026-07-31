@@ -144,8 +144,14 @@ function sponsoredNormalUpgradeBonusLevel() {
   return Math.max(0, Math.floor(effectiveIp / 2000));
 }
 
+function iu11_2Hardcap() {
+  return runtime.hasInfinityUpgrade("14-1") ? 30000 : 10000;
+}
+
 function iu11_2EffectiveInfinityCount() {
-  return Math.min(10000, Math.max(0, runtime.state.infinityCount));
+  const rawInfinityCount = Number(runtime.state.infinityCount);
+  const nonNegativeInfinityCount = Number.isNaN(rawInfinityCount) ? 0 : Math.max(0, rawInfinityCount);
+  return Math.min(iu11_2Hardcap(), nonNegativeInfinityCount);
 }
 
 function effectiveSpeedLevel() {
@@ -583,6 +589,7 @@ expose("currentPreviousGenerationScoreLog10", () => currentPreviousGenerationSco
 expose("currentInfinityPointsLog10", () => currentInfinityPointsLog10, (value) => { currentInfinityPointsLog10 = value; });
 expose("currentInfiniteScoreLog10", () => currentInfiniteScoreLog10, (value) => { currentInfiniteScoreLog10 = value; });
 expose("sponsoredNormalUpgradeBonusLevel", () => sponsoredNormalUpgradeBonusLevel, (value) => { sponsoredNormalUpgradeBonusLevel = value; });
+expose("iu11_2Hardcap", () => iu11_2Hardcap, (value) => { iu11_2Hardcap = value; });
 expose("iu11_2EffectiveInfinityCount", () => iu11_2EffectiveInfinityCount, (value) => { iu11_2EffectiveInfinityCount = value; });
 expose("effectiveSpeedLevel", () => effectiveSpeedLevel, (value) => { effectiveSpeedLevel = value; });
 expose("effectiveGainLevel", () => effectiveGainLevel, (value) => { effectiveGainLevel = value; });

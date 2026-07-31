@@ -293,6 +293,17 @@ const BALANCE_INFINITY_UPGRADES = [
       en: "Infinity Score is raised to ^0.5 before multiplying gain per vertex.",
     },
   },
+  {
+    id: "14-1",
+    bit: 20,
+    cost: 1e80,
+    requires: ["13-1"],
+    name: { ja: "14-1 ペナルティは遅れてやってくる", en: "14-1 The Penalty Comes Later" },
+    effect: {
+      ja: "IU11-2のハードキャップを×3遅らせる",
+      en: "Delays IU 11-2's hard cap by x3.",
+    },
+  },
 ];
 
 expose("INFINITY_CHALLENGES", () => INFINITY_CHALLENGES);

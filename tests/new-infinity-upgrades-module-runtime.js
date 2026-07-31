@@ -66,6 +66,13 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(byId.get("13-1")?.cost, 1e51, "IU 13-1 must cost 1e51 IP");
     assert.deepEqual(Array.from(byId.get("13-1")?.requires || []), ["12-1"], "IU 13-1 must require IU 12-1");
     assert.equal(byId.get("13-1")?.name.ja, "13-1 久々にここを見たなら", "IU 13-1 Japanese name must match the new upgrade");
+    assert.equal(byId.get("14-1")?.bit, 20, "IU 14-1 must use bit 20");
+    assert.equal(byId.get("14-1")?.cost, 1e80, "IU 14-1 must cost 1e80 IP");
+    assert.deepEqual(Array.from(byId.get("14-1")?.requires || []), ["13-1"], "IU 14-1 must require IU 13-1");
+    assert.equal(byId.get("14-1")?.name.ja, "14-1 ペナルティは遅れてやってくる", "IU 14-1 Japanese name must match the new upgrade");
+    assert.equal(byId.get("14-1")?.name.en, "14-1 The Penalty Comes Later", "IU 14-1 English name must match the new upgrade");
+    assert.equal(byId.get("14-1")?.effect.ja, "IU11-2のハードキャップを×3遅らせる", "IU 14-1 Japanese effect must describe the delayed hard cap");
+    assert.equal(byId.get("14-1")?.effect.en, "Delays IU 11-2's hard cap by x3.", "IU 14-1 English effect must describe the delayed hard cap");
   }
 
   {
@@ -232,6 +239,24 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     setLogResource(state, "infinityPoints", 51);
     assert.equal(debug.buyInfinityUpgrade("13-1"), true, "IU 13-1 must be purchasable after IU 12-1");
     assert.equal((state.infinityUpgradeMask & (1 << 19)) !== 0, true, "IU 13-1 purchase bit must be set");
+  }
+
+  {
+    const { debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.infinityUpgradeMask = purchasedMaskThrough(19);
+    state.infinityPointsExact = "9".repeat(80);
+    state.infinityPoints = Number.MAX_VALUE;
+    state.infinityPointsLog10 = 80;
+    assert.equal(debug.buyInfinityUpgrade("14-1"), false, "IU 14-1 must reject an IP balance just below 1e80");
+    assert.equal((state.infinityUpgradeMask & (1 << 20)) !== 0, false, "a rejected IU 14-1 purchase must not set its bit");
+
+    state.infinityPointsExact = `1${"0".repeat(80)}`;
+    state.infinityPoints = Number.MAX_VALUE;
+    state.infinityPointsLog10 = 80;
+    assert.equal(debug.buyInfinityUpgrade("14-1"), true, "IU 14-1 must be purchasable at exactly 1e80 IP");
+    assert.equal((state.infinityUpgradeMask & (1 << 20)) !== 0, true, "IU 14-1 purchase bit must be set");
+    assert.equal(state.infinityPointsExact, "0", "purchasing IU 14-1 must spend exactly 1e80 IP");
   }
 
   {
@@ -515,14 +540,65 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
       Math.abs(revised / legacy - (Math.pow(1.005, 1000) / 1001)) < 1e-10,
       "IU 11-2 should change IU 1-1 from Infinity+1 to 1.005^Infinity",
     );
+    state.infinityCount = 9999;
+    const beforeOriginalCap = runtime.vertexGainIncrease();
+    assert.equal(runtime.iu11_2EffectiveInfinityCount(), 9999, "IU 11-2 should use the count immediately below its original cap");
     state.infinityCount = 10000;
     assert.equal(runtime.iu11_2EffectiveInfinityCount(), 10000, "IU 11-2 should not softcap before 10000 Infinity");
-    const atSoftcapStart = runtime.vertexGainIncrease();
-    state.infinityCount = 1000000;
+    const atOriginalCap = runtime.vertexGainIncrease();
+    assert.ok(atOriginalCap > beforeOriginalCap, "IU 11-2 should still grow through the original cap boundary");
+    state.infinityCount = 10001;
     assert.equal(runtime.iu11_2EffectiveInfinityCount(), 10000, "IU 11-2 should stop growing after 10000 Infinity");
-    const farAfterSoftcap = runtime.vertexGainIncrease();
-    assert.equal(farAfterSoftcap, atSoftcapStart, "IU 11-2 should be flat after the 10000 Infinity cap");
-    assert.equal(Number.isFinite(farAfterSoftcap), true, "IU 11-2 softcapped multiplier must stay finite");
+    assert.equal(runtime.vertexGainIncrease(), atOriginalCap, "IU 11-2 should be flat after the 10000 Infinity cap");
+
+    state.infinityUpgradeMask = (1 << 0) | (1 << 17) | (1 << 20);
+    state.infinityCount = 29999;
+    const beforeExtendedCap = runtime.vertexGainIncrease();
+    assert.equal(runtime.iu11_2Hardcap(), 30000, "IU 14-1 should extend the IU 11-2 hard cap to 30000");
+    assert.equal(runtime.iu11_2EffectiveInfinityCount(), 29999, "IU 14-1 should use the count immediately below its extended cap");
+    state.infinityCount = 30000;
+    assert.equal(runtime.iu11_2EffectiveInfinityCount(), 30000, "IU 14-1 should allow the extended cap boundary");
+    const atExtendedCap = runtime.vertexGainIncrease();
+    assert.ok(atExtendedCap > beforeExtendedCap, "IU 14-1 should preserve growth through the extended cap boundary");
+    state.infinityCount = 30001;
+    assert.equal(runtime.iu11_2EffectiveInfinityCount(), 30000, "IU 14-1 should stop growing after 30000 Infinity");
+    assert.equal(runtime.vertexGainIncrease(), atExtendedCap, "IU 14-1 should be flat after the 30000 Infinity cap");
+    assert.equal(Number.isFinite(atExtendedCap), true, "IU 14-1's extended multiplier must stay finite");
+
+    state.infinityCount = 30000;
+    state.infinityUpgradeMask = 1 << 20;
+    const iu14OnlyGain = runtime.vertexGainIncrease();
+    state.infinityUpgradeMask = 0;
+    const withoutInfinityUpgradesGain = runtime.vertexGainIncrease();
+    assert.equal(iu14OnlyGain, withoutInfinityUpgradesGain, "IU 14-1 alone must not affect the IU 1-1 formula");
+
+    state.infinityUpgradeMask = (1 << 0) | (1 << 17) | (1 << 20);
+    for (const extremeCount of [-10, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_VALUE]) {
+      state.infinityCount = extremeCount;
+      const effectiveCount = runtime.iu11_2EffectiveInfinityCount();
+      assert.equal(Number.isFinite(effectiveCount), true, `IU 11-2 effective count must be finite for ${String(extremeCount)}`);
+      assert.ok(effectiveCount >= 0 && effectiveCount <= 30000, `IU 11-2 effective count must stay bounded for ${String(extremeCount)}`);
+      assert.equal(Number.isFinite(runtime.vertexGainIncrease()), true, `IU 11-2 gain must be finite for ${String(extremeCount)}`);
+    }
+  }
+
+  {
+    const source = await loadRuntime(candidatePath);
+    const { debug, storage } = source;
+    debug.state.infinityUpgradeMask = (1 << 19) | (1 << 20);
+    assert.equal(debug.saveGame("manual"), true, "IU14-1 state should save through the normal save path");
+    assert.equal(
+      (JSON.parse(storage.get(source.runtime.SAVE_KEY)).state.infinityUpgradeMask & (1 << 20)) !== 0,
+      true,
+      "normal saves must persist IU14-1",
+    );
+    const reloaded = await loadRuntime(candidatePath, new Map(storage));
+    assert.equal((reloaded.debug.state.infinityUpgradeMask & (1 << 20)) !== 0, true, "local save reloads must preserve IU14-1");
+
+    const saveCode = await source.debug.exportSaveCode();
+    const imported = await loadRuntime(candidatePath);
+    assert.equal(await imported.debug.importSaveCode(saveCode), true, "IU14-1 save codes should import");
+    assert.equal((imported.debug.state.infinityUpgradeMask & (1 << 20)) !== 0, true, "save-code imports must preserve IU14-1");
   }
 
   {

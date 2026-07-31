@@ -1125,7 +1125,8 @@ canvas {
 .infinity-upgrade-tier[data-tier="8"] .infinity-upgrade-node,
 .infinity-upgrade-tier[data-tier="9"] .infinity-upgrade-node,
 .infinity-upgrade-tier[data-tier="12"] .infinity-upgrade-node,
-.infinity-upgrade-tier[data-tier="13"] .infinity-upgrade-node {
+.infinity-upgrade-tier[data-tier="13"] .infinity-upgrade-node,
+.infinity-upgrade-tier[data-tier="14"] .infinity-upgrade-node {
   grid-column: 1 / -1;
   justify-self: center;
   width: min(360px, 100%);
@@ -2400,7 +2401,8 @@ canvas {
   .infinity-upgrade-tier[data-tier="8"] .infinity-upgrade-node,
   .infinity-upgrade-tier[data-tier="9"] .infinity-upgrade-node,
   .infinity-upgrade-tier[data-tier="12"] .infinity-upgrade-node,
-  .infinity-upgrade-tier[data-tier="13"] .infinity-upgrade-node {
+  .infinity-upgrade-tier[data-tier="13"] .infinity-upgrade-node,
+  .infinity-upgrade-tier[data-tier="14"] .infinity-upgrade-node {
     width: min(260px, 100%);
   }
 

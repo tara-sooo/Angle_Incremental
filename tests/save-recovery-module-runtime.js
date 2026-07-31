@@ -40,6 +40,24 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const purchasedMask = (1 << 19) | (1 << 20);
+    assert.equal(runtime.SAVE_VERSION, 10, "IU14-1 must keep the save version at 10");
+    debug.state.infinityUpgradeMask = purchasedMask;
+    assert.equal(debug.createCheckpoint("periodic", { force: true }), true, "IU14-1 state should be checkpointed");
+    debug.state.infinityUpgradeMask = 0;
+    const checkpointIndex = debug.recoveryEntries().checkpoints.findIndex((entry) => entry.reason === "periodic");
+    instance.context.window.confirm = () => true;
+    assert.equal(debug.restoreCheckpoint(checkpointIndex), true, "IU14-1 checkpoint state should be restorable");
+    assert.equal(debug.state.infinityUpgradeMask, purchasedMask, "checkpoint restore must recover IU14-1");
+    assert.equal(debug.restoreUndoSave(), true, "checkpoint restore should expose an undo path for IU14-1");
+    assert.equal(debug.state.infinityUpgradeMask, 0, "checkpoint undo must recover the state before the IU14-1 restore");
+    assert.equal(debug.restoreUndoSave(), true, "the undo entry should itself be reversible for IU14-1");
+    assert.equal(debug.state.infinityUpgradeMask, purchasedMask, "reversing the undo must recover IU14-1 again");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { debug, runtime, storage } = instance;
     const originalSave = runtime.serializeSaveData();
     originalSave.savedAt = Date.now();
