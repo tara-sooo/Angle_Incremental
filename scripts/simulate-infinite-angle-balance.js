@@ -78,12 +78,13 @@ function configureIdealSnapshot(instance, options) {
   const { state } = debug;
   const allInfinityUpgrades = (1 << runtime.INFINITY_UPGRADES.length) - 1;
   const allChallenges = (1 << runtime.INFINITY_CHALLENGE_COUNT) - 1;
-  const allAchievements = (2 ** runtime.ACHIEVEMENT_COUNT) - 1;
+  const allAchievementsHigh = (2 ** (runtime.ACHIEVEMENT_COUNT - 31)) - 1;
 
   state.infinityCount = 10000;
   state.infinityUpgradeMask = allInfinityUpgrades;
   state.completedChallenges = allChallenges;
-  state.achievementMask = allAchievements;
+  state.achievementMask = 0x7fffffff;
+  state.achievementMaskHigh = allAchievementsHigh;
   state.infiniteCapBroken = true;
   state.infiniteAngleUnlocked = true;
   state.towerFloor = 0;

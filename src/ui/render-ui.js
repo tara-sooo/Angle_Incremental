@@ -85,6 +85,16 @@ function countBits(value) {
   return count;
 }
 
+function countAchievementBits(state) {
+  let count = 0;
+  for (let id = 1; id <= runtime.ACHIEVEMENT_COUNT; id += 1) {
+    const mask = id <= 31 ? state.achievementMask : state.achievementMaskHigh;
+    const bit = 1 << (id <= 31 ? id - 1 : id - 32);
+    if ((((Number(mask) || 0) >>> 0) & bit) !== 0) count += 1;
+  }
+  return count;
+}
+
 function recoveryStateSummary(entry) {
   const state = entry?.state || {};
   const infinityPointsLog10 = runtime.sanitizeLog10(
@@ -95,7 +105,7 @@ function recoveryStateSummary(entry) {
     `${runtime.t("recoveryInfinity")}: ${runtime.formatUiNumber(state.infinityCount || 0)}`,
     `${runtime.t("recoveryIp")}: ${runtime.formatUiLogNumber(infinityPointsLog10)}`,
     `${runtime.t("recoveryChallenges")}: ${countBits(state.completedChallenges)}/${runtime.INFINITY_CHALLENGE_COUNT}`,
-    `${runtime.t("recoveryAchievements")}: ${countBits(state.achievementMask)}/${runtime.ACHIEVEMENT_COUNT}`,
+    `${runtime.t("recoveryAchievements")}: ${countAchievementBits(state)}/${runtime.ACHIEVEMENT_COUNT}`,
     `${runtime.t("recoveryIa")}: ${state.infiniteAngleUnlocked ? runtime.t("recoveryUnlocked") : runtime.t("recoveryLocked")}`,
     `${runtime.t("recoveryTower")}: ${Math.max(0, Math.floor(Number(state.towerFloor) || 0))}`,
   ].join(" · ");

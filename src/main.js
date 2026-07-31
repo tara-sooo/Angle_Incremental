@@ -1146,6 +1146,7 @@ function renderGameToText() {
       vertexGainIncrease: Number(runtime.vertexGainIncrease().toPrecision(6)),
       vertexGainIncreaseLog10: Number(runtime.vertexGainIncreaseLog10().toPrecision(6)),
       mask: runtime.state.achievementMask,
+      maskHigh: runtime.state.achievementMaskHigh,
       generationMultiplierReward: runtime.isAchievementUnlocked(3),
       totalPlayTime: Number(runtime.state.totalPlayTime.toFixed(1)),
       noGenerationCoreBoostReached: runtime.state.noGenerationCoreBoostReached,

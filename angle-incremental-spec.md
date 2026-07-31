@@ -426,7 +426,7 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。TC1/TC2をク�
 
 ## 13. 実績
 
-実績は31個あり、すべてのリセットを超えて保持される。
+実績は37個あり、すべてのリセットを超えて保持される。
 
 ```text
 実績倍率 = 1.01 ^ 達成済み実績数
@@ -467,6 +467,12 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。TC1/TC2をク�
 | 29 | スコアが1e628を超える | なし |
 | 30 | ICを8つクリア | なし |
 | 31 | IAを解放 | IP獲得量 `x100` |
+| 32 | 所持IPがe44に到達 | なし |
+| 33 | Towerを建設 | なし |
+| 34 | TC1をクリア | なし |
+| 35 | スコアがe2450を超える | なし |
+| 36 | Towerの階層が3に到達 | なし |
+| 37 | TC2をクリア | なし |
 
 ## 14. 自動化と統計
 
@@ -589,6 +595,7 @@ fastestInfinityChallengeTimes
 fastestTowerChallengeTimes
 infiniteCapBroken
 achievementMask
+achievementMaskHigh
 totalPlayTime
 totalRealPlayTime
 currentInfinityRunTime
