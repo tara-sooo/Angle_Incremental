@@ -1322,7 +1322,8 @@ try {
     assert.ok(mobileAchievements.listWidth > 0, "the mobile achievement list should have a visible layout");
 
     const mobileVertexGainDisplay = await mobilePage.evaluate(() => {
-      const { state } = window.__angleDebug;
+      const { state, switchMainTab } = window.__angleDebug;
+      switchMainTab("angle");
       const original = {
         achievementMask: state.achievementMask,
         achievementMaskHigh: state.achievementMaskHigh,
