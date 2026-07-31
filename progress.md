@@ -117,6 +117,7 @@ Original prompt: では、中核ループを完成させてください
 - Prepared the 0.9.0 release candidate with save recovery checkpoints, IU 13-1, Tower Challenges 1/2 and replay support, persistent IC/TC fastest clear times, and invalid-challenge timer cleanup while keeping SAVE_VERSION 10 unchanged; TC3/TC4 remain deferred.
 - Temporarily removed Time Flux gameplay and UI for #70: offline progress is always normal progression, the offline tick setting lives in Settings, and dormant Time Flux save fields remain compatible without active effects.
 - Added achievements 32-37 for Infinite Angle and Tower progression, with a separate high achievement mask that preserves SAVE_VERSION 10 compatibility.
+- Added IU14-1 after IU13-1, extending IU11-2's Infinity-count hard cap from 10000 to 30000 while preserving SAVE_VERSION 10 compatibility.
 
 ## TODO
 

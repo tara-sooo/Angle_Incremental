@@ -104,6 +104,8 @@ Infinity Upgradeは、Infinity後の主な成長要素です。
 
 後半のIUでは、Infinity自動化、IP獲得式の変更、リセット後のCore Boost開始、所持スコアの指数化などが解放されます。
 
+IU14-1はIU13-1の後段にあり、IU11-2のInfinity回数ハードキャップを10000から30000へ延長します。
+
 ## 8. Infinity Challenge
 
 Infinity Challenge (IC) は、制約付きでInfinity到達を目指す挑戦です。IU 4-1で解放されます。
