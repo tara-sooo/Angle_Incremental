@@ -55,7 +55,10 @@ function currentLog10FromState(value, savedLog) {
 
 function coreBoostRequirementWithoutEarlyCap() {
   const count = Math.max(0, Math.floor(runtime.state.coreBoostCount));
-  const multiplier = 2 ** count;
+  const growthPower = typeof runtime.coreBoostRequirementGrowthPower === "function"
+    ? runtime.coreBoostRequirementGrowthPower()
+    : 2;
+  const multiplier = growthPower ** count;
   if (Number.isFinite(multiplier)) {
     const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
     const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;

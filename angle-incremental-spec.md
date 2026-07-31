@@ -34,7 +34,7 @@
 | Infinity Point / IP | Infinity Upgrade購入とInfinity Angleの解放・通常強化購入に使うリソース。 |
 | Infinity Upgrade / IU | IPで購入する恒久強化。 |
 | Infinity Challenge / IC | 制約付きでInfinity到達を目指すチャレンジ。 |
-| Tower Challenge / TC | Towerの次階建設を制限する予定のチャレンジ。 |
+| Tower Challenge / TC | Towerの次階建設を制限するチャレンジ。TC1・TC2を実装済み、TC3・TC4は未実装。 |
 | Infinity Angle / IA | e20 IPで解放する、Infinity内の独立した図形進行。 |
 | Infinity Score | IAの核到達で得るInfinity内スコア。^0.3後に通常の頂点獲得量へ乗算する。 |
 | Tower | IPで建設し、階数に応じてスコア累乗を強化するInfinity後の恒久要素。 |
@@ -411,18 +411,42 @@ Towerスコア累乗 = 1 + Tower階数 * 0.05
 実効スコアlog10 = 生スコアlog10 * The Angle側のスコア累乗 * Towerスコア累乗
 ```
 
+Towerの通常スコア累乗とTC1報酬のInfinity Score累乗は別系統である。TC1をクリアすると、Infinity Scoreの有効累乗は次の式になる。
+
+```text
+TC1追加指数 = max(0, Tower階数 - 3) * 0.077
+Infinity Score累乗 = (IU13-1未購入なら0.3、購入済みなら0.5) + TC1追加指数
+```
+
+このInfinity Score累乗は、IAのInfinity Scoreが通常の頂点獲得量へ与える倍率にだけ適用し、Towerスコア累乗には加算しない。
+
 Floor 13より後の必要IPは、必要IPのlog10を `345 * 1.15^(階数 - 13)` として扱う。必要IPが正確なIP上限を超える場合は建設できない。
 
 ### 12.2 Tower Challengeの現行状態
 
-TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。TC1/TC2をクリアするまで対応する次の階数を建設できない。TCはInfinity Challengeと併用でき、開始・中止時にInfinity以下をリセットする。クリア済みのTCも再挑戦でき、恒久報酬は初回クリア時のみ解放される。
+TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。TC1/TC2をクリアするまで対応する次の階数を建設できない。TCはInfinity Challengeと併用でき、開始・中止時にInfinity以下をリセットする。クリア済みのTCも再挑戦でき、恒久報酬は初回クリア時のみ解放される。TC1・TC2の報酬はクリア後、通常プレイと後続TC内で有効になる。
 
 | TC | 制約 | 目標 | 報酬 |
 | --- | --- | --- | --- |
-| TC1 親友より知り合い | TAの通常強化は購入できず、IU11-1の効果上限は`/5`される。 | `1e308 Score` | 「Infinity Score累乗」を解放。到達時はTC専用リセットを行い、IP/Infinity回数は増えない。再挑戦時も同じリセットを行う。 |
-| TC2 核家族世帯撲滅委員会 | CBは封印され、GRスコア倍率は`^0.1`、GRコスト倍率は`x0.90`を下限とする。 | `1e1300 Score` | 「Core Boost強化」を解放。初回・再挑戦とも通常Infinity報酬を付与する。 |
+| TC1 親友より知り合い | TAの通常強化は購入できず、IU11-1の効果上限は`/5`される。 | `1e308 Score` | 「Infinity Score累乗」を解放。Floor 3以降の追加階層ごとに指数へ`+0.077`する。到達時はTC専用リセットを行い、IP/Infinity回数は増えない。再挑戦時も同じリセットを行う。 |
+| TC2 核家族世帯撲滅委員会 | CBは封印され、GRスコア倍率は`^0.1`、GRコスト倍率は`x0.90`を下限とする。 | `1e1555 Score` | 「Core Boost強化」を解放。Floor 5以降、CB要求量の生指数を1階層ごとに`-0.03`し、`1.50`未満では強いソフトキャップを適用する。初回・再挑戦とも通常Infinity報酬を付与する。 |
 | TC3 | 未定 | 未定 | 未定 |
 | TC4 | 未定 | 未定 | 未定 |
+
+TC2のCore Boost要求量増加指数は、TC2未クリア時またはFloor 5では`2.00`である。TC2クリア後の生指数は次の式で計算する。
+
+```text
+CB要求量生指数 = 2 - max(0, Tower階数 - 5) * 0.03
+```
+
+生指数が`1.50`以上なら実効指数も同じ値とする。`1.50`未満では、`d = 1.50 - 生指数`として次のソフトキャップを適用する。
+
+```text
+CB要求量実効指数 = 1.50 - 0.10 * d / (1 + d)
+CB要求量log10 = log10(1.00e20) * (CB要求量実効指数 ^ Core Boost回数)
+```
+
+この式は`1.50`で連続し、Floor 22の生指数`1.49`を約`1.499`へ緩和する。Floor 22以降も実効指数は変化し続け、長期的には`1.40`へ漸近する。`1.50`で固定するハードキャップではない。
 
 ## 13. 実績
 
