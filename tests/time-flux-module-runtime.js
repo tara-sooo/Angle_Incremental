@@ -21,32 +21,6 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(runtime.timeFluxGain(), 360, "initial Time Flux gain should be six minutes per hour");
   assert.equal(runtime.timeFluxGainUpgradeCost(), 1800, "the first gain upgrade should cost 30 minutes");
   assert.equal(runtime.timeFluxCapacityUpgradeCost(), 1350, "the first capacity upgrade should cost 22.5 minutes");
-  assert.equal(runtime.TIME_FLUX_MAX_CAPACITY_LEVEL, 59, "Time Flux capacity should have 60 staged levels");
-  assert.equal(runtime.timeFluxCapacitySeconds(7), 172800, "capacity level 7 should be 48 hours");
-  assert.equal(runtime.timeFluxCapacitySeconds(14), 460800, "capacity level 14 should be 128 hours");
-  assert.equal(runtime.timeFluxCapacitySeconds(19), 604800, "capacity level 19 should be seven days");
-  assert.equal(runtime.timeFluxCapacitySeconds(59), 1209600, "capacity level 59 should be fourteen days");
-  assert.equal(runtime.timeFluxCapacitySeconds(60), 1209600, "capacity should clamp above the maximum level");
-  assert.equal(runtime.timeFluxCapacityUpgradeCost(59), Infinity, "the maximum capacity should have no upgrade cost");
-
-  state.timeFluxCapacityLevel = runtime.TIME_FLUX_MAX_CAPACITY_LEVEL;
-  state.timeFlux = 1209600;
-  assert.equal(runtime.canBuyTimeFluxUpgrade("capacity"), false, "the maximum capacity should not be purchasable");
-  assert.equal(debug.buyTimeFluxUpgrade("capacity"), false, "buying at maximum capacity should be rejected");
-  runtime.updateUi();
-  assert.equal(
-    instance.context.document.getElementById("timeFluxCapacityLevel").textContent,
-    "MAX",
-    "the capacity level UI should show MAX",
-  );
-  assert.equal(
-    instance.context.document.getElementById("timeFluxCapacityCost").textContent,
-    "MAX",
-    "the capacity cost UI should show MAX",
-  );
-  state.timeFluxCapacityLevel = 0;
-  state.timeFlux = 0;
-
   state.timeFlux = 1350;
   assert.equal(debug.buyTimeFluxUpgrade("capacity"), true, "capacity upgrade should spend TF");
   assert.equal(state.timeFluxCapacityLevel, 1, "capacity level should increase");
@@ -322,6 +296,53 @@ async function runTimeFluxModuleRuntimeTest() {
     runtime.update = originalOfflineUpdate;
   }
 
+  const extremeServerInstance = await loadRuntime(candidatePath);
+  const extremeServerDebug = extremeServerInstance.debug;
+  const extremeServerRuntime = extremeServerInstance.runtime;
+  extremeServerInstance.context.window.fetch = async () => ({
+    ok: true,
+    headers: { get: () => new Date().toUTCString() },
+  });
+  await extremeServerRuntime.syncServerClock();
+  const ancientServerSavedAt = Date.now() - 1e12;
+  const extremeServerElapsed = extremeServerRuntime.offlineElapsedFromSave(
+    Date.now(),
+    ancientServerSavedAt,
+  );
+  assert.equal(extremeServerElapsed.clockSource, "server", "an available server clock should be used for ancient saves");
+  assert.ok(extremeServerElapsed.elapsedSeconds > 1e8, "the trusted server interval should remain unlimited");
+  extremeServerDebug.state.offlineProgressEnabled = true;
+  extremeServerRuntime.state.offlineTickCount = extremeServerRuntime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS;
+  const originalExtremeServerUpdate = extremeServerRuntime.update;
+  let extremeServerUpdateCalls = 0;
+  extremeServerRuntime.update = () => {
+    extremeServerUpdateCalls += 1;
+  };
+  try {
+    const extremeServerReport = extremeServerDebug.processOfflineElapsed(
+      extremeServerElapsed.elapsedSeconds,
+      "test",
+      extremeServerElapsed,
+    );
+    assert.equal(extremeServerReport.capped, false, "ancient trusted server intervals should not use a duration cap");
+    assert.equal(
+      extremeServerReport.effectiveElapsedSeconds,
+      extremeServerElapsed.elapsedSeconds,
+      "ancient trusted server intervals should retain their full duration",
+    );
+    assert.ok(
+      extremeServerReport.processedTicks <= extremeServerRuntime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS,
+      "ancient trusted server intervals should use bounded processing",
+    );
+    assert.equal(
+      extremeServerUpdateCalls,
+      extremeServerReport.processedTicks,
+      "bounded offline processing should not expand with the interval duration",
+    );
+  } finally {
+    extremeServerRuntime.update = originalExtremeServerUpdate;
+  }
+
   const timeFluxBeforeClockAnomaly = state.timeFlux;
   const clockAnomalyReport = debug.processOfflineElapsed(3600, "test", {
     clockSource: "server",
@@ -374,12 +395,9 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.currentInfinityRealTime, 0, "old saves should default to zero real Infinity time");
   assert.equal(state.fastestInfinityRealTime, 0, "old saves should default to no fastest real Infinity time");
 
-  runtime.applySaveData({ timeFluxCapacityLevel: 8, timeFlux: 123 }, 10);
-  assert.equal(state.timeFluxCapacityLevel, 8, "legacy capacity levels within the table should be preserved");
-  assert.equal(state.timeFlux, 123, "legacy TF below the new capacity should be preserved");
   runtime.applySaveData({ timeFluxCapacityLevel: 60, timeFlux: 1500000 }, 10);
-  assert.equal(state.timeFluxCapacityLevel, 59, "legacy capacity levels above MAX should clamp to MAX");
-  assert.equal(state.timeFlux, 1209600, "legacy TF above the new capacity should clamp to fourteen days");
+  assert.equal(state.timeFluxCapacityLevel, 60, "existing TF capacity levels should remain unchanged");
+  assert.equal(state.timeFlux, 1500000, "existing TF balances should remain unchanged when below the legacy capacity");
 
   runtime.applySaveData({
     lastInfinityRuns: [{ time: 4, scoreLog10: 3, ipGain: 2, challenge: 0 }],
@@ -453,13 +471,60 @@ async function runTimeFluxModuleRuntimeTest() {
   };
   try {
     assert.equal(saveFailureDebug.saveGame("manual"), false, "storage failures should report a failed save");
-    assert.ok(
-      saveFailureRuntime.offlineBaselineTimestamp > 1,
-      "a failed save should still rebase the in-memory offline baseline",
+    assert.equal(
+      saveFailureRuntime.offlineBaselineTimestamp,
+      1,
+      "a failed save should not advance the in-memory offline baseline",
     );
   } finally {
     saveFailureInstance.context.localStorage.setItem = originalSetItem;
   }
+
+  const hiddenSaveFailureInstance = await loadRuntime(candidatePath);
+  const hiddenSaveFailureRuntime = hiddenSaveFailureInstance.runtime;
+  const hiddenSaveFailureBaseline = Date.now() - 60 * 1000;
+  hiddenSaveFailureRuntime.setOfflineBaseline(hiddenSaveFailureBaseline, 0);
+  const hiddenSaveFailureReport = { source: "before-hidden-save" };
+  hiddenSaveFailureRuntime.offlineReport = hiddenSaveFailureReport;
+  const hiddenSaveFailureState = hiddenSaveFailureRuntime.snapshotRuntimeState();
+  const hiddenSaveFailureOriginalSetItem = hiddenSaveFailureInstance.context.localStorage.setItem;
+  hiddenSaveFailureInstance.context.document.hidden = true;
+  hiddenSaveFailureInstance.context.localStorage.setItem = (key, value) => {
+    if (key === hiddenSaveFailureRuntime.SAVE_KEY) throw new Error("storage unavailable");
+    return hiddenSaveFailureOriginalSetItem(key, value);
+  };
+  try {
+    await assert.doesNotReject(
+      hiddenSaveFailureRuntime.handleVisibilityChange(),
+      "a hidden-save failure should be converted into recovery mode",
+    );
+  } finally {
+    hiddenSaveFailureInstance.context.localStorage.setItem = hiddenSaveFailureOriginalSetItem;
+    hiddenSaveFailureInstance.context.document.hidden = false;
+  }
+  assert.deepEqual(
+    hiddenSaveFailureRuntime.snapshotRuntimeState(),
+    hiddenSaveFailureState,
+    "a hidden-save failure should restore the game state",
+  );
+  assert.equal(
+    hiddenSaveFailureRuntime.offlineBaselineTimestamp,
+    hiddenSaveFailureBaseline,
+    "a hidden-save failure should preserve the offline baseline",
+  );
+  assert.equal(
+    hiddenSaveFailureRuntime.offlineReport,
+    hiddenSaveFailureReport,
+    "a hidden-save failure should restore the previous offline report",
+  );
+  assert.equal(hiddenSaveFailureRuntime.loadRecoveryMode, true, "a hidden-save failure should enter recovery mode");
+  assert.equal(hiddenSaveFailureRuntime.autoSaveElapsed, 0, "a hidden-save failure should reset the autosave timer");
+  assert.equal(
+    JSON.parse(hiddenSaveFailureInstance.context.localStorage.getItem(hiddenSaveFailureRuntime.SAVE_LOAD_FAILURE_KEY))
+      .offlineRetrySavedAt,
+    hiddenSaveFailureBaseline,
+    "hidden-save recovery should preserve the retry baseline",
+  );
 
   const resumeInstance = await loadRuntime(candidatePath);
   const resumeDebug = resumeInstance.debug;
@@ -492,6 +557,267 @@ async function runTimeFluxModuleRuntimeTest() {
     "visibility resume should retain the interval captured before a pending save rebases the baseline",
   );
   assert.ok(resumeDebug.state.timeFlux > 0, "the retained resume interval should grant Time Flux");
+
+  const visibilityExceptionInstance = await loadRuntime(candidatePath);
+  const visibilityExceptionDebug = visibilityExceptionInstance.debug;
+  const visibilityExceptionRuntime = visibilityExceptionInstance.runtime;
+  const visibilityExceptionBaseline = Date.now() - 60 * 1000;
+  visibilityExceptionRuntime.setOfflineBaseline(visibilityExceptionBaseline, 0);
+  visibilityExceptionRuntime.normalAutobuyElapsed = 0.37;
+  visibilityExceptionRuntime.autoSaveElapsed = 1.25;
+  const previousVisibilityExceptionReport = { source: "before-resume" };
+  visibilityExceptionRuntime.offlineReport = previousVisibilityExceptionReport;
+  const visibilityExceptionState = visibilityExceptionRuntime.snapshotRuntimeState();
+  const visibilityExceptionNormalAutobuyElapsed = visibilityExceptionRuntime.normalAutobuyElapsed;
+  const visibilityExceptionLastTime = visibilityExceptionRuntime.lastTime;
+  const visibilityExceptionOriginalUpdate = visibilityExceptionRuntime.update;
+  let visibilityExceptionUpdateCount = 0;
+  visibilityExceptionRuntime.update = (...args) => {
+    visibilityExceptionUpdateCount += 1;
+    const result = visibilityExceptionOriginalUpdate(...args);
+    if (visibilityExceptionUpdateCount === 1) throw new Error("injected visibility update failure");
+    return result;
+  };
+  visibilityExceptionInstance.context.window.fetch = async () => ({
+    ok: true,
+    headers: { get: () => new Date().toUTCString() },
+  });
+  try {
+    await assert.doesNotReject(
+      visibilityExceptionRuntime.handleVisibilityChange(),
+      "visibility resume failures should be converted into recovery mode",
+    );
+  } finally {
+    visibilityExceptionRuntime.update = visibilityExceptionOriginalUpdate;
+  }
+  assert.deepEqual(
+    visibilityExceptionRuntime.snapshotRuntimeState(),
+    visibilityExceptionState,
+    "a visibility resume exception should restore the complete game state",
+  );
+  assert.equal(
+    visibilityExceptionRuntime.normalAutobuyElapsed,
+    visibilityExceptionNormalAutobuyElapsed,
+    "a visibility resume exception should restore the normal autobuy timer",
+  );
+  assert.equal(
+    visibilityExceptionRuntime.offlineBaselineTimestamp,
+    visibilityExceptionBaseline,
+    "a visibility resume exception should restore the local baseline",
+  );
+  assert.equal(
+    visibilityExceptionRuntime.offlineReport,
+    previousVisibilityExceptionReport,
+    "a visibility resume exception should restore the previous report",
+  );
+  assert.equal(visibilityExceptionRuntime.offlineProcessing, false, "offline processing should always be cleared");
+  assert.equal(visibilityExceptionRuntime.autoSaveElapsed, 0, "recovery should consume the autosave timer");
+  assert.equal(visibilityExceptionRuntime.lastTime, visibilityExceptionLastTime, "resume rollback should restore frame timing");
+  assert.equal(visibilityExceptionRuntime.loadRecoveryMode, true, "a visibility resume exception should enter recovery mode");
+
+  const visibilitySaveFailureInstance = await loadRuntime(candidatePath);
+  const visibilitySaveFailureDebug = visibilitySaveFailureInstance.debug;
+  const visibilitySaveFailureRuntime = visibilitySaveFailureInstance.runtime;
+  const visibilitySaveFailureBaseline = Date.now() - 60 * 1000;
+  let resolveVisibilitySaveFailureClockRequest;
+  const pendingVisibilitySaveFailureClockRequest = new Promise((resolve) => {
+    resolveVisibilitySaveFailureClockRequest = resolve;
+  });
+  visibilitySaveFailureInstance.context.window.fetch = () => pendingVisibilitySaveFailureClockRequest;
+  visibilitySaveFailureRuntime.setOfflineBaseline(visibilitySaveFailureBaseline, 0);
+  visibilitySaveFailureDebug.state.offlineProgressEnabled = false;
+  visibilitySaveFailureDebug.state.timeFlux = 0;
+  const visibilitySaveFailureOriginalSetItem = visibilitySaveFailureInstance.context.localStorage.setItem;
+  const visibilitySaveFailureOriginalRemoveItem = visibilitySaveFailureInstance.context.localStorage.removeItem;
+  try {
+    const visibilitySaveFailurePromise = visibilitySaveFailureRuntime.handleVisibilityChange();
+    await Promise.resolve();
+    assert.equal(
+      visibilitySaveFailureRuntime.saveGame("manual"),
+      true,
+      "a save during clock synchronization should succeed before the resume save fails",
+    );
+    const pendingResumeSave = JSON.parse(
+      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY),
+    );
+    assert.ok(
+      pendingResumeSave.savedAt > visibilitySaveFailureBaseline,
+      "the pending resume save should advance the persisted timestamp",
+    );
+    const pendingResumeSaveFingerprint = visibilitySaveFailureRuntime.currentSaveFingerprint();
+    visibilitySaveFailureInstance.context.localStorage.setItem = (key, value) => {
+      if (key === visibilitySaveFailureRuntime.SAVE_KEY) throw new Error("save storage unavailable");
+      return visibilitySaveFailureOriginalSetItem(key, value);
+    };
+    resolveVisibilitySaveFailureClockRequest({
+      ok: true,
+      headers: { get: () => new Date().toUTCString() },
+    });
+    await visibilitySaveFailurePromise;
+    assert.equal(
+      visibilitySaveFailureDebug.state.timeFlux,
+      0,
+      "a failed visibility save should roll back offline rewards",
+    );
+    assert.equal(
+      visibilitySaveFailureRuntime.offlineReport,
+      null,
+      "a failed visibility save should clear the offline report",
+    );
+    assert.equal(
+      visibilitySaveFailureRuntime.offlineBaselineTimestamp,
+      visibilitySaveFailureBaseline,
+      "a failed visibility save should restore the previous offline baseline",
+    );
+    assert.equal(
+      visibilitySaveFailureRuntime.loadRecoveryMode,
+      true,
+      "a failed visibility save should require save recovery",
+    );
+    const visibilitySaveFailureDiagnostic = JSON.parse(
+      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY),
+    );
+    assert.equal(
+      visibilitySaveFailureDiagnostic.offlineRetrySavedAt,
+      visibilitySaveFailureBaseline,
+      "save recovery should preserve the visibility interval baseline for retry",
+    );
+    assert.equal(
+      visibilitySaveFailureDiagnostic.offlineRetrySaveFingerprint,
+      pendingResumeSaveFingerprint,
+      "save recovery should fingerprint the latest local save for retry",
+    );
+    visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
+    visibilitySaveFailureInstance.context.localStorage.removeItem = (key) => {
+      if (key === visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY) {
+        throw new Error("recovery diagnostic removal unavailable");
+      }
+      return visibilitySaveFailureOriginalRemoveItem(key);
+    };
+    assert.equal(
+      visibilitySaveFailureDebug.retryLoad(),
+      true,
+      "retry should apply the captured visibility interval after the save failure",
+    );
+    assert.ok(
+      visibilitySaveFailureDebug.state.timeFlux > 0,
+      "retry should restore the offline reward from the captured visibility interval",
+    );
+    const recoveredSave = JSON.parse(
+      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY),
+    );
+    const originalProcessOfflineElapsed = visibilitySaveFailureRuntime.processOfflineElapsed;
+    let reloadRetryBaseline;
+    visibilitySaveFailureRuntime.processOfflineElapsed = (elapsed, source, clockContext) => {
+      reloadRetryBaseline = clockContext?.retryBaseline;
+      return originalProcessOfflineElapsed(elapsed, source, clockContext);
+    };
+    try {
+      assert.equal(
+        visibilitySaveFailureDebug.loadGame(),
+        true,
+        "a successful recovery should remain loadable when its diagnostic cannot be removed",
+      );
+    } finally {
+      visibilitySaveFailureRuntime.processOfflineElapsed = originalProcessOfflineElapsed;
+    }
+    assert.ok(
+      !reloadRetryBaseline || reloadRetryBaseline.savedAt === recoveredSave.savedAt,
+      "a stale retry baseline must not be reused after a successful recovery",
+    );
+  } finally {
+    visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
+    visibilitySaveFailureInstance.context.localStorage.removeItem = visibilitySaveFailureOriginalRemoveItem;
+  }
+
+  const concurrentSaveInstance = await loadRuntime(candidatePath);
+  const concurrentSaveDebug = concurrentSaveInstance.debug;
+  const concurrentSaveRuntime = concurrentSaveInstance.runtime;
+  concurrentSaveDebug.state.offlineProgressEnabled = false;
+  concurrentSaveDebug.state.timeFlux = 0;
+  assert.equal(concurrentSaveRuntime.saveGame("manual"), true, "the concurrent-save test should seed a save");
+  const concurrentSaveBaseline = Date.now() - 60 * 1000;
+  concurrentSaveRuntime.setOfflineBaseline(concurrentSaveBaseline, 0);
+  let resolveConcurrentClockRequest;
+  const pendingConcurrentClockRequest = new Promise((resolve) => {
+    resolveConcurrentClockRequest = resolve;
+  });
+  concurrentSaveInstance.context.window.fetch = () => pendingConcurrentClockRequest;
+  const concurrentSaveOriginalSetItem = concurrentSaveInstance.context.localStorage.setItem;
+  const concurrentResumePromise = concurrentSaveRuntime.handleVisibilityChange();
+  await Promise.resolve();
+  const replacementSave = JSON.parse(
+    concurrentSaveInstance.context.localStorage.getItem(concurrentSaveRuntime.SAVE_KEY),
+  );
+  replacementSave.savedAt = Date.now() - 1000;
+  replacementSave.state.totalPlayTime = 9876;
+  replacementSave.state.timeFlux = 120;
+  concurrentSaveOriginalSetItem.call(
+    concurrentSaveInstance.context.localStorage,
+    concurrentSaveRuntime.SAVE_KEY,
+    JSON.stringify(replacementSave),
+  );
+  try {
+    resolveConcurrentClockRequest({
+      ok: true,
+      headers: { get: () => new Date().toUTCString() },
+    });
+    await concurrentResumePromise;
+    assert.equal(
+      concurrentSaveRuntime.loadRecoveryMode,
+      false,
+      "a concurrent save replacement should reload without entering recovery",
+    );
+    assert.equal(
+      concurrentSaveDebug.state.totalPlayTime,
+      replacementSave.state.totalPlayTime,
+      "a concurrent save replacement should preserve the newer tab's state",
+    );
+    assert.equal(
+      concurrentSaveDebug.state.timeFlux >= replacementSave.state.timeFlux,
+      true,
+      "a concurrent save replacement should not restore the old tab's Time Flux",
+    );
+    const persistedAfterConcurrentResume = JSON.parse(
+      concurrentSaveInstance.context.localStorage.getItem(concurrentSaveRuntime.SAVE_KEY),
+    );
+    assert.equal(
+      persistedAfterConcurrentResume.state.totalPlayTime,
+      replacementSave.state.totalPlayTime,
+      "the old tab must not overwrite a concurrent save replacement",
+    );
+  } finally {
+    concurrentSaveInstance.context.localStorage.setItem = concurrentSaveOriginalSetItem;
+  }
+
+  const automationRollbackInstance = await loadRuntime(candidatePath);
+  const automationRollbackDebug = automationRollbackInstance.debug;
+  const automationRollbackRuntime = automationRollbackInstance.runtime;
+  const autoBuySpeedUpgrade = automationRollbackRuntime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "1-2");
+  automationRollbackDebug.state.infinityUpgradeMask = 1 << autoBuySpeedUpgrade.bit;
+  automationRollbackDebug.state.automationEnabled = true;
+  automationRollbackDebug.state.offlineProgressEnabled = true;
+  automationRollbackRuntime.normalAutobuyElapsed = 0.02;
+  const normalAutobuyElapsedBeforeFailure = automationRollbackRuntime.normalAutobuyElapsed;
+  const automationRollbackOriginalSetItem = automationRollbackInstance.context.localStorage.setItem;
+  automationRollbackInstance.context.localStorage.setItem = (key, value) => {
+    if (key === automationRollbackRuntime.SAVE_KEY) throw new Error("save storage unavailable");
+    return automationRollbackOriginalSetItem(key, value);
+  };
+  try {
+    assert.equal(
+      automationRollbackDebug.processOfflineElapsed(0.01, "test", { clockSource: "server" }),
+      null,
+      "an automation save failure should abort offline processing",
+    );
+    assert.equal(
+      automationRollbackRuntime.normalAutobuyElapsed,
+      normalAutobuyElapsedBeforeFailure,
+      "a failed offline save should roll back the normal autobuy timer",
+    );
+  } finally {
+    automationRollbackInstance.context.localStorage.setItem = automationRollbackOriginalSetItem;
+  }
 
   const resetResumeInstance = await loadRuntime(candidatePath);
   const resetResumeDebug = resetResumeInstance.debug;

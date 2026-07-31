@@ -118,7 +118,6 @@ Original prompt: では、中核ループを完成させてください
 
 ## TODO
 
-- Verify the new save-code controls, IC auto-complete toggle, and updated IC formula display in Firefox/Playwright on desktop and mobile before release.
 - Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: playtest the tuned Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle upgrade curve.

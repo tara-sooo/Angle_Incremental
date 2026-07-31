@@ -102,17 +102,11 @@ function updateTimeFluxUi() {
     ? runtime.t("offlineProgressEnabled")
     : runtime.t("offlineProgressDisabled");
   elements.timeFluxGainLevel.textContent = `${runtime.t("level")} ${state.timeFluxGainLevel}`;
-  const capacityAtMax = runtime.clampTimeFluxCapacityLevel(state.timeFluxCapacityLevel)
-    >= runtime.TIME_FLUX_MAX_CAPACITY_LEVEL;
-  elements.timeFluxCapacityLevel.textContent = capacityAtMax
-    ? runtime.t("max")
-    : `${runtime.t("level")} ${state.timeFluxCapacityLevel}`;
+  elements.timeFluxCapacityLevel.textContent = `${runtime.t("level")} ${state.timeFluxCapacityLevel}`;
   elements.timeFluxGainEffect.textContent = `${formatFluxTime(runtime.timeFluxGain())}/${runtime.t("hourShort")}`;
   elements.timeFluxCapacityEffect.textContent = formatFluxTime(capacity);
   elements.timeFluxGainCost.textContent = `${runtime.t("cost")} ${formatFluxTime(runtime.timeFluxGainUpgradeCost())}`;
-  elements.timeFluxCapacityCost.textContent = capacityAtMax
-    ? runtime.t("max")
-    : `${runtime.t("cost")} ${formatFluxTime(runtime.timeFluxCapacityUpgradeCost())}`;
+  elements.timeFluxCapacityCost.textContent = `${runtime.t("cost")} ${formatFluxTime(runtime.timeFluxCapacityUpgradeCost())}`;
   elements.timeFluxGainUpgrade.disabled = !runtime.canBuyTimeFluxUpgrade("gain");
   elements.timeFluxCapacityUpgrade.disabled = !runtime.canBuyTimeFluxUpgrade("capacity");
 

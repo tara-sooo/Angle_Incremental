@@ -69,6 +69,43 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.score = 123;
+    state.scoreLog10 = Math.log10(123);
+    state.generationCount = 41;
+    state.lastInfinityRuns = [{ time: 3, realTime: 2, scoreLog10: 1, ipGain: 4, challenge: 0 }];
+    const before = {
+      score: state.score,
+      scoreLog10: state.scoreLog10,
+      generationCount: state.generationCount,
+      lastInfinityRuns: state.lastInfinityRuns.map((run) => ({ ...run })),
+    };
+    const originalSanitizeInfinityRunRecords = runtime.sanitizeInfinityRunRecords;
+    runtime.sanitizeInfinityRunRecords = () => {
+      throw new Error("test partial apply failure");
+    };
+    try {
+      assert.throws(
+        () => runtime.applySaveData({ score: 999, scoreLog10: 999, generationCount: 99 }, 10),
+        /test partial apply failure/,
+        "a partial save-data application should surface its error",
+      );
+    } finally {
+      runtime.sanitizeInfinityRunRecords = originalSanitizeInfinityRunRecords;
+    }
+    assert.equal(state.score, before.score, "a partial apply failure must restore the score");
+    assert.equal(state.scoreLog10, before.scoreLog10, "a partial apply failure must restore score log data");
+    assert.equal(state.generationCount, before.generationCount, "a partial apply failure must restore generation state");
+    assert.equal(
+      JSON.stringify(state.lastInfinityRuns),
+      JSON.stringify(before.lastInfinityRuns),
+      "a partial apply failure must restore nested state",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { debug, runtime, storage } = instance;
     const originalSave = runtime.serializeSaveData();
     originalSave.savedAt = Date.now();
@@ -97,6 +134,50 @@ async function runSaveRecoveryModuleRuntimeTest() {
       assert.equal(failure.stage, "offline", "offline failures should be diagnosed separately");
     } finally {
       runtime.processOfflineElapsed = originalProcessOfflineElapsed;
+    }
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { context, debug, runtime, storage } = instance;
+    const { state } = debug;
+    state.generationCount = 8;
+    const originalSave = runtime.serializeSaveData();
+    originalSave.savedAt = Date.now();
+    const rawSave = JSON.stringify(originalSave);
+    const originalProcessOfflineElapsed = runtime.processOfflineElapsed;
+    const originalOfflineElapsedFromSave = runtime.offlineElapsedFromSave;
+    const originalSetItem = context.localStorage.setItem;
+    storage.set(runtime.SAVE_KEY, rawSave);
+    runtime.offlineElapsedFromSave = () => ({
+      elapsedSeconds: 60,
+      clockSource: "local-fallback",
+      clockAnomaly: false,
+      legacyTimestampUsed: false,
+    });
+    runtime.processOfflineElapsed = () => {
+      runtime.state.generationCount += 1;
+    };
+    context.localStorage.setItem = (key, value) => {
+      if (key === runtime.SAVE_KEY) throw new Error("storage full");
+      return originalSetItem(key, value);
+    };
+    try {
+      assert.equal(debug.loadGame(), false, "offline progress must fail when the post-progress save fails");
+      assert.equal(state.generationCount, 8, "a failed post-offline save must roll back the applied reward");
+      assert.equal(storage.get(runtime.SAVE_KEY), rawSave, "a failed post-offline save must keep the original save");
+      assert.equal(runtime.loadRecoveryMode, true, "a failed post-offline save must require recovery");
+      const failure = JSON.parse(storage.get(runtime.SAVE_LOAD_FAILURE_KEY));
+      assert.equal(failure.stage, "offline", "post-offline save failures should use offline diagnostics");
+
+      context.localStorage.setItem = originalSetItem;
+      assert.equal(debug.retryLoad(), true, "retry should succeed after the storage failure is removed");
+      assert.equal(state.generationCount, 9, "retry should apply the offline reward exactly once");
+      assert.equal(JSON.parse(storage.get(runtime.SAVE_KEY)).state.generationCount, 9, "retry should persist the applied reward");
+    } finally {
+      context.localStorage.setItem = originalSetItem;
+      runtime.processOfflineElapsed = originalProcessOfflineElapsed;
+      runtime.offlineElapsedFromSave = originalOfflineElapsedFromSave;
     }
   }
 
@@ -211,8 +292,57 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
     state.generationCount = 40;
     assert.equal(debug.createCheckpoint("pre-tower-build", { force: true }), true, "event checkpoints should be writable");
-    const event = debug.recoveryEntries().checkpoints.find((entry) => entry.reason === "pre-tower-build");
+    const checkpointsAfterEvent = debug.recoveryEntries().checkpoints;
+    const event = checkpointsAfterEvent.find((entry) => entry.reason === "pre-tower-build");
     assert.equal(event.state.generationCount, 40, "event checkpoints should retain the pre-action state");
+    assert.equal(
+      checkpointsAfterEvent.filter((entry) => entry.reason === "periodic").length,
+      3,
+      "event checkpoints must not displace periodic recovery points",
+    );
+    assert.equal(
+      checkpointsAfterEvent.filter((entry) => entry.reason === "pre-tower-build").length,
+      1,
+      "event checkpoints must be stored only once",
+    );
+
+    const rollbackNow = Date.now();
+    const fullEventHistory = Array.from(
+      { length: runtime.MAX_EVENT_SAVE_CHECKPOINTS },
+      (_, index) => ({
+        appVersion: "0.9.0",
+        saveVersion: 10,
+        savedAt: rollbackNow + (index + 1) * 60 * 1000,
+        backedUpAt: rollbackNow + (index + 1) * 60 * 1000,
+        reason: `pre-event-${index}`,
+        state: { score: 0, scoreLog10: -Infinity, generationCount: index },
+      }),
+    );
+    const rollbackEventInstance = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save-checkpoints", JSON.stringify(fullEventHistory)],
+    ]));
+    const { debug: rollbackEventDebug, runtime: rollbackEventRuntime } = rollbackEventInstance;
+    Object.defineProperty(rollbackEventRuntime, "localClockNowMs", {
+      configurable: true,
+      value: () => rollbackNow,
+    });
+    rollbackEventDebug.state.generationCount = 99;
+    assert.equal(
+      rollbackEventDebug.createCheckpoint("pre-tower-build", { force: true }),
+      true,
+      "a new event checkpoint should be writable after a local clock rollback",
+    );
+    const rollbackEventEntries = rollbackEventDebug.recoveryEntries().checkpoints;
+    assert.equal(
+      rollbackEventEntries.filter((entry) => entry.reason === "pre-tower-build").length,
+      1,
+      "a rolled-back event checkpoint must not be discarded or duplicated",
+    );
+    assert.equal(
+      rollbackEventEntries.length,
+      rollbackEventRuntime.MAX_EVENT_SAVE_CHECKPOINTS,
+      "event retention should remain capped after pinning the new checkpoint",
+    );
 
     const restoreTargetIndex = debug.recoveryEntries().checkpoints.findIndex((entry) => entry.reason === "pre-tower-build");
     state.generationCount = 99;
@@ -222,7 +352,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(state.generationCount, 99, "checkpoint undo should recover the pre-restore state");
 
     state.generationCount = 41;
-    assert.equal(runtime.reloadForRemoteUpdate("0.9.1"), undefined, "a remote update reload should be deferred by the test location");
+    assert.equal(runtime.reloadForRemoteUpdate("test-update"), undefined, "a remote update reload should be deferred by the test location");
     assert.equal(
       debug.recoveryEntries().checkpoints.some((entry) => entry.reason === "pre-update"),
       true,
@@ -322,6 +452,34 @@ async function runSaveRecoveryModuleRuntimeTest() {
       afterReloadPeriodic.some((entry) => entry.state.generationCount === 1),
       true,
       "the valid pre-rollback checkpoint should remain available after reload",
+    );
+
+    const fullFutureNow = Date.now() + 60 * 60 * 1000;
+    const fullFutureHistory = [1, 2, 3].map((generationCount, index) => ({
+      appVersion: "0.9.0",
+      saveVersion: 10,
+      savedAt: fullFutureNow + (index + 1) * 60 * 60 * 1000,
+      backedUpAt: fullFutureNow + (index + 1) * 60 * 60 * 1000,
+      reason: "periodic",
+      state: { score: 0, scoreLog10: -Infinity, generationCount },
+    }));
+    const fullFutureInstance = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save-checkpoints", JSON.stringify(fullFutureHistory)],
+    ]));
+    const { debug: fullFutureDebug } = fullFutureInstance;
+    fullFutureDebug.state.generationCount = 4;
+    assert.equal(
+      fullFutureDebug.saveGame("auto"),
+      true,
+      "a rollback should still write a checkpoint when future entries already fill the limit",
+    );
+    const fullFuturePeriodic = fullFutureDebug.recoveryEntries().checkpoints
+      .filter((entry) => entry.reason === "periodic");
+    assert.equal(fullFuturePeriodic.length, 3, "future checkpoint histories should keep the periodic limit");
+    assert.equal(
+      fullFuturePeriodic.some((entry) => entry.state.generationCount === 4),
+      true,
+      "the newly created rollback recovery point must survive periodic rotation",
     );
 
     const mixedNow = Date.now();

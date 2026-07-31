@@ -4,6 +4,8 @@ import { runtime, expose } from "../runtime/shared.js";
 
 const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
 let recoveryRevision = 0;
+let saveRevision = 0;
+let lastLocalSaveFingerprint = "";
 let lastPeriodicCheckpointMonotonicAt = null;
 let loadTransactionActive = false;
 let loadRecoveryMode = false;
@@ -24,6 +26,24 @@ function normalizeStoredSave(candidate) {
     serverSavedAt: runtime.sanitizeNumber(candidate.serverSavedAt, 0),
     state: candidate.state,
   };
+}
+
+function saveFingerprint(raw) {
+  let hash = 2166136261;
+  for (let index = 0; index < raw.length; index += 1) {
+    hash ^= raw.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${raw.length}:${hash >>> 0}`;
+}
+
+function currentSaveFingerprint() {
+  try {
+    const raw = localStorage.getItem(runtime.SAVE_KEY);
+    return raw ? saveFingerprint(raw) : "";
+  } catch (error) {
+    return "";
+  }
 }
 
 function recoveryEntryFromSave(saveData, reason, backedUpAt = currentSaveTimestamp()) {
@@ -103,6 +123,11 @@ function readLoadFailure() {
       saveVersion: Math.floor(runtime.sanitizeNumber(parsed.saveVersion, 0)),
       savedAt: runtime.sanitizeNumber(parsed.savedAt, 0),
       serverSavedAt: runtime.sanitizeNumber(parsed.serverSavedAt, 0),
+      offlineRetrySavedAt: runtime.sanitizeNumber(parsed.offlineRetrySavedAt, 0),
+      offlineRetryServerSavedAt: runtime.sanitizeNumber(parsed.offlineRetryServerSavedAt, 0),
+      offlineRetrySaveFingerprint: typeof parsed.offlineRetrySaveFingerprint === "string"
+        ? parsed.offlineRetrySaveFingerprint
+        : "",
       stage: parsed.stage === "offline" ? "offline" : "apply",
       errorName: typeof parsed.errorName === "string" ? parsed.errorName : "Error",
       errorMessage: typeof parsed.errorMessage === "string" ? parsed.errorMessage : "",
@@ -121,15 +146,23 @@ function errorDetails(error) {
   };
 }
 
-function writeLoadFailure(stage, error, parsed = null) {
+function writeLoadFailure(stage, error, parsed = null, retryBaseline = null) {
   try {
     const details = errorDetails(error);
+    const retrySavedAt = runtime.sanitizeNumber(retryBaseline?.savedAt, 0);
+    const retryServerSavedAt = runtime.sanitizeNumber(retryBaseline?.serverSavedAt, 0);
+    const retrySaveFingerprint = typeof retryBaseline?.saveFingerprint === "string"
+      ? retryBaseline.saveFingerprint
+      : "";
     localStorage.setItem(runtime.SAVE_LOAD_FAILURE_KEY, JSON.stringify({
       failedAt: currentSaveTimestamp(),
       appVersion: runtime.APP_VERSION,
       saveVersion: parsed?.version || 0,
       savedAt: parsed?.savedAt || 0,
       serverSavedAt: parsed?.serverSavedAt || 0,
+      offlineRetrySavedAt: retrySavedAt,
+      offlineRetryServerSavedAt: retryServerSavedAt,
+      offlineRetrySaveFingerprint: retrySaveFingerprint,
       stage,
       ...details,
     }));
@@ -148,6 +181,17 @@ function clearLoadFailure() {
   } catch (error) {
     // A stale diagnostic is harmless when the save itself is healthy.
   }
+}
+
+function enterLoadRecovery(
+  stage = "apply",
+  error = new Error("load recovery required"),
+  parsed = null,
+  retryBaseline = null,
+) {
+  loadRecoveryMode = true;
+  writeLoadFailure(stage, error, parsed, retryBaseline);
+  runtime.setSaveStatus(runtime.t("loadFailed"));
 }
 
 function readCheckpointEntries() {
@@ -185,6 +229,36 @@ function latestCheckpointAtTimestamp(entries, timestampKey, currentTimestamp) {
       if (!latest || entry[timestampKey] > latest[timestampKey]) return entry;
       return latest;
     }, null);
+}
+
+function periodicCheckpointTimestamp(entry, saveData) {
+  const useServerTimestamp = runtime.serverClockAvailable?.()
+    && saveData.serverSavedAt > 0
+    && entry.serverSavedAt > 0;
+  return {
+    value: useServerTimestamp ? entry.serverSavedAt : entry.savedAt,
+    current: useServerTimestamp ? saveData.serverSavedAt : saveData.savedAt,
+  };
+}
+
+function retainPeriodicCheckpoints(entries, nextEntry, saveData) {
+  const existing = entries.filter((entry) => entry !== nextEntry);
+  const eligible = existing
+    .filter((entry) => {
+      const timestamp = periodicCheckpointTimestamp(entry, saveData);
+      return timestamp.value > 0 && timestamp.value <= timestamp.current;
+    })
+    .sort((left, right) => (
+      periodicCheckpointTimestamp(right, saveData).value
+      - periodicCheckpointTimestamp(left, saveData).value
+    ));
+  const future = existing
+    .filter((entry) => !eligible.includes(entry))
+    .sort((left, right) => (
+      periodicCheckpointTimestamp(right, saveData).value
+      - periodicCheckpointTimestamp(left, saveData).value
+    ));
+  return [nextEntry, ...eligible, ...future].slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
 }
 
 function latestPeriodicCheckpoint(saveData, periodic) {
@@ -273,15 +347,22 @@ function createCheckpoint(reason = "periodic", options = {}) {
 
     const nextEntry = recoveryEntryFromSave(saveData, reason);
     const nextEntries = [nextEntry, ...entries.filter((entry) => entry.reason !== reason || reason === "periodic")];
-    const periodicEntries = nextEntries
-      .filter((entry) => entry.reason === "periodic")
-      .sort((left, right) => right.savedAt - left.savedAt)
-      .slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
-    const eventEntries = nextEntries
-      .filter((entry) => entry.reason !== "periodic")
-      .sort((left, right) => right.backedUpAt - left.backedUpAt)
-      .slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS);
-    writeRecoveryEntry(runtime.SAVE_CHECKPOINTS_KEY, [...periodicEntries, ...eventEntries]);
+    const periodicEntries = reason === "periodic"
+      ? retainPeriodicCheckpoints(
+        nextEntries.filter((entry) => entry.reason === "periodic"),
+        nextEntry,
+        saveData,
+      )
+      : periodic.slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
+    const eventCandidates = reason === "periodic"
+      ? nextEntries.filter((entry) => entry.reason !== "periodic")
+      : [nextEntry, ...nextEntries.filter((entry) => entry !== nextEntry && entry.reason !== "periodic")];
+    const eventEntries = eventCandidates.sort((left, right) => right.backedUpAt - left.backedUpAt);
+    const retainedEventEntries = reason === "periodic"
+      ? eventEntries.slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS)
+      : [nextEntry, ...eventEntries.filter((entry) => entry !== nextEntry)]
+        .slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS);
+    writeRecoveryEntry(runtime.SAVE_CHECKPOINTS_KEY, [...periodicEntries, ...retainedEventEntries]);
     if (reason === "periodic") {
       const monotonicNow = runtime.monotonicClockNowMs?.();
       lastPeriodicCheckpointMonotonicAt = Number.isFinite(monotonicNow) ? monotonicNow : null;
@@ -408,7 +489,27 @@ function sanitizeChallengeTimes(value, count) {
   return Array.from({ length: count }, (_, index) => Math.max(0, runtime.sanitizeNumber(source[index], 0)));
 }
 
-function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
+function cloneStateValue(value) {
+  if (Array.isArray(value)) return value.map(cloneStateValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, cloneStateValue(entry)]));
+  }
+  return value;
+}
+
+function snapshotRuntimeState() {
+  return Object.fromEntries(
+    Object.entries(runtime.state).map(([key, value]) => [key, cloneStateValue(value)]),
+  );
+}
+
+function restoreRuntimeState(snapshot) {
+  Object.entries(snapshot).forEach(([key, value]) => {
+    runtime.state[key] = cloneStateValue(value);
+  });
+}
+
+function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   const score = runtime.hydrateLogResource(data.score, data.scoreLog10);
   runtime.state.score = score.value;
@@ -570,7 +671,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.OFFLINE_PROGRESS_DEFAULT_ENABLED,
   );
   runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
-  runtime.state.timeFluxCapacityLevel = runtime.clampTimeFluxCapacityLevel(data.timeFluxCapacityLevel);
+  runtime.state.timeFluxCapacityLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxCapacityLevel, 0)));
   runtime.state.timeFluxGainLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxGainLevel, 0)));
   runtime.state.timeFlux = Math.min(
     runtime.timeFluxCapacitySeconds(),
@@ -693,6 +794,16 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.floatingTexts = [];
 }
 
+function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
+  const snapshot = snapshotRuntimeState();
+  try {
+    applySaveDataUnsafe(data, saveVersion);
+  } catch (error) {
+    restoreRuntimeState(snapshot);
+    throw error;
+  }
+}
+
 function serializeSaveData() {
   runtime.normalizeInfinityPointState();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
@@ -723,12 +834,17 @@ function saveGame(reason = "auto", options = {}) {
   if (runtime.offlineProcessing) return true;
   let savedAt = Date.now();
   let serverSavedAt = 0;
+  let savePersisted = false;
   try {
     savedAt = runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
     const saveData = serializeSaveData();
     saveData.savedAt = savedAt;
     serverSavedAt = saveData.serverSavedAt || 0;
-    localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(saveData));
+    const serializedSave = JSON.stringify(saveData);
+    localStorage.setItem(runtime.SAVE_KEY, serializedSave);
+    savePersisted = true;
+    lastLocalSaveFingerprint = saveFingerprint(serializedSave);
+    saveRevision += 1;
     runtime.autoSaveElapsed = 0;
     const checkpointSaved = createCheckpoint("periodic");
     runtime.setSaveStatus(
@@ -742,7 +858,7 @@ function saveGame(reason = "auto", options = {}) {
     runtime.setSaveStatus(runtime.t("saveFailed"));
     return false;
   } finally {
-    if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
+    if (savePersisted && runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
   }
 }
 
@@ -830,11 +946,23 @@ function loadGame(options = {}) {
 
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
     const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);
+    const loadedSaveFingerprint = saveFingerprint(raw);
+    const previousLoadFailure = readLoadFailure();
+    const retryMetadataMatchesSave = previousLoadFailure?.stage === "offline"
+      && previousLoadFailure.offlineRetrySavedAt > 0
+      && previousLoadFailure.offlineRetrySaveFingerprint === loadedSaveFingerprint;
+    const retryBaseline = retryMetadataMatchesSave
+      ? {
+        savedAt: previousLoadFailure.offlineRetrySavedAt,
+        serverSavedAt: previousLoadFailure.offlineRetryServerSavedAt,
+        saveFingerprint: loadedSaveFingerprint,
+      }
+      : { savedAt, serverSavedAt, saveFingerprint: loadedSaveFingerprint };
     try {
       const offlineElapsed = runtime.offlineElapsedFromSave
-        ? runtime.offlineElapsedFromSave(savedAt, serverSavedAt)
+        ? runtime.offlineElapsedFromSave(retryBaseline.savedAt, retryBaseline.serverSavedAt)
         : {
-          elapsedSeconds: Math.max(0, (Date.now() - savedAt) / 1000),
+          elapsedSeconds: Math.max(0, (Date.now() - retryBaseline.savedAt) / 1000),
           clockSource: "local-fallback",
           clockAnomaly: false,
           legacyTimestampUsed: false,
@@ -843,13 +971,25 @@ function loadGame(options = {}) {
         runtime.processOfflineElapsed
         && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
       ) {
-        runtime.processOfflineElapsed(offlineElapsed.elapsedSeconds, "load", offlineElapsed);
+        const offlineResult = runtime.processOfflineElapsed(
+          offlineElapsed.elapsedSeconds,
+          "load",
+          { ...offlineElapsed, retryBaseline },
+        );
+        if (offlineResult === null) throw new Error("offline progress save failed");
         offlineProcessed = true;
       } else if (runtime.setOfflineBaseline) {
         runtime.setOfflineBaseline(
           runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
           runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
         );
+      }
+      if (offlineProcessed) {
+        loadTransactionActive = false;
+        loadRecoveryMode = false;
+        if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) {
+          throw new Error("offline progress save failed");
+        }
       }
     } catch (error) {
       try {
@@ -858,9 +998,10 @@ function loadGame(options = {}) {
         // The persisted save remains authoritative even if the in-memory rollback fails.
       }
       runtime.offlineReport = null;
-      if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
+      if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
       loadRecoveryMode = true;
-      writeLoadFailure("offline", error, parsed);
+      runtime.autoSaveElapsed = 0;
+      writeLoadFailure("offline", error, parsed, retryBaseline);
       runtime.setSaveStatus(runtime.t("loadFailed"));
       return false;
     }
@@ -868,8 +1009,6 @@ function loadGame(options = {}) {
     loadRecoveryMode = false;
     clearLoadFailure();
     runtime.autoSaveElapsed = 0;
-    loadTransactionActive = false;
-    if (offlineProcessed) runtime.saveGame("manual", { allowDuringLoadRecovery: true });
     runtime.setSaveStatus(runtime.t("loaded"));
     return true;
   } catch (error) {
@@ -1044,8 +1183,14 @@ expose("backupCurrentSave", () => backupCurrentSave, (value) => { backupCurrentS
 expose("createCheckpoint", () => createCheckpoint, (value) => { createCheckpoint = value; });
 expose("recoveryEntries", () => recoveryEntries, (value) => { recoveryEntries = value; });
 expose("recoveryRevision", () => recoveryRevision);
+expose("saveRevision", () => saveRevision);
+expose("lastLocalSaveFingerprint", () => lastLocalSaveFingerprint);
 expose("loadRecoveryMode", () => loadRecoveryMode);
 expose("finishLoadRecovery", () => finishLoadRecovery);
+expose("currentSaveFingerprint", () => currentSaveFingerprint);
+expose("enterLoadRecovery", () => enterLoadRecovery);
+expose("snapshotRuntimeState", () => snapshotRuntimeState);
+expose("restoreRuntimeState", () => restoreRuntimeState);
 expose("restorePreImportSave", () => restorePreImportSave, (value) => { restorePreImportSave = value; });
 expose("restoreCheckpoint", () => restoreCheckpoint, (value) => { restoreCheckpoint = value; });
 expose("restoreUndoSave", () => restoreUndoSave, (value) => { restoreUndoSave = value; });
