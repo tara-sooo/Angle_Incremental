@@ -471,13 +471,60 @@ async function runTimeFluxModuleRuntimeTest() {
   };
   try {
     assert.equal(saveFailureDebug.saveGame("manual"), false, "storage failures should report a failed save");
-    assert.ok(
-      saveFailureRuntime.offlineBaselineTimestamp > 1,
-      "a failed save should still rebase the in-memory offline baseline",
+    assert.equal(
+      saveFailureRuntime.offlineBaselineTimestamp,
+      1,
+      "a failed save should not advance the in-memory offline baseline",
     );
   } finally {
     saveFailureInstance.context.localStorage.setItem = originalSetItem;
   }
+
+  const hiddenSaveFailureInstance = await loadRuntime(candidatePath);
+  const hiddenSaveFailureRuntime = hiddenSaveFailureInstance.runtime;
+  const hiddenSaveFailureBaseline = Date.now() - 60 * 1000;
+  hiddenSaveFailureRuntime.setOfflineBaseline(hiddenSaveFailureBaseline, 0);
+  const hiddenSaveFailureReport = { source: "before-hidden-save" };
+  hiddenSaveFailureRuntime.offlineReport = hiddenSaveFailureReport;
+  const hiddenSaveFailureState = hiddenSaveFailureRuntime.snapshotRuntimeState();
+  const hiddenSaveFailureOriginalSetItem = hiddenSaveFailureInstance.context.localStorage.setItem;
+  hiddenSaveFailureInstance.context.document.hidden = true;
+  hiddenSaveFailureInstance.context.localStorage.setItem = (key, value) => {
+    if (key === hiddenSaveFailureRuntime.SAVE_KEY) throw new Error("storage unavailable");
+    return hiddenSaveFailureOriginalSetItem(key, value);
+  };
+  try {
+    await assert.doesNotReject(
+      hiddenSaveFailureRuntime.handleVisibilityChange(),
+      "a hidden-save failure should be converted into recovery mode",
+    );
+  } finally {
+    hiddenSaveFailureInstance.context.localStorage.setItem = hiddenSaveFailureOriginalSetItem;
+    hiddenSaveFailureInstance.context.document.hidden = false;
+  }
+  assert.deepEqual(
+    hiddenSaveFailureRuntime.snapshotRuntimeState(),
+    hiddenSaveFailureState,
+    "a hidden-save failure should restore the game state",
+  );
+  assert.equal(
+    hiddenSaveFailureRuntime.offlineBaselineTimestamp,
+    hiddenSaveFailureBaseline,
+    "a hidden-save failure should preserve the offline baseline",
+  );
+  assert.equal(
+    hiddenSaveFailureRuntime.offlineReport,
+    hiddenSaveFailureReport,
+    "a hidden-save failure should restore the previous offline report",
+  );
+  assert.equal(hiddenSaveFailureRuntime.loadRecoveryMode, true, "a hidden-save failure should enter recovery mode");
+  assert.equal(hiddenSaveFailureRuntime.autoSaveElapsed, 0, "a hidden-save failure should reset the autosave timer");
+  assert.equal(
+    JSON.parse(hiddenSaveFailureInstance.context.localStorage.getItem(hiddenSaveFailureRuntime.SAVE_LOAD_FAILURE_KEY))
+      .offlineRetrySavedAt,
+    hiddenSaveFailureBaseline,
+    "hidden-save recovery should preserve the retry baseline",
+  );
 
   const resumeInstance = await loadRuntime(candidatePath);
   const resumeDebug = resumeInstance.debug;

@@ -834,6 +834,7 @@ function saveGame(reason = "auto", options = {}) {
   if (runtime.offlineProcessing) return true;
   let savedAt = Date.now();
   let serverSavedAt = 0;
+  let savePersisted = false;
   try {
     savedAt = runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
     const saveData = serializeSaveData();
@@ -841,6 +842,7 @@ function saveGame(reason = "auto", options = {}) {
     serverSavedAt = saveData.serverSavedAt || 0;
     const serializedSave = JSON.stringify(saveData);
     localStorage.setItem(runtime.SAVE_KEY, serializedSave);
+    savePersisted = true;
     lastLocalSaveFingerprint = saveFingerprint(serializedSave);
     saveRevision += 1;
     runtime.autoSaveElapsed = 0;
@@ -856,7 +858,7 @@ function saveGame(reason = "auto", options = {}) {
     runtime.setSaveStatus(runtime.t("saveFailed"));
     return false;
   } finally {
-    if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
+    if (savePersisted && runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
   }
 }
 

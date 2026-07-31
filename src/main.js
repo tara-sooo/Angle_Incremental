@@ -880,7 +880,14 @@ async function handleVisibilityChange() {
       saveFingerprint: runtime.currentSaveFingerprint?.() || "",
     };
     try {
-      runtime.saveGame("auto");
+      const saved = runtime.saveGame("auto");
+      if (!saved) {
+        restoreOfflineTransaction(
+          transactionSnapshot,
+          new Error("visibility hide save failed"),
+          retryBaseline,
+        );
+      }
     } catch (error) {
       restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
     }
