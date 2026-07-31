@@ -34,14 +34,13 @@ const EXPECTED_MODULE_PATHS = [
   "/src/ui/render-infinity.js",
   "/src/ui/render-achievements.js",
   "/src/ui/render-automation.js",
-  "/src/ui/render-time-flux.js",
+  "/src/ui/render-offline-report.js",
   "/src/ui/render-ui.js",
   "/src/systems/angle.js",
   "/src/systems/generation.js",
   "/src/systems/core-boost.js",
   "/src/systems/infinity.js",
   "/src/systems/infinite-angle.js",
-  "/src/systems/time-flux.js",
   "/src/systems/balance.js",
   "/src/systems/balance-angle.js",
   "/src/systems/balance-generation.js",
@@ -278,15 +277,17 @@ try {
     const serverClockLoaded = await serverClockPage.evaluate(() => {
       const snapshot = JSON.parse(window.render_game_to_text());
       return {
+        totalPlayTime: window.__angleDebug.state.totalPlayTime,
         timeFlux: window.__angleDebug.state.timeFlux,
         report: snapshot.timeFlux.report,
         persisted: JSON.parse(localStorage.getItem("angle-incremental-save")),
       };
     });
     assert.ok(
-      serverClockLoaded.timeFlux > 7 * 24 * 360,
-      "server-based offline TF should process more than seven days despite a local clock offset",
+      serverClockLoaded.totalPlayTime > 7 * 86400,
+      "server-based offline progress should process more than seven days despite a local clock offset",
     );
+    assert.equal(serverClockLoaded.timeFlux, 0, "server-based offline progress should not grant dormant Time Flux");
     assert.ok(serverClockLoaded.report.elapsedSeconds > 7 * 86400, "the server-clock report should include more than seven days");
     assert.equal(serverClockLoaded.report.capped, false, "trusted server-clock offline rewards should not be capped");
     assert.equal(serverClockLoaded.report.clockSource, "server", "server-based offline reports should identify their clock source");
@@ -386,8 +387,8 @@ try {
   });
   assert.deepEqual(
     tabStructure.mainTabs,
-    ["angle", "infinity", "challenges", "timeFlux", "automation", "statistics", "achievements", "help", "settings"],
-    "main tabs should place Challenges after Infinity",
+    ["angle", "infinity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
+    "main tabs should omit the dormant Time Flux tab",
   );
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
   assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
@@ -519,186 +520,129 @@ try {
   assert.equal(towerChallengeFlow.replay.button, "挑戦中止", "a replaying TC should expose a stop button");
   assert.equal(towerChallengeFlow.replay.disabled, false, "a replaying TC stop button should be enabled");
   assert.equal(towerChallengeFlow.replayCompleted, true, "a replaying TC should complete at its displayed target");
-  const timeFluxInitial = await page.evaluate(() => {
-    const {
-      state,
-      switchMainTab,
-      setTimeFluxSpeed,
-      applySetting,
-      advanceOnlineTime,
-      processOfflineElapsed,
-    } = window.__angleDebug;
+  const timeFluxRemoval = await page.evaluate(() => {
+    const { state, advanceOnlineTime, processOfflineElapsed } = window.__angleDebug;
     state.totalPlayTime = 0;
     state.totalRealPlayTime = 0;
     state.currentInfinityRunTime = 0;
     state.currentInfinityRealTime = 0;
-    state.timeFlux = 10;
-    state.timeFluxSpeed = 1;
-    state.timeFluxCustomSpeed = 4;
-    state.timeFluxGainLevel = 0;
-    state.timeFluxCapacityLevel = 0;
-    applySetting("showTimeFluxQuickBar", true);
-    applySetting("offlineProgressEnabled", true);
-    switchMainTab("angle");
-    window.advanceTime(0);
-    const quickBarInitial = {
-      visible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
-      amount: document.querySelector("#timeFluxQuickAmount")?.textContent?.trim() ?? "",
-      speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
-      customSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
-      customButtonType: document.querySelector("#timeFluxQuickCustomSpeedButton")?.tagName ?? "",
-      customButtonPressed: document.querySelector("#timeFluxQuickCustomSpeedButton")?.getAttribute("aria-pressed") ?? "",
-      customInputPresent: Boolean(document.querySelector("#timeFluxQuickCustomSpeedInput")),
+    state.timeFlux = 123456;
+    state.timeFluxSpeed = 60;
+    state.offlineProgressEnabled = false;
+    window.__angleDebug.advanceOnlineTime(1);
+    const ui = {
+      quickBar: Boolean(document.querySelector("#timeFluxQuickBar")),
+      panel: Boolean(document.querySelector("#timeFluxPanel")),
+      tab: Boolean(document.querySelector('[data-tab="timeFlux"]')),
+      speedButton: Boolean(document.querySelector(".time-flux-speed")),
+      upgrade: Boolean(document.querySelector("#timeFluxGainUpgrade")),
+      offlineToggle: Boolean(document.querySelector("#timeFluxOfflineToggle")),
+      tickInput: Boolean(document.querySelector("#offlineTickInput")),
     };
-    document.querySelector('#timeFluxQuickBar .time-flux-speed[data-speed="2"]')?.click();
-    const quickBarChanged = {
-      stateSpeed: state.timeFluxSpeed,
-      speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
-    };
-    switchMainTab("timeFlux");
-    window.advanceTime(0);
-    const tabMirrored = document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "";
-    const customInput = document.querySelector("#timeFluxCustomSpeedInput");
-    if (customInput) {
-      customInput.value = "10";
-      customInput.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-    const customDraft = {
-      stateSpeed: state.timeFluxSpeed,
-      stateCustomSpeed: state.timeFluxCustomSpeed,
-      input: customInput?.value ?? "",
-      quickBar: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
-      applyValue: document.querySelector("#timeFluxCustomSpeedApplyValue")?.textContent?.trim() ?? "",
-    };
-    document.querySelector("#timeFluxCustomSpeedApply")?.click();
-    const customConfigured = {
-      stateSpeed: state.timeFluxSpeed,
-      stateCustomSpeed: state.timeFluxCustomSpeed,
-      input: customInput?.value ?? "",
-      quickBar: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
-      applyPressed: document.querySelector("#timeFluxCustomSpeedApply")?.getAttribute("aria-pressed") ?? "",
-    };
-    document.querySelector('#timeFluxPanel .time-flux-speed[data-speed="3"]')?.click();
-    const quickBarMirrored = {
-      speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
-      customSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
-    };
-    document.querySelector("#timeFluxQuickCustomSpeedButton")?.click();
-    const quickBarCustomActivated = {
-      stateSpeed: state.timeFluxSpeed,
-      speed: document.querySelector("#timeFluxQuickSpeed")?.textContent?.trim() ?? "",
-      tabSpeed: document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "",
-      customButtonPressed: document.querySelector("#timeFluxQuickCustomSpeedButton")?.getAttribute("aria-pressed") ?? "",
-    };
-    applySetting("showTimeFluxQuickBar", false);
-    const hiddenQuickBar = document.querySelector("#timeFluxQuickBar")?.hidden === true;
-    applySetting("showTimeFluxQuickBar", true);
-    applySetting("topBarMode", "hidden");
-    const quickBarWithHiddenTopBar = document.querySelector("#timeFluxQuickBar")?.hidden === false;
-    applySetting("topBarMode", "news");
-    setTimeFluxSpeed(1);
-    state.timeFlux = 10;
-    switchMainTab("timeFlux");
-    window.advanceTime(0);
-    const initial = {
-      panelActive: Boolean(document.querySelector('[data-panel="timeFlux"]')?.classList.contains("is-active")),
-      amount: document.querySelector("#timeFluxAmount")?.textContent?.trim() ?? "",
-      gain: document.querySelector("#timeFluxGain")?.textContent?.trim() ?? "",
-      speed: document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "",
-      customSpeed: document.querySelector("#timeFluxCustomSpeedInput")?.value ?? "",
-    };
-    state.totalPlayTime = 0;
-    state.totalRealPlayTime = 0;
-    state.currentInfinityRunTime = 0;
-    state.currentInfinityRealTime = 0;
-    setTimeFluxSpeed(2);
-    advanceOnlineTime(1);
-    const accelerated = {
+    const online = {
       totalPlayTime: state.totalPlayTime,
       totalRealPlayTime: state.totalRealPlayTime,
       currentInfinityRunTime: state.currentInfinityRunTime,
       currentInfinityRealTime: state.currentInfinityRealTime,
       timeFlux: state.timeFlux,
-      speed: document.querySelector("#timeFluxSpeed")?.textContent?.trim() ?? "",
     };
-    state.timeFlux = 0;
-    applySetting("offlineProgressEnabled", false);
-    const report = processOfflineElapsed(3600, "test");
-    const offline = {
-      mode: document.querySelector("#offlineReportMode")?.textContent?.trim() ?? "",
-      visible: document.querySelector("#offlineReportPanel")?.hidden === false,
-      gained: report?.timeFluxGained ?? 0,
+    const layoutRect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+    const layoutBefore = {
+      shellHeight: layoutRect("#shell")?.height ?? 0,
+      mainTabsHeight: layoutRect(".main-tabs")?.height ?? 0,
+      mainPanelsHeight: layoutRect(".main-panels")?.height ?? 0,
+    };
+    const report = processOfflineElapsed(1, "test", { clockSource: "server" });
+    const reportPanel = document.querySelector("#offlineReportPanel");
+    const layoutAfter = {
+      shellHeight: layoutRect("#shell")?.height ?? 0,
+      mainTabsHeight: layoutRect(".main-tabs")?.height ?? 0,
+      mainPanelsHeight: layoutRect(".main-panels")?.height ?? 0,
+    };
+    return {
+      ui,
+      online,
+      report,
+      reportVisible: document.querySelector("#offlineReportPanel")?.hidden === false,
+      reportMode: document.querySelector("#offlineReportMode")?.textContent?.trim() ?? "",
+      reportOutsideShell: reportPanel?.closest("#shell") === null,
+      reportPosition: reportPanel ? getComputedStyle(reportPanel).position : "",
+      layoutBefore,
+      layoutAfter,
       totalPlayTime: state.totalPlayTime,
       totalRealPlayTime: state.totalRealPlayTime,
-    };
-    document.querySelector("#offlineReportClose")?.click();
-    applySetting("offlineProgressEnabled", true);
-    state.timeFlux = 0;
-    setTimeFluxSpeed(1);
-    switchMainTab("angle");
-    window.advanceTime(0);
-    return {
-      initial,
-      accelerated,
-      offline,
-      quickBarInitial,
-      quickBarChanged,
-      tabMirrored,
-      customDraft,
-      customConfigured,
-      quickBarMirrored,
-      quickBarCustomActivated,
-      hiddenQuickBar,
-      quickBarWithHiddenTopBar,
+      timeFlux: state.timeFlux,
     };
   });
-  assert.equal(timeFluxInitial.quickBarInitial.visible, true, "the Time Flux quick bar should be visible on other tabs");
-  assert.match(timeFluxInitial.quickBarInitial.amount, /10秒 \/ 30分/);
-  assert.equal(timeFluxInitial.quickBarInitial.speed, "×1");
-  assert.equal(timeFluxInitial.quickBarInitial.customSpeed, "×4");
-  assert.equal(timeFluxInitial.quickBarInitial.customButtonType, "BUTTON", "the quick bar custom speed should be a button");
-  assert.equal(timeFluxInitial.quickBarInitial.customButtonPressed, "false");
-  assert.equal(timeFluxInitial.quickBarInitial.customInputPresent, false, "the quick bar should not contain the custom-speed input");
-  assert.equal(timeFluxInitial.quickBarChanged.stateSpeed, 2, "the quick bar should change the shared Time Flux speed");
-  assert.equal(timeFluxInitial.quickBarChanged.speed, "×2");
-  assert.equal(timeFluxInitial.tabMirrored, "×2", "the Time Flux tab should mirror quick bar speed changes");
-  assert.equal(timeFluxInitial.customDraft.stateSpeed, 2, "typing a custom speed should not change the active speed before applying");
-  assert.equal(timeFluxInitial.customDraft.stateCustomSpeed, 4, "typing a custom speed should not overwrite the saved custom speed before applying");
-  assert.equal(timeFluxInitial.customDraft.input, "10");
-  assert.equal(timeFluxInitial.customDraft.quickBar, "×4", "the quick bar should keep showing the saved custom speed while editing a draft");
-  assert.equal(timeFluxInitial.customDraft.applyValue, "×10", "the Time Flux tab button should preview the draft value");
-  assert.equal(timeFluxInitial.customConfigured.stateSpeed, 10, "the TF tab input should select the custom speed");
-  assert.equal(timeFluxInitial.customConfigured.stateCustomSpeed, 10, "the TF tab input should update the remembered custom speed");
-  assert.equal(timeFluxInitial.customConfigured.input, "10");
-  assert.equal(timeFluxInitial.customConfigured.quickBar, "×10", "the quick bar should display the configured custom speed");
-  assert.equal(timeFluxInitial.customConfigured.applyPressed, "true");
-  assert.equal(timeFluxInitial.quickBarMirrored.speed, "×3", "the quick bar should mirror Time Flux tab speed changes");
-  assert.equal(timeFluxInitial.quickBarMirrored.customSpeed, "×10", "preset changes should not erase the displayed custom speed");
-  assert.equal(timeFluxInitial.quickBarCustomActivated.stateSpeed, 10, "the quick bar custom button should apply the saved custom speed");
-  assert.equal(timeFluxInitial.quickBarCustomActivated.speed, "×10");
-  assert.equal(timeFluxInitial.quickBarCustomActivated.tabSpeed, "×10", "the Time Flux tab should mirror quick-bar custom speed changes");
-  assert.equal(timeFluxInitial.quickBarCustomActivated.customButtonPressed, "true");
-  assert.equal(timeFluxInitial.hiddenQuickBar, true, "the quick bar visibility setting should hide only the quick bar");
-  assert.equal(timeFluxInitial.quickBarWithHiddenTopBar, true, "the quick bar should be independent from top bar visibility");
-  assert.equal(timeFluxInitial.initial.panelActive, true, "Time Flux should activate as an independent main tab");
-  assert.match(timeFluxInitial.initial.amount, /10秒 \/ 30分/);
-  assert.match(timeFluxInitial.initial.gain, /6分0秒\/時/);
-  assert.equal(timeFluxInitial.initial.speed, "×1");
-  assert.equal(timeFluxInitial.initial.customSpeed, "10");
-  assert.ok(
-    Math.abs(timeFluxInitial.accelerated.totalPlayTime - 2) < 1e-9,
-    `x2 should advance two game seconds per real second (actual ${timeFluxInitial.accelerated.totalPlayTime})`,
-  );
-  assert.ok(Math.abs(timeFluxInitial.accelerated.totalRealPlayTime - 1) < 1e-9, "x2 should count one real second");
-  assert.ok(Math.abs(timeFluxInitial.accelerated.currentInfinityRunTime - 2) < 1e-9, "x2 should advance game Infinity time");
-  assert.ok(Math.abs(timeFluxInitial.accelerated.currentInfinityRealTime - 1) < 1e-9, "x2 should advance real Infinity time by one second");
-  assert.ok(Math.abs(timeFluxInitial.accelerated.timeFlux - 9) < 1e-9, "x2 should consume one TF per real second");
-  assert.equal(timeFluxInitial.accelerated.speed, "×2");
-  assert.equal(timeFluxInitial.offline.mode, "TF蓄積");
-  assert.equal(timeFluxInitial.offline.visible, true, "offline result should be shown after returning to the game");
-  assert.equal(timeFluxInitial.offline.gained, 360, "one hour offline should grant the base TF rate");
-  assert.ok(Math.abs(timeFluxInitial.offline.totalPlayTime - 2) < 1e-9, "TF accumulation should not advance game time");
-  assert.ok(Math.abs(timeFluxInitial.offline.totalRealPlayTime - 1) < 1e-9, "offline TF accumulation should not add real play time");
+  assert.equal(timeFluxRemoval.ui.quickBar, false, "the Time Flux quick bar should be removed");
+  assert.equal(timeFluxRemoval.ui.panel, false, "the Time Flux panel should be removed");
+  assert.equal(timeFluxRemoval.ui.tab, false, "the Time Flux tab should be removed");
+  assert.equal(timeFluxRemoval.ui.speedButton, false, "Time Flux speed controls should be removed");
+  assert.equal(timeFluxRemoval.ui.upgrade, false, "Time Flux upgrade controls should be removed");
+  assert.equal(timeFluxRemoval.ui.offlineToggle, false, "the Time Flux offline toggle should be removed");
+  assert.equal(timeFluxRemoval.ui.tickInput, true, "the offline tick setting should remain available");
+  assert.ok(Math.abs(timeFluxRemoval.online.totalPlayTime - 1) < 1e-9, "online time should advance at a fixed one-to-one rate");
+  assert.ok(Math.abs(timeFluxRemoval.online.totalRealPlayTime - 1) < 1e-9, "online real time should advance normally");
+  assert.ok(Math.abs(timeFluxRemoval.online.currentInfinityRunTime - 1) < 1e-9, "Infinity time should advance at a fixed one-to-one rate");
+  assert.ok(Math.abs(timeFluxRemoval.online.currentInfinityRealTime - 1) < 1e-9, "real Infinity time should advance normally");
+  assert.equal(timeFluxRemoval.online.timeFlux, 123456, "dormant Time Flux should not be consumed online");
+  assert.equal(timeFluxRemoval.report.offlineProgressEnabled, true, "legacy disabled offline progress should migrate to normal processing");
+  assert.equal(timeFluxRemoval.report.timeFluxGained, undefined, "normal offline reports should not grant dormant Time Flux");
+  assert.equal(timeFluxRemoval.reportVisible, true, "normal offline processing should show the report");
+  assert.equal(timeFluxRemoval.reportMode, "オフライン進行", "the report should identify normal offline progress");
+  assert.equal(timeFluxRemoval.reportOutsideShell, true, "the offline report should not participate in the shell grid");
+  assert.equal(timeFluxRemoval.reportPosition, "fixed", "the offline report should render as an overlay");
+  for (const key of ["shellHeight", "mainTabsHeight", "mainPanelsHeight"]) {
+    assert.ok(
+      Math.abs(timeFluxRemoval.layoutAfter[key] - timeFluxRemoval.layoutBefore[key]) < 0.1,
+      `offline report should not change ${key}`,
+    );
+  }
+  await page.setViewportSize({ width: 640, height: 360 });
+  const shortMobileOfflineReport = await page.evaluate(() => {
+    const panel = document.querySelector("#offlineReportPanel");
+    const heading = panel?.querySelector(".panel-heading")?.getBoundingClientRect();
+    const rect = panel?.getBoundingClientRect();
+    const style = panel ? getComputedStyle(panel) : null;
+    return {
+      top: rect?.top ?? -Infinity,
+      bottom: rect?.bottom ?? Infinity,
+      headingTop: heading?.top ?? -Infinity,
+      maxHeight: Number.parseFloat(style?.maxHeight ?? "NaN"),
+      overflowY: style?.overflowY ?? "",
+      viewportHeight: window.innerHeight,
+    };
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  assert.ok(shortMobileOfflineReport.top >= 0, "short mobile offline reports should stay within the viewport at the top");
+  assert.ok(shortMobileOfflineReport.bottom <= shortMobileOfflineReport.viewportHeight, "short mobile offline reports should stay within the viewport at the bottom");
+  assert.ok(shortMobileOfflineReport.headingTop >= 0, "short mobile offline report headings should remain visible");
+  assert.ok(shortMobileOfflineReport.maxHeight <= shortMobileOfflineReport.viewportHeight - 84, "short mobile reports should use a viewport-relative max height");
+  assert.equal(shortMobileOfflineReport.overflowY, "auto", "short mobile reports should scroll internally");
+  await page.setViewportSize({ width: 1280, height: 360 });
+  const shortDesktopOfflineReport = await page.evaluate(() => {
+    const panel = document.querySelector("#offlineReportPanel");
+    const heading = panel?.querySelector(".panel-heading")?.getBoundingClientRect();
+    const rect = panel?.getBoundingClientRect();
+    const style = panel ? getComputedStyle(panel) : null;
+    return {
+      top: rect?.top ?? -Infinity,
+      bottom: rect?.bottom ?? Infinity,
+      headingTop: heading?.top ?? -Infinity,
+      maxHeight: Number.parseFloat(style?.maxHeight ?? "NaN"),
+      overflowY: style?.overflowY ?? "",
+      viewportHeight: window.innerHeight,
+    };
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  assert.ok(shortDesktopOfflineReport.top >= 0, "short desktop offline reports should stay within the viewport at the top");
+  assert.ok(shortDesktopOfflineReport.bottom <= shortDesktopOfflineReport.viewportHeight, "short desktop offline reports should stay within the viewport at the bottom");
+  assert.ok(shortDesktopOfflineReport.headingTop >= 0, "short desktop offline report headings should remain visible");
+  assert.ok(shortDesktopOfflineReport.maxHeight <= shortDesktopOfflineReport.viewportHeight - 36, "short desktop reports should use a viewport-relative max height");
+  assert.equal(shortDesktopOfflineReport.overflowY, "auto", "short desktop reports should scroll internally");
+  assert.ok(Math.abs(timeFluxRemoval.totalPlayTime - 2) < 1e-9, "offline processing should advance normal game time");
+  assert.ok(Math.abs(timeFluxRemoval.totalRealPlayTime - 1) < 1e-9, "offline processing should not add real play time");
+  assert.equal(timeFluxRemoval.timeFlux, 123456, "offline processing should not change dormant Time Flux");
   const newsTicker = await page.evaluate(() => {
     const ticker = document.querySelector("#newsTicker");
     const item = document.querySelector("#newsTickerText");
@@ -734,21 +678,30 @@ try {
   });
   assert.equal(topBarModes.value, "news", "top bar mode should default to news");
   assert.deepEqual(topBarModes.options, ["news", "resources", "progress", "blank", "hidden"], "top bar mode select should expose all display modes");
-  const quickBarSetting = await page.evaluate(() => {
-    const toggle = document.querySelector("#timeFluxQuickBarToggle");
-    const before = toggle?.checked === true;
-    toggle?.click();
-    const hidden = document.querySelector("#timeFluxQuickBar")?.hidden === true;
-    toggle?.click();
-    return {
+  const offlineTickSetting = await page.evaluate(() => {
+    const { switchMainTab } = window.__angleDebug;
+    switchMainTab("settings");
+    const input = document.querySelector("#offlineTickInput");
+    const before = input?.value ?? "";
+    if (input) {
+      input.value = "5000";
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    window.advanceTime(0);
+    const result = {
       before,
-      hidden,
-      restored: document.querySelector("#timeFluxQuickBar")?.hidden === false,
+      value: input?.value ?? "",
+      state: window.__angleDebug.state.offlineTickCount,
+      width: input?.getBoundingClientRect().width ?? 0,
+      height: input?.getBoundingClientRect().height ?? 0,
     };
+    switchMainTab("angle");
+    return result;
   });
-  assert.equal(quickBarSetting.before, true, "the TF quick bar setting should default to enabled");
-  assert.equal(quickBarSetting.hidden, true, "the TF quick bar setting should hide the quick bar");
-  assert.equal(quickBarSetting.restored, true, "the TF quick bar setting should restore the quick bar");
+  assert.equal(offlineTickSetting.before, "1000", "the offline tick setting should have a stable default");
+  assert.equal(offlineTickSetting.value, "5000", "the offline tick setting should accept a numeric value");
+  assert.equal(offlineTickSetting.state, 5000, "the offline tick setting should update runtime state");
+  assert.ok(offlineTickSetting.width > 0 && offlineTickSetting.height > 0, "the offline tick setting should remain visible");
   const addedJapaneseNews = await page.evaluate(() => {
     const item = document.querySelector("#newsTickerText");
     window.__angleDebug.applySetting("language", "ja");
@@ -823,18 +776,14 @@ try {
   const hiddenTopBar = await page.evaluate(() => {
     window.__angleDebug.applySetting("topBarMode", "hidden");
     const ticker = document.querySelector("#newsTicker");
-    const quickBar = document.querySelector("#timeFluxQuickBar");
     const panels = document.querySelector(".main-panels");
     return {
       hidden: Boolean(ticker?.hidden),
-      quickBarVisible: quickBar?.hidden === false,
-      quickBarBottom: quickBar?.getBoundingClientRect().bottom ?? 0,
       panelTop: panels?.getBoundingClientRect().top ?? 0,
     };
   });
   assert.equal(hiddenTopBar.hidden, true, "hidden top bar should hide the bar");
-  assert.equal(hiddenTopBar.quickBarVisible, true, "hidden top bar should not hide the independent Time Flux quick bar");
-  assert.ok(hiddenTopBar.panelTop >= hiddenTopBar.quickBarBottom - 1, "main panels should remain below the visible Time Flux quick bar");
+  assert.ok(hiddenTopBar.panelTop >= 0, "main panels should remain laid out when the top bar is hidden");
   const restoredNewsTopBar = await page.evaluate(() => {
     window.__angleDebug.applySetting("topBarMode", "news");
     const item = document.querySelector("#newsTickerText");
@@ -847,57 +796,46 @@ try {
   assert.equal(restoredNewsTopBar.animated, true, "news mode should restore scrolling animation");
   const fpsPlacement = await page.evaluate(() => {
     window.__angleDebug.applySetting("topBarMode", "news");
-    window.__angleDebug.applySetting("showTimeFluxQuickBar", true);
     window.__angleDebug.applySetting("showFps", true);
     const ticker = document.querySelector("#newsTicker")?.getBoundingClientRect();
     const track = document.querySelector(".news-track")?.getBoundingClientRect();
     const fps = document.querySelector("#fpsCounter")?.getBoundingClientRect();
     window.__angleDebug.applySetting("topBarMode", "hidden");
-    const hiddenQuickBarBottom = document.querySelector("#timeFluxQuickBar")?.getBoundingClientRect().bottom ?? 0;
     const hiddenTop = document.querySelector("#fpsCounter")?.getBoundingClientRect().top ?? 999;
     return {
       insideTopBar: Boolean(ticker && fps && fps.top >= ticker.top && fps.bottom <= ticker.bottom),
       clearOfNewsText: Boolean(track && fps && track.right <= fps.left),
-      hiddenQuickBarBottom,
       hiddenTop,
     };
   });
   assert.equal(fpsPlacement.insideTopBar, true, "FPS counter should fit inside the visible top bar");
   assert.equal(fpsPlacement.clearOfNewsText, true, "FPS counter should not overlap the news text track");
-  assert.ok(fpsPlacement.hiddenTop >= fpsPlacement.hiddenQuickBarBottom - 1, "FPS counter should stay below the visible Time Flux quick bar");
+  assert.ok(fpsPlacement.hiddenTop >= 0, "FPS counter should remain positioned when the top bar is hidden");
   const achievementToastPlacement = await page.evaluate(() => {
     const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
     window.__angleDebug.applySetting("topBarMode", "news");
-    window.__angleDebug.applySetting("showTimeFluxQuickBar", true);
-    const normalQuickBar = rect("#timeFluxQuickBar");
     const normalToasts = rect("#achievementToasts");
     window.__angleDebug.applySetting("topBarMode", "hidden");
-    const hiddenQuickBar = rect("#timeFluxQuickBar");
     const hiddenToasts = rect("#achievementToasts");
     const hiddenFps = rect("#fpsCounter");
     const originalRootFontSize = document.documentElement.style.fontSize;
     document.documentElement.style.fontSize = "32px";
     window.__angleDebug.applySetting("topBarMode", "hidden");
-    const largeQuickBar = rect("#timeFluxQuickBar");
     const largeToasts = rect("#achievementToasts");
     const largeFps = rect("#fpsCounter");
     document.documentElement.style.fontSize = originalRootFontSize;
     window.__angleDebug.applySetting("topBarMode", "news");
     return {
-      normalQuickBarBottom: normalQuickBar?.bottom ?? 0,
       normalToastTop: normalToasts?.top ?? 0,
-      hiddenQuickBarBottom: hiddenQuickBar?.bottom ?? 0,
       hiddenToastTop: hiddenToasts?.top ?? 0,
       hiddenFpsBottom: hiddenFps?.bottom ?? 0,
-      largeQuickBarBottom: largeQuickBar?.bottom ?? 0,
       largeToastTop: largeToasts?.top ?? 0,
       largeFpsBottom: largeFps?.bottom ?? 0,
     };
   });
-  assert.ok(achievementToastPlacement.normalToastTop >= achievementToastPlacement.normalQuickBarBottom - 1, "achievement toasts should stay below the visible Time Flux quick bar");
-  assert.ok(achievementToastPlacement.hiddenToastTop >= achievementToastPlacement.hiddenQuickBarBottom - 1, "hidden top bar achievement toasts should stay below the visible Time Flux quick bar");
+  assert.ok(achievementToastPlacement.normalToastTop >= 0, "achievement toasts should remain positioned in normal mode");
   assert.ok(achievementToastPlacement.hiddenToastTop >= achievementToastPlacement.hiddenFpsBottom - 1, "hidden top bar achievement toasts should stay below the FPS counter");
-  assert.ok(achievementToastPlacement.largeToastTop >= achievementToastPlacement.largeQuickBarBottom - 1, "large text achievement toasts should stay below the visible Time Flux quick bar");
+  assert.ok(achievementToastPlacement.largeToastTop >= 0, "large-text achievement toasts should remain positioned");
   assert.ok(achievementToastPlacement.largeToastTop >= achievementToastPlacement.largeFpsBottom - 1, "large text achievement toasts should stay below the FPS counter");
   const breakCapPlacement = await page.evaluate(() => {
     const breakCap = document.querySelector("#breakCapButton");
@@ -1162,52 +1100,28 @@ try {
     const mobileStartup = await mobilePage.evaluate(() => ({
       updateTitle: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
       tabCount: document.querySelectorAll(".main-tab").length,
-      quickBarVisible: document.querySelector("#timeFluxQuickBar")?.hidden === false,
+      timeFluxTab: Boolean(document.querySelector('[data-tab="timeFlux"]')),
+      timeFluxPanel: Boolean(document.querySelector("#timeFluxPanel")),
+      timeFluxQuickBar: Boolean(document.querySelector("#timeFluxQuickBar")),
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
     assert.equal(mobileStartup.updateTitle, "0.9.0 アップデート", "mobile startup should use the release version");
-    assert.equal(mobileStartup.tabCount, 9, "mobile startup should expose every main tab");
-    assert.equal(mobileStartup.quickBarVisible, true, "the Time Flux quick bar should be visible on mobile");
+    assert.equal(mobileStartup.tabCount, 8, "mobile startup should expose the active main tabs");
+    assert.equal(mobileStartup.timeFluxTab, false, "mobile startup should omit the dormant Time Flux tab");
+    assert.equal(mobileStartup.timeFluxPanel, false, "mobile startup should omit the dormant Time Flux panel");
+    assert.equal(mobileStartup.timeFluxQuickBar, false, "mobile startup should omit the dormant Time Flux quick bar");
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
     await mobilePage.locator("#updateModalClose").click();
 
-    await mobilePage.locator('[data-tab="timeFlux"]').click();
-    const mobileTimeFlux = await mobilePage.evaluate(() => {
-      const input = document.querySelector("#timeFluxCustomSpeedInput");
-      if (input) {
-        input.value = "12";
-        input.dispatchEvent(new Event("input", { bubbles: true }));
-      }
-      window.advanceTime(0);
-      const draft = {
-        stateSpeed: window.__angleDebug.state.timeFluxSpeed,
-        stateCustomSpeed: window.__angleDebug.state.timeFluxCustomSpeed,
-        quickSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
-      };
-      document.querySelector("#timeFluxCustomSpeedApply")?.click();
-      return {
-        panelActive: document.querySelector('[data-panel="timeFlux"]')?.classList.contains("is-active") ?? false,
-        customInputWidth: input?.getBoundingClientRect().width ?? 0,
-        customSpeed: input?.value ?? "",
-        quickSpeed: document.querySelector("#timeFluxQuickCustomSpeed")?.textContent?.trim() ?? "",
-        customButtonType: document.querySelector("#timeFluxCustomSpeedApply")?.tagName ?? "",
-        stateSpeed: window.__angleDebug.state.timeFluxSpeed,
-        stateCustomSpeed: window.__angleDebug.state.timeFluxCustomSpeed,
-        draft,
-        quickInputPresent: Boolean(document.querySelector("#timeFluxQuickCustomSpeedInput")),
-      };
-    });
-    assert.equal(mobileTimeFlux.panelActive, true, "the Time Flux tab should activate on mobile");
-    assert.equal(mobileTimeFlux.draft.stateSpeed, 1, "mobile custom speed input should not change the active speed before applying");
-    assert.equal(mobileTimeFlux.draft.stateCustomSpeed, 4, "mobile custom speed input should not change the saved speed before applying");
-    assert.equal(mobileTimeFlux.draft.quickSpeed, "×4", "mobile quick bar should keep the saved speed while editing");
-    assert.equal(mobileTimeFlux.customSpeed, "12", "the mobile Time Flux tab should accept custom speed input");
-    assert.equal(mobileTimeFlux.quickSpeed, "×12", "the mobile quick bar should mirror custom speed");
-    assert.equal(mobileTimeFlux.customButtonType, "BUTTON", "the mobile Time Flux custom speed control should be a button");
-    assert.equal(mobileTimeFlux.stateSpeed, 12, "the mobile custom speed button should apply the active speed");
-    assert.equal(mobileTimeFlux.stateCustomSpeed, 12, "the mobile custom speed button should save the custom speed");
-    assert.equal(mobileTimeFlux.quickInputPresent, false, "the mobile quick bar should remain read-only");
-    assert.ok(mobileTimeFlux.customInputWidth > 0, "the mobile custom speed input should remain visible");
+    await mobilePage.locator('[data-tab="settings"]').click();
+    const mobileOfflineSetting = await mobilePage.evaluate(() => ({
+      panelActive: document.querySelector('[data-panel="settings"]')?.classList.contains("is-active") ?? false,
+      tickInputWidth: document.querySelector("#offlineTickInput")?.getBoundingClientRect().width ?? 0,
+      tickInputHeight: document.querySelector("#offlineTickInput")?.getBoundingClientRect().height ?? 0,
+    }));
+    assert.equal(mobileOfflineSetting.panelActive, true, "the Settings tab should activate on mobile");
+    assert.ok(mobileOfflineSetting.tickInputWidth > 0, "the mobile offline tick setting should remain visible");
+    assert.ok(mobileOfflineSetting.tickInputHeight > 0, "the mobile offline tick setting should remain usable");
 
     await mobilePage.locator('[data-tab="statistics"]').click();
     const mobileStatistics = await mobilePage.evaluate(() => ({
@@ -1251,26 +1165,24 @@ try {
       applySetting("showFps", true);
       window.advanceTime(0);
       const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
-      const quickBar = rect("#timeFluxQuickBar");
       const toasts = rect("#achievementToasts");
       const fps = rect("#fpsCounter");
       return {
         panelActive: document.querySelector('[data-infinity-panel="angle"]')?.classList.contains("is-active") ?? false,
         canvasWidth: document.querySelector("#infiniteAngleCanvas")?.getBoundingClientRect().width ?? 0,
-        quickBarBottom: quickBar?.bottom ?? 0,
         toastTop: toasts?.top ?? 0,
         fpsTop: fps?.top ?? 0,
       };
     });
     assert.equal(mobileInfiniteAngle.panelActive, true, "the mobile IA panel should activate");
     assert.ok(mobileInfiniteAngle.canvasWidth > 0, "the mobile IA canvas should have a rendered width");
-    assert.ok(mobileInfiniteAngle.toastTop >= mobileInfiniteAngle.quickBarBottom - 1, "mobile achievement toasts should clear the quick bar");
-    assert.ok(mobileInfiniteAngle.fpsTop >= mobileInfiniteAngle.quickBarBottom - 1, "mobile FPS should clear the quick bar");
+    assert.ok(mobileInfiniteAngle.toastTop >= 0, "mobile achievement toasts should remain positioned");
+    assert.ok(mobileInfiniteAngle.fpsTop >= 0, "mobile FPS should remain positioned");
     assert.deepEqual(mobileErrors, [], "mobile critical paths should produce no browser errors");
     report.mobile = {
       viewport: "390x844",
       startup: mobileStartup,
-      timeFlux: mobileTimeFlux,
+      offlineSetting: mobileOfflineSetting,
       statistics: mobileStatistics,
       infiniteAngle: mobileInfiniteAngle,
     };

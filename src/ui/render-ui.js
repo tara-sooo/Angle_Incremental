@@ -308,7 +308,7 @@ function updateUi() {
 
   runtime.updateAutomationUi();
   runtime.updateStatisticsUi();
-  runtime.updateTimeFluxUi();
+  runtime.updateOfflineReportUi();
 
   const unlockedAchievements = runtime.achievementCount();
   runtime.elements.achievementTabState.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT}`;
@@ -323,7 +323,7 @@ function updateUi() {
   syncFormControl(runtime.elements.numberFormatSelect, runtime.state.numberFormat);
   syncFormControl(runtime.elements.timeUnitSelect, runtime.state.timeUnit);
   syncFormControl(runtime.elements.topBarModeSelect, runtime.state.topBarMode);
-  syncFormControl(runtime.elements.timeFluxQuickBarToggle, runtime.state.showTimeFluxQuickBar);
+  syncFormControl(runtime.elements.offlineTickInput, runtime.state.offlineTickCount);
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);
   runtime.elements.fpsCounter.hidden = !runtime.state.showFps;
   if (runtime.state.showFps) runtime.elements.fpsCounter.textContent = `FPS ${Math.round(runtime.smoothedFps)}`;
