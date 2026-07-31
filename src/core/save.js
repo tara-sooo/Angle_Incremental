@@ -963,16 +963,18 @@ function loadGame(options = {}) {
       return false;
     }
 
+    const loadedSaveFingerprint = saveFingerprint(raw);
     try {
       applySaveData(parsed.state, parsed.version);
     } catch (error) {
       loadRecoveryMode = true;
+      // The valid raw save is still the storage source after an apply failure.
+      lastKnownSaveFingerprint = loadedSaveFingerprint;
       writeLoadFailure("apply", error, parsed);
       runtime.setSaveStatus(runtime.t("loadFailed"));
       return false;
     }
 
-    const loadedSaveFingerprint = saveFingerprint(raw);
     lastKnownSaveFingerprint = loadedSaveFingerprint;
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
     const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);

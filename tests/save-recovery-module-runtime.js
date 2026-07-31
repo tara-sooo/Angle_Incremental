@@ -87,6 +87,48 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { context, debug, runtime, storage } = instance;
+    const { state } = debug;
+    state.generationCount = 41;
+    assert.equal(
+      debug.createCheckpoint("periodic", { force: true }),
+      true,
+      "an apply-failure recovery test should have a checkpoint to restore",
+    );
+    state.generationCount = 7;
+    const originalSave = runtime.serializeSaveData();
+    originalSave.savedAt = Date.now();
+    const rawSave = JSON.stringify(originalSave);
+    storage.set(runtime.SAVE_KEY, rawSave);
+    const checkpointIndex = debug.recoveryEntries().checkpoints.findIndex(
+      (entry) => entry.reason === "periodic" && entry.state.generationCount === 41,
+    );
+    assert.notEqual(checkpointIndex, -1, "the recovery test checkpoint should be available");
+    const originalApply = runtime.applySaveData;
+    runtime.applySaveData = () => {
+      throw new Error("test checkpoint apply failure");
+    };
+    try {
+      assert.equal(debug.loadGame(), false, "an apply failure should enter recovery before checkpoint restore");
+    } finally {
+      runtime.applySaveData = originalApply;
+    }
+    context.window.confirm = () => true;
+    assert.equal(
+      debug.restoreCheckpoint(checkpointIndex),
+      true,
+      "checkpoint restoration should save after an apply failure",
+    );
+    assert.equal(state.generationCount, 41, "checkpoint restoration should recover the selected state");
+    assert.equal(
+      JSON.parse(storage.get(runtime.SAVE_KEY)).state.generationCount,
+      41,
+      "checkpoint restoration after an apply failure should persist the recovered state",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     const { state } = debug;
     state.score = 123;

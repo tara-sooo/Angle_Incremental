@@ -114,6 +114,9 @@ function collectQualityViolations(report) {
     if (automaticTransitions?.idleThirtyFps?.level !== "high") {
       violations.push(`${prefix}/automatic quality degraded at 30 FPS with a 5ms render cost`);
     }
+    if (automaticTransitions?.balancedAtSixtyFps?.level !== "balanced") {
+      violations.push(`${prefix}/automatic quality incorrectly degraded Balanced at 60 FPS with a 20ms render cost`);
+    }
     if (automaticTransitions?.afterBalanced?.level !== "balanced") {
       violations.push(`${prefix}/automatic quality did not degrade high -> balanced`);
     }
@@ -299,6 +302,10 @@ try {
         const automaticTransitions = {
           initial: debug.renderQualityState(),
         };
+        for (let index = 0; index < 30; index += 1) debug.updateRenderQualityForTest(40, 60, true);
+        for (let index = 0; index < 60; index += 1) debug.updateRenderQualityForTest(20, 60, true);
+        automaticTransitions.balancedAtSixtyFps = debug.renderQualityState();
+        debug.setRenderQualityForTest("auto");
         for (let index = 0; index < 120; index += 1) debug.updateRenderQualityForTest(5, 30, true);
         automaticTransitions.idleThirtyFps = debug.renderQualityState();
         for (let index = 0; index < 60; index += 1) debug.updateRenderQualityForTest(40, 30, true);

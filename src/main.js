@@ -179,7 +179,10 @@ function updateRenderQuality(renderCostMs, canvasRendered = true) {
   renderCostEma = renderCostEma === 0
     ? measuredCostMs
     : renderCostEma * 0.9 + measuredCostMs * 0.1;
-  const frameBudgetMs = observedFrameBudgetMs();
+  const frameBudgetMs = Math.max(
+    observedFrameBudgetMs(),
+    renderFrameIntervalMs(),
+  );
   const pressured = renderCostEma > frameBudgetMs;
   if (pressured) {
     renderPressureFrames += 1;
