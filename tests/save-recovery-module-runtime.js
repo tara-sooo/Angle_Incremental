@@ -291,10 +291,14 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(debug.recoveryEntries().checkpoints.length, 3, "one corrupt checkpoint must not block valid checkpoints");
 
     state.generationCount = 40;
+    state.achievementMask = 1 << (31 - 1);
+    state.achievementMaskHigh = 0b111111;
     assert.equal(debug.createCheckpoint("pre-tower-build", { force: true }), true, "event checkpoints should be writable");
     const checkpointsAfterEvent = debug.recoveryEntries().checkpoints;
     const event = checkpointsAfterEvent.find((entry) => entry.reason === "pre-tower-build");
     assert.equal(event.state.generationCount, 40, "event checkpoints should retain the pre-action state");
+    assert.equal(event.state.achievementMask, 1 << (31 - 1), "event checkpoints should retain the low achievement mask");
+    assert.equal(event.state.achievementMaskHigh, 0b111111, "event checkpoints should retain the high achievement mask");
     assert.equal(
       checkpointsAfterEvent.filter((entry) => entry.reason === "periodic").length,
       3,
@@ -346,10 +350,16 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
     const restoreTargetIndex = debug.recoveryEntries().checkpoints.findIndex((entry) => entry.reason === "pre-tower-build");
     state.generationCount = 99;
+    state.achievementMask = 0;
+    state.achievementMaskHigh = 0;
     assert.equal(debug.restoreCheckpoint(restoreTargetIndex), true, "a checkpoint should be restorable from the recovery list");
     assert.equal(state.generationCount, 40, "checkpoint restoration should apply the selected state");
+    assert.equal(state.achievementMask & (1 << (31 - 1)), 1 << (31 - 1), "checkpoint restoration should restore the low achievement mask");
+    assert.equal(state.achievementMaskHigh, 0b111111, "checkpoint restoration should restore the high achievement mask");
     assert.equal(debug.restoreUndoSave(), true, "checkpoint restoration should expose an undo action");
     assert.equal(state.generationCount, 99, "checkpoint undo should recover the pre-restore state");
+    assert.equal(state.achievementMask & (1 << (31 - 1)), 0, "checkpoint undo should recover the previous low achievement mask");
+    assert.equal(state.achievementMaskHigh, 0, "checkpoint undo should recover the previous high achievement mask");
 
     state.generationCount = 41;
     assert.equal(runtime.reloadForRemoteUpdate("test-update"), undefined, "a remote update reload should be deferred by the test location");
@@ -376,9 +386,12 @@ async function runSaveRecoveryModuleRuntimeTest() {
     state.infinityCount = 1234567;
     state.infinityPoints = 1234567;
     state.infinityPointsLog10 = Math.log10(state.infinityPoints);
+    state.achievementMask = 0x7fffffff;
+    state.achievementMaskHigh = 0b111111;
     assert.equal(debug.createCheckpoint("format-test", { force: true }), true);
     runtime.updateUi();
     const compactSummary = runtime.elements.saveCheckpointList.children[0].children[0].children[2].textContent;
+    assert.match(compactSummary, /実績: 37\/37/, "recovery summaries should count achievements from both masks");
     state.numberFormat = "scientific";
     runtime.updateUi();
     const scientificSummary = runtime.elements.saveCheckpointList.children[0].children[0].children[2].textContent;

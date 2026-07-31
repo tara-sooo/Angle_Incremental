@@ -673,6 +673,12 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   } else {
     runtime.state.achievementMask = loadedAchievementMask;
   }
+  const loadedAchievementMaskHigh = runtime.parseSavedNumber(data.achievementMaskHigh);
+  runtime.state.achievementMaskHigh = Number.isFinite(loadedAchievementMaskHigh)
+    && loadedAchievementMaskHigh >= -2147483648
+    && loadedAchievementMaskHigh <= 0xffffffff
+    ? Math.floor(loadedAchievementMaskHigh) >>> 0
+    : 0;
   runtime.state.totalPlayTime = runtime.sanitizeNumber(data.totalPlayTime, 0);
   runtime.state.totalRealPlayTime = runtime.sanitizeNumber(data.totalRealPlayTime, 0);
   runtime.state.currentInfinityRunTime = runtime.sanitizeNumber(data.currentInfinityRunTime, 0);
@@ -817,6 +823,7 @@ function serializeSaveData() {
   runtime.state.offlineProgressEnabled = true;
   runtime.normalizeInfinityPointState();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
+  runtime.state.achievementMaskHigh = ((Number(runtime.state.achievementMaskHigh) || 0) >>> 0);
   const data = {};
   runtime.SAVE_FIELDS.forEach((field) => {
     data[field] = runtime.state[field];
@@ -1134,6 +1141,7 @@ function resetSave() {
     fastestTowerChallengeTimes: Array(4).fill(0),
     infiniteCapBroken: false,
     achievementMask: 0,
+    achievementMaskHigh: 0,
     totalPlayTime: 0,
     totalRealPlayTime: 0,
     currentInfinityRunTime: 0,

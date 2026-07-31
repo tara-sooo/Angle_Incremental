@@ -393,6 +393,60 @@ try {
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
   assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
   assert.deepEqual(tabStructure.statisticsTabs, ["overview", "challenges"], "Statistics subtabs should be ordered Overview, Challenge Records");
+  const achievementUi = await page.evaluate(() => {
+    const { state, switchMainTab } = window.__angleDebug;
+    switchMainTab("achievements");
+    state.achievementMask = 0x7fffffff;
+    state.achievementMaskHigh = 0b111111;
+    state.language = "ja";
+    window.advanceTime(0);
+    const rows = Array.from(document.querySelectorAll(".achievement-row"));
+    const japanese = rows.slice(31).map((row) => ({
+      title: row.querySelector(".achievement-title")?.textContent?.trim() ?? "",
+      condition: row.querySelector(".achievement-condition")?.textContent?.trim() ?? "",
+      rewardHidden: row.querySelector(".achievement-reward")?.hidden ?? false,
+    }));
+    const japaneseSummary = document.querySelector("#achievementSummary")?.textContent?.trim() ?? "";
+    state.language = "en";
+    window.advanceTime(0);
+    const english = rows.slice(31).map((row) => ({
+      title: row.querySelector(".achievement-title")?.textContent?.trim() ?? "",
+      condition: row.querySelector(".achievement-condition")?.textContent?.trim() ?? "",
+    }));
+    const englishSummary = document.querySelector("#achievementSummary")?.textContent?.trim() ?? "";
+    state.language = "ja";
+    window.advanceTime(0);
+    return {
+      panelActive: document.querySelector('[data-panel="achievements"]')?.classList.contains("is-active") ?? false,
+      count: rows.length,
+      japaneseSummary,
+      englishSummary,
+      japanese,
+      english,
+      listWidth: document.querySelector("#achievementList")?.getBoundingClientRect().width ?? 0,
+    };
+  });
+  assert.equal(achievementUi.panelActive, true, "the Achievements panel should activate on desktop");
+  assert.equal(achievementUi.count, 37, "the desktop Achievements panel should render 37 rows");
+  assert.equal(achievementUi.japaneseSummary, "37/37 実績", "the desktop Japanese Achievements summary should show 37 achievements");
+  assert.equal(achievementUi.englishSummary, "37/37 Achievements", "the desktop English Achievements summary should show 37 achievements");
+  assert.deepEqual(achievementUi.japanese, [
+    { title: "不吉だという前提は置いておいて", condition: "所持IPがe44に到達", rewardHidden: true },
+    { title: "バベルも土台から", condition: "Towerを建設", rewardHidden: true },
+    { title: "あれをチャレンジだと呼ぶべきではない", condition: "TC1をクリア", rewardHidden: true },
+    { title: "道しるべを残す", condition: "スコアがe2450を超える", rewardHidden: true },
+    { title: "ちょっぴり豪邸", condition: "Towerの階層が3に到達", rewardHidden: true },
+    { title: "物騒な名前", condition: "TC2をクリア", rewardHidden: true },
+  ], "the desktop Japanese achievement definitions should be exact");
+  assert.deepEqual(achievementUi.english, [
+    { title: "Assuming It Is Unlucky", condition: "Hold at least 1e44 IP." },
+    { title: "Babel Starts from the Foundation", condition: "Build the Tower." },
+    { title: "We Should Not Call That a Challenge", condition: "Complete TC1." },
+    { title: "Leave a Signpost", condition: "Reach more than 1e2450 score." },
+    { title: "A Slightly Luxurious Mansion", condition: "Reach Tower Floor 3." },
+    { title: "A Violent-Sounding Name", condition: "Complete TC2." },
+  ], "the desktop English achievement definitions should be exact");
+  assert.ok(achievementUi.listWidth > 0, "the desktop achievement list should have a visible layout");
   const desktopUiChanges = await page.evaluate(() => {
     const { state, switchMainTab, switchInfinitySubtab, switchStatisticsSubtab } = window.__angleDebug;
     switchMainTab("infinity");
@@ -1122,6 +1176,27 @@ try {
     assert.equal(mobileOfflineSetting.panelActive, true, "the Settings tab should activate on mobile");
     assert.ok(mobileOfflineSetting.tickInputWidth > 0, "the mobile offline tick setting should remain visible");
     assert.ok(mobileOfflineSetting.tickInputHeight > 0, "the mobile offline tick setting should remain usable");
+
+    await mobilePage.locator('[data-tab="achievements"]').click();
+    const mobileAchievements = await mobilePage.evaluate(() => {
+      const { state } = window.__angleDebug;
+      state.achievementMask = 0x7fffffff;
+      state.achievementMaskHigh = 0b111111;
+      state.language = "ja";
+      window.advanceTime(0);
+      const rows = document.querySelectorAll(".achievement-row");
+      const lastRow = rows[rows.length - 1];
+      return {
+        panelActive: document.querySelector('[data-panel="achievements"]')?.classList.contains("is-active") ?? false,
+        count: rows.length,
+        lastTitle: lastRow?.querySelector(".achievement-title")?.textContent?.trim() ?? "",
+        listWidth: document.querySelector("#achievementList")?.getBoundingClientRect().width ?? 0,
+      };
+    });
+    assert.equal(mobileAchievements.panelActive, true, "the Achievements panel should activate on mobile");
+    assert.equal(mobileAchievements.count, 37, "the mobile Achievements panel should render 37 rows");
+    assert.equal(mobileAchievements.lastTitle, "物騒な名前", "the mobile Achievements panel should keep the final row visible");
+    assert.ok(mobileAchievements.listWidth > 0, "the mobile achievement list should have a visible layout");
 
     await mobilePage.locator('[data-tab="statistics"]').click();
     const mobileStatistics = await mobilePage.evaluate(() => ({
