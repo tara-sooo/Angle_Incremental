@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.9.0";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.10.0";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 

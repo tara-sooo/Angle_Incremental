@@ -14,7 +14,7 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.9.0";
+const EXPECTED_ASSET_VERSION = "0.10.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -123,8 +123,8 @@ try {
       canvas: modal?.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.9.0 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.9.0 アップデート", "the update modal should show the current Japanese version");
+  assert.equal(updateModal.visible, true, "the 0.10.0 update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, "0.10.0 アップデート", "the update modal should show the current Japanese version");
   assert.match(updateModal.summary, /セーブ復旧/);
   assert.match(updateModal.canvas, /Tower Challenge/);
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
@@ -1282,7 +1282,7 @@ try {
       timeFluxQuickBar: Boolean(document.querySelector("#timeFluxQuickBar")),
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
-    assert.equal(mobileStartup.updateTitle, "0.9.0 アップデート", "mobile startup should use the release version");
+    assert.equal(mobileStartup.updateTitle, "0.10.0 アップデート", "mobile startup should use the release version");
     assert.equal(mobileStartup.tabCount, 8, "mobile startup should expose the active main tabs");
     assert.equal(mobileStartup.timeFluxTab, false, "mobile startup should omit the dormant Time Flux tab");
     assert.equal(mobileStartup.timeFluxPanel, false, "mobile startup should omit the dormant Time Flux panel");

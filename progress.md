@@ -120,6 +120,7 @@ Original prompt: では、中核ループを完成させてください
 - Added IU14-1 after IU13-1, extending IU11-2's Infinity-count hard cap from 10000 to 30000 while preserving SAVE_VERSION 10 compatibility.
 - Unified the vertex gain increase display with the shared number formatter at 1000 and above while preserving small values and IC6's 0.001 precision.
 - Updated TC1 and TC2 for Tower-floor scaling: TC1 now adds `+0.077` Infinity Score exponent per floor after Floor 3, while TC2 targets `1e1555` and soft-caps Core Boost requirement growth below `^1.50` without changing the save format.
+- Prepared the 0.10.0 release candidate with Time Flux removal, achievements 32-37, IU14-1, unified vertex-gain formatting, and floor-scaled Tower Challenge rewards while keeping SAVE_VERSION 10 compatible.
 
 ## TODO
 
