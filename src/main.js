@@ -952,6 +952,25 @@ async function handleVisibilityChange() {
       reloadAfterSaveConflict();
       return;
     }
+    if (!runtime.state.offlineProgressEnabled) {
+      offlineReport = null;
+      rebaseLocalClock();
+      setOfflineBaseline(
+        localClockNow(),
+        serverClockAvailable() ? estimatedServerNowMs() : 0,
+      );
+      runtime.updateUi();
+      if (!runtime.saveGame("manual")) {
+        restoreOfflineTransaction(
+          transactionSnapshot,
+          new Error("disabled offline progress baseline save failed"),
+          retryBaseline,
+        );
+        return;
+      }
+      lastTime = currentFrameTime();
+      return;
+    }
     await syncServerClock();
     if (resumeGeneration !== visibilityResumeGeneration) return;
 

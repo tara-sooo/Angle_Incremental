@@ -271,11 +271,18 @@ async function runTimeFluxModuleRuntimeTest() {
   disabledResumeRuntime.normalAutobuyElapsed = 0.37;
   const disabledResumeState = disabledResumeRuntime.snapshotRuntimeState();
   const disabledResumeAutobuyElapsed = disabledResumeRuntime.normalAutobuyElapsed;
-  disabledResumeInstance.context.window.fetch = async () => ({
-    ok: true,
-    headers: { get: () => new Date().toUTCString() },
-  });
-  await disabledResumeRuntime.handleVisibilityChange();
+  let disabledResumeClockRequested = false;
+  const pendingDisabledResumeClockRequest = new Promise(() => {});
+  disabledResumeInstance.context.window.fetch = () => {
+    disabledResumeClockRequested = true;
+    return pendingDisabledResumeClockRequest;
+  };
+  const disabledResumeResult = await Promise.race([
+    disabledResumeRuntime.handleVisibilityChange().then(() => "completed"),
+    new Promise((resolve) => setTimeout(() => resolve("timed out"), 100)),
+  ]);
+  assert.equal(disabledResumeResult, "completed", "disabled visibility resume should not wait for server clock synchronization");
+  assert.equal(disabledResumeClockRequested, false, "disabled visibility resume should skip the server clock request");
   assert.deepEqual(disabledResumeRuntime.snapshotRuntimeState(), disabledResumeState, "disabled visibility resume should not advance game state");
   assert.equal(disabledResumeRuntime.normalAutobuyElapsed, disabledResumeAutobuyElapsed, "disabled visibility resume should not advance automation timing");
   assert.equal(disabledResumeRuntime.offlineReport, null, "disabled visibility resume should not show an offline report");
