@@ -128,6 +128,32 @@ try {
   assert.match(updateModal.summary, /Time Flux/);
   assert.match(updateModal.summary, /IU14-1/);
   assert.match(updateModal.canvas, /Tower Challenge/);
+  const desktopButtonInteraction = await page.evaluate(() => {
+    const selectors = ["[data-tab=angle]", "#speedUpgrade"];
+    return selectors.map((selector) => {
+      const button = document.querySelector(selector);
+      const styles = getComputedStyle(button);
+      return {
+        selector,
+        transitionDurations: styles.transitionDuration.split(",").map((value) => value.trim()),
+        touchAction: styles.touchAction,
+        hoverCapable: window.matchMedia("(hover: hover)").matches,
+        finePointer: window.matchMedia("(pointer: fine)").matches,
+      };
+    });
+  });
+  assert.ok(
+    desktopButtonInteraction.every((button) => button.hoverCapable && button.finePointer),
+    "the desktop smoke context should expose a fine hover pointer",
+  );
+  assert.ok(
+    desktopButtonInteraction.every((button) => button.transitionDurations.every((duration) => duration === "0.12s")),
+    "desktop buttons should retain their 120ms transitions",
+  );
+  assert.ok(
+    desktopButtonInteraction.every((button) => button.touchAction === "manipulation"),
+    "desktop buttons should still use touch-action manipulation",
+  );
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   const serverClockProbe = await page.evaluate(async () => {
@@ -1275,6 +1301,39 @@ try {
       && Boolean(window.__angleDebug?.ready)
     ));
     await mobilePage.evaluate(() => window.__angleDebug.ready);
+    const mobileButtonInteraction = await mobilePage.evaluate(() => {
+      const selectors = ["[data-tab=angle]", "#speedUpgrade"];
+      return {
+        hoverNone: window.matchMedia("(hover: none)").matches,
+        coarsePointer: window.matchMedia("(pointer: coarse)").matches,
+        buttons: selectors.map((selector) => {
+          const button = document.querySelector(selector);
+          const styles = getComputedStyle(button);
+          return {
+            selector,
+            transitionDurations: styles.transitionDuration.split(",").map((value) => value.trim()),
+            touchAction: styles.touchAction,
+            tapHighlightColor: styles.webkitTapHighlightColor,
+          };
+        }),
+      };
+    });
+    assert.ok(
+      mobileButtonInteraction.hoverNone || mobileButtonInteraction.coarsePointer,
+      "the mobile smoke context should expose a touch-oriented pointer",
+    );
+    assert.ok(
+      mobileButtonInteraction.buttons.every((button) => button.transitionDurations.every((duration) => duration === "0s")),
+      "touch buttons should apply their state without a transition delay",
+    );
+    assert.ok(
+      mobileButtonInteraction.buttons.every((button) => button.touchAction === "manipulation"),
+      "touch buttons should use touch-action manipulation",
+    );
+    assert.ok(
+      mobileButtonInteraction.buttons.every((button) => button.tapHighlightColor === "rgba(0, 0, 0, 0)"),
+      "touch buttons should suppress the browser tap highlight",
+    );
     const mobileStartup = await mobilePage.evaluate(() => ({
       updateTitle: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
       tabCount: document.querySelectorAll(".main-tab").length,
