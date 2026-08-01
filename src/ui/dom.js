@@ -117,6 +117,7 @@ const elements = {
   numberFormatSelect: document.getElementById("numberFormatSelect"),
   timeUnitSelect: document.getElementById("timeUnitSelect"),
   topBarModeSelect: document.getElementById("topBarModeSelect"),
+  offlineProgressToggle: document.getElementById("offlineProgressToggle"),
   offlineTickInput: document.getElementById("offlineTickInput"),
   updateModal: document.getElementById("updateModal"),
   updateModalClose: document.getElementById("updateModalClose"),

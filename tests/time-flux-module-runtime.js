@@ -36,13 +36,28 @@ async function runTimeFluxModuleRuntimeTest() {
   state.timeFlux = 987654;
   state.totalPlayTime = 0;
   state.totalRealPlayTime = 0;
-  const migratedOfflineReport = debug.processOfflineElapsed(1, "test", { clockSource: "server" });
-  assert.equal(state.offlineProgressEnabled, true, "offline progress should migrate to the always-on mode");
-  assert.equal(state.timeFlux, 987654, "normal offline progress should not grant or consume Time Flux");
-  assert.ok(Math.abs(state.totalPlayTime - 1) < 1e-9, "old disabled-progress saves should receive normal offline progress");
-  assert.equal(state.totalRealPlayTime, 0, "offline progress should not count as real play time");
-  assert.equal(migratedOfflineReport.offlineProgressEnabled, true, "offline reports should use the normal mode");
-  assert.equal(Object.hasOwn(migratedOfflineReport, "timeFluxGained"), false, "offline reports should not expose TF rewards");
+  const disabledBaseline = Date.now() - 60 * 1000;
+  runtime.setOfflineBaseline(disabledBaseline, 0);
+  const disabledBefore = {
+    totalPlayTime: state.totalPlayTime,
+    totalRealPlayTime: state.totalRealPlayTime,
+    currentInfinityRunTime: state.currentInfinityRunTime,
+    currentInfinityRealTime: state.currentInfinityRealTime,
+    timeFlux: state.timeFlux,
+  };
+  const disabledOfflineResult = debug.processOfflineElapsed(1, "test", { clockSource: "server" });
+  assert.equal(state.offlineProgressEnabled, false, "the offline progress setting should remain disabled");
+  assert.deepEqual({
+    totalPlayTime: state.totalPlayTime,
+    totalRealPlayTime: state.totalRealPlayTime,
+    currentInfinityRunTime: state.currentInfinityRunTime,
+    currentInfinityRealTime: state.currentInfinityRealTime,
+    timeFlux: state.timeFlux,
+  }, disabledBefore, "disabled offline progress should not change game state");
+  assert.equal(disabledOfflineResult.skipped, true, "disabled offline processing should return a successful skip result");
+  assert.equal(runtime.offlineReport, null, "disabled offline processing should not show a report");
+  assert.ok(runtime.offlineBaselineTimestamp > disabledBaseline, "disabled offline processing should rebase the local baseline");
+  state.offlineProgressEnabled = true;
 
   const originalUpdate = runtime.update;
   let boundedUpdateCalls = 0;
@@ -87,7 +102,7 @@ async function runTimeFluxModuleRuntimeTest() {
     timeFluxCustomSpeed: 99,
     showTimeFluxQuickBar: false,
   }, 10);
-  assert.equal(state.offlineProgressEnabled, true, "loading an old disabled-progress save should normalize the flag");
+  assert.equal(state.offlineProgressEnabled, false, "loading an explicit disabled-progress save should preserve the flag");
   assert.equal(state.timeFlux, 1500000, "dormant balances should not be capacity-clamped");
   assert.equal(state.timeFluxCapacityLevel, 60, "dormant capacity levels should be preserved");
   assert.equal(state.timeFluxGainLevel, 3, "dormant gain levels should be preserved");
@@ -96,7 +111,7 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(state.showTimeFluxQuickBar, false, "dormant visibility settings should be preserved");
 
   const serialized = runtime.serializeSaveData();
-  assert.equal(serialized.state.offlineProgressEnabled, true, "normal saves should persist the migrated offline mode");
+  assert.equal(serialized.state.offlineProgressEnabled, false, "normal saves should persist the disabled offline mode");
   assert.equal(serialized.state.timeFlux, 1500000, "dormant balances should round-trip through local saves");
   assert.equal(serialized.state.timeFluxCapacityLevel, 60, "dormant capacity levels should be saved");
   assert.equal(serialized.state.timeFluxGainLevel, 3, "dormant gain levels should be saved");
@@ -119,11 +134,11 @@ async function runTimeFluxModuleRuntimeTest() {
       JSON.stringify({
         version: 10,
         savedAt: oldSaveTimestamp,
-        state: { offlineProgressEnabled: false, timeFlux: 777 },
+        state: { timeFlux: 777 },
       }),
     ],
   ]));
-  assert.equal(loadedInstance.debug.state.offlineProgressEnabled, true, "old saves should migrate to normal offline progress");
+  assert.equal(loadedInstance.debug.state.offlineProgressEnabled, true, "old saves without the setting should default to enabled");
   assert.equal(loadedInstance.debug.state.timeFlux, 777, "old dormant balances should survive loading and offline processing");
   assert.equal(loadedInstance.runtime.offlineReport.offlineProgressEnabled, true, "loaded offline reports should use normal progress");
   assert.equal(loadedInstance.runtime.offlineReport.clockSource, "local-fallback", "the harness should identify local fallback time");
@@ -132,6 +147,46 @@ async function runTimeFluxModuleRuntimeTest() {
     /サーバー時刻を取得できなかった/,
     "local fallback should remain visible in the offline report",
   );
+
+  const disabledLoadedInstance = await loadRuntime(candidatePath, new Map([
+    [
+      "angle-incremental-save",
+      JSON.stringify({
+        version: 10,
+        savedAt: oldSaveTimestamp,
+        state: { offlineProgressEnabled: false, timeFlux: 778 },
+      }),
+    ],
+  ]));
+  assert.equal(disabledLoadedInstance.debug.state.offlineProgressEnabled, false, "disabled saves should remain disabled after loading");
+  assert.equal(disabledLoadedInstance.debug.state.timeFlux, 778, "disabled saves should preserve dormant balances");
+  assert.equal(disabledLoadedInstance.debug.state.totalPlayTime, 0, "disabled loads should not grant offline play time");
+  assert.equal(disabledLoadedInstance.runtime.offlineReport, null, "disabled loads should not show an offline report");
+  const disabledLoadedSave = JSON.parse(
+    disabledLoadedInstance.context.localStorage.getItem(disabledLoadedInstance.runtime.SAVE_KEY),
+  );
+  assert.ok(disabledLoadedSave.savedAt > oldSaveTimestamp, "disabled loads should persist the rebased timestamp");
+  assert.equal(disabledLoadedSave.state.offlineProgressEnabled, false, "disabled loads should persist the disabled setting");
+
+  const toggleInstance = await loadRuntime(candidatePath);
+  const toggleDebug = toggleInstance.debug;
+  const toggleRuntime = toggleInstance.runtime;
+  toggleRuntime.setOfflineBaseline(Date.now() - 60 * 1000, 0);
+  toggleDebug.applySetting("offlineProgressEnabled", false);
+  const disabledToggleSave = JSON.parse(
+    toggleInstance.context.localStorage.getItem(toggleRuntime.SAVE_KEY),
+  );
+  assert.equal(disabledToggleSave.state.offlineProgressEnabled, false, "turning offline progress off should persist immediately");
+  assert.ok(disabledToggleSave.savedAt > oldSaveTimestamp, "turning offline progress off should reset the saved baseline");
+  toggleDebug.applySetting("offlineProgressEnabled", true);
+  const reenabledToggleSave = JSON.parse(
+    toggleInstance.context.localStorage.getItem(toggleRuntime.SAVE_KEY),
+  );
+  assert.equal(reenabledToggleSave.state.offlineProgressEnabled, true, "turning offline progress on should persist immediately");
+  const reenabledInstance = await loadRuntime(candidatePath, new Map([
+    [toggleRuntime.SAVE_KEY, JSON.stringify(reenabledToggleSave)],
+  ]));
+  assert.ok(reenabledInstance.debug.state.totalPlayTime < 1, "reenabling offline progress should not replay the disabled interval");
 
   const saveFailureInstance = await loadRuntime(candidatePath);
   const saveFailureRuntime = saveFailureInstance.runtime;
@@ -188,7 +243,7 @@ async function runTimeFluxModuleRuntimeTest() {
   });
   resumeInstance.context.window.fetch = () => pendingClockRequest;
   resumeRuntime.setOfflineBaseline(Date.now() - 60 * 1000, 0);
-  resumeDebug.state.offlineProgressEnabled = false;
+  resumeDebug.state.offlineProgressEnabled = true;
   resumeDebug.state.timeFlux = 0;
   const playTimeBeforeResume = resumeDebug.state.totalPlayTime;
   const resumePromise = resumeRuntime.handleVisibilityChange();
@@ -204,6 +259,32 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.ok(resumeRuntime.offlineReport.elapsedSeconds >= 50, "visibility resume should retain its captured interval");
   assert.ok(resumeDebug.state.totalPlayTime > playTimeBeforeResume, "visibility resume should apply normal offline progress");
   assert.equal(resumeDebug.state.timeFlux, 0, "visibility resume should not grant dormant Time Flux");
+
+  const disabledResumeInstance = await loadRuntime(candidatePath);
+  const disabledResumeDebug = disabledResumeInstance.debug;
+  const disabledResumeRuntime = disabledResumeInstance.runtime;
+  const disabledResumeBaseline = Date.now() - 60 * 1000;
+  disabledResumeRuntime.setOfflineBaseline(disabledResumeBaseline, 0);
+  disabledResumeDebug.state.offlineProgressEnabled = false;
+  disabledResumeDebug.state.totalPlayTime = 12;
+  disabledResumeDebug.state.currentInfinityRunTime = 7;
+  disabledResumeRuntime.normalAutobuyElapsed = 0.37;
+  const disabledResumeState = disabledResumeRuntime.snapshotRuntimeState();
+  const disabledResumeAutobuyElapsed = disabledResumeRuntime.normalAutobuyElapsed;
+  disabledResumeInstance.context.window.fetch = async () => ({
+    ok: true,
+    headers: { get: () => new Date().toUTCString() },
+  });
+  await disabledResumeRuntime.handleVisibilityChange();
+  assert.deepEqual(disabledResumeRuntime.snapshotRuntimeState(), disabledResumeState, "disabled visibility resume should not advance game state");
+  assert.equal(disabledResumeRuntime.normalAutobuyElapsed, disabledResumeAutobuyElapsed, "disabled visibility resume should not advance automation timing");
+  assert.equal(disabledResumeRuntime.offlineReport, null, "disabled visibility resume should not show an offline report");
+  assert.ok(disabledResumeRuntime.offlineBaselineTimestamp > disabledResumeBaseline, "disabled visibility resume should rebase the baseline");
+  const disabledResumeSave = JSON.parse(
+    disabledResumeInstance.context.localStorage.getItem(disabledResumeRuntime.SAVE_KEY),
+  );
+  assert.equal(disabledResumeSave.state.offlineProgressEnabled, false, "disabled visibility resume should persist the setting");
+  assert.ok(disabledResumeSave.savedAt > disabledResumeBaseline, "disabled visibility resume should persist the rebased timestamp");
 
   const visibilityExceptionInstance = await loadRuntime(candidatePath);
   const visibilityExceptionRuntime = visibilityExceptionInstance.runtime;
@@ -255,7 +336,7 @@ async function runTimeFluxModuleRuntimeTest() {
   });
   visibilitySaveFailureInstance.context.window.fetch = () => pendingVisibilitySaveFailureClockRequest;
   visibilitySaveFailureRuntime.setOfflineBaseline(visibilitySaveFailureBaseline, 0);
-  visibilitySaveFailureDebug.state.offlineProgressEnabled = false;
+  visibilitySaveFailureDebug.state.offlineProgressEnabled = true;
   visibilitySaveFailureDebug.state.timeFlux = 0;
   const visibilitySaveFailureOriginalSetItem = visibilitySaveFailureInstance.context.localStorage.setItem;
   const visibilitySaveFailureOriginalRemoveItem = visibilitySaveFailureInstance.context.localStorage.removeItem;

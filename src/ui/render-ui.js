@@ -345,6 +345,7 @@ function updateUi() {
   syncFormControl(runtime.elements.numberFormatSelect, runtime.state.numberFormat);
   syncFormControl(runtime.elements.timeUnitSelect, runtime.state.timeUnit);
   syncFormControl(runtime.elements.topBarModeSelect, runtime.state.topBarMode);
+  syncFormControl(runtime.elements.offlineProgressToggle, runtime.state.offlineProgressEnabled);
   syncFormControl(runtime.elements.offlineTickInput, runtime.state.offlineTickCount);
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);
   runtime.elements.fpsCounter.hidden = !runtime.state.showFps;

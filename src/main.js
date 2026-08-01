@@ -767,6 +767,39 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
           : ""
         : runtime.currentSaveFingerprint?.() || "",
     };
+    if (!runtime.state.offlineProgressEnabled) {
+      offlineReport = null;
+      setOfflineBaseline(
+        localClockNow(),
+        serverClockAvailable() ? estimatedServerNowMs() : 0,
+      );
+      runtime.updateUi();
+      if (!runtime.saveGame("manual")) {
+        restoreOfflineTransaction(
+          transactionSnapshot,
+          new Error("offline progress baseline save failed"),
+          retryBaseline,
+        );
+        return null;
+      }
+      lastTime = currentFrameTime();
+      if (clockAnomaly) rebaseLocalClock();
+      return {
+        source,
+        skipped: true,
+        elapsedSeconds: elapsed,
+        effectiveElapsedSeconds: 0,
+        simulatedSeconds: 0,
+        processedTicks: 0,
+        requestedTicks: 0,
+        precisionReduced: false,
+        capped: false,
+        offlineProgressEnabled: false,
+        clockSource,
+        clockAnomaly,
+        rewardSuppressed: false,
+      };
+    }
     const before = offlineSnapshot();
     const usesLocalRewardCap = clockSource !== "server";
     const trustedElapsed = clockAnomaly
@@ -779,7 +812,6 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
     let requestedTicks = 0;
     let precisionReduced = false;
 
-    runtime.state.offlineProgressEnabled = true;
     if (!clockAnomaly) {
       const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
       simulatedSeconds = trustedElapsed;
@@ -819,7 +851,7 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
       requestedTicks,
       precisionReduced,
       capped: effectiveElapsedSeconds + 1e-9 < elapsed,
-      offlineProgressEnabled: true,
+      offlineProgressEnabled: runtime.state.offlineProgressEnabled,
       clockSource,
       clockAnomaly,
       rewardSuppressed: clockAnomaly,
@@ -1224,7 +1256,7 @@ function renderGameToText() {
       gainLevel: runtime.state.timeFluxGainLevel,
       speed: runtime.state.timeFluxSpeed,
       customSpeed: runtime.state.timeFluxCustomSpeed,
-      offlineProgressEnabled: true,
+      offlineProgressEnabled: runtime.state.offlineProgressEnabled,
       offlineTickCount: runtime.state.offlineTickCount,
       report: offlineReport,
     },

@@ -64,7 +64,15 @@ function applySetting(key, value) {
   if (key === "numberFormat") runtime.state.numberFormat = runtime.normalizeChoice(value, ["compact", "scientific", "detailed"], "compact");
   if (key === "timeUnit") runtime.state.timeUnit = runtime.normalizeChoice(value, ["auto", "seconds", "milliseconds"], "auto");
   if (key === "topBarMode") runtime.state.topBarMode = runtime.normalizeChoice(value, ["news", "resources", "progress", "blank", "hidden"], "news");
-  if (key === "offlineProgressEnabled") runtime.state.offlineProgressEnabled = true;
+  if (key === "offlineProgressEnabled") {
+    runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(value, true);
+    runtime.offlineReport = null;
+    runtime.invalidateVisibilityResume?.();
+    runtime.setOfflineBaseline?.(
+      runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
+      runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
+    );
+  }
   if (key === "offlineTickCount") runtime.state.offlineTickCount = runtime.clampOfflineTickCount(value);
   if (key === "showFloatingText" && !value) runtime.state.floatingTexts = [];
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
@@ -126,6 +134,10 @@ function bindEvents() {
   runtime.elements.offlineTickInput.addEventListener("change", () => applySetting(
     "offlineTickCount",
     runtime.elements.offlineTickInput.value,
+  ));
+  runtime.elements.offlineProgressToggle.addEventListener("change", () => applySetting(
+    "offlineProgressEnabled",
+    runtime.elements.offlineProgressToggle.checked,
   ));
   runtime.elements.offlineReportClose.addEventListener("click", () => {
     runtime.offlineReport = null;

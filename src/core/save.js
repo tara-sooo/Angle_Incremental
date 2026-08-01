@@ -691,7 +691,7 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.fastestInfinityTime = runtime.sanitizeNumber(data.fastestInfinityTime, 0);
   runtime.state.fastestInfinityRealTime = runtime.sanitizeNumber(data.fastestInfinityRealTime, 0);
   runtime.state.lastInfinityRuns = runtime.sanitizeInfinityRunRecords(data.lastInfinityRuns);
-  runtime.state.offlineProgressEnabled = true;
+  runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(data.offlineProgressEnabled, true);
   runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
   runtime.state.timeFluxCapacityLevel = dormantTimeFluxValue(data.timeFluxCapacityLevel, 0);
   runtime.state.timeFluxGainLevel = dormantTimeFluxValue(data.timeFluxGainLevel, 0);
@@ -825,7 +825,6 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
 }
 
 function serializeSaveData() {
-  runtime.state.offlineProgressEnabled = true;
   runtime.normalizeInfinityPointState();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
   runtime.state.achievementMaskHigh = ((Number(runtime.state.achievementMaskHigh) || 0) >>> 0);
