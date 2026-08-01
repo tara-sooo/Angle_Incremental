@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "check:version": "node tests/version-consistency.mjs"
+  },
   "devDependencies": {
     "playwright": "^1.61.1"
   }

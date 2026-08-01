@@ -7,6 +7,7 @@ import { chromium } from "playwright";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reportPath = path.join(root, "browser-smoke-report.json");
+const EXPECTED_ASSET_VERSION = JSON.parse(await readFile(path.join(root, "version.json"), "utf8")).appVersion;
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -14,7 +15,6 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.10.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -123,8 +123,8 @@ try {
       canvas: modal?.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.10.0 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.10.0 アップデート", "the update modal should show the current Japanese version");
+  assert.equal(updateModal.visible, true, "the current-version update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, `${EXPECTED_ASSET_VERSION} アップデート`, "the update modal should show the current Japanese version");
   assert.match(updateModal.summary, /Time Flux/);
   assert.match(updateModal.summary, /IU14-1/);
   assert.match(updateModal.canvas, /Tower Challenge/);
@@ -1421,7 +1421,7 @@ try {
       timeFluxQuickBar: Boolean(document.querySelector("#timeFluxQuickBar")),
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
-    assert.equal(mobileStartup.updateTitle, "0.10.0 アップデート", "mobile startup should use the release version");
+    assert.equal(mobileStartup.updateTitle, `${EXPECTED_ASSET_VERSION} アップデート`, "mobile startup should use the release version");
     assert.equal(mobileStartup.tabCount, 8, "mobile startup should expose the active main tabs");
     assert.equal(mobileStartup.timeFluxTab, false, "mobile startup should omit the dormant Time Flux tab");
     assert.equal(mobileStartup.timeFluxPanel, false, "mobile startup should omit the dormant Time Flux panel");
