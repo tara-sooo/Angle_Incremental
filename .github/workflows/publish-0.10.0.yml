@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  pages: read
 
 jobs:
   publish:
@@ -71,10 +72,42 @@ jobs:
           git checkout -B release/0.10.0 origin/release/0.10.0
           printf 'tag=v0.10.0\nrelease_url=%s\ntarget=6e8d3ca81e437d4b30e5fe8387cc4f406438d6fc\n' "$release_url" > .release-0.10.0-published
           git add .release-0.10.0-published
-          if git diff --cached --quiet; then
-            exit 0
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Record 0.10.0 publication verification"
+            git push origin HEAD:release/0.10.0
           fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Record 0.10.0 publication verification"
-          git push origin HEAD:release/0.10.0
+
+      - name: Verify GitHub Pages deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pages_json="$(gh api "repos/$GITHUB_REPOSITORY/pages" 2>/dev/null || true)"
+          git fetch origin release/0.10.0
+          git checkout -B release/0.10.0 origin/release/0.10.0
+          if [ -z "$pages_json" ]; then
+            printf 'pages_configured=false\n' > .release-0.10.0-live-check
+          else
+            page_url="$(printf '%s' "$pages_json" | jq -r '.html_url // empty')"
+            page_status="$(printf '%s' "$pages_json" | jq -r '.status // empty')"
+            http_status=""
+            live_version=""
+            for attempt in $(seq 1 12); do
+              http_status="$(curl -L -sS -o "$RUNNER_TEMP/live-version.json" -w '%{http_code}' "${page_url%/}/version.json?release=0.10.0" || true)"
+              live_version="$(jq -r '.appVersion // empty' "$RUNNER_TEMP/live-version.json" 2>/dev/null || true)"
+              if [ "$http_status" = "200" ] && [ "$live_version" = "0.10.0" ]; then
+                break
+              fi
+              sleep 5
+            done
+            printf 'pages_configured=true\npage_url=%s\npage_status=%s\nhttp_status=%s\napp_version=%s\n' \
+              "$page_url" "$page_status" "$http_status" "$live_version" > .release-0.10.0-live-check
+          fi
+          git add .release-0.10.0-live-check
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Record 0.10.0 live deployment check"
+            git push origin HEAD:release/0.10.0
+          fi
