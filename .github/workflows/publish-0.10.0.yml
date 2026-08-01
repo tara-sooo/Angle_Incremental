@@ -1,0 +1,63 @@
+name: Publish 0.10.0
+
+on:
+  push:
+    branches:
+      - release/0.10.0
+    paths:
+      - .github/workflows/publish-0.10.0.yml
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out released main commit
+        uses: actions/checkout@v4
+        with:
+          ref: 6e8d3ca81e437d4b30e5fe8387cc4f406438d6fc
+          fetch-depth: 0
+
+      - name: Create annotated v0.10.0 tag
+        run: |
+          if git rev-parse --verify --quiet refs/tags/v0.10.0; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a v0.10.0 6e8d3ca81e437d4b30e5fe8387cc4f406438d6fc -m "Angle Incremental 0.10.0"
+          git push origin refs/tags/v0.10.0
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.10.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            exit 0
+          fi
+          cat > "$RUNNER_TEMP/release-notes.md" <<'EOF'
+          ## Angle Incremental 0.10.0
+
+          ### 主な変更
+
+          - Time Fluxをプレイヤー向け機能とUIから一時的に削除しました。旧セーブの関連値は将来の再導入に備えて保持し、離席時間は通常のオフライン進行として処理します。
+          - Infinite Angle／Tower進行に対応する実績32〜37を追加し、32件を超える解除状態を安全に保存できるようにしました。
+          - Infinity Upgrade 14-1を追加し、IU11-2のInfinity回数ハードキャップを10,000から30,000へ延長できるようにしました。
+          - 「頂点通過ごとの増加」をスコアと同じ数値表記設定へ統一しました。
+          - TC1・TC2報酬をTower階層に応じてスケーリングさせ、TC2の目標を1e1555 Scoreへ変更しました。
+
+          ### 信頼性と互換性
+
+          - 複数タブ間のセーブ競合検出、ロード失敗後のチェックポイント復旧、自動画質調整を改善しました。
+          - `SAVE_VERSION`は10のままです。既存v10セーブ、休眠中のTime Flux値、実績・IU・Tower／TC状態、チェックポイント、セーブコード、復旧、Undoとの互換性を維持します。
+          - 構文検査、ESM回帰テスト、デスクトップ／モバイルのブラウザスモーク、性能スモークを通過しています。
+
+          実装範囲: #70, #71, #72, #73, #74
+          EOF
+          gh release create v0.10.0 \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Angle Incremental 0.10.0" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
