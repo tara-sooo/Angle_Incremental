@@ -61,3 +61,20 @@ jobs:
             --verify-tag \
             --title "Angle Incremental 0.10.0" \
             --notes-file "$RUNNER_TEMP/release-notes.md"
+
+      - name: Verify publication and record marker
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_url="$(gh release view v0.10.0 --repo "$GITHUB_REPOSITORY" --json url --jq .url)"
+          git fetch origin release/0.10.0
+          git checkout -B release/0.10.0 origin/release/0.10.0
+          printf 'tag=v0.10.0\nrelease_url=%s\ntarget=6e8d3ca81e437d4b30e5fe8387cc4f406438d6fc\n' "$release_url" > .release-0.10.0-published
+          git add .release-0.10.0-published
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Record 0.10.0 publication verification"
+          git push origin HEAD:release/0.10.0
