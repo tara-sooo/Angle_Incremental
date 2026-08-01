@@ -40,8 +40,23 @@ async function runVersionConsistencyModuleRuntimeTest() {
   };
   const missingJavaScriptIssues = checker.collectVersionConsistencyIssues(missingJavaScriptSources);
   assert.ok(
-    missingJavaScriptIssues.some((entry) => entry.label === "index.html main.js cache buster" && entry.actual === "<missing>"),
+    missingJavaScriptIssues.some((entry) => entry.label.includes("src/main.js") && entry.actual === "<missing>"),
     "a missing JavaScript cache buster should be reported",
+  );
+
+  const missingImportMapJavaScriptSources = {
+    ...sources,
+    index: sources.index.replace(
+      `./src/runtime/shared.js?v=${expectedVersion}`,
+      "./src/runtime/shared.js",
+    ),
+  };
+  const missingImportMapJavaScriptIssues = checker.collectVersionConsistencyIssues(missingImportMapJavaScriptSources);
+  assert.ok(
+    missingImportMapJavaScriptIssues.some(
+      (entry) => entry.label.includes("src/runtime/shared.js") && entry.actual === "<missing>",
+    ),
+    "a missing non-main JavaScript cache buster should be reported",
   );
 
   const missingJapaneseTitleSources = {

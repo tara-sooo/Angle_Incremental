@@ -81,7 +81,20 @@ function extractHtmlUpdateTitle(indexSource) {
 
 function extractCacheVersions(source, pattern) {
   if (typeof source !== "string") return [];
-  return [...source.matchAll(pattern)].map((match) => ({ path: match[1], version: match[2] }));
+  return [...source.matchAll(pattern)].map((match) => ({ path: match[1], version: match[2] || null }));
+}
+
+function extractJavaScriptCacheVersions(indexSource) {
+  return [
+    ...extractCacheVersions(
+      indexSource,
+      /:\s*["']([^"']+\.js)(?:\?v=([^"'&\s]+))?["']/g,
+    ),
+    ...extractCacheVersions(
+      indexSource,
+      /\bsrc\s*=\s*["']([^"']+\.js)(?:\?v=([^"'&\s]+))?["']/g,
+    ),
+  ];
 }
 
 export function collectVersionConsistencyIssues(sources) {
@@ -104,10 +117,7 @@ export function collectVersionConsistencyIssues(sources) {
     });
   }
 
-  const jsVersions = extractCacheVersions(
-    sources.index,
-    /["']([^"']+\.js)\?v=([^"'&\s]+)["']/g,
-  );
+  const jsVersions = extractJavaScriptCacheVersions(sources.index);
   if (jsVersions.length === 0) {
     issues.push(issue("index.html JavaScript cache buster", expected, null));
   } else {
