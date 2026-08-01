@@ -28,7 +28,7 @@ function createAchievementRows() {
 }
 
 function updateAchievementRows() {
-  const signature = `${runtime.state.achievementMask}|${runtime.state.language}`;
+  const signature = `${runtime.state.achievementMask}|${runtime.state.achievementMaskHigh}|${runtime.state.language}`;
   if (signature === lastAchievementSignature) return;
   lastAchievementSignature = signature;
   const language = runtime.TEXT[runtime.state.language] ? runtime.state.language : "ja";

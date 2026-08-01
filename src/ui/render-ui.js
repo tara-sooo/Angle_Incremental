@@ -5,6 +5,7 @@ import { runtime, expose } from "../runtime/shared.js";
 let renderedRecoveryRevision = -1;
 let renderedRecoveryLanguage = "";
 let renderedRecoveryNumberFormat = "";
+let renderedLoadRecoveryMode = false;
 
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
@@ -84,6 +85,16 @@ function countBits(value) {
   return count;
 }
 
+function countAchievementBits(state) {
+  let count = 0;
+  for (let id = 1; id <= runtime.ACHIEVEMENT_COUNT; id += 1) {
+    const mask = id <= 31 ? state.achievementMask : state.achievementMaskHigh;
+    const bit = 1 << (id <= 31 ? id - 1 : id - 32);
+    if ((((Number(mask) || 0) >>> 0) & bit) !== 0) count += 1;
+  }
+  return count;
+}
+
 function recoveryStateSummary(entry) {
   const state = entry?.state || {};
   const infinityPointsLog10 = runtime.sanitizeLog10(
@@ -94,7 +105,7 @@ function recoveryStateSummary(entry) {
     `${runtime.t("recoveryInfinity")}: ${runtime.formatUiNumber(state.infinityCount || 0)}`,
     `${runtime.t("recoveryIp")}: ${runtime.formatUiLogNumber(infinityPointsLog10)}`,
     `${runtime.t("recoveryChallenges")}: ${countBits(state.completedChallenges)}/${runtime.INFINITY_CHALLENGE_COUNT}`,
-    `${runtime.t("recoveryAchievements")}: ${countBits(state.achievementMask)}/${runtime.ACHIEVEMENT_COUNT}`,
+    `${runtime.t("recoveryAchievements")}: ${countAchievementBits(state)}/${runtime.ACHIEVEMENT_COUNT}`,
     `${runtime.t("recoveryIa")}: ${state.infiniteAngleUnlocked ? runtime.t("recoveryUnlocked") : runtime.t("recoveryLocked")}`,
     `${runtime.t("recoveryTower")}: ${Math.max(0, Math.floor(Number(state.towerFloor) || 0))}`,
   ].join(" · ");
@@ -109,16 +120,37 @@ function updateSaveRecoveryUi() {
     && currentRevision === renderedRecoveryRevision
     && renderedRecoveryLanguage === runtime.state.language
     && renderedRecoveryNumberFormat === runtime.state.numberFormat
+    && renderedLoadRecoveryMode === Boolean(runtime.loadRecoveryMode)
   ) return;
   const recovery = runtime.recoveryEntries();
   elements.preImportBackupStatus.textContent = recovery.preImport
     ? `${runtime.t("preImportBackupAvailable")} ${formatRecoveryTimestamp(recovery.preImport.backedUpAt)}`
     : runtime.t("noPreImportBackup");
+  if (elements.loadFailureStatus) {
+    const failure = recovery.loadFailure;
+    if (failure) {
+      const stageText = runtime.t(failure.stage === "offline" ? "loadFailureOffline" : "loadFailureApply");
+      const detail = failure.errorMessage ? `: ${failure.errorMessage}` : "";
+      elements.loadFailureStatus.textContent = `${runtime.t("loadFailureDetected")} ${stageText}${detail}`;
+    } else {
+      elements.loadFailureStatus.textContent = runtime.loadRecoveryMode
+        ? runtime.t("loadRecoveryRequired")
+        : "";
+    }
+  }
+  if (elements.quarantineStatus) {
+    elements.quarantineStatus.textContent = recovery.quarantine
+      ? `${runtime.t("quarantineAvailable")} ${formatRecoveryTimestamp(recovery.quarantine.quarantinedAt)}`
+      : "";
+  }
+  if (elements.retryLoadButton) elements.retryLoadButton.hidden = !runtime.loadRecoveryMode;
+  if (elements.restoreQuarantineButton) elements.restoreQuarantineButton.hidden = !recovery.quarantine;
   if (elements.restorePreImportButton) elements.restorePreImportButton.hidden = !recovery.preImport;
   if (elements.restoreUndoButton) elements.restoreUndoButton.hidden = !recovery.undo;
   renderedRecoveryRevision = currentRevision === null ? renderedRecoveryRevision : currentRevision;
   renderedRecoveryLanguage = runtime.state.language;
   renderedRecoveryNumberFormat = runtime.state.numberFormat;
+  renderedLoadRecoveryMode = Boolean(runtime.loadRecoveryMode);
   clearElement(elements.saveCheckpointList);
   if (recovery.checkpoints.length === 0) {
     elements.saveCheckpointList.textContent = runtime.t("noCheckpoints");
@@ -154,6 +186,13 @@ function canSpend(amount) {
   return canSpendLog(runtime.log10Value(amount));
 }
 
+function formatVertexGainIncrease(log10Value) {
+  if (typeof log10Value !== "number" || Number.isNaN(log10Value) || log10Value === -Infinity) return "0";
+  if (log10Value === Infinity || log10Value === Number.MAX_VALUE) return "∞";
+  if (log10Value < 3) return runtime.formatSmallDecimal(runtime.valueFromLog10(log10Value));
+  return runtime.formatUiLogNumber(log10Value);
+}
+
 function updateUi() {
   if (runtime.offlineProcessing) return;
   const currentCostLogs = runtime.costLogs();
@@ -165,10 +204,7 @@ function updateUi() {
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());
   const vertexGainIncreaseLog10 = runtime.vertexGainIncreaseLog10();
-  const vertexGainIncreaseText = vertexGainIncreaseLog10 > 308
-    ? runtime.formatUiLogNumber(vertexGainIncreaseLog10)
-    : runtime.formatSmallDecimal(runtime.valueFromLog10(vertexGainIncreaseLog10));
-  runtime.elements.vertexGainValue.textContent = `+${vertexGainIncreaseText}`;
+  runtime.elements.vertexGainValue.textContent = `+${formatVertexGainIncrease(vertexGainIncreaseLog10)}`;
   runtime.elements.lapValue.textContent = runtime.formatDuration(runtime.lapDuration());
   runtime.elements.lapSpeedValue.textContent = runtime.isLapSpeedSoftcapped()
     ? `${formatMultiplierLog(runtime.effectiveLapSpeedLog10())} ${runtime.t("lapSpeedSoftcapped")} / raw ${formatMultiplierLog(runtime.rawLapSpeedLog10())}`
@@ -204,6 +240,8 @@ function updateUi() {
 
   runtime.elements.coreBoostCount.textContent = String(runtime.state.coreBoostCount);
   runtime.elements.coreBoostRequirement.textContent = runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10());
+  runtime.elements.coreBoostRequirementGrowthPowerRaw.textContent = `^${runtime.coreBoostRequirementRawGrowthPower().toFixed(3)}`;
+  runtime.elements.coreBoostRequirementGrowthPower.textContent = `^${runtime.coreBoostRequirementGrowthPower().toFixed(3)}`;
   const nextCoreBoost = runtime.nextCoreBoostValues();
   runtime.elements.coreBoostGainBoost.textContent = formatMultiplierPreview(runtime.coreBoostGainIncreaseMultiplier(), nextCoreBoost.gainMultiplier);
   runtime.elements.coreBoostExponent.textContent = formatExponentPreview(runtime.coreBoostGainExponent(), nextCoreBoost.gainExponent);
@@ -270,6 +308,12 @@ function updateUi() {
   runtime.elements.towerFloorHeading.textContent = `Floor ${currentTowerFloor}`;
   runtime.elements.towerFloorValue.textContent = String(currentTowerFloor);
   runtime.elements.towerScoreExponentValue.textContent = `^${runtime.towerScoreExponent().toFixed(2)}`;
+  const towerChallenge1ScorePowerBase = runtime.hasInfinityUpgrade("13-1") ? 0.5 : runtime.INFINITE_ANGLE_SCORE_POWER;
+  const towerChallenge1ScorePowerBonus = runtime.towerChallenge1InfinityScorePowerBonus();
+  const towerChallenge1ScorePowerTotal = runtime.infiniteAngleScorePower();
+  runtime.elements.towerChallenge1ScorePowerBase.textContent = `^${towerChallenge1ScorePowerBase.toFixed(3)}`;
+  runtime.elements.towerChallenge1ScorePowerBonus.textContent = `+^${towerChallenge1ScorePowerBonus.toFixed(3)}`;
+  runtime.elements.towerChallenge1ScorePowerTotal.textContent = `^${towerChallenge1ScorePowerTotal.toFixed(3)}`;
   runtime.elements.towerNextCost.textContent = `${runtime.formatUiLogNumber(nextTowerCostLog10)} IP`;
   runtime.elements.towerGateStatus.textContent = !towerGateReady
     ? runtime.t("towerNeedChallenge").replace("{index}", String(towerGate))
@@ -286,7 +330,7 @@ function updateUi() {
 
   runtime.updateAutomationUi();
   runtime.updateStatisticsUi();
-  runtime.updateTimeFluxUi();
+  runtime.updateOfflineReportUi();
 
   const unlockedAchievements = runtime.achievementCount();
   runtime.elements.achievementTabState.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT}`;
@@ -301,7 +345,7 @@ function updateUi() {
   syncFormControl(runtime.elements.numberFormatSelect, runtime.state.numberFormat);
   syncFormControl(runtime.elements.timeUnitSelect, runtime.state.timeUnit);
   syncFormControl(runtime.elements.topBarModeSelect, runtime.state.topBarMode);
-  syncFormControl(runtime.elements.timeFluxQuickBarToggle, runtime.state.showTimeFluxQuickBar);
+  syncFormControl(runtime.elements.offlineTickInput, runtime.state.offlineTickCount);
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);
   runtime.elements.fpsCounter.hidden = !runtime.state.showFps;
   if (runtime.state.showFps) runtime.elements.fpsCounter.textContent = `FPS ${Math.round(runtime.smoothedFps)}`;
@@ -381,6 +425,7 @@ expose("clearElement", () => clearElement, (value) => { clearElement = value; })
 expose("updateSaveRecoveryUi", () => updateSaveRecoveryUi, (value) => { updateSaveRecoveryUi = value; });
 expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
+expose("formatVertexGainIncrease", () => formatVertexGainIncrease, (value) => { formatVertexGainIncrease = value; });
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });
 expose("setSaveStatus", () => setSaveStatus, (value) => { setSaveStatus = value; });
 expose("gainExpressionConfig", () => gainExpressionConfig, (value) => { gainExpressionConfig = value; });

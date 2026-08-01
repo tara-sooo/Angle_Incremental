@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.9.0";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.10.0";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
@@ -64,7 +64,7 @@ function applySetting(key, value) {
   if (key === "numberFormat") runtime.state.numberFormat = runtime.normalizeChoice(value, ["compact", "scientific", "detailed"], "compact");
   if (key === "timeUnit") runtime.state.timeUnit = runtime.normalizeChoice(value, ["auto", "seconds", "milliseconds"], "auto");
   if (key === "topBarMode") runtime.state.topBarMode = runtime.normalizeChoice(value, ["news", "resources", "progress", "blank", "hidden"], "news");
-  if (key === "offlineProgressEnabled") runtime.state.offlineProgressEnabled = Boolean(value);
+  if (key === "offlineProgressEnabled") runtime.state.offlineProgressEnabled = true;
   if (key === "offlineTickCount") runtime.state.offlineTickCount = runtime.clampOfflineTickCount(value);
   if (key === "showFloatingText" && !value) runtime.state.floatingTexts = [];
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
@@ -106,13 +106,6 @@ function isEditableKeyboardTarget(target) {
   return isEditableElement(target) || isEditableElement(activeElement);
 }
 
-function applyTimeFluxCustomSpeedInput() {
-  const input = runtime.elements.timeFluxCustomSpeedInput;
-  if (!input) return;
-  input.dataset.customSpeedDirty = "false";
-  runtime.setTimeFluxCustomSpeed(input.value);
-}
-
 function bindEvents() {
   installNumericStabilityFixes();
   runtime.elements.speedUpgrade.addEventListener("click", runtime.buySpeed);
@@ -130,32 +123,10 @@ function bindEvents() {
   runtime.elements.infiniteAngleGainUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("gain"));
   runtime.elements.towerBuildButton.addEventListener("click", runtime.buildTower);
   runtime.elements.breakCapButton.addEventListener("click", runtime.breakInfiniteCap);
-  runtime.elements.timeFluxGainUpgrade.addEventListener("click", () => runtime.buyTimeFluxUpgrade("gain"));
-  runtime.elements.timeFluxCapacityUpgrade.addEventListener("click", () => runtime.buyTimeFluxUpgrade("capacity"));
-  runtime.elements.timeFluxSpeedButtons.forEach((button) => {
-    button.addEventListener("click", () => runtime.setTimeFluxSpeed(button.dataset.speed));
-  });
-  runtime.elements.timeFluxCustomSpeedButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      if (button === runtime.elements.timeFluxCustomSpeedApply) {
-        applyTimeFluxCustomSpeedInput();
-      } else {
-        runtime.setTimeFluxCustomSpeed(runtime.state.timeFluxCustomSpeed);
-      }
-    });
-  });
-  runtime.elements.timeFluxOfflineToggle.addEventListener("change", () => applySetting(
-    "offlineProgressEnabled",
-    runtime.elements.timeFluxOfflineToggle.checked,
-  ));
-  runtime.elements.timeFluxTickInput.addEventListener("change", () => applySetting(
+  runtime.elements.offlineTickInput.addEventListener("change", () => applySetting(
     "offlineTickCount",
-    runtime.elements.timeFluxTickInput.value,
+    runtime.elements.offlineTickInput.value,
   ));
-  runtime.elements.timeFluxCustomSpeedInput.addEventListener("input", () => {
-    runtime.elements.timeFluxCustomSpeedInput.dataset.customSpeedDirty = "true";
-    runtime.updateTimeFluxUi();
-  });
   runtime.elements.offlineReportClose.addEventListener("click", () => {
     runtime.offlineReport = null;
     runtime.updateUi();
@@ -192,13 +163,19 @@ function bindEvents() {
   runtime.elements.numberFormatSelect.addEventListener("change", () => applySetting("numberFormat", runtime.elements.numberFormatSelect.value));
   runtime.elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", runtime.elements.timeUnitSelect.value));
   runtime.elements.topBarModeSelect.addEventListener("change", () => applySetting("topBarMode", runtime.elements.topBarModeSelect.value));
-  runtime.elements.timeFluxQuickBarToggle.addEventListener("change", () => applySetting(
-    "showTimeFluxQuickBar",
-    runtime.elements.timeFluxQuickBarToggle.checked,
-  ));
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
+  if (runtime.elements.retryLoadButton) runtime.elements.retryLoadButton.addEventListener("click", () => {
+    runtime.retryLoad();
+    runtime.updateUi();
+    runtime.draw();
+  });
+  if (runtime.elements.restoreQuarantineButton) runtime.elements.restoreQuarantineButton.addEventListener("click", () => {
+    runtime.restoreQuarantineSave();
+    runtime.updateUi();
+    runtime.draw();
+  });
   if (runtime.elements.restorePreImportButton) runtime.elements.restorePreImportButton.addEventListener("click", runtime.restorePreImportSave);
   if (runtime.elements.restoreUndoButton) runtime.elements.restoreUndoButton.addEventListener("click", runtime.restoreUndoSave);
   if (runtime.elements.saveCheckpointList) runtime.elements.saveCheckpointList.addEventListener("click", (event) => {

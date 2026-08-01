@@ -61,6 +61,7 @@ function topBarSignature(mode) {
     runtime.state.activeChallenge,
     runtime.state.completedChallenges,
     runtime.state.achievementMask,
+    runtime.state.achievementMaskHigh,
   ].join("|");
 }
 

@@ -23,6 +23,54 @@ async function runTowerModuleRuntimeTest() {
   {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
+    debug.state.towerFloor = 3;
+    assert.equal(runtime.towerChallenge1InfinityScorePowerBonus(), 0, "uncleared TC1 should provide no Infinity Score exponent bonus");
+    debug.state.completedTowerChallenges = 1;
+    assert.equal(runtime.towerChallenge1InfinityScorePowerBonus(), 0, "TC1 should add no bonus at its unlock floor");
+    debug.state.towerFloor = 4;
+    assert.equal(runtime.towerChallenge1InfinityScorePowerBonus(), 0.077, "TC1 should add 0.077 at Floor 4");
+    debug.state.towerFloor = 5;
+    assert.equal(runtime.towerChallenge1InfinityScorePowerBonus(), 0.154, "TC1 should add 0.154 at Floor 5");
+    assert.equal(runtime.towerScoreExponent(), 1.25, "TC1 reward should not alter Tower's normal score exponent");
+    assert.ok(Math.abs(runtime.infiniteAngleScorePower() - 0.454) < 1e-12, "TC1 bonus should apply to the Infinity Score exponent");
+    const iu13 = runtime.infinityUpgradeById("13-1");
+    debug.state.infinityUpgradeMask = 1 << iu13.bit;
+    assert.ok(Math.abs(runtime.infiniteAngleScorePower() - 0.654) < 1e-12, "TC1 bonus should stack on IU13-1's base exponent");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    debug.state.towerFloor = 22;
+    debug.state.completedTowerChallenges = 0;
+    assert.equal(runtime.coreBoostRequirementRawGrowthPower(), 2, "uncleared TC2 should keep the base requirement growth power");
+    assert.equal(runtime.coreBoostRequirementGrowthPower(), 2, "uncleared TC2 should not apply its reward");
+    debug.state.completedTowerChallenges = 2;
+    const expectedPowers = new Map([
+      [5, 2],
+      [6, 1.97],
+      [7, 1.94],
+      [21, 1.52],
+      [22, 1.49],
+    ]);
+    expectedPowers.forEach((expected, floor) => {
+      debug.state.towerFloor = floor;
+      assert.equal(runtime.coreBoostRequirementRawGrowthPower(), expected, `Floor ${floor} should use the specified raw TC2 growth power`);
+    });
+    debug.state.towerFloor = 21;
+    assert.equal(runtime.coreBoostRequirementGrowthPower(), 1.52, "the TC2 soft cap should not affect raw powers at or above 1.50");
+    debug.state.towerFloor = 22;
+    const floor22EffectivePower = runtime.coreBoostRequirementGrowthPower();
+    assert.ok(floor22EffectivePower > 1.49 && floor22EffectivePower < 1.5, "Floor 22 should enter the soft-cap region without freezing at 1.50");
+    debug.state.towerFloor = 23;
+    assert.ok(runtime.coreBoostRequirementGrowthPower() < floor22EffectivePower, "the effective power should continue improving after Floor 22");
+    debug.state.coreBoostCount = 1;
+    assert.equal(runtime.coreBoostRequirementLog10(), runtime.coreBoostRequirementGrowthPower() * 20, "Core Boost requirements should use the shared effective growth power");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
     const ic1 = runtime.infinityUpgradeById("4-1");
     debug.state.infinityUpgradeMask = 1 << ic1.bit;
     debug.state.infinityCount = 1;
@@ -120,9 +168,9 @@ async function runTowerModuleRuntimeTest() {
     debug.state.scoreLog10 = 20;
     debug.state.score = 1e20;
     assert.equal(runtime.canCoreBoost(), false, "TC2 should seal Core Boost");
-    debug.state.scoreLog10 = 1300;
+    debug.state.scoreLog10 = 1555;
     debug.state.score = Number.MAX_VALUE;
-    assert.equal(runtime.towerChallengeCanComplete(), true, "TC2 should complete at 1e1300 Score");
+    assert.equal(runtime.towerChallengeCanComplete(), true, "TC2 should complete at 1e1555 Score");
     assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC2 should use the normal Infinity completion path");
     assert.equal(debug.state.completedTowerChallenges & 2, 2, "TC2 completion should persist its reward flag");
     assert.equal(debug.state.activeTowerChallenge, 0, "TC2 should stop after completion");
@@ -131,7 +179,7 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(runtime.toggleTowerChallenge(2), true, "a cleared TC2 should be replayable");
     assert.equal(debug.state.activeTowerChallenge, 2, "TC2 replay should become active");
     runtime.advanceOnlineTime(1);
-    debug.state.scoreLog10 = 1300;
+    debug.state.scoreLog10 = 1555;
     debug.state.score = Number.MAX_VALUE;
     assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC2 replay should complete at its target");
     assert.equal(debug.state.completedTowerChallenges & 2, 2, "TC2 replay should preserve its reward flag");
@@ -206,6 +254,8 @@ async function runTowerModuleRuntimeTest() {
     assert.deepEqual(Array.from(challengeReloaded.debug.state.fastestTowerChallengeTimes), [9, 10, 11, 12], "TC fastest times should survive a local save");
     assert.equal(challengeReloaded.debug.state.scoreLog10, 123, "valid replay progress should survive a local save");
     assert.equal(challengeReloaded.runtime.canCoreBoost(), false, "TC2 restrictions should survive a local save");
+    assert.equal(challengeReloaded.runtime.coreBoostRequirementRawGrowthPower(), 2, "TC2 reward scaling should use the saved Tower floor");
+    assert.equal(challengeReloaded.runtime.coreBoostRequirementGrowthPower(), 2, "TC2 reward scaling should survive a local save");
 
     const invalid = await loadRuntime(candidatePath);
     invalid.debug.state.towerFloor = 0;

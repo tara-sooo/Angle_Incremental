@@ -15,14 +15,13 @@ import "./ui/render-challenges.js";
 import "./ui/render-infinity.js";
 import "./ui/render-achievements.js";
 import "./ui/render-automation.js";
-import "./ui/render-time-flux.js";
+import "./ui/render-offline-report.js";
 import "./ui/render-ui.js";
 import "./systems/angle.js";
 import "./systems/generation.js";
 import "./systems/core-boost.js";
 import "./systems/infinity.js";
 import "./systems/infinite-angle.js";
-import "./systems/time-flux.js";
 import "./ui/events.js";
 import "./systems/balance.js";
 
@@ -39,6 +38,12 @@ let activeStatisticsSubtab = "overview";
 let selectedInfinityUpgradeId = "1-1";
 let appliedLanguage = "";
 let smoothedFps = 0;
+let renderQualityLevel = "high";
+let renderQualityOverride = "";
+let renderCostEma = 0;
+let renderPressureFrames = 0;
+let renderRecoveryFrames = 0;
+let lastRenderedFrameAt = -Infinity;
 let offlineBaselineTimestamp = Date.now();
 let offlineBaselineServerTimestamp = 0;
 let offlineProcessing = false;
@@ -60,6 +65,12 @@ const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
 
+const RENDER_QUALITY_PROFILES = Object.freeze({
+  high: Object.freeze({ devicePixelRatio: 2, vertexLimit: 720, frameIntervalMs: 0 }),
+  balanced: Object.freeze({ devicePixelRatio: 1.5, vertexLimit: 360, frameIntervalMs: 1000 / 30 }),
+  low: Object.freeze({ devicePixelRatio: 1, vertexLimit: 180, frameIntervalMs: 1000 / 30 }),
+});
+
 const baseUpdateUi = runtime.updateUi;
 const baseSaveGame = runtime.saveGame;
 
@@ -80,13 +91,13 @@ function batchedUpdateUi(...args) {
   return baseUpdateUi(...args);
 }
 
-function batchedSaveGame(reason = "auto") {
+function batchedSaveGame(reason = "auto", options = {}) {
   if (simulationBatchActive()) {
     queueSimulationSave(reason);
     return true;
   }
   if (simulationFlushActive) simulationFlushSavePerformed = true;
-  return baseSaveGame(reason);
+  return baseSaveGame(reason, options);
 }
 
 runtime.updateUi = batchedUpdateUi;
@@ -124,6 +135,121 @@ function runSimulationBatch(callback) {
 function monotonicClockNow() {
   const performanceApi = window.performance;
   return performanceApi && typeof performanceApi.now === "function" ? performanceApi.now() : Date.now();
+}
+
+function renderQualityProfile() {
+  return RENDER_QUALITY_PROFILES[renderQualityOverride || renderQualityLevel] || RENDER_QUALITY_PROFILES.high;
+}
+
+function renderVertexLimit() {
+  return renderQualityProfile().vertexLimit;
+}
+
+function renderDevicePixelRatio() {
+  return Math.min(window.devicePixelRatio || 1, renderQualityProfile().devicePixelRatio);
+}
+
+function renderFrameIntervalMs() {
+  return renderQualityProfile().frameIntervalMs;
+}
+
+function resetRenderQualityCounters() {
+  renderCostEma = 0;
+  renderPressureFrames = 0;
+  renderRecoveryFrames = 0;
+  lastRenderedFrameAt = -Infinity;
+}
+
+function setRenderQualityLevel(level) {
+  if (!RENDER_QUALITY_PROFILES[level] || level === renderQualityLevel) return false;
+  renderQualityLevel = level;
+  resetRenderQualityCounters();
+  if (runtime.resizeCanvas) runtime.resizeCanvas();
+  if (runtime.resizeInfiniteAngleCanvas) runtime.resizeInfiniteAngleCanvas();
+  return true;
+}
+
+function observedFrameBudgetMs() {
+  return smoothedFps > 0 && Number.isFinite(smoothedFps) ? 1000 / smoothedFps : 1000 / 60;
+}
+
+function updateRenderQuality(renderCostMs, canvasRendered = true) {
+  if (!canvasRendered || renderQualityOverride) return;
+  const measuredCostMs = Number.isFinite(renderCostMs) ? Math.max(0, renderCostMs) : 0;
+  renderCostEma = renderCostEma === 0
+    ? measuredCostMs
+    : renderCostEma * 0.9 + measuredCostMs * 0.1;
+  const frameBudgetMs = Math.max(
+    observedFrameBudgetMs(),
+    renderFrameIntervalMs(),
+  );
+  const pressured = renderCostEma > frameBudgetMs;
+  if (pressured) {
+    renderPressureFrames += 1;
+    renderRecoveryFrames = 0;
+    if (renderPressureFrames >= 30) {
+      if (renderQualityLevel === "high") setRenderQualityLevel("balanced");
+      else if (renderQualityLevel === "balanced") setRenderQualityLevel("low");
+    }
+    return;
+  }
+  renderPressureFrames = 0;
+  if (renderCostEma < frameBudgetMs * 0.75) {
+    renderRecoveryFrames += 1;
+    if (renderRecoveryFrames >= 120) {
+      if (renderQualityLevel === "low") setRenderQualityLevel("balanced");
+      else if (renderQualityLevel === "balanced") setRenderQualityLevel("high");
+    }
+  } else {
+    renderRecoveryFrames = 0;
+  }
+}
+
+function shouldRenderFrame(now) {
+  const interval = renderFrameIntervalMs();
+  if (interval <= 0 || now - lastRenderedFrameAt >= interval) {
+    lastRenderedFrameAt = now;
+    return true;
+  }
+  return false;
+}
+
+function renderQualityState() {
+  const profile = renderQualityProfile();
+  return {
+    level: renderQualityOverride || renderQualityLevel,
+    automaticLevel: renderQualityLevel,
+    devicePixelRatio: profile.devicePixelRatio,
+    vertexLimit: profile.vertexLimit,
+    frameIntervalMs: profile.frameIntervalMs,
+    renderCostEma,
+  };
+}
+
+function setRenderQualityForTest(level) {
+  if (level === "auto") {
+    renderQualityOverride = "";
+    renderQualityLevel = "high";
+    resetRenderQualityCounters();
+    if (runtime.resizeCanvas) runtime.resizeCanvas();
+    if (runtime.resizeInfiniteAngleCanvas) runtime.resizeInfiniteAngleCanvas();
+    return true;
+  }
+  if (!RENDER_QUALITY_PROFILES[level]) return false;
+  renderQualityOverride = level;
+  renderQualityLevel = level;
+  resetRenderQualityCounters();
+  if (runtime.resizeCanvas) runtime.resizeCanvas();
+  if (runtime.resizeInfiniteAngleCanvas) runtime.resizeInfiniteAngleCanvas();
+  return true;
+}
+
+function updateRenderQualityForTest(renderCostMs, fps, canvasRendered = true) {
+  const previousFps = smoothedFps;
+  if (Number.isFinite(fps)) smoothedFps = fps;
+  updateRenderQuality(renderCostMs, canvasRendered);
+  smoothedFps = previousFps;
+  return renderQualityState();
 }
 
 function localClockNow() {
@@ -239,7 +365,10 @@ function offlineElapsedFromSave(savedAt, serverSavedAt) {
 
   if (serverClockAvailable() && recordedServerAt > 0) {
     const currentServerAt = estimatedServerNowMs();
-    if (currentServerAt < recordedServerAt - runtime.SERVER_CLOCK_BACKWARD_TOLERANCE_SECONDS * 1000) {
+    const elapsedMilliseconds = currentServerAt - recordedServerAt;
+    if (!Number.isFinite(currentServerAt)
+      || !Number.isFinite(elapsedMilliseconds)
+      || elapsedMilliseconds < -runtime.SERVER_CLOCK_BACKWARD_TOLERANCE_SECONDS * 1000) {
       return {
         elapsedSeconds: 0,
         clockSource: "server",
@@ -248,7 +377,7 @@ function offlineElapsedFromSave(savedAt, serverSavedAt) {
       };
     }
     return {
-      elapsedSeconds: Math.max(0, (currentServerAt - recordedServerAt) / 1000),
+      elapsedSeconds: Math.max(0, elapsedMilliseconds / 1000),
       clockSource: "server",
       clockAnomaly: false,
       legacyTimestampUsed: false,
@@ -264,8 +393,18 @@ function offlineElapsedFromSave(savedAt, serverSavedAt) {
     };
   }
 
+  const elapsedMilliseconds = currentLocalAt - localSavedAt;
+  if (!Number.isFinite(currentLocalAt) || !Number.isFinite(elapsedMilliseconds)) {
+    return {
+      elapsedSeconds: 0,
+      clockSource: serverClockAvailable() ? "legacy-local" : "local-fallback",
+      clockAnomaly: true,
+      legacyTimestampUsed: serverClockAvailable(),
+    };
+  }
+
   return {
-    elapsedSeconds: Math.max(0, (currentLocalAt - localSavedAt) / 1000),
+    elapsedSeconds: Math.max(0, elapsedMilliseconds / 1000),
     clockSource: serverClockAvailable() ? "legacy-local" : "local-fallback",
     clockAnomaly: false,
     legacyTimestampUsed: serverClockAvailable(),
@@ -468,7 +607,11 @@ function update(dt) {
   const estimatedCoreHits = vertexSteps > 0
     ? Math.ceil(vertexSteps / Math.max(3, vertices)) * runtime.coreVertexIndices().length
     : 0;
-  if (vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME || estimatedCoreHits > runtime.MAX_CORE_HITS_PER_FRAME) {
+  const useOfflineApproximation = offlineProcessing
+    && dt > runtime.OFFLINE_PROGRESS_APPROXIMATION_THRESHOLD_SECONDS_PER_TICK;
+  if (useOfflineApproximation
+    || vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME
+    || estimatedCoreHits > runtime.MAX_CORE_HITS_PER_FRAME) {
     if (runtime.processManyVertices(start, end)) return;
   } else {
     for (let vertex = start; vertex <= end; vertex += 1) {
@@ -488,8 +631,12 @@ function update(dt) {
 
 function runRealTimeMaintenance(realSeconds) {
   if (offlineProcessing || realSeconds <= 0) return;
-  autoSaveElapsed += realSeconds;
-  if (autoSaveElapsed >= 5) runtime.saveGame("auto");
+  if (runtime.loadRecoveryMode) {
+    autoSaveElapsed = 0;
+  } else {
+    autoSaveElapsed += realSeconds;
+    if (autoSaveElapsed >= 5) runtime.saveGame("auto");
+  }
 
   updateCheckElapsed += realSeconds;
   if (updateCheckElapsed >= runtime.UPDATE_CHECK_INTERVAL_SECONDS) {
@@ -504,13 +651,7 @@ function advanceOnlineTime(realSeconds) {
   if (realDt <= 0) return 0;
   runtime.state.totalRealPlayTime += realDt;
   runtime.state.currentInfinityRealTime += realDt;
-  const selectedSpeed = runtime.clampTimeFluxSpeed(runtime.state.timeFluxSpeed);
-  const requestedExtra = realDt * Math.max(0, selectedSpeed - 1);
-  const consumed = runtime.consumeTimeFlux(requestedExtra);
-  const gameSeconds = realDt + consumed;
-  if (consumed + 1e-12 < requestedExtra || (selectedSpeed > 1 && runtime.state.timeFlux <= 1e-12)) {
-    runtime.state.timeFluxSpeed = 1;
-  }
+  const gameSeconds = realDt;
 
   runSimulationBatch(() => {
     let remaining = gameSeconds;
@@ -534,78 +675,178 @@ function offlineSnapshot() {
   };
 }
 
-function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext = {}) {
-  const elapsed = Math.max(0, runtime.sanitizeNumber(elapsedSeconds, 0));
-  const clockAnomaly = Boolean(clockContext.clockAnomaly);
-  if (elapsed <= 0 && !clockAnomaly) return null;
-  const before = offlineSnapshot();
-  const trustedElapsed = clockAnomaly
-    ? 0
-    : Math.min(elapsed, runtime.OFFLINE_REWARD_MAX_SECONDS);
-  let simulatedSeconds = 0;
-  let processedTicks = 0;
-  let timeFluxGained = 0;
-  let capacityReached = false;
-  let requestedTicks = 0;
-  let precisionReduced = false;
+function offlineProgressNumericallySafe(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return false;
+  if (!Number.isFinite(runtime.state.totalPlayTime + seconds)) return false;
+  if (!Number.isFinite(runtime.state.currentInfinityRunTime + seconds)) return false;
+  if (!Number.isFinite(runtime.state.currentGenerationRunTime + seconds)) return false;
 
-  if (!clockAnomaly && runtime.state.offlineProgressEnabled) {
-    const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
-    const maximumSeconds = tickCount * runtime.OFFLINE_PROGRESS_MAX_SECONDS_PER_TICK;
-    simulatedSeconds = Math.min(trustedElapsed, maximumSeconds);
-    requestedTicks = Math.max(
-      1,
-      Math.min(tickCount, Math.ceil(simulatedSeconds / runtime.MAX_SIMULATION_STEP_SECONDS)),
-    );
-    processedTicks = Math.min(requestedTicks, runtime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS);
-    precisionReduced = processedTicks < requestedTicks;
-    const tickSeconds = simulatedSeconds / processedTicks;
-    offlineProcessing = true;
-    try {
-      for (let tick = 0; tick < processedTicks; tick += 1) update(tickSeconds);
-    } finally {
-      offlineProcessing = false;
-    }
-  } else if (!clockAnomaly) {
-    const theoreticalGain = runtime.timeFluxGainPerHour() * trustedElapsed / 3600;
-    timeFluxGained = runtime.addTimeFlux(theoreticalGain);
-    capacityReached = timeFluxGained + 1e-9 < theoreticalGain;
+  const lapDuration = runtime.lapDuration();
+  const vertices = runtime.effectiveVertexCount();
+  const progressDelta = lapDuration > 0 && vertices > 0
+    ? seconds / lapDuration * vertices
+    : NaN;
+  if (!Number.isFinite(progressDelta)
+    || !Number.isFinite(runtime.state.totalVertexProgress + progressDelta)) return false;
+
+  if (runtime.state.infiniteAngleUnlocked) {
+    const infiniteLapDuration = runtime.infiniteAngleLapDuration();
+    const infiniteVertices = runtime.infiniteAngleVertexCount();
+    const infiniteProgressDelta = infiniteLapDuration > 0 && infiniteVertices > 0
+      ? seconds / infiniteLapDuration * infiniteVertices
+      : NaN;
+    if (!Number.isFinite(infiniteProgressDelta)
+      || !Number.isFinite(runtime.state.infiniteAngleTotalVertexProgress + infiniteProgressDelta)) return false;
   }
 
-  const after = offlineSnapshot();
-  const effectiveElapsedSeconds = clockAnomaly
-    ? 0
-    : runtime.state.offlineProgressEnabled
-      ? simulatedSeconds
-      : trustedElapsed;
-  offlineReport = {
-    source,
-    elapsedSeconds: elapsed,
-    effectiveElapsedSeconds,
-    simulatedSeconds,
-    processedTicks,
-    requestedTicks,
-    precisionReduced,
-    capped: effectiveElapsedSeconds + 1e-9 < elapsed,
-    offlineProgressEnabled: runtime.state.offlineProgressEnabled,
-    timeFluxGained,
-    capacityReached,
-    clockSource: clockContext.clockSource || (serverClockAvailable() ? "server" : "local-fallback"),
-    clockAnomaly,
-    rewardSuppressed: clockAnomaly,
-    legacyTimestampUsed: Boolean(clockContext.legacyTimestampUsed),
-    infinityCountBefore: before.infinityCount,
-    infinityCountAfter: after.infinityCount,
-    infinityPointsBeforeLog10: before.infinityPointsLog10,
-    infinityPointsAfterLog10: after.infinityPointsLog10,
-    infiniteScoreBeforeLog10: before.infiniteScoreLog10,
-    infiniteScoreAfterLog10: after.infiniteScoreLog10,
+  return true;
+}
+
+function snapshotOfflineTransaction() {
+  return {
+    state: runtime.snapshotRuntimeState(),
+    normalAutobuyElapsed,
+    autoSaveElapsed,
+    offlineBaselineTimestamp,
+    offlineBaselineServerTimestamp,
+    offlineReport,
+    lastTime,
   };
-  runtime.updateUi();
-  runtime.saveGame("manual");
-  lastTime = currentFrameTime();
-  if (clockAnomaly) rebaseLocalClock();
-  return offlineReport;
+}
+
+function restoreOfflineTransaction(snapshot, error, retryBaseline) {
+  try {
+    runtime.restoreRuntimeState(snapshot.state);
+  } catch (restoreError) {
+    // Recovery mode still prevents further writes when in-memory restoration fails.
+  }
+  normalAutobuyElapsed = snapshot.normalAutobuyElapsed;
+  offlineReport = snapshot.offlineReport;
+  offlineProcessing = false;
+  try {
+    setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
+  } catch (baselineError) {
+    offlineBaselineTimestamp = snapshot.offlineBaselineTimestamp;
+    offlineBaselineServerTimestamp = snapshot.offlineBaselineServerTimestamp;
+  }
+  autoSaveElapsed = 0;
+  lastTime = snapshot.lastTime;
+  try {
+    runtime.enterLoadRecovery("offline", error, null, retryBaseline);
+  } catch (recoveryError) {
+    // The save module sets recovery mode before reporting the diagnostic.
+  }
+  try {
+    runtime.updateUi();
+  } catch (updateError) {
+    // Recovery must not turn a handled save failure into an unhandled resume error.
+  }
+}
+
+function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext = {}) {
+  const transactionSnapshot = snapshotOfflineTransaction();
+  let retryBaseline = {
+    savedAt: transactionSnapshot.offlineBaselineTimestamp,
+    serverSavedAt: transactionSnapshot.offlineBaselineServerTimestamp,
+    saveFingerprint: "",
+  };
+  try {
+    const numericElapsed = runtime.sanitizeNumber(elapsedSeconds, NaN);
+    const invalidElapsed = !Number.isFinite(numericElapsed);
+    const elapsed = invalidElapsed ? 0 : Math.max(0, numericElapsed);
+    const clockSource = clockContext.clockSource
+      || (serverClockAvailable() ? "server" : "local-fallback");
+    let clockAnomaly = Boolean(clockContext.clockAnomaly) || invalidElapsed;
+    if (elapsed <= 0 && !clockAnomaly) return null;
+    retryBaseline = {
+      savedAt: clockContext.retryBaseline?.savedAt ?? transactionSnapshot.offlineBaselineTimestamp,
+      serverSavedAt: clockContext.retryBaseline?.serverSavedAt ?? transactionSnapshot.offlineBaselineServerTimestamp,
+      saveFingerprint: clockContext.retryBaseline
+        ? typeof clockContext.retryBaseline.saveFingerprint === "string"
+          ? clockContext.retryBaseline.saveFingerprint
+          : ""
+        : runtime.currentSaveFingerprint?.() || "",
+    };
+    const before = offlineSnapshot();
+    const usesLocalRewardCap = clockSource !== "server";
+    const trustedElapsed = clockAnomaly
+      ? 0
+      : usesLocalRewardCap
+        ? Math.min(elapsed, runtime.OFFLINE_LOCAL_REWARD_MAX_SECONDS)
+        : elapsed;
+    let simulatedSeconds = 0;
+    let processedTicks = 0;
+    let requestedTicks = 0;
+    let precisionReduced = false;
+
+    runtime.state.offlineProgressEnabled = true;
+    if (!clockAnomaly) {
+      const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
+      simulatedSeconds = trustedElapsed;
+      requestedTicks = Math.max(
+        1,
+        Math.min(tickCount, Math.ceil(simulatedSeconds / runtime.MAX_SIMULATION_STEP_SECONDS)),
+      );
+      processedTicks = Math.min(requestedTicks, runtime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS);
+      precisionReduced = processedTicks < requestedTicks;
+      if (!offlineProgressNumericallySafe(simulatedSeconds)) {
+        clockAnomaly = true;
+        simulatedSeconds = 0;
+        requestedTicks = 0;
+        processedTicks = 0;
+        precisionReduced = false;
+      } else {
+        const tickSeconds = simulatedSeconds / processedTicks;
+        offlineProcessing = true;
+        try {
+          for (let tick = 0; tick < processedTicks; tick += 1) update(tickSeconds);
+        } finally {
+          offlineProcessing = false;
+        }
+      }
+    }
+
+    const after = offlineSnapshot();
+    const effectiveElapsedSeconds = clockAnomaly
+      ? 0
+      : simulatedSeconds;
+    offlineReport = {
+      source,
+      elapsedSeconds: elapsed,
+      effectiveElapsedSeconds,
+      simulatedSeconds,
+      processedTicks,
+      requestedTicks,
+      precisionReduced,
+      capped: effectiveElapsedSeconds + 1e-9 < elapsed,
+      offlineProgressEnabled: true,
+      clockSource,
+      clockAnomaly,
+      rewardSuppressed: clockAnomaly,
+      legacyTimestampUsed: Boolean(clockContext.legacyTimestampUsed),
+      infinityCountBefore: before.infinityCount,
+      infinityCountAfter: after.infinityCount,
+      infinityPointsBeforeLog10: before.infinityPointsLog10,
+      infinityPointsAfterLog10: after.infinityPointsLog10,
+      infiniteScoreBeforeLog10: before.infiniteScoreLog10,
+      infiniteScoreAfterLog10: after.infiniteScoreLog10,
+    };
+    runtime.updateUi();
+    if (!runtime.saveGame("manual")) {
+      restoreOfflineTransaction(
+        transactionSnapshot,
+        new Error("offline progress save failed"),
+        retryBaseline,
+      );
+      return null;
+    }
+    lastTime = currentFrameTime();
+    if (clockAnomaly) rebaseLocalClock();
+    return offlineReport;
+  } catch (error) {
+    restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
+    return null;
+  }
 }
 
 function setOfflineBaseline(timestamp = localClockNow(), serverTimestamp = 0) {
@@ -619,30 +860,100 @@ function invalidateVisibilityResume() {
   visibilityResumeGeneration += 1;
 }
 
+function saveSourceIsCurrent() {
+  return runtime.saveSourceIsCurrent ? runtime.saveSourceIsCurrent() : true;
+}
+
+function reloadAfterSaveConflict() {
+  offlineReport = null;
+  if (!runtime.loadGame({ allowDuringLoadRecovery: true })) {
+    throw new Error("save changed during visibility transition and could not be reloaded");
+  }
+  runtime.updateUi();
+  drawActiveView();
+}
+
 async function handleVisibilityChange() {
   if (document.hidden) {
-    runtime.saveGame("auto");
+    const transactionSnapshot = snapshotOfflineTransaction();
+    const retryBaseline = {
+      savedAt: offlineBaselineTimestamp,
+      serverSavedAt: offlineBaselineServerTimestamp,
+      saveFingerprint: runtime.lastKnownSaveFingerprint || "",
+    };
+    try {
+      if (!saveSourceIsCurrent()) {
+        reloadAfterSaveConflict();
+        return;
+      }
+      const saved = runtime.saveGame("auto");
+      if (!saved) {
+        restoreOfflineTransaction(
+          transactionSnapshot,
+          new Error("visibility hide save failed"),
+          retryBaseline,
+        );
+      }
+    } catch (error) {
+      restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
+    }
     return;
   }
   if (visibilityResumeInFlight) return;
+  if (runtime.loadRecoveryMode) return;
   visibilityResumeInFlight = true;
+  const transactionSnapshot = snapshotOfflineTransaction();
   // Saving while the clock request is pending may rebase the shared baseline.
   // Keep the interval that this resume began with so it cannot be discarded.
   const resumeBaselineTimestamp = offlineBaselineTimestamp;
   const resumeBaselineServerTimestamp = offlineBaselineServerTimestamp;
+  const resumeBaselineSaveFingerprint = runtime.lastKnownSaveFingerprint || "";
+  const resumeBaselineSaveRevision = runtime.saveRevision;
   const resumeGeneration = visibilityResumeGeneration;
+  const retryBaseline = {
+    savedAt: resumeBaselineTimestamp,
+    serverSavedAt: resumeBaselineServerTimestamp,
+    saveFingerprint: resumeBaselineSaveFingerprint,
+  };
   try {
+    if (!saveSourceIsCurrent()) {
+      reloadAfterSaveConflict();
+      return;
+    }
     await syncServerClock();
     if (resumeGeneration !== visibilityResumeGeneration) return;
+
+    const expectedSaveFingerprint = runtime.saveRevision !== resumeBaselineSaveRevision
+      ? runtime.lastLocalSaveFingerprint || runtime.lastKnownSaveFingerprint || ""
+      : resumeBaselineSaveFingerprint;
+    const currentFingerprint = runtime.currentSaveFingerprint?.() || "";
+    if (currentFingerprint !== expectedSaveFingerprint) {
+      offlineReport = null;
+      if (!runtime.loadGame({ allowDuringLoadRecovery: true })) {
+        throw new Error("save changed during visibility resume and could not be reloaded");
+      }
+      runtime.updateUi();
+      drawActiveView();
+      return;
+    }
+    // A successful local save may have rebased SAVE_KEY while the clock request was pending.
+    // Retry the captured interval against that latest local save, not its old fingerprint.
+    retryBaseline.saveFingerprint = expectedSaveFingerprint;
+
     const elapsed = offlineElapsedFromSave(resumeBaselineTimestamp, resumeBaselineServerTimestamp);
     if (elapsed.elapsedSeconds > 0 || elapsed.clockAnomaly) {
-      processOfflineElapsed(elapsed.elapsedSeconds, "visibility", elapsed);
+      processOfflineElapsed(elapsed.elapsedSeconds, "visibility", {
+        ...elapsed,
+        retryBaseline,
+      });
     } else {
       setOfflineBaseline(
         localClockNow(),
         serverClockAvailable() ? estimatedServerNowMs() : 0,
       );
     }
+  } catch (error) {
+    restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
   } finally {
     visibilityResumeInFlight = false;
   }
@@ -653,8 +964,15 @@ function currentFrameTime() {
 }
 
 function drawActiveView() {
-  if (runtime.activeMainTab === "angle") runtime.draw();
-  if (runtime.activeMainTab === "infinity" && runtime.activeInfinitySubtab === "angle") runtime.drawInfiniteAngle();
+  if (runtime.activeMainTab === "angle") {
+    runtime.draw();
+    return true;
+  }
+  if (runtime.activeMainTab === "infinity" && runtime.activeInfinitySubtab === "angle") {
+    runtime.drawInfiniteAngle();
+    return true;
+  }
+  return false;
 }
 
 let lastTime = currentFrameTime();
@@ -680,7 +998,11 @@ function frame(now) {
     uiUpdateElapsed %= runtime.UI_UPDATE_INTERVAL_SECONDS;
     runtime.updateUi();
   }
-  drawActiveView();
+  const renderStartedAt = monotonicClockNow();
+  if (shouldRenderFrame(now)) {
+    const canvasRendered = drawActiveView();
+    if (canvasRendered) updateRenderQuality(Math.max(0, monotonicClockNow() - renderStartedAt));
+  }
   requestNextFrame(frame);
 }
 
@@ -763,6 +1085,8 @@ function renderGameToText() {
       requirement: runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10()),
       requirementLog10: runtime.coreBoostRequirementLog10(),
       requirementText: runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10()),
+      requirementGrowthPowerRaw: runtime.coreBoostRequirementRawGrowthPower(),
+      requirementGrowthPower: runtime.coreBoostRequirementGrowthPower(),
       gainIncreaseMultiplier: Number(runtime.coreBoostGainIncreaseMultiplier().toFixed(2)),
       gainExponent: Number(runtime.coreBoostGainExponent().toFixed(2)),
     },
@@ -818,6 +1142,9 @@ function renderGameToText() {
     tower: {
       floor: runtime.towerFloor(),
       scoreExponent: Number(runtime.towerScoreExponent().toFixed(4)),
+      challenge1ScorePowerBase: runtime.hasInfinityUpgrade("13-1") ? 0.5 : runtime.INFINITE_ANGLE_SCORE_POWER,
+      challenge1ScorePowerBonus: runtime.towerChallenge1InfinityScorePowerBonus(),
+      challenge1ScorePower: runtime.infiniteAngleScorePower(),
       nextFloor: runtime.towerNextFloor(),
       nextCostLog10: Number(runtime.towerNextFloorCostLog10().toPrecision(6)),
       gate: runtime.towerGateForFloor(runtime.towerNextFloor()),
@@ -841,6 +1168,7 @@ function renderGameToText() {
       vertexGainIncrease: Number(runtime.vertexGainIncrease().toPrecision(6)),
       vertexGainIncreaseLog10: Number(runtime.vertexGainIncreaseLog10().toPrecision(6)),
       mask: runtime.state.achievementMask,
+      maskHigh: runtime.state.achievementMaskHigh,
       generationMultiplierReward: runtime.isAchievementUnlocked(3),
       totalPlayTime: Number(runtime.state.totalPlayTime.toFixed(1)),
       noGenerationCoreBoostReached: runtime.state.noGenerationCoreBoostReached,
@@ -890,14 +1218,13 @@ function renderGameToText() {
       lastInfinityRuns: runtime.state.lastInfinityRuns,
     },
     timeFlux: {
-      amount: Number(runtime.state.timeFlux.toPrecision(6)),
-      capacity: Number(runtime.timeFluxCapacity().toPrecision(6)),
-      gainPerHour: Number(runtime.timeFluxGain().toPrecision(6)),
+      dormant: true,
+      amount: runtime.state.timeFlux,
       capacityLevel: runtime.state.timeFluxCapacityLevel,
       gainLevel: runtime.state.timeFluxGainLevel,
       speed: runtime.state.timeFluxSpeed,
       customSpeed: runtime.state.timeFluxCustomSpeed,
-      offlineProgressEnabled: runtime.state.offlineProgressEnabled,
+      offlineProgressEnabled: true,
       offlineTickCount: runtime.state.offlineTickCount,
       report: offlineReport,
     },
@@ -947,6 +1274,11 @@ expose("activeStatisticsSubtab", () => activeStatisticsSubtab, (value) => { acti
 expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => { selectedInfinityUpgradeId = value; });
 expose("appliedLanguage", () => appliedLanguage, (value) => { appliedLanguage = value; });
 expose("smoothedFps", () => smoothedFps, (value) => { smoothedFps = value; });
+expose("renderQualityState", () => renderQualityState);
+expose("renderVertexLimit", () => renderVertexLimit);
+expose("renderDevicePixelRatio", () => renderDevicePixelRatio);
+expose("renderFrameIntervalMs", () => renderFrameIntervalMs);
+expose("setRenderQualityForTest", () => setRenderQualityForTest);
 expose("offlineBaselineTimestamp", () => offlineBaselineTimestamp, (value) => { offlineBaselineTimestamp = value; });
 expose("offlineBaselineServerTimestamp", () => offlineBaselineServerTimestamp, (value) => { offlineBaselineServerTimestamp = value; });
 expose("offlineProcessing", () => offlineProcessing, (value) => { offlineProcessing = value; });
@@ -956,6 +1288,7 @@ expose("serverClockAnomaly", () => serverClockAnomaly);
 expose("serverClockAvailable", () => serverClockAvailable);
 expose("serverClockNowMs", () => trustedClockNowMs);
 expose("localClockNowMs", () => localClockNow);
+expose("monotonicClockNowMs", () => monotonicClockNow);
 expose("syncServerClock", () => syncServerClock);
 expose("offlineElapsedFromSave", () => offlineElapsedFromSave);
 expose("rebaseLocalClock", () => rebaseLocalClock);
@@ -1003,9 +1336,6 @@ window.__angleDebug = {
   unlockInfiniteAngle: runtime.unlockInfiniteAngle,
   buyInfiniteAngleUpgrade: runtime.buyInfiniteAngleUpgrade,
   buyAllInfiniteAngleUpgrades: runtime.buyAllInfiniteAngleUpgrades,
-  buyTimeFluxUpgrade: runtime.buyTimeFluxUpgrade,
-  setTimeFluxSpeed: runtime.setTimeFluxSpeed,
-  setTimeFluxCustomSpeed: runtime.setTimeFluxCustomSpeed,
   updateInfiniteAngle: runtime.updateInfiniteAngle,
   toggleInfinityChallenge: runtime.toggleInfinityChallenge,
   breakInfiniteCap: runtime.breakInfiniteCap,
@@ -1027,6 +1357,8 @@ window.__angleDebug = {
   restorePreImportSave: runtime.restorePreImportSave,
   restoreCheckpoint: runtime.restoreCheckpoint,
   restoreUndoSave: runtime.restoreUndoSave,
+  retryLoad: runtime.retryLoad,
+  restoreQuarantineSave: runtime.restoreQuarantineSave,
   loadGame: runtime.loadGame,
   resetSave: runtime.resetSave,
   exportSaveCode: runtime.exportSaveCode,
@@ -1034,6 +1366,10 @@ window.__angleDebug = {
   completeChallengeIfReady: runtime.completeChallengeIfReady,
   syncServerClock,
   offlineElapsedFromSave,
+  renderQualityState,
+  setRenderQualityForTest,
+  updateRenderQualityForTest,
+  canvasCacheStats: runtime.canvasCacheStats,
   serverClockAvailable,
   serverClockNowMs: trustedClockNowMs,
   serverClockSource: () => serverClockSource,

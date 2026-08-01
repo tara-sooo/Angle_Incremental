@@ -115,10 +115,15 @@ Original prompt: では、中核ループを完成させてください
 - Made cleared Tower Challenges replayable: permanent rewards remain first-clear-only, TC1 replays use its dedicated reset, and TC2 replays retain normal Infinity rewards.
 - Centered IU 12-1 and 13-1 in the Infinity Upgrade tree and added Statistics sub-tabs with persistent fastest game-time records for all IC and TC entries.
 - Prepared the 0.9.0 release candidate with save recovery checkpoints, IU 13-1, Tower Challenges 1/2 and replay support, persistent IC/TC fastest clear times, and invalid-challenge timer cleanup while keeping SAVE_VERSION 10 unchanged; TC3/TC4 remain deferred.
+- Temporarily removed Time Flux gameplay and UI for #70: offline progress is always normal progression, the offline tick setting lives in Settings, and dormant Time Flux save fields remain compatible without active effects.
+- Added achievements 32-37 for Infinite Angle and Tower progression, with a separate high achievement mask that preserves SAVE_VERSION 10 compatibility.
+- Added IU14-1 after IU13-1, extending IU11-2's Infinity-count hard cap from 10000 to 30000 while preserving SAVE_VERSION 10 compatibility.
+- Unified the vertex gain increase display with the shared number formatter at 1000 and above while preserving small values and IC6's 0.001 precision.
+- Updated TC1 and TC2 for Tower-floor scaling: TC1 now adds `+0.077` Infinity Score exponent per floor after Floor 3, while TC2 targets `1e1555` and soft-caps Core Boost requirement growth below `^1.50` without changing the save format.
+- Prepared the 0.10.0 release candidate with Time Flux removal, achievements 32-37, IU14-1, unified vertex-gain formatting, and floor-scaled Tower Challenge rewards while keeping SAVE_VERSION 10 compatible.
 
 ## TODO
 
-- Verify the new save-code controls, IC auto-complete toggle, and updated IC formula display in Firefox/Playwright on desktop and mobile before release.
 - Future balance pass: playtest the new Generation formula against the intended 3-4 Core Boost path before first Infinity.
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: playtest the tuned Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle upgrade curve.

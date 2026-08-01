@@ -220,7 +220,8 @@ function buyAllInfiniteAngleUpgrades(options = {}) {
 }
 
 function infiniteAngleScorePower() {
-  return runtime.hasInfinityUpgrade("13-1") ? 0.5 : runtime.INFINITE_ANGLE_SCORE_POWER;
+  const basePower = runtime.hasInfinityUpgrade("13-1") ? 0.5 : runtime.INFINITE_ANGLE_SCORE_POWER;
+  return basePower + runtime.towerChallenge1InfinityScorePowerBonus();
 }
 
 function infiniteAngleBoostLog10() {

@@ -34,6 +34,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run browser ESM smoke test
         run: node tests/browser-smoke.mjs
+      - name: Run performance smoke test
+        run: node tests/performance-smoke.mjs
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -41,5 +43,6 @@ jobs:
           name: test-diagnostics
           path: |
             browser-smoke-report.json
+            output/performance-smoke.json
             regression-failure.txt
           if-no-files-found: warn

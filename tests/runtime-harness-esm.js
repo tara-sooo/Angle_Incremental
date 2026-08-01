@@ -117,7 +117,15 @@ class FakeElement {
 function createContext(initialStorage = new Map()) {
   const elements = new Map();
   const document = {
-    createElement: (tag) => new FakeElement(tag),
+    createElement: (tag) => {
+      const element = new FakeElement(tag);
+      if (tag === "canvas") {
+        element.width = 300;
+        element.height = 150;
+        element.getContext = () => createCanvasContext();
+      }
+      return element;
+    },
     getElementById: (id) => {
       if (!elements.has(id)) elements.set(id, new FakeElement(id));
       return elements.get(id);
@@ -156,6 +164,7 @@ function createContext(initialStorage = new Map()) {
 
   const createCanvasContext = () => ({
     clearRect() {},
+    drawImage() {},
     fillRect() {},
     beginPath() {},
     arc() {},

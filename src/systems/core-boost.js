@@ -2,8 +2,29 @@ import { runtime, expose } from "../runtime/shared.js";
 
 // Core Boost requirements, effects, and reset behavior.
 
+const CORE_BOOST_REQUIREMENT_GROWTH_POWER_BASE = 2;
+const CORE_BOOST_REQUIREMENT_SOFTCAP_START = 1.5;
+const CORE_BOOST_REQUIREMENT_SOFTCAP_SCALE = 0.1;
+
+function coreBoostRequirementRawGrowthPower() {
+  if (!runtime.towerChallengeCompleted(2)) return CORE_BOOST_REQUIREMENT_GROWTH_POWER_BASE;
+  const steps = Math.max(0, runtime.towerFloor() - 5);
+  return CORE_BOOST_REQUIREMENT_GROWTH_POWER_BASE - steps * 0.03;
+}
+
+function applyCoreBoostRequirementSoftcap(rawPower) {
+  if (rawPower >= CORE_BOOST_REQUIREMENT_SOFTCAP_START) return rawPower;
+  const distance = CORE_BOOST_REQUIREMENT_SOFTCAP_START - rawPower;
+  return CORE_BOOST_REQUIREMENT_SOFTCAP_START
+    - CORE_BOOST_REQUIREMENT_SOFTCAP_SCALE * distance / (1 + distance);
+}
+
+function coreBoostRequirementGrowthPower() {
+  return applyCoreBoostRequirementSoftcap(coreBoostRequirementRawGrowthPower());
+}
+
 function coreBoostRequirementLog10() {
-  const multiplier = 2 ** runtime.state.coreBoostCount;
+  const multiplier = coreBoostRequirementGrowthPower() ** runtime.state.coreBoostCount;
   if (!Number.isFinite(multiplier)) return runtime.MAX_TRACKED_LOG10;
   const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
   const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
@@ -110,6 +131,8 @@ function runCoreBoost() {
 }
 
 expose("coreBoostRequirementLog10", () => coreBoostRequirementLog10, (value) => { coreBoostRequirementLog10 = value; });
+expose("coreBoostRequirementRawGrowthPower", () => coreBoostRequirementRawGrowthPower);
+expose("coreBoostRequirementGrowthPower", () => coreBoostRequirementGrowthPower);
 expose("coreBoostRequirement", () => coreBoostRequirement, (value) => { coreBoostRequirement = value; });
 expose("canCoreBoost", () => canCoreBoost, (value) => { canCoreBoost = value; });
 expose("coreBoostBonusPower", () => coreBoostBonusPower, (value) => { coreBoostBonusPower = value; });

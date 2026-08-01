@@ -19,8 +19,8 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { state } = instance.debug;
     const { runtime } = instance;
 
-    assert.equal(runtime.ACHIEVEMENT_COUNT, 31, "achievement total should be derived from the 31 definitions");
-    assert.equal(runtime.ACHIEVEMENTS.length, 31, "achievement definition array should contain 31 entries");
+    assert.equal(runtime.ACHIEVEMENT_COUNT, 37, "achievement total should be derived from the 37 definitions");
+    assert.equal(runtime.ACHIEVEMENTS.length, 37, "achievement definition array should contain 37 entries");
 
     state.achievementMask = 0;
     state.gainLevel = 10;
@@ -67,6 +67,79 @@ async function runAchievementV2ModuleRuntimeTest() {
     state.infiniteAngleUnlocked = true;
     runtime.checkAchievements(false);
     assert.equal(runtime.isAchievementUnlocked(31), true, "unlocking IA should unlock achievement 31");
+  }
+
+  {
+    const cases = [
+      {
+        id: 32,
+        before: (state) => { state.infinityPointsLog10 = 43.999; },
+        after: (state) => { state.infinityPointsLog10 = 44; },
+      },
+      {
+        id: 33,
+        before: (state) => { state.towerFloor = 0; },
+        after: (state) => { state.towerFloor = 1; },
+      },
+      {
+        id: 34,
+        before: (state) => { state.completedTowerChallenges = 0; },
+        after: (state) => { state.completedTowerChallenges = 1 << 0; },
+      },
+      {
+        id: 35,
+        before: (state) => { setLogResource(state, "score", 2450); },
+        after: (state) => { setLogResource(state, "score", 2450.1); },
+      },
+      {
+        id: 36,
+        before: (state) => { state.towerFloor = 2; },
+        after: (state) => { state.towerFloor = 3; },
+      },
+      {
+        id: 37,
+        before: (state) => { state.completedTowerChallenges = 0; },
+        after: (state) => { state.completedTowerChallenges = 1 << 1; },
+      },
+    ];
+    for (const testCase of cases) {
+      const instance = await loadRuntime(candidatePath);
+      const { state } = instance.debug;
+      const { runtime } = instance;
+      state.achievementMask = 0;
+      state.achievementMaskHigh = 0;
+      testCase.before(state);
+      assert.equal(runtime.ACHIEVEMENTS[testCase.id - 1].isUnlocked(), false, `achievement ${testCase.id} should remain locked before its threshold`);
+      testCase.after(state);
+      assert.equal(runtime.ACHIEVEMENTS[testCase.id - 1].isUnlocked(), true, `achievement ${testCase.id} should be eligible at its threshold`);
+      runtime.checkAchievements(false);
+      assert.equal(runtime.isAchievementUnlocked(testCase.id), true, `achievement ${testCase.id} should unlock after checking its threshold`);
+    }
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
+    state.achievementMask = 0;
+    state.achievementMaskHigh = 0b111111;
+    assert.equal(runtime.isAchievementUnlocked(1), false, "high achievement bits must not unlock achievement 1");
+    assert.equal(runtime.isAchievementUnlocked(2), false, "high achievement bits must not unlock achievement 2");
+    [32, 33, 34, 35, 36, 37].forEach((id) => {
+      assert.equal(runtime.isAchievementUnlocked(id), true, `achievement ${id} should use its high-mask bit`);
+    });
+
+    state.achievementMask = (1 << 6) - 1;
+    state.achievementMaskHigh = 0;
+    assert.equal(runtime.isAchievementUnlocked(1), true, "low achievement bit 0 should remain achievement 1");
+    assert.equal(runtime.isAchievementUnlocked(6), true, "low achievement bit 5 should remain achievement 6");
+    assert.equal(runtime.isAchievementUnlocked(32), false, "low achievement bits must not unlock achievement 32");
+
+    state.achievementMask = 0x7fffffff;
+    state.achievementMaskHigh = 0b111111;
+    assert.equal(runtime.achievementCount(), 37, "all 37 achievements should be counted across both masks");
+    assertNearlyEqual(runtime.achievementGainMultiplier(), Math.pow(1.01, 37), "all 37 achievements should apply the shared multiplier");
   }
 
   {
@@ -209,6 +282,39 @@ async function runAchievementV2ModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const lowMask = 1 << (31 - 1);
+    const highMask = 0b111111;
+
+    runtime.applySaveData({ achievementMask: lowMask }, 10);
+    assert.equal(debug.state.achievementMask, lowMask, "old v10 saves should preserve the low achievement mask");
+    assert.equal(debug.state.achievementMaskHigh, 0, "old v10 saves without a high mask should default it to zero");
+
+    debug.state.achievementMaskHigh = highMask;
+    const serialized = runtime.serializeSaveData();
+    assert.equal(serialized.state.achievementMask, lowMask, "serialized saves should retain the low achievement mask");
+    assert.equal(serialized.state.achievementMaskHigh, highMask, "serialized saves should include the high achievement mask");
+
+    debug.state.achievementMaskHigh = 1 << 31;
+    const normalizedSignedMask = runtime.serializeSaveData().state.achievementMaskHigh;
+    assert.equal(normalizedSignedMask, 0x80000000, "serialized high masks should remain unsigned at bit 31");
+    debug.state.achievementMaskHigh = highMask;
+
+    const reloaded = await loadRuntime(candidatePath);
+    reloaded.runtime.applySaveData(serialized.state, serialized.version);
+    assert.equal(reloaded.debug.state.achievementMask, lowMask, "save reload should retain achievement 31");
+    assert.equal(reloaded.debug.state.achievementMaskHigh, highMask, "save reload should retain achievements 32-37");
+
+    const code = await runtime.exportSaveCode();
+    debug.state.achievementMask = 0;
+    debug.state.achievementMaskHigh = 0;
+    assert.equal(await runtime.importSaveCode(code), true, "save-code import should restore both achievement masks");
+    assert.equal(debug.state.achievementMask, lowMask, "save-code import should restore the low achievement mask");
+    assert.equal(debug.state.achievementMaskHigh, highMask, "save-code import should restore the high achievement mask");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { state } = instance.debug;
     const { runtime } = instance;
 
@@ -248,13 +354,14 @@ async function runAchievementV2ModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
     const { runtime } = instance;
 
     runtime.createAchievementRows();
     runtime.updateAchievementRows();
 
     const rows = runtime.elements.achievementList.querySelectorAll(".achievement-row");
-    assert.equal(rows.length, 31, "achievement rows should be rendered in the module runtime");
+    assert.equal(rows.length, 37, "achievement rows should be rendered in the module runtime");
 
     const firstReward = rows[0].querySelector(".achievement-reward");
     assert.equal(firstReward.textContent, "", "achievements without individual rewards should not repeat the shared reward");
@@ -279,6 +386,39 @@ async function runAchievementV2ModuleRuntimeTest() {
     assert.equal(rows[30].querySelector(".achievement-title").textContent, "六兆年と一夜の付き合い", "achievement 31 row should use the new order");
     assert.equal(achievement31Reward.textContent, "報酬: IP獲得量が×100", "achievement 31 should advertise the IP multiplier");
     assert.equal(achievement31Reward.hidden, false, "achievement 31 reward should be visible");
+
+    const japaneseDefinitions = [
+      ["不吉だという前提は置いておいて", "所持IPがe44に到達"],
+      ["バベルも土台から", "Towerを建設"],
+      ["あれをチャレンジだと呼ぶべきではない", "TC1をクリア"],
+      ["道しるべを残す", "スコアがe2450を超える"],
+      ["ちょっぴり豪邸", "Towerの階層が3に到達"],
+      ["物騒な名前", "TC2をクリア"],
+    ];
+    japaneseDefinitions.forEach(([title, condition], offset) => {
+      const row = rows[31 + offset];
+      assert.equal(row.querySelector(".achievement-title").textContent, title, `achievement ${32 + offset} should use the Japanese title`);
+      assert.equal(row.querySelector(".achievement-condition").textContent, condition, `achievement ${32 + offset} should use the Japanese condition`);
+      const reward = row.querySelector(".achievement-reward");
+      assert.equal(reward.textContent, "", `achievement ${32 + offset} should not have an individual reward`);
+      assert.equal(reward.hidden, true, `achievement ${32 + offset} reward should be hidden`);
+    });
+
+    const englishDefinitions = [
+      ["Assuming It Is Unlucky", "Hold at least 1e44 IP."],
+      ["Babel Starts from the Foundation", "Build the Tower."],
+      ["We Should Not Call That a Challenge", "Complete TC1."],
+      ["Leave a Signpost", "Reach more than 1e2450 score."],
+      ["A Slightly Luxurious Mansion", "Reach Tower Floor 3."],
+      ["A Violent-Sounding Name", "Complete TC2."],
+    ];
+    state.language = "en";
+    runtime.updateAchievementRows();
+    englishDefinitions.forEach(([title, condition], offset) => {
+      const row = rows[31 + offset];
+      assert.equal(row.querySelector(".achievement-title").textContent, title, `achievement ${32 + offset} should use the English title`);
+      assert.equal(row.querySelector(".achievement-condition").textContent, condition, `achievement ${32 + offset} should use the English condition`);
+    });
   }
 
   console.log("Achievement v2 module runtime tests passed");

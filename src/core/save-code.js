@@ -93,11 +93,12 @@ async function importSaveCode(code) {
     backupFailed = !runtime.backupCurrentSave("pre-import");
     if (backupFailed) return false;
     runtime.applySaveData(parsed.state, parsed.version);
-    if (!runtime.saveGame("manual")) {
+    if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) {
       runtime.applySaveData(currentSave.state, currentSave.version);
       runtime.setSaveStatus(runtime.t("saveCodeImportFailed"));
       return false;
     }
+    if (runtime.finishLoadRecovery) runtime.finishLoadRecovery();
     runtime.updateUi();
     runtime.draw();
     runtime.setSaveStatus(runtime.t("saveCodeImported"));

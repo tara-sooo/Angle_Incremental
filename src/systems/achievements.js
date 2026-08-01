@@ -190,9 +190,45 @@ const ACHIEVEMENTS = [
     reward: { ja: "IP獲得量が×100", en: "Infinity Point gain x100." },
     isUnlocked: () => runtime.state.infiniteAngleUnlocked,
   },
+  {
+    title: { ja: "不吉だという前提は置いておいて", en: "Assuming It Is Unlucky" },
+    condition: { ja: "所持IPがe44に到達", en: "Hold at least 1e44 IP." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.currentInfinityPointsLog10() >= 44,
+  },
+  {
+    title: { ja: "バベルも土台から", en: "Babel Starts from the Foundation" },
+    condition: { ja: "Towerを建設", en: "Build the Tower." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.towerFloor() >= 1,
+  },
+  {
+    title: { ja: "あれをチャレンジだと呼ぶべきではない", en: "We Should Not Call That a Challenge" },
+    condition: { ja: "TC1をクリア", en: "Complete TC1." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.towerChallengeCompleted(1),
+  },
+  {
+    title: { ja: "道しるべを残す", en: "Leave a Signpost" },
+    condition: { ja: "スコアがe2450を超える", en: "Reach more than 1e2450 score." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.currentScoreLog10() > 2450,
+  },
+  {
+    title: { ja: "ちょっぴり豪邸", en: "A Slightly Luxurious Mansion" },
+    condition: { ja: "Towerの階層が3に到達", en: "Reach Tower Floor 3." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.towerFloor() >= 3,
+  },
+  {
+    title: { ja: "物騒な名前", en: "A Violent-Sounding Name" },
+    condition: { ja: "TC2をクリア", en: "Complete TC2." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.towerChallengeCompleted(2),
+  },
 ];
 
-let cachedAchievementMask = null;
+let cachedAchievementSignature = null;
 let cachedAchievementCount = 0;
 
 Object.defineProperty(runtime, "ACHIEVEMENT_COUNT", {
@@ -202,13 +238,19 @@ Object.defineProperty(runtime, "ACHIEVEMENT_COUNT", {
 });
 
 function isAchievementUnlocked(id) {
-  return (runtime.state.achievementMask & (1 << (id - 1))) !== 0;
+  const normalizedId = Math.floor(Number(id));
+  if (normalizedId < 1 || normalizedId > 63) return false;
+  const mask = normalizedId <= 31 ? runtime.state.achievementMask : runtime.state.achievementMaskHigh;
+  const bit = 1 << (normalizedId <= 31 ? normalizedId - 1 : normalizedId - 32);
+  return (((Number(mask) || 0) >>> 0) & bit) !== 0;
 }
 
 function achievementCount() {
-  const mask = runtime.state.achievementMask;
-  if (mask === cachedAchievementMask) return cachedAchievementCount;
-  cachedAchievementMask = mask;
+  const lowMask = ((Number(runtime.state.achievementMask) || 0) >>> 0);
+  const highMask = ((Number(runtime.state.achievementMaskHigh) || 0) >>> 0);
+  const signature = `${lowMask}|${highMask}`;
+  if (signature === cachedAchievementSignature) return cachedAchievementCount;
+  cachedAchievementSignature = signature;
   cachedAchievementCount = 0;
   let count = 0;
   for (let id = 1; id <= runtime.ACHIEVEMENT_COUNT; id += 1) {
@@ -240,7 +282,12 @@ function checkAchievements(notify = false) {
   ACHIEVEMENTS.forEach((achievement, index) => {
     const id = index + 1;
     if (!isAchievementUnlocked(id) && achievement.isUnlocked()) {
-      runtime.state.achievementMask |= 1 << index;
+      const bit = 1 << (id <= 31 ? id - 1 : id - 32);
+      if (id <= 31) {
+        runtime.state.achievementMask = (((Number(runtime.state.achievementMask) || 0) >>> 0) | bit) >>> 0;
+      } else {
+        runtime.state.achievementMaskHigh = (((Number(runtime.state.achievementMaskHigh) || 0) >>> 0) | bit) >>> 0;
+      }
       unlockedIds.push(id);
       if (notify) showAchievementNotification(id);
     }

@@ -4,9 +4,29 @@ import { runtime, expose } from "../runtime/shared.js";
 
 const VERSION_9_INFINITY_POINT_CAP = 10_000_000_000n;
 let recoveryRevision = 0;
+let saveRevision = 0;
+let lastLocalSaveFingerprint = "";
+let lastKnownSaveFingerprint = "";
+let lastPeriodicCheckpointMonotonicAt = null;
+let loadTransactionActive = false;
+let loadRecoveryMode = false;
 
 function currentSaveTimestamp() {
   return runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
+}
+
+function dormantTimeFluxValue(value, fallback) {
+  return runtime.sanitizeNumber(value, fallback);
+}
+
+function clampOfflineTickCount(value) {
+  return Math.min(
+    runtime.OFFLINE_PROGRESS_MAX_TICKS,
+    Math.max(runtime.OFFLINE_PROGRESS_MIN_TICKS, Math.floor(runtime.sanitizeNumber(
+      value,
+      runtime.OFFLINE_PROGRESS_DEFAULT_TICKS,
+    ))),
+  );
 }
 
 function normalizeStoredSave(candidate) {
@@ -21,6 +41,28 @@ function normalizeStoredSave(candidate) {
     serverSavedAt: runtime.sanitizeNumber(candidate.serverSavedAt, 0),
     state: candidate.state,
   };
+}
+
+function saveFingerprint(raw) {
+  let hash = 2166136261;
+  for (let index = 0; index < raw.length; index += 1) {
+    hash ^= raw.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${raw.length}:${hash >>> 0}`;
+}
+
+function currentSaveFingerprint() {
+  try {
+    const raw = localStorage.getItem(runtime.SAVE_KEY);
+    return raw ? saveFingerprint(raw) : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+function saveSourceIsCurrent() {
+  return currentSaveFingerprint() === lastKnownSaveFingerprint;
 }
 
 function recoveryEntryFromSave(saveData, reason, backedUpAt = currentSaveTimestamp()) {
@@ -68,6 +110,109 @@ function readRecoveryEntry(key) {
   }
 }
 
+function readQuarantineEntry() {
+  try {
+    const raw = localStorage.getItem(runtime.SAVE_QUARANTINE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || typeof parsed.raw !== "string") return null;
+    return {
+      quarantinedAt: runtime.sanitizeNumber(parsed.quarantinedAt, 0),
+      appVersion: typeof parsed.appVersion === "string" ? parsed.appVersion : "",
+      saveVersion: Math.floor(runtime.sanitizeNumber(parsed.saveVersion, 0)),
+      stage: typeof parsed.stage === "string" ? parsed.stage : "format",
+      errorName: typeof parsed.errorName === "string" ? parsed.errorName : "",
+      errorMessage: typeof parsed.errorMessage === "string" ? parsed.errorMessage : "",
+      raw: parsed.raw,
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function readLoadFailure() {
+  try {
+    const raw = localStorage.getItem(runtime.SAVE_LOAD_FAILURE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    return {
+      failedAt: runtime.sanitizeNumber(parsed.failedAt, 0),
+      appVersion: typeof parsed.appVersion === "string" ? parsed.appVersion : "",
+      saveVersion: Math.floor(runtime.sanitizeNumber(parsed.saveVersion, 0)),
+      savedAt: runtime.sanitizeNumber(parsed.savedAt, 0),
+      serverSavedAt: runtime.sanitizeNumber(parsed.serverSavedAt, 0),
+      offlineRetrySavedAt: runtime.sanitizeNumber(parsed.offlineRetrySavedAt, 0),
+      offlineRetryServerSavedAt: runtime.sanitizeNumber(parsed.offlineRetryServerSavedAt, 0),
+      offlineRetrySaveFingerprint: typeof parsed.offlineRetrySaveFingerprint === "string"
+        ? parsed.offlineRetrySaveFingerprint
+        : "",
+      stage: parsed.stage === "offline" ? "offline" : "apply",
+      errorName: typeof parsed.errorName === "string" ? parsed.errorName : "Error",
+      errorMessage: typeof parsed.errorMessage === "string" ? parsed.errorMessage : "",
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+function errorDetails(error) {
+  const errorName = typeof error?.name === "string" && error.name ? error.name : "Error";
+  const errorMessage = String(error?.message || error || "").slice(0, 500);
+  return {
+    errorName: errorName.slice(0, 100),
+    errorMessage,
+  };
+}
+
+function writeLoadFailure(stage, error, parsed = null, retryBaseline = null) {
+  try {
+    const details = errorDetails(error);
+    const retrySavedAt = runtime.sanitizeNumber(retryBaseline?.savedAt, 0);
+    const retryServerSavedAt = runtime.sanitizeNumber(retryBaseline?.serverSavedAt, 0);
+    const retrySaveFingerprint = typeof retryBaseline?.saveFingerprint === "string"
+      ? retryBaseline.saveFingerprint
+      : "";
+    localStorage.setItem(runtime.SAVE_LOAD_FAILURE_KEY, JSON.stringify({
+      failedAt: currentSaveTimestamp(),
+      appVersion: runtime.APP_VERSION,
+      saveVersion: parsed?.version || 0,
+      savedAt: parsed?.savedAt || 0,
+      serverSavedAt: parsed?.serverSavedAt || 0,
+      offlineRetrySavedAt: retrySavedAt,
+      offlineRetryServerSavedAt: retryServerSavedAt,
+      offlineRetrySaveFingerprint: retrySaveFingerprint,
+      stage,
+      ...details,
+    }));
+    recoveryRevision += 1;
+  } catch (writeError) {
+    // The recovery mode still protects the save when diagnostics cannot be stored.
+  }
+}
+
+function clearLoadFailure() {
+  try {
+    if (localStorage.getItem(runtime.SAVE_LOAD_FAILURE_KEY) !== null) {
+      localStorage.removeItem(runtime.SAVE_LOAD_FAILURE_KEY);
+      recoveryRevision += 1;
+    }
+  } catch (error) {
+    // A stale diagnostic is harmless when the save itself is healthy.
+  }
+}
+
+function enterLoadRecovery(
+  stage = "apply",
+  error = new Error("load recovery required"),
+  parsed = null,
+  retryBaseline = null,
+) {
+  loadRecoveryMode = true;
+  writeLoadFailure(stage, error, parsed, retryBaseline);
+  runtime.setSaveStatus(runtime.t("loadFailed"));
+}
+
 function readCheckpointEntries() {
   try {
     const raw = localStorage.getItem(runtime.SAVE_CHECKPOINTS_KEY);
@@ -85,6 +230,109 @@ function writeRecoveryEntry(key, entry) {
   recoveryRevision += 1;
 }
 
+function latestEligibleCheckpointAtTimestamp(entries, timestampKey, currentTimestamp) {
+  return entries
+    .filter((entry) => entry[timestampKey] > 0 && entry[timestampKey] <= currentTimestamp)
+    .reduce((latest, entry) => {
+      if (!latest || entry[timestampKey] > latest[timestampKey]) return entry;
+      return latest;
+    }, null);
+}
+
+function latestCheckpointAtTimestamp(entries, timestampKey, currentTimestamp) {
+  const latestEligible = latestEligibleCheckpointAtTimestamp(entries, timestampKey, currentTimestamp);
+  if (latestEligible) return latestEligible;
+  return entries
+    .filter((entry) => entry[timestampKey] > 0)
+    .reduce((latest, entry) => {
+      if (!latest || entry[timestampKey] > latest[timestampKey]) return entry;
+      return latest;
+    }, null);
+}
+
+function periodicCheckpointTimestamp(entry, saveData) {
+  const useServerTimestamp = runtime.serverClockAvailable?.()
+    && saveData.serverSavedAt > 0
+    && entry.serverSavedAt > 0;
+  return {
+    value: useServerTimestamp ? entry.serverSavedAt : entry.savedAt,
+    current: useServerTimestamp ? saveData.serverSavedAt : saveData.savedAt,
+  };
+}
+
+function retainPeriodicCheckpoints(entries, nextEntry, saveData) {
+  const existing = entries.filter((entry) => entry !== nextEntry);
+  const eligible = existing
+    .filter((entry) => {
+      const timestamp = periodicCheckpointTimestamp(entry, saveData);
+      return timestamp.value > 0 && timestamp.value <= timestamp.current;
+    })
+    .sort((left, right) => (
+      periodicCheckpointTimestamp(right, saveData).value
+      - periodicCheckpointTimestamp(left, saveData).value
+    ));
+  const future = existing
+    .filter((entry) => !eligible.includes(entry))
+    .sort((left, right) => (
+      periodicCheckpointTimestamp(right, saveData).value
+      - periodicCheckpointTimestamp(left, saveData).value
+    ));
+  return [nextEntry, ...eligible, ...future].slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
+}
+
+function latestPeriodicCheckpoint(saveData, periodic) {
+  const currentServerSavedAt = runtime.serverClockAvailable?.() && saveData.serverSavedAt > 0
+    ? saveData.serverSavedAt
+    : 0;
+  const hasServerTimestamps = currentServerSavedAt > 0
+    && periodic.some((entry) => entry.serverSavedAt > 0);
+  const hasLocalOnlyEntries = periodic.some((entry) => entry.serverSavedAt <= 0);
+  const timestampKey = hasServerTimestamps && !hasLocalOnlyEntries ? "serverSavedAt" : "savedAt";
+  const currentTimestamp = timestampKey === "serverSavedAt" ? currentServerSavedAt : saveData.savedAt;
+  return latestCheckpointAtTimestamp(periodic, timestampKey, currentTimestamp);
+}
+
+function serverPeriodicCheckpointState(saveData, periodic) {
+  if (!runtime.serverClockAvailable?.() || saveData.serverSavedAt <= 0) {
+    return { hasFuture: false };
+  }
+  const serverTimestamped = periodic.filter((entry) => entry.serverSavedAt > 0);
+  return {
+    latestEligible: latestEligibleCheckpointAtTimestamp(
+      serverTimestamped,
+      "serverSavedAt",
+      saveData.serverSavedAt,
+    ),
+    hasFuture: serverTimestamped.some((entry) => entry.serverSavedAt > saveData.serverSavedAt),
+  };
+}
+
+function periodicCheckpointDue(saveData, latestPeriodic, serverPeriodicState) {
+  const monotonicNow = runtime.monotonicClockNowMs?.();
+  if (
+    Number.isFinite(monotonicNow)
+    && Number.isFinite(lastPeriodicCheckpointMonotonicAt)
+    && monotonicNow - lastPeriodicCheckpointMonotonicAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS
+  ) {
+    return false;
+  }
+
+  const latestEligibleServerCheckpoint = serverPeriodicState?.latestEligible;
+  const recentServerCheckpoint = latestEligibleServerCheckpoint?.serverSavedAt > 0
+    && saveData.serverSavedAt - latestEligibleServerCheckpoint.serverSavedAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS;
+  if (serverPeriodicState?.hasFuture && !recentServerCheckpoint) {
+    return true;
+  }
+
+  const currentServerSavedAt = runtime.serverClockAvailable?.() && saveData.serverSavedAt > 0
+    ? saveData.serverSavedAt
+    : 0;
+  const elapsed = currentServerSavedAt > 0 && latestPeriodic.serverSavedAt > 0
+    ? currentServerSavedAt - latestPeriodic.serverSavedAt
+    : saveData.savedAt - latestPeriodic.savedAt;
+  return elapsed < 0 || elapsed >= runtime.SAVE_CHECKPOINT_INTERVAL_MS;
+}
+
 function backupCurrentSave(reason = "pre-import", key = runtime.SAVE_PRE_IMPORT_KEY) {
   try {
     const saveData = serializeSaveData();
@@ -97,6 +345,7 @@ function backupCurrentSave(reason = "pre-import", key = runtime.SAVE_PRE_IMPORT_
 }
 
 function createCheckpoint(reason = "periodic", options = {}) {
+  if (loadRecoveryMode && !options.allowDuringLoadRecovery) return false;
   if (runtime.offlineProcessing && reason === "periodic") return false;
   try {
     const saveData = serializeSaveData();
@@ -104,26 +353,39 @@ function createCheckpoint(reason = "periodic", options = {}) {
     const periodic = entries
       .filter((entry) => entry.reason === "periodic")
       .sort((left, right) => right.savedAt - left.savedAt);
+    const latestPeriodic = latestPeriodicCheckpoint(saveData, periodic);
+    const serverPeriodicState = serverPeriodicCheckpointState(saveData, periodic);
     if (
       reason === "periodic"
       && !options.force
-      && periodic[0]
-      && saveData.savedAt - periodic[0].savedAt < runtime.SAVE_CHECKPOINT_INTERVAL_MS
+      && latestPeriodic
+      && !periodicCheckpointDue(saveData, latestPeriodic, serverPeriodicState)
     ) {
       return true;
     }
 
     const nextEntry = recoveryEntryFromSave(saveData, reason);
     const nextEntries = [nextEntry, ...entries.filter((entry) => entry.reason !== reason || reason === "periodic")];
-    const periodicEntries = nextEntries
-      .filter((entry) => entry.reason === "periodic")
-      .sort((left, right) => right.savedAt - left.savedAt)
-      .slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
-    const eventEntries = nextEntries
-      .filter((entry) => entry.reason !== "periodic")
-      .sort((left, right) => right.backedUpAt - left.backedUpAt)
-      .slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS);
-    writeRecoveryEntry(runtime.SAVE_CHECKPOINTS_KEY, [...periodicEntries, ...eventEntries]);
+    const periodicEntries = reason === "periodic"
+      ? retainPeriodicCheckpoints(
+        nextEntries.filter((entry) => entry.reason === "periodic"),
+        nextEntry,
+        saveData,
+      )
+      : periodic.slice(0, runtime.MAX_PERIODIC_SAVE_CHECKPOINTS);
+    const eventCandidates = reason === "periodic"
+      ? nextEntries.filter((entry) => entry.reason !== "periodic")
+      : [nextEntry, ...nextEntries.filter((entry) => entry !== nextEntry && entry.reason !== "periodic")];
+    const eventEntries = eventCandidates.sort((left, right) => right.backedUpAt - left.backedUpAt);
+    const retainedEventEntries = reason === "periodic"
+      ? eventEntries.slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS)
+      : [nextEntry, ...eventEntries.filter((entry) => entry !== nextEntry)]
+        .slice(0, runtime.MAX_EVENT_SAVE_CHECKPOINTS);
+    writeRecoveryEntry(runtime.SAVE_CHECKPOINTS_KEY, [...periodicEntries, ...retainedEventEntries]);
+    if (reason === "periodic") {
+      const monotonicNow = runtime.monotonicClockNowMs?.();
+      lastPeriodicCheckpointMonotonicAt = Number.isFinite(monotonicNow) ? monotonicNow : null;
+    }
     return true;
   } catch (error) {
     runtime.setSaveStatus(runtime.t("checkpointSaveFailed"));
@@ -136,7 +398,14 @@ function recoveryEntries() {
     preImport: readRecoveryEntry(runtime.SAVE_PRE_IMPORT_KEY),
     undo: readRecoveryEntry(runtime.SAVE_RESTORE_UNDO_KEY),
     checkpoints: readCheckpointEntries(),
+    quarantine: readQuarantineEntry(),
+    loadFailure: readLoadFailure(),
   };
+}
+
+function finishLoadRecovery() {
+  loadRecoveryMode = false;
+  clearLoadFailure();
 }
 
 function restoreRecoveryEntry(entry, successMessage = "recoveryRestored") {
@@ -151,13 +420,18 @@ function restoreRecoveryEntry(entry, successMessage = "recoveryRestored") {
       recoveryEntryFromSave(currentSave, "pre-restore"),
     );
     applySaveData(entry.save.state, entry.save.version);
-    if (!runtime.saveGame("manual")) throw new Error("restore save failed");
+    if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) throw new Error("restore save failed");
+    finishLoadRecovery();
     runtime.updateUi();
     runtime.draw();
     runtime.setSaveStatus(runtime.t(successMessage));
     return true;
   } catch (error) {
-    applySaveData(currentSave.state, currentSave.version);
+    try {
+      applySaveData(currentSave.state, currentSave.version);
+    } catch (restoreError) {
+      // Keep the recovery mode active if the in-memory rollback is also unavailable.
+    }
     if (runtime.setOfflineBaseline) {
       runtime.setOfflineBaseline(currentSave.savedAt, currentSave.serverSavedAt);
     }
@@ -234,7 +508,27 @@ function sanitizeChallengeTimes(value, count) {
   return Array.from({ length: count }, (_, index) => Math.max(0, runtime.sanitizeNumber(source[index], 0)));
 }
 
-function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
+function cloneStateValue(value) {
+  if (Array.isArray(value)) return value.map(cloneStateValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, cloneStateValue(entry)]));
+  }
+  return value;
+}
+
+function snapshotRuntimeState() {
+  return Object.fromEntries(
+    Object.entries(runtime.state).map(([key, value]) => [key, cloneStateValue(value)]),
+  );
+}
+
+function restoreRuntimeState(snapshot) {
+  Object.entries(snapshot).forEach(([key, value]) => {
+    runtime.state[key] = cloneStateValue(value);
+  });
+}
+
+function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   const score = runtime.hydrateLogResource(data.score, data.scoreLog10);
   runtime.state.score = score.value;
@@ -384,6 +678,12 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   } else {
     runtime.state.achievementMask = loadedAchievementMask;
   }
+  const loadedAchievementMaskHigh = runtime.parseSavedNumber(data.achievementMaskHigh);
+  runtime.state.achievementMaskHigh = Number.isFinite(loadedAchievementMaskHigh)
+    && loadedAchievementMaskHigh >= -2147483648
+    && loadedAchievementMaskHigh <= 0xffffffff
+    ? Math.floor(loadedAchievementMaskHigh) >>> 0
+    : 0;
   runtime.state.totalPlayTime = runtime.sanitizeNumber(data.totalPlayTime, 0);
   runtime.state.totalRealPlayTime = runtime.sanitizeNumber(data.totalRealPlayTime, 0);
   runtime.state.currentInfinityRunTime = runtime.sanitizeNumber(data.currentInfinityRunTime, 0);
@@ -391,21 +691,16 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.fastestInfinityTime = runtime.sanitizeNumber(data.fastestInfinityTime, 0);
   runtime.state.fastestInfinityRealTime = runtime.sanitizeNumber(data.fastestInfinityRealTime, 0);
   runtime.state.lastInfinityRuns = runtime.sanitizeInfinityRunRecords(data.lastInfinityRuns);
-  runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(
-    data.offlineProgressEnabled,
-    runtime.OFFLINE_PROGRESS_DEFAULT_ENABLED,
-  );
+  runtime.state.offlineProgressEnabled = true;
   runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
-  runtime.state.timeFluxCapacityLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxCapacityLevel, 0)));
-  runtime.state.timeFluxGainLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.timeFluxGainLevel, 0)));
-  runtime.state.timeFlux = Math.min(
-    runtime.timeFluxCapacitySeconds(),
-    Math.max(0, runtime.sanitizeNumber(data.timeFlux, 0)),
-  );
-  const loadedTimeFluxSpeed = runtime.clampTimeFluxSpeed(data.timeFluxSpeed);
+  runtime.state.timeFluxCapacityLevel = dormantTimeFluxValue(data.timeFluxCapacityLevel, 0);
+  runtime.state.timeFluxGainLevel = dormantTimeFluxValue(data.timeFluxGainLevel, 0);
+  runtime.state.timeFlux = dormantTimeFluxValue(data.timeFlux, 0);
+  const loadedTimeFluxSpeed = dormantTimeFluxValue(data.timeFluxSpeed, 1);
   const hasCustomTimeFluxSpeed = Object.prototype.hasOwnProperty.call(data, "timeFluxCustomSpeed");
-  const loadedCustomTimeFluxSpeed = runtime.clampTimeFluxCustomSpeed(
+  const loadedCustomTimeFluxSpeed = dormantTimeFluxValue(
     hasCustomTimeFluxSpeed ? data.timeFluxCustomSpeed : Math.max(4, loadedTimeFluxSpeed),
+    4,
   );
   runtime.state.timeFluxSpeed = loadedTimeFluxSpeed;
   runtime.state.timeFluxCustomSpeed = loadedCustomTimeFluxSpeed;
@@ -519,9 +814,21 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.floatingTexts = [];
 }
 
+function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
+  const snapshot = snapshotRuntimeState();
+  try {
+    applySaveDataUnsafe(data, saveVersion);
+  } catch (error) {
+    restoreRuntimeState(snapshot);
+    throw error;
+  }
+}
+
 function serializeSaveData() {
+  runtime.state.offlineProgressEnabled = true;
   runtime.normalizeInfinityPointState();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
+  runtime.state.achievementMaskHigh = ((Number(runtime.state.achievementMaskHigh) || 0) >>> 0);
   const data = {};
   runtime.SAVE_FIELDS.forEach((field) => {
     data[field] = runtime.state[field];
@@ -539,16 +846,33 @@ function serializeSaveData() {
   return saveData;
 }
 
-function saveGame(reason = "auto") {
+function saveGame(reason = "auto", options = {}) {
+  if (loadTransactionActive) return true;
+  if (loadRecoveryMode && !options.allowDuringLoadRecovery) {
+    runtime.autoSaveElapsed = 0;
+    runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
+    return false;
+  }
   if (runtime.offlineProcessing) return true;
+  if (!saveSourceIsCurrent()) {
+    runtime.autoSaveElapsed = 0;
+    runtime.setSaveStatus(runtime.t("saveFailed"));
+    return false;
+  }
   let savedAt = Date.now();
   let serverSavedAt = 0;
+  let savePersisted = false;
   try {
     savedAt = runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
     const saveData = serializeSaveData();
     saveData.savedAt = savedAt;
     serverSavedAt = saveData.serverSavedAt || 0;
-    localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(saveData));
+    const serializedSave = JSON.stringify(saveData);
+    localStorage.setItem(runtime.SAVE_KEY, serializedSave);
+    savePersisted = true;
+    lastLocalSaveFingerprint = saveFingerprint(serializedSave);
+    lastKnownSaveFingerprint = lastLocalSaveFingerprint;
+    saveRevision += 1;
     runtime.autoSaveElapsed = 0;
     const checkpointSaved = createCheckpoint("periodic");
     runtime.setSaveStatus(
@@ -562,77 +886,219 @@ function saveGame(reason = "auto") {
     runtime.setSaveStatus(runtime.t("saveFailed"));
     return false;
   } finally {
-    if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
+    if (savePersisted && runtime.setOfflineBaseline) runtime.setOfflineBaseline(savedAt, serverSavedAt);
   }
 }
 
-function quarantineSave(raw) {
+function quarantineSave(raw, details = {}, options = {}) {
+  let changed = false;
+  let quarantined = false;
   try {
     if (raw) {
+      const error = errorDetails(details.error);
       localStorage.setItem(runtime.SAVE_QUARANTINE_KEY, JSON.stringify({
-        quarantinedAt: Date.now(),
+        quarantinedAt: currentSaveTimestamp(),
         appVersion: runtime.APP_VERSION,
+        saveVersion: details.saveVersion || 0,
+        stage: details.stage || "format",
+        errorName: error.errorName,
+        errorMessage: error.errorMessage,
         raw,
       }));
+      changed = true;
+      quarantined = true;
     }
-    localStorage.removeItem(runtime.SAVE_KEY);
   } catch (error) {
     // Quarantine failure should not prevent the game from opening.
   }
+  if (options.removeSave && quarantined) {
+    try {
+      localStorage.removeItem(runtime.SAVE_KEY);
+      changed = true;
+    } catch (error) {
+      // The original save is still preferable to an in-memory replacement.
+    }
+  }
+  if (changed) recoveryRevision += 1;
 }
 
-function loadGame() {
+function loadGame(options = {}) {
+  const allowDuringLoadRecovery = Boolean(options.allowDuringLoadRecovery);
+  if (loadRecoveryMode && !allowDuringLoadRecovery) {
+    runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
+    return false;
+  }
   let raw = null;
+  let parsed = null;
+  let offlineProcessed = false;
+  loadTransactionActive = true;
   try {
     raw = localStorage.getItem(runtime.SAVE_KEY);
     if (!raw) {
       runtime.setSaveStatus(runtime.t("noSave"));
-      return;
+      return false;
     }
 
-    const parsed = normalizeStoredSave(JSON.parse(raw));
+    let candidate;
+    try {
+      candidate = JSON.parse(raw);
+    } catch (error) {
+      loadRecoveryMode = true;
+      clearLoadFailure();
+      quarantineSave(raw, { stage: "parse", error }, { removeSave: true });
+      runtime.setSaveStatus(runtime.t("loadFailed"));
+      return false;
+    }
+
+    parsed = normalizeStoredSave(candidate);
     if (!parsed) {
-      quarantineSave(raw);
+      loadRecoveryMode = true;
+      clearLoadFailure();
+      quarantineSave(
+        raw,
+        { stage: "normalize", error: new Error("invalid save format") },
+        { removeSave: true },
+      );
       runtime.setSaveStatus(runtime.t("oldSave"));
-      return;
+      return false;
     }
 
-    applySaveData(parsed.state, parsed.version);
+    const loadedSaveFingerprint = saveFingerprint(raw);
+    try {
+      applySaveData(parsed.state, parsed.version);
+    } catch (error) {
+      loadRecoveryMode = true;
+      // The valid raw save is still the storage source after an apply failure.
+      lastKnownSaveFingerprint = loadedSaveFingerprint;
+      writeLoadFailure("apply", error, parsed);
+      runtime.setSaveStatus(runtime.t("loadFailed"));
+      return false;
+    }
+
+    lastKnownSaveFingerprint = loadedSaveFingerprint;
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
     const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);
-    const offlineElapsed = runtime.offlineElapsedFromSave
-      ? runtime.offlineElapsedFromSave(savedAt, serverSavedAt)
-      : {
-        elapsedSeconds: Math.max(0, (Date.now() - savedAt) / 1000),
-        clockSource: "local-fallback",
-        clockAnomaly: false,
-        legacyTimestampUsed: false,
-      };
-    if (
-      runtime.processOfflineElapsed
-      && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
-    ) {
-      runtime.processOfflineElapsed(offlineElapsed.elapsedSeconds, "load", offlineElapsed);
-    } else if (runtime.setOfflineBaseline) {
-      runtime.setOfflineBaseline(
-        runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
-        runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
-      );
+    const previousLoadFailure = readLoadFailure();
+    const retryMetadataMatchesSave = previousLoadFailure?.stage === "offline"
+      && previousLoadFailure.offlineRetrySavedAt > 0
+      && previousLoadFailure.offlineRetrySaveFingerprint === loadedSaveFingerprint;
+    const retryBaseline = retryMetadataMatchesSave
+      ? {
+        savedAt: previousLoadFailure.offlineRetrySavedAt,
+        serverSavedAt: previousLoadFailure.offlineRetryServerSavedAt,
+        saveFingerprint: loadedSaveFingerprint,
+      }
+      : { savedAt, serverSavedAt, saveFingerprint: loadedSaveFingerprint };
+    try {
+      const offlineElapsed = runtime.offlineElapsedFromSave
+        ? runtime.offlineElapsedFromSave(retryBaseline.savedAt, retryBaseline.serverSavedAt)
+        : {
+          elapsedSeconds: Math.max(0, (Date.now() - retryBaseline.savedAt) / 1000),
+          clockSource: "local-fallback",
+          clockAnomaly: false,
+          legacyTimestampUsed: false,
+        };
+      if (
+        runtime.processOfflineElapsed
+        && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
+      ) {
+        const offlineResult = runtime.processOfflineElapsed(
+          offlineElapsed.elapsedSeconds,
+          "load",
+          { ...offlineElapsed, retryBaseline },
+        );
+        if (offlineResult === null) throw new Error("offline progress save failed");
+        offlineProcessed = true;
+      } else if (runtime.setOfflineBaseline) {
+        runtime.setOfflineBaseline(
+          runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
+          runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
+        );
+      }
+      if (offlineProcessed) {
+        loadTransactionActive = false;
+        loadRecoveryMode = false;
+        if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) {
+          throw new Error("offline progress save failed");
+        }
+      }
+    } catch (error) {
+      try {
+        applySaveData(parsed.state, parsed.version);
+      } catch (restoreError) {
+        // The persisted save remains authoritative even if the in-memory rollback fails.
+      }
+      runtime.offlineReport = null;
+      if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
+      loadRecoveryMode = true;
+      runtime.autoSaveElapsed = 0;
+      writeLoadFailure("offline", error, parsed, retryBaseline);
+      runtime.setSaveStatus(runtime.t("loadFailed"));
+      return false;
     }
+
+    loadRecoveryMode = false;
+    clearLoadFailure();
+    lastKnownSaveFingerprint = offlineProcessed
+      ? currentSaveFingerprint()
+      : loadedSaveFingerprint;
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(runtime.t("loaded"));
+    return true;
   } catch (error) {
-    quarantineSave(raw);
+    loadRecoveryMode = true;
+    writeLoadFailure("apply", error, parsed);
     runtime.setSaveStatus(runtime.t("loadFailed"));
+    return false;
+  } finally {
+    loadTransactionActive = false;
   }
+}
+
+function retryLoad() {
+  return loadGame({ allowDuringLoadRecovery: true });
+}
+
+function restoreQuarantineSave() {
+  const entry = readQuarantineEntry();
+  if (!entry?.raw) {
+    runtime.setSaveStatus(runtime.t("recoveryInvalid"));
+    return false;
+  }
+  if (
+    typeof window !== "undefined"
+    && typeof window.confirm === "function"
+    && !window.confirm(runtime.t("restoreQuarantineConfirm"))
+  ) return false;
+  if (!backupCurrentSave("pre-quarantine-restore", runtime.SAVE_RESTORE_UNDO_KEY)) return false;
+  try {
+    localStorage.setItem(runtime.SAVE_KEY, entry.raw);
+  } catch (error) {
+    runtime.setSaveStatus(runtime.t("recoveryRestoreFailed"));
+    return false;
+  }
+  const restored = loadGame({ allowDuringLoadRecovery: true });
+  if (!restored) return false;
+  try {
+    localStorage.removeItem(runtime.SAVE_QUARANTINE_KEY);
+    recoveryRevision += 1;
+  } catch (error) {
+    // Keeping the quarantine copy is safer than losing a recovery option.
+  }
+  runtime.setSaveStatus(runtime.t("quarantineRestored"));
+  return true;
 }
 
 function resetSave() {
   const confirmed = window.confirm(runtime.t("resetConfirm"));
   if (!confirmed) return;
-  if (!createCheckpoint("pre-reset", { force: true })) return;
+  if (!createCheckpoint("pre-reset", { force: true, allowDuringLoadRecovery: true })) return;
+  loadRecoveryMode = false;
+  clearLoadFailure();
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   localStorage.removeItem(runtime.SAVE_KEY);
+  lastKnownSaveFingerprint = "";
+  lastLocalSaveFingerprint = "";
   runtime.offlineReport = null;
   if (runtime.rebaseLocalClock) runtime.rebaseLocalClock();
   if (runtime.setOfflineBaseline) {
@@ -694,6 +1160,7 @@ function resetSave() {
     fastestTowerChallengeTimes: Array(4).fill(0),
     infiniteCapBroken: false,
     achievementMask: 0,
+    achievementMaskHigh: 0,
     totalPlayTime: 0,
     totalRealPlayTime: 0,
     currentInfinityRunTime: 0,
@@ -746,6 +1213,7 @@ function resetSave() {
 }
 
 expose("legacyInfinityUpgradeRefundLog10", () => legacyInfinityUpgradeRefundLog10, (value) => { legacyInfinityUpgradeRefundLog10 = value; });
+expose("clampOfflineTickCount", () => clampOfflineTickCount, (value) => { clampOfflineTickCount = value; });
 expose("applySaveData", () => applySaveData, (value) => { applySaveData = value; });
 expose("serializeSaveData", () => serializeSaveData, (value) => { serializeSaveData = value; });
 expose("saveGame", () => saveGame, (value) => { saveGame = value; });
@@ -753,9 +1221,21 @@ expose("backupCurrentSave", () => backupCurrentSave, (value) => { backupCurrentS
 expose("createCheckpoint", () => createCheckpoint, (value) => { createCheckpoint = value; });
 expose("recoveryEntries", () => recoveryEntries, (value) => { recoveryEntries = value; });
 expose("recoveryRevision", () => recoveryRevision);
+expose("saveRevision", () => saveRevision);
+expose("lastLocalSaveFingerprint", () => lastLocalSaveFingerprint);
+expose("lastKnownSaveFingerprint", () => lastKnownSaveFingerprint);
+expose("loadRecoveryMode", () => loadRecoveryMode);
+expose("finishLoadRecovery", () => finishLoadRecovery);
+expose("currentSaveFingerprint", () => currentSaveFingerprint);
+expose("saveSourceIsCurrent", () => saveSourceIsCurrent);
+expose("enterLoadRecovery", () => enterLoadRecovery);
+expose("snapshotRuntimeState", () => snapshotRuntimeState);
+expose("restoreRuntimeState", () => restoreRuntimeState);
 expose("restorePreImportSave", () => restorePreImportSave, (value) => { restorePreImportSave = value; });
 expose("restoreCheckpoint", () => restoreCheckpoint, (value) => { restoreCheckpoint = value; });
 expose("restoreUndoSave", () => restoreUndoSave, (value) => { restoreUndoSave = value; });
 expose("quarantineSave", () => quarantineSave, (value) => { quarantineSave = value; });
 expose("loadGame", () => loadGame, (value) => { loadGame = value; });
+expose("retryLoad", () => retryLoad, (value) => { retryLoad = value; });
+expose("restoreQuarantineSave", () => restoreQuarantineSave, (value) => { restoreQuarantineSave = value; });
 expose("resetSave", () => resetSave, (value) => { resetSave = value; });
