@@ -85,15 +85,15 @@ function extractCacheVersions(source, pattern) {
 }
 
 function extractJavaScriptCacheVersions(indexSource) {
+  if (typeof indexSource !== "string") return [];
+  const extract = (pattern) => [...indexSource.matchAll(pattern)].map((match) => {
+    const [assetPath, query = ""] = match[1].split("?", 2);
+    const version = query.match(/(?:^|&)v=([^&]*)/)?.[1] || null;
+    return { path: assetPath, version };
+  });
   return [
-    ...extractCacheVersions(
-      indexSource,
-      /:\s*["']([^"']+\.js)(?:\?v=([^"'&\s]+))?["']/g,
-    ),
-    ...extractCacheVersions(
-      indexSource,
-      /\bsrc\s*=\s*["']([^"']+\.js)(?:\?v=([^"'&\s]+))?["']/g,
-    ),
+    ...extract(/:\s*["']([^"']+\.js(?:\?[^"']*)?)["']/g),
+    ...extract(/\bsrc\s*=\s*["']([^"']+\.js(?:\?[^"']*)?)["']/g),
   ];
 }
 
