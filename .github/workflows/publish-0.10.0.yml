@@ -8,6 +8,7 @@ on:
       - .github/workflows/publish-0.10.0.yml
 
 permissions:
+  actions: read
   contents: write
   pages: read
 
@@ -109,5 +110,39 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git commit -m "Record 0.10.0 live deployment check"
+            git push origin HEAD:release/0.10.0
+          fi
+
+      - name: Verify main Regression Suite
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_json=""
+          for attempt in $(seq 1 12); do
+            run_json="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=6e8d3ca81e437d4b30e5fe8387cc4f406438d6fc&event=push&per_page=20" \
+              --jq '.workflow_runs[] | select(.name == "Regression Suite") | {status, conclusion, html_url, run_number}' | head -n 1)"
+            run_status="$(printf '%s' "$run_json" | jq -r '.status // empty' 2>/dev/null || true)"
+            if [ "$run_status" = "completed" ]; then
+              break
+            fi
+            sleep 5
+          done
+          git fetch origin release/0.10.0
+          git checkout -B release/0.10.0 origin/release/0.10.0
+          if [ -z "$run_json" ]; then
+            printf 'run_found=false\n' > .release-0.10.0-main-ci
+          else
+            run_status="$(printf '%s' "$run_json" | jq -r '.status // empty')"
+            conclusion="$(printf '%s' "$run_json" | jq -r '.conclusion // empty')"
+            run_url="$(printf '%s' "$run_json" | jq -r '.html_url // empty')"
+            run_number="$(printf '%s' "$run_json" | jq -r '.run_number // empty')"
+            printf 'run_found=true\nstatus=%s\nconclusion=%s\nrun_number=%s\nrun_url=%s\n' \
+              "$run_status" "$conclusion" "$run_number" "$run_url" > .release-0.10.0-main-ci
+          fi
+          git add .release-0.10.0-main-ci
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Record 0.10.0 main CI check"
             git push origin HEAD:release/0.10.0
           fi
