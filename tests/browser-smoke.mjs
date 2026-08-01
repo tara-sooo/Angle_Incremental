@@ -1302,15 +1302,36 @@ try {
     ));
     await mobilePage.evaluate(() => window.__angleDebug.ready);
     const mobileButtonInteraction = await mobilePage.evaluate(() => {
-      const selectors = ["[data-tab=angle]", "#speedUpgrade"];
+      document.querySelector("#infiniteAngleUnlockButton").disabled = false;
+      const selectors = ["[data-tab=angle]", "#speedUpgrade", "#infiniteAngleUnlockButton"];
+      const rules = [];
+      const collectRules = (cssRules) => {
+        Array.from(cssRules).forEach((rule) => {
+          if (rule.cssRules && rule.cssRules.length > 0) collectRules(rule.cssRules);
+          else rules.push(rule);
+        });
+      };
+      Array.from(document.styleSheets).forEach((styleSheet) => {
+        try {
+          collectRules(styleSheet.cssRules);
+        } catch (error) {
+          // Cross-origin stylesheets are not part of this local smoke test.
+        }
+      });
+      const pressedRule = rules.find((rule) => rule.selectorText === "button:active:not(:disabled)");
       return {
         hoverNone: window.matchMedia("(hover: none)").matches,
         coarsePointer: window.matchMedia("(pointer: coarse)").matches,
+        pressedFeedback: {
+          transform: pressedRule?.style.transform ?? "",
+          filter: pressedRule?.style.filter ?? "",
+        },
         buttons: selectors.map((selector) => {
           const button = document.querySelector(selector);
           const styles = getComputedStyle(button);
           return {
             selector,
+            disabled: Boolean(button?.disabled),
             transitionDurations: styles.transitionDuration.split(",").map((value) => value.trim()),
             touchAction: styles.touchAction,
             tapHighlightColor: styles.webkitTapHighlightColor,
@@ -1333,6 +1354,16 @@ try {
     assert.ok(
       mobileButtonInteraction.buttons.every((button) => button.tapHighlightColor === "rgba(0, 0, 0, 0)"),
       "touch buttons should suppress the browser tap highlight",
+    );
+    assert.deepEqual(
+      mobileButtonInteraction.pressedFeedback,
+      { transform: "translateY(1px)", filter: "brightness(0.92)" },
+      "touch buttons should retain visible pressed feedback after tap highlight suppression",
+    );
+    assert.equal(
+      mobileButtonInteraction.buttons.find((button) => button.selector === "#infiniteAngleUnlockButton")?.disabled,
+      false,
+      "the Infinite Angle unlock button should be covered in its enabled touch state",
     );
     const mobileStartup = await mobilePage.evaluate(() => ({
       updateTitle: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",

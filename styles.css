@@ -1701,6 +1701,11 @@ canvas {
 }
 
 @media (hover: none), (pointer: coarse) {
+  button:active:not(:disabled) {
+    transform: translateY(1px);
+    filter: brightness(0.92);
+  }
+
   button {
     transition-duration: 0ms !important;
   }
