@@ -7,6 +7,7 @@ import { chromium } from "playwright";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reportPath = path.join(root, "output", "performance-smoke.json");
+const expectedAppVersion = JSON.parse(await readFile(path.join(root, "version.json"), "utf8")).appVersion;
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -163,10 +164,10 @@ try {
     for (const deviceScaleFactor of deviceScaleFactors) {
       const context = await browser.newContext({ viewport, deviceScaleFactor });
       const page = await context.newPage();
-      await page.addInitScript(() => {
+      await page.addInitScript(({ appVersion }) => {
         window.requestAnimationFrame = () => 0;
-        localStorage.setItem("angle-incremental-seen-version", "0.10.0");
-      });
+        localStorage.setItem("angle-incremental-seen-version", appVersion);
+      }, { appVersion: expectedAppVersion });
       await page.goto(`http://127.0.0.1:${address.port}/index.html`, { waitUntil: "networkidle" });
       await page.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
       await page.evaluate(() => window.__angleDebug.ready);

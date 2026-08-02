@@ -7,6 +7,7 @@ import { chromium } from "playwright";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const reportPath = path.join(root, "browser-smoke-report.json");
+const EXPECTED_ASSET_VERSION = JSON.parse(await readFile(path.join(root, "version.json"), "utf8")).appVersion;
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -14,7 +15,6 @@ const contentTypes = {
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
 };
-const EXPECTED_ASSET_VERSION = "0.10.0";
 const EXPECTED_MODULE_PATHS = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -123,11 +123,38 @@ try {
       canvas: modal?.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
     };
   });
-  assert.equal(updateModal.visible, true, "the 0.10.0 update modal should appear for a fresh browser profile");
-  assert.equal(updateModal.title, "0.10.0 アップデート", "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /Time Flux/);
-  assert.match(updateModal.summary, /IU14-1/);
-  assert.match(updateModal.canvas, /Tower Challenge/);
+  assert.equal(updateModal.visible, true, "the current-version update modal should appear for a fresh browser profile");
+  assert.equal(updateModal.title, `${EXPECTED_ASSET_VERSION} アップデート`, "the update modal should show the current Japanese version");
+  assert.match(updateModal.summary, /タッチ端末/);
+  assert.match(updateModal.summary, /オフライン進行/);
+  assert.match(updateModal.canvas, /押下表示/);
+  assert.match(updateModal.canvas, /オフライン進行/);
+  const desktopButtonInteraction = await page.evaluate(() => {
+    const selectors = ["[data-tab=angle]", "#speedUpgrade"];
+    return selectors.map((selector) => {
+      const button = document.querySelector(selector);
+      const styles = getComputedStyle(button);
+      return {
+        selector,
+        transitionDurations: styles.transitionDuration.split(",").map((value) => value.trim()),
+        touchAction: styles.touchAction,
+        hoverCapable: window.matchMedia("(hover: hover)").matches,
+        finePointer: window.matchMedia("(pointer: fine)").matches,
+      };
+    });
+  });
+  assert.ok(
+    desktopButtonInteraction.every((button) => button.hoverCapable && button.finePointer),
+    "the desktop smoke context should expose a fine hover pointer",
+  );
+  assert.ok(
+    desktopButtonInteraction.every((button) => button.transitionDurations.every((duration) => duration === "0.12s")),
+    "desktop buttons should retain their 120ms transitions",
+  );
+  assert.ok(
+    desktopButtonInteraction.every((button) => button.touchAction === "manipulation"),
+    "desktop buttons should still use touch-action manipulation",
+  );
   const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
   assert.equal(manifestVersion.appVersion, EXPECTED_ASSET_VERSION, "version.json should match the asset version");
   const serverClockProbe = await page.evaluate(async () => {
@@ -254,7 +281,7 @@ try {
       version: 10,
       savedAt: serverClockSavedAt,
       serverSavedAt: serverClockSavedAt - 8 * 86400 * 1000,
-      state: { offlineProgressEnabled: false, timeFlux: 0, timeFluxCapacityLevel: 30 },
+      state: { offlineProgressEnabled: true, timeFlux: 0, timeFluxCapacityLevel: 30 },
     },
     checkpoints: [{
       appVersion: EXPECTED_ASSET_VERSION,
@@ -263,7 +290,7 @@ try {
       serverSavedAt: serverClockSavedAt,
       backedUpAt: serverClockSavedAt + 3 * 86400 * 1000,
       reason: "periodic",
-      state: { offlineProgressEnabled: false, timeFlux: 0 },
+      state: { offlineProgressEnabled: true, timeFlux: 0 },
     }],
   });
   const serverClockPage = await serverClockContext.newPage();
@@ -706,7 +733,7 @@ try {
     state.currentInfinityRealTime = 0;
     state.timeFlux = 123456;
     state.timeFluxSpeed = 60;
-    state.offlineProgressEnabled = false;
+    state.offlineProgressEnabled = true;
     window.__angleDebug.advanceOnlineTime(1);
     const ui = {
       quickBar: Boolean(document.querySelector("#timeFluxQuickBar")),
@@ -764,7 +791,7 @@ try {
   assert.ok(Math.abs(timeFluxRemoval.online.currentInfinityRunTime - 1) < 1e-9, "Infinity time should advance at a fixed one-to-one rate");
   assert.ok(Math.abs(timeFluxRemoval.online.currentInfinityRealTime - 1) < 1e-9, "real Infinity time should advance normally");
   assert.equal(timeFluxRemoval.online.timeFlux, 123456, "dormant Time Flux should not be consumed online");
-  assert.equal(timeFluxRemoval.report.offlineProgressEnabled, true, "legacy disabled offline progress should migrate to normal processing");
+  assert.equal(timeFluxRemoval.report.offlineProgressEnabled, true, "enabled offline progress should use the normal processing mode");
   assert.equal(timeFluxRemoval.report.timeFluxGained, undefined, "normal offline reports should not grant dormant Time Flux");
   assert.equal(timeFluxRemoval.reportVisible, true, "normal offline processing should show the report");
   assert.equal(timeFluxRemoval.reportMode, "オフライン進行", "the report should identify normal offline progress");
@@ -880,6 +907,54 @@ try {
   assert.equal(offlineTickSetting.value, "5000", "the offline tick setting should accept a numeric value");
   assert.equal(offlineTickSetting.state, 5000, "the offline tick setting should update runtime state");
   assert.ok(offlineTickSetting.width > 0 && offlineTickSetting.height > 0, "the offline tick setting should remain visible");
+  const offlineProgressSetting = await page.evaluate(() => {
+    const { switchMainTab } = window.__angleDebug;
+    switchMainTab("settings");
+    const toggle = document.querySelector("#offlineProgressToggle");
+    const before = {
+      checked: toggle?.checked ?? false,
+      state: window.__angleDebug.state.offlineProgressEnabled,
+    };
+    if (toggle) {
+      toggle.checked = false;
+      toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    window.advanceTime(0);
+    const disabled = {
+      checked: toggle?.checked ?? true,
+      state: window.__angleDebug.state.offlineProgressEnabled,
+      persisted: JSON.parse(localStorage.getItem("angle-incremental-save") || "{}").state?.offlineProgressEnabled,
+    };
+    if (toggle) {
+      toggle.checked = true;
+      toggle.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    window.advanceTime(0);
+    const enabled = {
+      checked: toggle?.checked ?? false,
+      state: window.__angleDebug.state.offlineProgressEnabled,
+      persisted: JSON.parse(localStorage.getItem("angle-incremental-save") || "{}").state?.offlineProgressEnabled,
+    };
+    const width = toggle?.getBoundingClientRect().width ?? 0;
+    const height = toggle?.getBoundingClientRect().height ?? 0;
+    switchMainTab("angle");
+    return {
+      before,
+      disabled,
+      enabled,
+      width,
+      height,
+    };
+  });
+  assert.equal(offlineProgressSetting.before.checked, true, "offline progress should be enabled by default");
+  assert.equal(offlineProgressSetting.before.state, true, "the default offline progress state should be enabled");
+  assert.equal(offlineProgressSetting.disabled.checked, false, "the offline progress checkbox should turn off");
+  assert.equal(offlineProgressSetting.disabled.state, false, "disabling offline progress should update runtime state");
+  assert.equal(offlineProgressSetting.disabled.persisted, false, "disabling offline progress should persist the setting");
+  assert.equal(offlineProgressSetting.enabled.checked, true, "the offline progress checkbox should turn on");
+  assert.equal(offlineProgressSetting.enabled.state, true, "enabling offline progress should update runtime state");
+  assert.equal(offlineProgressSetting.enabled.persisted, true, "enabling offline progress should persist the setting");
+  assert.ok(offlineProgressSetting.width > 0 && offlineProgressSetting.height > 0, "the offline progress setting should remain usable");
   const addedJapaneseNews = await page.evaluate(() => {
     const item = document.querySelector("#newsTickerText");
     window.__angleDebug.applySetting("language", "ja");
@@ -1275,6 +1350,70 @@ try {
       && Boolean(window.__angleDebug?.ready)
     ));
     await mobilePage.evaluate(() => window.__angleDebug.ready);
+    const mobileButtonInteraction = await mobilePage.evaluate(() => {
+      document.querySelector("#infiniteAngleUnlockButton").disabled = false;
+      const selectors = ["[data-tab=angle]", "#speedUpgrade", "#infiniteAngleUnlockButton"];
+      const rules = [];
+      const collectRules = (cssRules) => {
+        Array.from(cssRules).forEach((rule) => {
+          if (rule.cssRules && rule.cssRules.length > 0) collectRules(rule.cssRules);
+          else rules.push(rule);
+        });
+      };
+      Array.from(document.styleSheets).forEach((styleSheet) => {
+        try {
+          collectRules(styleSheet.cssRules);
+        } catch (error) {
+          // Cross-origin stylesheets are not part of this local smoke test.
+        }
+      });
+      const pressedRule = rules.find((rule) => rule.selectorText === "button:active:not(:disabled)");
+      return {
+        hoverNone: window.matchMedia("(hover: none)").matches,
+        coarsePointer: window.matchMedia("(pointer: coarse)").matches,
+        pressedFeedback: {
+          transform: pressedRule?.style.transform ?? "",
+          filter: pressedRule?.style.filter ?? "",
+        },
+        buttons: selectors.map((selector) => {
+          const button = document.querySelector(selector);
+          const styles = getComputedStyle(button);
+          return {
+            selector,
+            disabled: Boolean(button?.disabled),
+            transitionDurations: styles.transitionDuration.split(",").map((value) => value.trim()),
+            touchAction: styles.touchAction,
+            tapHighlightColor: styles.webkitTapHighlightColor,
+          };
+        }),
+      };
+    });
+    assert.ok(
+      mobileButtonInteraction.hoverNone || mobileButtonInteraction.coarsePointer,
+      "the mobile smoke context should expose a touch-oriented pointer",
+    );
+    assert.ok(
+      mobileButtonInteraction.buttons.every((button) => button.transitionDurations.every((duration) => duration === "0s")),
+      "touch buttons should apply their state without a transition delay",
+    );
+    assert.ok(
+      mobileButtonInteraction.buttons.every((button) => button.touchAction === "manipulation"),
+      "touch buttons should use touch-action manipulation",
+    );
+    assert.ok(
+      mobileButtonInteraction.buttons.every((button) => button.tapHighlightColor === "rgba(0, 0, 0, 0)"),
+      "touch buttons should suppress the browser tap highlight",
+    );
+    assert.deepEqual(
+      mobileButtonInteraction.pressedFeedback,
+      { transform: "translateY(1px)", filter: "brightness(0.92)" },
+      "touch buttons should retain visible pressed feedback after tap highlight suppression",
+    );
+    assert.equal(
+      mobileButtonInteraction.buttons.find((button) => button.selector === "#infiniteAngleUnlockButton")?.disabled,
+      false,
+      "the Infinite Angle unlock button should be covered in its enabled touch state",
+    );
     const mobileStartup = await mobilePage.evaluate(() => ({
       updateTitle: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
       tabCount: document.querySelectorAll(".main-tab").length,
@@ -1283,7 +1422,7 @@ try {
       timeFluxQuickBar: Boolean(document.querySelector("#timeFluxQuickBar")),
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
-    assert.equal(mobileStartup.updateTitle, "0.10.0 アップデート", "mobile startup should use the release version");
+    assert.equal(mobileStartup.updateTitle, `${EXPECTED_ASSET_VERSION} アップデート`, "mobile startup should use the release version");
     assert.equal(mobileStartup.tabCount, 8, "mobile startup should expose the active main tabs");
     assert.equal(mobileStartup.timeFluxTab, false, "mobile startup should omit the dormant Time Flux tab");
     assert.equal(mobileStartup.timeFluxPanel, false, "mobile startup should omit the dormant Time Flux panel");
@@ -1294,10 +1433,14 @@ try {
     await mobilePage.locator('[data-tab="settings"]').click();
     const mobileOfflineSetting = await mobilePage.evaluate(() => ({
       panelActive: document.querySelector('[data-panel="settings"]')?.classList.contains("is-active") ?? false,
+      progressToggleWidth: document.querySelector("#offlineProgressToggle")?.getBoundingClientRect().width ?? 0,
+      progressToggleHeight: document.querySelector("#offlineProgressToggle")?.getBoundingClientRect().height ?? 0,
       tickInputWidth: document.querySelector("#offlineTickInput")?.getBoundingClientRect().width ?? 0,
       tickInputHeight: document.querySelector("#offlineTickInput")?.getBoundingClientRect().height ?? 0,
     }));
     assert.equal(mobileOfflineSetting.panelActive, true, "the Settings tab should activate on mobile");
+    assert.ok(mobileOfflineSetting.progressToggleWidth > 0, "the mobile offline progress setting should remain visible");
+    assert.ok(mobileOfflineSetting.progressToggleHeight > 0, "the mobile offline progress setting should remain usable");
     assert.ok(mobileOfflineSetting.tickInputWidth > 0, "the mobile offline tick setting should remain visible");
     assert.ok(mobileOfflineSetting.tickInputHeight > 0, "the mobile offline tick setting should remain usable");
 

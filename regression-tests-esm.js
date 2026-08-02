@@ -14,6 +14,7 @@ async function main() {
   await require("./tests/tower-module-runtime.js").runTowerModuleRuntimeTest();
   await require("./tests/save-recovery-module-runtime.js").runSaveRecoveryModuleRuntimeTest();
   await require("./tests/time-flux-module-runtime.js").runTimeFluxModuleRuntimeTest();
+  await require("./tests/version-consistency-module-runtime.js").runVersionConsistencyModuleRuntimeTest();
 }
 
 main().catch((error) => {

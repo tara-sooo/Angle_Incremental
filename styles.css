@@ -37,6 +37,11 @@ select {
   font: inherit;
 }
 
+button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .shell {
   width: min(1640px, calc(100vw - 18px));
   height: 100svh;
@@ -174,11 +179,18 @@ select {
   transition: transform 120ms ease, filter 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
-.main-tab:hover,
 .main-tab.is-active {
   color: white;
   border-color: var(--line-strong);
   filter: brightness(1.16);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .main-tab:hover {
+    color: white;
+    border-color: var(--line-strong);
+    filter: brightness(1.16);
+  }
 }
 
 .main-tab.is-active {
@@ -465,22 +477,24 @@ canvas {
   background: linear-gradient(180deg, #93503f, #703226);
 }
 
-.upgrade-button:hover:not(:disabled),
-.buy-all-button:hover:not(:disabled),
-.generation-button:hover:not(:disabled),
-.core-boost-button:hover:not(:disabled),
-.infinity-button:hover:not(:disabled),
-.mini-button:hover:not(:disabled),
-.infinity-upgrade-node:hover:not(:disabled),
-.infinity-upgrade-detail-buy:hover:not(:disabled),
-.challenge-row button:hover:not(:disabled),
-.challenge-button:hover:not(:disabled),
-.tower-build-button:hover:not(:disabled),
-.break-button:hover:not(:disabled),
-.reset-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  filter: brightness(1.12);
-  border-color: rgba(255, 255, 255, 0.34);
+@media (hover: hover) and (pointer: fine) {
+  .upgrade-button:hover:not(:disabled),
+  .buy-all-button:hover:not(:disabled),
+  .generation-button:hover:not(:disabled),
+  .core-boost-button:hover:not(:disabled),
+  .infinity-button:hover:not(:disabled),
+  .mini-button:hover:not(:disabled),
+  .infinity-upgrade-node:hover:not(:disabled),
+  .infinity-upgrade-detail-buy:hover:not(:disabled),
+  .challenge-row button:hover:not(:disabled),
+  .challenge-button:hover:not(:disabled),
+  .tower-build-button:hover:not(:disabled),
+  .break-button:hover:not(:disabled),
+  .reset-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    filter: brightness(1.12);
+    border-color: rgba(255, 255, 255, 0.34);
+  }
 }
 
 .upgrade-button:active:not(:disabled),
@@ -763,11 +777,18 @@ canvas {
   overflow-wrap: anywhere;
 }
 
-.infinity-subtab:hover,
 .infinity-subtab.is-active {
   color: white;
   border-color: var(--line-strong);
   filter: brightness(1.14);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .infinity-subtab:hover {
+    color: white;
+    border-color: var(--line-strong);
+    filter: brightness(1.14);
+  }
 }
 
 .infinity-subtab.is-active {
@@ -819,13 +840,25 @@ canvas {
   overflow-wrap: anywhere;
 }
 
-.challenge-subtab:hover,
-.challenge-subtab.is-active,
-.statistics-subtab:hover,
 .statistics-subtab.is-active {
   color: white;
   border-color: var(--line-strong);
   filter: brightness(1.14);
+}
+
+.challenge-subtab.is-active {
+  color: white;
+  border-color: var(--line-strong);
+  filter: brightness(1.14);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .challenge-subtab:hover,
+  .statistics-subtab:hover {
+    color: white;
+    border-color: var(--line-strong);
+    filter: brightness(1.14);
+  }
 }
 
 .challenge-subtab.is-active,
@@ -1648,9 +1681,11 @@ canvas {
   border-color: var(--accent);
 }
 
-.reset-button:hover:not(:disabled) {
-  color: white;
-  background: var(--accent);
+@media (hover: hover) and (pointer: fine) {
+  .reset-button:hover:not(:disabled) {
+    color: white;
+    background: var(--accent);
+  }
 }
 
 .light-effects *,
@@ -1659,8 +1694,21 @@ canvas {
   transition: none !important;
 }
 
-.light-effects button:hover:not(:disabled) {
-  transform: none;
+@media (hover: hover) and (pointer: fine) {
+  .light-effects button:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (hover: none), (pointer: coarse) {
+  button:active:not(:disabled) {
+    transform: translateY(1px);
+    filter: brightness(0.92);
+  }
+
+  button {
+    transition-duration: 0ms !important;
+  }
 }
 
 .fps-counter {
