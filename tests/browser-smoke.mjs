@@ -125,9 +125,10 @@ try {
   });
   assert.equal(updateModal.visible, true, "the current-version update modal should appear for a fresh browser profile");
   assert.equal(updateModal.title, `${EXPECTED_ASSET_VERSION} アップデート`, "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /Time Flux/);
-  assert.match(updateModal.summary, /IU14-1/);
-  assert.match(updateModal.canvas, /Tower Challenge/);
+  assert.match(updateModal.summary, /タッチ端末/);
+  assert.match(updateModal.summary, /オフライン進行/);
+  assert.match(updateModal.canvas, /押下表示/);
+  assert.match(updateModal.canvas, /オフライン進行/);
   const desktopButtonInteraction = await page.evaluate(() => {
     const selectors = ["[data-tab=angle]", "#speedUpgrade"];
     return selectors.map((selector) => {

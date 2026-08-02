@@ -12,25 +12,26 @@ async function runVersionConsistencyModuleRuntimeTest() {
   );
 
   const expectedVersion = checker.extractAppVersion(sources.constants);
+  const alternateVersion = expectedVersion === "0.10.1" ? "0.10.2" : "0.10.1";
   const upgradedSources = Object.fromEntries(
     Object.entries(sources).map(([key, source]) => [
       key,
-      typeof source === "string" ? source.replaceAll(expectedVersion, "0.10.1") : source,
+      typeof source === "string" ? source.replaceAll(expectedVersion, alternateVersion) : source,
     ]),
   );
   assert.deepEqual(
     checker.collectVersionConsistencyIssues(upgradedSources),
     [],
-    "a consistent 0.10.1 release notation should pass",
+    `a consistent ${alternateVersion} release notation should pass`,
   );
 
   const mismatchedCssSources = {
     ...sources,
-    index: sources.index.replace(`styles.css?v=${expectedVersion}`, "styles.css?v=0.10.1"),
+    index: sources.index.replace(`styles.css?v=${expectedVersion}`, `styles.css?v=${alternateVersion}`),
   };
   const mismatchedCssIssues = checker.collectVersionConsistencyIssues(mismatchedCssSources);
   assert.ok(
-    mismatchedCssIssues.some((entry) => entry.label.includes("CSS cache buster") && entry.actual === "0.10.1"),
+    mismatchedCssIssues.some((entry) => entry.label.includes("CSS cache buster") && entry.actual === alternateVersion),
     "a mismatched CSS cache buster should identify the target and detected value",
   );
 
