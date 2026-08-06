@@ -87,6 +87,36 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { debug, runtime, storage } = instance;
+    const save = runtime.serializeSaveData();
+    save.savedAt = Date.now() - 1000;
+    storage.set(runtime.SAVE_KEY, JSON.stringify(save));
+    const originalOfflineElapsedFromSave = runtime.offlineElapsedFromSave;
+    const originalProcessOfflineElapsed = runtime.processOfflineElapsed;
+    let resolveOffline;
+    runtime.offlineElapsedFromSave = () => ({
+      elapsedSeconds: 1,
+      clockSource: "server",
+      clockAnomaly: false,
+      legacyTimestampUsed: false,
+    });
+    runtime.processOfflineElapsed = () => new Promise((resolve) => {
+      resolveOffline = resolve;
+    });
+    try {
+      const firstLoad = debug.loadGame();
+      while (!resolveOffline) await Promise.resolve();
+      assert.equal(await debug.loadGame(), false, "a concurrent recovery load should be rejected while the first load is active");
+      resolveOffline({});
+      assert.equal(await firstLoad, true, "the first recovery load should finish normally");
+    } finally {
+      runtime.offlineElapsedFromSave = originalOfflineElapsedFromSave;
+      runtime.processOfflineElapsed = originalProcessOfflineElapsed;
+    }
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { context, debug, runtime, storage } = instance;
     const { state } = debug;
     state.generationCount = 41;

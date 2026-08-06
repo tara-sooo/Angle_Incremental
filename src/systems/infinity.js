@@ -212,7 +212,13 @@ function applyStartingCoreBoosts() {
 }
 
 function recordInfinityCountRate(countGain, realElapsed, challenge, towerChallenge) {
-  if (challenge > 0 || towerChallenge > 0) return;
+  if (
+    runtime.offlineProcessing
+    || challenge > 0
+    || towerChallenge > 0
+    || runtime.state.activeChallenge > 0
+    || runtime.state.activeTowerChallenge > 0
+  ) return;
   const safeCountGain = Math.max(0, Math.floor(runtime.sanitizeNumber(countGain, 0)));
   const safeRealElapsed = Math.max(
     runtime.MAX_SIMULATION_STEP_SECONDS,

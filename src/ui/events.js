@@ -56,6 +56,7 @@ function switchStatisticsSubtab(tab) {
 }
 
 function applySetting(key, value) {
+  if (runtime.offlineProcessing) return;
   runtime.state[key] = value;
   if (key === "language") {
     runtime.state.language = runtime.normalizeChoice(value, ["ja", "en"], "ja");

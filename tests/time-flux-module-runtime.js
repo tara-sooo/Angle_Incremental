@@ -608,11 +608,50 @@ async function runTimeFluxModuleRuntimeTest() {
     millionTickRuntime.update = millionTickOriginalUpdate;
   }
 
+  const reentrancyInstance = await loadRuntime(candidatePath);
+  const reentrancyRuntime = reentrancyInstance.runtime;
+  const reentrancyDebug = reentrancyInstance.debug;
+  const reentrancyOriginalUpdate = reentrancyRuntime.update;
+  const reentrancyOriginalSetTimeout = reentrancyInstance.context.window.setTimeout;
+  let reentrancyYielded = false;
+  reentrancyDebug.state.generationCount = 7;
+  reentrancyDebug.state.offlineTickCount = reentrancyRuntime.OFFLINE_PROGRESS_MAX_TICKS;
+  reentrancyRuntime.update = () => {};
+  reentrancyInstance.context.window.setTimeout = (callback) => {
+    if (!reentrancyYielded) {
+      reentrancyYielded = true;
+      reentrancyDebug.resetSave();
+      reentrancyDebug.applySetting("offlineProgressEnabled", false);
+      reentrancyRuntime.offlineReport = null;
+    }
+    callback();
+    return 0;
+  };
+  try {
+    const reentrancyReport = await reentrancyDebug.processOfflineElapsed(
+      2000 * reentrancyRuntime.MAX_SIMULATION_STEP_SECONDS,
+      "test",
+      { clockSource: "server" },
+    );
+    assert.ok(reentrancyReport.processedTicks >= 2000, "chunked offline processing should survive a cleared shared report");
+    assert.equal(reentrancyDebug.state.generationCount, 7, "offline processing should lock reset actions while yielding");
+    assert.equal(reentrancyDebug.state.offlineProgressEnabled, true, "offline processing should lock settings while yielding");
+  } finally {
+    reentrancyRuntime.update = reentrancyOriginalUpdate;
+    reentrancyInstance.context.window.setTimeout = reentrancyOriginalSetTimeout;
+  }
+
   const rateInstance = await loadRuntime(candidatePath);
   const rateRuntime = rateInstance.runtime;
   const rateState = rateInstance.debug.state;
   rateRuntime.recordInfinityRun(0, 0, 1, false, 1, 0);
   rateRuntime.recordInfinityRun(0, 0, 0, false, 1, 2);
+  rateRuntime.offlineProcessing = true;
+  rateRuntime.recordInfinityRun(0, 0, 0, false, 1, 0);
+  rateRuntime.offlineProcessing = false;
+  rateState.activeTowerChallenge = 2;
+  rateRuntime.recordInfinityRun(0, 0, 0, false, 1, 0);
+  rateState.activeTowerChallenge = 0;
   assert.equal(rateState.bestInfinityCountPerSecond, 0, "challenge Infinity runs should not set the best rate");
   rateState.infinityCount = 1;
   rateState.score = Number.MAX_VALUE;

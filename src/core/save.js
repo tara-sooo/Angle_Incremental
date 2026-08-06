@@ -9,6 +9,7 @@ let lastLocalSaveFingerprint = "";
 let lastKnownSaveFingerprint = "";
 let lastPeriodicCheckpointMonotonicAt = null;
 let loadTransactionActive = false;
+let loadInFlight = false;
 let loadRecoveryMode = false;
 
 function currentSaveTimestamp() {
@@ -935,9 +936,11 @@ async function loadGame(options = {}) {
     runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
     return false;
   }
+  if (loadInFlight) return false;
   let raw = null;
   let parsed = null;
   let offlineProcessed = false;
+  loadInFlight = true;
   loadTransactionActive = true;
   try {
     raw = localStorage.getItem(runtime.SAVE_KEY);
@@ -1059,6 +1062,7 @@ async function loadGame(options = {}) {
     return false;
   } finally {
     loadTransactionActive = false;
+    loadInFlight = false;
   }
 }
 
@@ -1067,6 +1071,7 @@ function retryLoad() {
 }
 
 async function restoreQuarantineSave() {
+  if (loadInFlight) return false;
   const entry = readQuarantineEntry();
   if (!entry?.raw) {
     runtime.setSaveStatus(runtime.t("recoveryInvalid"));
@@ -1097,6 +1102,7 @@ async function restoreQuarantineSave() {
 }
 
 function resetSave() {
+  if (runtime.offlineProcessing) return;
   const confirmed = window.confirm(runtime.t("resetConfirm"));
   if (!confirmed) return;
   if (!createCheckpoint("pre-reset", { force: true, allowDuringLoadRecovery: true })) return;
@@ -1233,6 +1239,7 @@ expose("recoveryRevision", () => recoveryRevision);
 expose("saveRevision", () => saveRevision);
 expose("lastLocalSaveFingerprint", () => lastLocalSaveFingerprint);
 expose("lastKnownSaveFingerprint", () => lastKnownSaveFingerprint);
+expose("loadInFlight", () => loadInFlight);
 expose("loadRecoveryMode", () => loadRecoveryMode);
 expose("finishLoadRecovery", () => finishLoadRecovery);
 expose("currentSaveFingerprint", () => currentSaveFingerprint);

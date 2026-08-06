@@ -578,7 +578,8 @@ function runLayerAutomation() {
   return false;
 }
 
-function update(dt) {
+function update(dt, allowOffline = false) {
+  if (offlineProcessing && !allowOffline) return;
   runtime.state.totalPlayTime += dt;
   runtime.state.currentInfinityRunTime += dt;
   runtime.state.currentGenerationRunTime += dt;
@@ -650,6 +651,7 @@ function runRealTimeMaintenance(realSeconds) {
 }
 
 function advanceOnlineTime(realSeconds) {
+  if (offlineProcessing) return 0;
   const realDt = Math.max(0, runtime.sanitizeNumber(realSeconds, 0));
   if (realDt <= 0) return 0;
   runtime.state.totalRealPlayTime += realDt;
@@ -792,6 +794,21 @@ function yieldToEventLoop() {
   });
 }
 
+function setOfflineProcessingLock(locked) {
+  if (!document.querySelectorAll) return;
+  document.querySelectorAll("button, input, select, textarea").forEach((control) => {
+    if (!control.dataset) return;
+    if (locked) {
+      if (control.disabled) return;
+      control.dataset.offlineProcessingLocked = "true";
+      control.disabled = true;
+    } else if (control.dataset.offlineProcessingLocked === "true") {
+      control.disabled = false;
+      delete control.dataset.offlineProcessingLocked;
+    }
+  });
+}
+
 function refreshOfflineReportProgress(report, before, startedAt) {
   const current = offlineSnapshot();
   report.infinityCountAfter = current.infinityCount;
@@ -910,7 +927,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       } else {
         const tickSeconds = simulatedSeconds / requestedTicks;
         const startedAt = monotonicClockNow();
-        offlineReport = {
+        const progressReport = offlineReport = {
           source,
           elapsedSeconds: elapsed,
           effectiveElapsedSeconds: simulatedSeconds,
@@ -937,6 +954,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           totalInfinityCountGain: 0,
         };
         offlineProcessing = true;
+        setOfflineProcessingLock(true);
         try {
           while (processedTicks < requestedTicks) {
             const chunkStartedAt = monotonicClockNow();
@@ -945,18 +963,19 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
               processedTicks + OFFLINE_PROCESS_MAX_TICKS_PER_CHUNK,
             );
             do {
-              update(tickSeconds);
+              update(tickSeconds, true);
               processedTicks += 1;
             } while (
               processedTicks < chunkEnd
               && monotonicClockNow() - chunkStartedAt < OFFLINE_PROCESS_TIME_BUDGET_MS
             );
-            offlineReport.processedTicks = processedTicks;
-            refreshOfflineReportProgress(offlineReport, before, startedAt);
-            processingMilliseconds = offlineReport.processingMilliseconds;
+            progressReport.processedTicks = processedTicks;
+            refreshOfflineReportProgress(progressReport, before, startedAt);
+            processingMilliseconds = progressReport.processingMilliseconds;
             if (processedTicks < requestedTicks) await yieldToEventLoop();
           }
         } finally {
+          setOfflineProcessingLock(false);
           offlineProcessing = false;
         }
       }
@@ -1045,6 +1064,7 @@ async function reloadAfterSaveConflict() {
 }
 
 async function handleVisibilityChange() {
+  if (offlineProcessing) return;
   if (document.hidden) {
     const transactionSnapshot = snapshotOfflineTransaction();
     const retryBaseline = {
@@ -1173,7 +1193,7 @@ function frame(now) {
     smoothedFps = smoothedFps === 0 ? instantFps : smoothedFps * 0.9 + instantFps * 0.1;
   }
   lastTime = now;
-  if (document.hidden || visibilityResumeInFlight) {
+  if (document.hidden || visibilityResumeInFlight || offlineProcessing) {
     requestNextFrame(frame);
     return;
   }
