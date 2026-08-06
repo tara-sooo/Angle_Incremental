@@ -68,7 +68,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       throw new Error("test apply failure");
     };
     try {
-      assert.equal(debug.loadGame(), false, "an apply failure should fail the load transaction");
+      assert.equal(await debug.loadGame(), false, "an apply failure should fail the load transaction");
       assert.equal(storage.get(runtime.SAVE_KEY), rawSave, "an apply failure must keep the normal save");
       assert.equal(storage.has(runtime.SAVE_QUARANTINE_KEY), false, "an apply failure must not quarantine the save");
       const failure = JSON.parse(storage.get(runtime.SAVE_LOAD_FAILURE_KEY));
@@ -80,7 +80,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     } finally {
       runtime.applySaveData = originalApply;
     }
-    assert.equal(debug.retryLoad(), true, "a successful retry should finish the load recovery");
+    assert.equal(await debug.retryLoad(), true, "a successful retry should finish the load recovery");
     assert.equal(runtime.loadRecoveryMode, false, "successful retry should resume normal saving");
     assert.equal(storage.has(runtime.SAVE_LOAD_FAILURE_KEY), false, "successful retry should clear the diagnostic");
   }
@@ -109,7 +109,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       throw new Error("test checkpoint apply failure");
     };
     try {
-      assert.equal(debug.loadGame(), false, "an apply failure should enter recovery before checkpoint restore");
+      assert.equal(await debug.loadGame(), false, "an apply failure should enter recovery before checkpoint restore");
     } finally {
       runtime.applySaveData = originalApply;
     }
@@ -184,7 +184,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
         legacyTimestampUsed: false,
       });
       try {
-        assert.equal(debug.loadGame(), false, "an offline failure should fail the load transaction");
+        assert.equal(await debug.loadGame(), false, "an offline failure should fail the load transaction");
       } finally {
         runtime.offlineElapsedFromSave = originalOfflineElapsedFromSave;
       }
@@ -223,7 +223,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       return originalSetItem(key, value);
     };
     try {
-      assert.equal(debug.loadGame(), false, "offline progress must fail when the post-progress save fails");
+      assert.equal(await debug.loadGame(), false, "offline progress must fail when the post-progress save fails");
       assert.equal(state.generationCount, 8, "a failed post-offline save must roll back the applied reward");
       assert.equal(storage.get(runtime.SAVE_KEY), rawSave, "a failed post-offline save must keep the original save");
       assert.equal(runtime.loadRecoveryMode, true, "a failed post-offline save must require recovery");
@@ -231,7 +231,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       assert.equal(failure.stage, "offline", "post-offline save failures should use offline diagnostics");
 
       context.localStorage.setItem = originalSetItem;
-      assert.equal(debug.retryLoad(), true, "retry should succeed after the storage failure is removed");
+      assert.equal(await debug.retryLoad(), true, "retry should succeed after the storage failure is removed");
       assert.equal(state.generationCount, 9, "retry should apply the offline reward exactly once");
       assert.equal(JSON.parse(storage.get(runtime.SAVE_KEY)).state.generationCount, 9, "retry should persist the applied reward");
     } finally {
@@ -246,7 +246,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     const { debug, runtime, storage } = instance;
     const invalidRaw = "{not-json";
     storage.set(runtime.SAVE_KEY, invalidRaw);
-    assert.equal(debug.loadGame(), false, "invalid JSON should fail the load");
+    assert.equal(await debug.loadGame(), false, "invalid JSON should fail the load");
     assert.equal(storage.has(runtime.SAVE_KEY), false, "invalid JSON should remove the normal save after quarantine");
     const quarantine = JSON.parse(storage.get(runtime.SAVE_QUARANTINE_KEY));
     assert.equal(quarantine.raw, invalidRaw, "invalid JSON should be preserved verbatim");
@@ -265,7 +265,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       if (key === runtime.SAVE_QUARANTINE_KEY) throw new Error("storage full");
       return originalSetItem(key, value);
     };
-    assert.equal(debug.loadGame(), false, "a format failure should still fail when quarantine storage is full");
+    assert.equal(await debug.loadGame(), false, "a format failure should still fail when quarantine storage is full");
     assert.equal(
       storage.get(runtime.SAVE_KEY),
       invalidRaw,
@@ -282,7 +282,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       appVersion: runtime.APP_VERSION,
       raw: recoverableRaw,
     }));
-    assert.equal(debug.restoreQuarantineSave(), true, "a quarantined valid save should be restorable");
+    assert.equal(await debug.restoreQuarantineSave(), true, "a quarantined valid save should be restorable");
     assert.equal(storage.has(runtime.SAVE_QUARANTINE_KEY), false, "successful quarantine restore should consume the quarantine copy");
     assert.equal(storage.has(runtime.SAVE_KEY), true, "successful quarantine restore should write the normal save");
   }
@@ -299,7 +299,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     state.score = Number.MAX_VALUE;
     state.scoreLog10 = 309;
     try {
-      debug.processOfflineElapsed(1, "test");
+      await debug.processOfflineElapsed(1, "test");
       assert.equal(state.activeChallenge, 0, "offline automation should complete the active Infinity Challenge");
       assert.equal(state.completedChallenges & 1, 1, "offline challenge completion should persist its reward state");
       assert.equal(state.infinityCount, 2, "offline challenge completion should continue with a fresh Infinity run");

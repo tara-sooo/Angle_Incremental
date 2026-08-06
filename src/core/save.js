@@ -691,6 +691,14 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.fastestInfinityTime = runtime.sanitizeNumber(data.fastestInfinityTime, 0);
   runtime.state.fastestInfinityRealTime = runtime.sanitizeNumber(data.fastestInfinityRealTime, 0);
   runtime.state.lastInfinityRuns = runtime.sanitizeInfinityRunRecords(data.lastInfinityRuns);
+  runtime.state.bestInfinityCountPerSecond = Math.max(
+    0,
+    runtime.sanitizeNumber(data.bestInfinityCountPerSecond, 0),
+  );
+  runtime.state.infinityCountRateRemainder = Math.max(
+    0,
+    Math.min(0.9999999999999999, runtime.sanitizeNumber(data.infinityCountRateRemainder, 0)),
+  );
   runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(data.offlineProgressEnabled, true);
   runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
   runtime.state.timeFluxCapacityLevel = dormantTimeFluxValue(data.timeFluxCapacityLevel, 0);
@@ -921,7 +929,7 @@ function quarantineSave(raw, details = {}, options = {}) {
   if (changed) recoveryRevision += 1;
 }
 
-function loadGame(options = {}) {
+async function loadGame(options = {}) {
   const allowDuringLoadRecovery = Boolean(options.allowDuringLoadRecovery);
   if (loadRecoveryMode && !allowDuringLoadRecovery) {
     runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
@@ -1001,7 +1009,7 @@ function loadGame(options = {}) {
         runtime.processOfflineElapsed
         && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
       ) {
-        const offlineResult = runtime.processOfflineElapsed(
+        const offlineResult = await runtime.processOfflineElapsed(
           offlineElapsed.elapsedSeconds,
           "load",
           { ...offlineElapsed, retryBaseline },
@@ -1058,7 +1066,7 @@ function retryLoad() {
   return loadGame({ allowDuringLoadRecovery: true });
 }
 
-function restoreQuarantineSave() {
+async function restoreQuarantineSave() {
   const entry = readQuarantineEntry();
   if (!entry?.raw) {
     runtime.setSaveStatus(runtime.t("recoveryInvalid"));
@@ -1076,7 +1084,7 @@ function restoreQuarantineSave() {
     runtime.setSaveStatus(runtime.t("recoveryRestoreFailed"));
     return false;
   }
-  const restored = loadGame({ allowDuringLoadRecovery: true });
+  const restored = await loadGame({ allowDuringLoadRecovery: true });
   if (!restored) return false;
   try {
     localStorage.removeItem(runtime.SAVE_QUARANTINE_KEY);
@@ -1167,6 +1175,8 @@ function resetSave() {
     fastestInfinityTime: 0,
     fastestInfinityRealTime: 0,
     lastInfinityRuns: [],
+    bestInfinityCountPerSecond: 0,
+    infinityCountRateRemainder: 0,
     offlineProgressEnabled: true,
     offlineTickCount: 1000,
     timeFlux: 0,

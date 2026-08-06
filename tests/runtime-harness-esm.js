@@ -210,7 +210,10 @@ function createContext(initialStorage = new Map()) {
       addEventListener() {},
       removeEventListener() {},
       requestAnimationFrame() {},
-      setTimeout() {},
+      setTimeout(callback) {
+        callback();
+        return 0;
+      },
       confirm: () => true,
       location,
       ResizeObserver: null,
@@ -220,7 +223,10 @@ function createContext(initialStorage = new Map()) {
       devicePixelRatio: 1,
     },
     ResizeObserver: null,
-    setTimeout() {},
+    setTimeout(callback) {
+      callback();
+      return 0;
+    },
     URL,
     Math,
     Number,
@@ -236,7 +242,10 @@ function createContext(initialStorage = new Map()) {
   context.window.URL = URL;
   context.window.Math = Math;
   context.window.requestAnimationFrame = () => {};
-  context.window.setTimeout = () => {};
+  context.window.setTimeout = (callback) => {
+    callback();
+    return 0;
+  };
   return { context, storage };
 }
 

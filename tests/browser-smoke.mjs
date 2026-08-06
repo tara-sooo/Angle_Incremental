@@ -725,7 +725,7 @@ try {
   assert.equal(towerRewardDisplay.tc2.effective, "^1.499", "TC2 should expose the soft-capped requirement growth power");
   assert.equal(towerRewardDisplay.englishLabels.tc1Base, "TC1 base exponent", "TC1 exponent labels should be translated to English");
   assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth (effective)", "TC2 exponent labels should be translated to English");
-  const timeFluxRemoval = await page.evaluate(() => {
+  const timeFluxRemoval = await page.evaluate(async () => {
     const { state, advanceOnlineTime, processOfflineElapsed } = window.__angleDebug;
     state.totalPlayTime = 0;
     state.totalRealPlayTime = 0;
@@ -757,7 +757,7 @@ try {
       mainTabsHeight: layoutRect(".main-tabs")?.height ?? 0,
       mainPanelsHeight: layoutRect(".main-panels")?.height ?? 0,
     };
-    const report = processOfflineElapsed(1, "test", { clockSource: "server" });
+    const report = await processOfflineElapsed(1, "test", { clockSource: "server" });
     const reportPanel = document.querySelector("#offlineReportPanel");
     const layoutAfter = {
       shellHeight: layoutRect("#shell")?.height ?? 0,

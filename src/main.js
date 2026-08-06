@@ -61,6 +61,9 @@ let serverClockSource = "local-fallback";
 let serverClockAnomaly = false;
 let localClockAnomaly = false;
 let localClockAnchor = null;
+let offlineProcessPromise = null;
+const OFFLINE_PROCESS_TIME_BUDGET_MS = 8;
+const OFFLINE_PROCESS_MAX_TICKS_PER_CHUNK = 1000;
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
@@ -675,6 +678,38 @@ function offlineSnapshot() {
   };
 }
 
+function offlineInfinityAggregationEnabled() {
+  return runtime.state.automationEnabled
+    && runtime.state.autoRunInfinity
+    && runtime.state.autoInfinityPointThresholdLog10 === 0
+    && runtime.state.infinityCount > 0
+    && runtime.hasInfinityUpgrade("8-1")
+    && runtime.state.activeChallenge <= 0
+    && runtime.state.activeTowerChallenge <= 0;
+}
+
+function applyOfflineInfinityAggregation(
+  effectiveElapsedSeconds,
+  normalInfinityCountGain,
+  bestRate,
+  rateRemainder,
+) {
+  if (!Number.isFinite(bestRate) || bestRate <= 0 || effectiveElapsedSeconds <= 0) {
+    return { added: 0, remainder: rateRemainder };
+  }
+  const target = bestRate * effectiveElapsedSeconds * runtime.OFFLINE_INFINITY_AGGREGATION_EFFICIENCY
+    + Math.max(0, rateRemainder);
+  if (!Number.isFinite(target) || target <= 0) return { added: 0, remainder: rateRemainder };
+  const targetCount = Math.floor(target);
+  const additional = Math.max(0, targetCount - normalInfinityCountGain);
+  const added = runtime.addAggregatedInfinityCount(additional);
+  runtime.state.infinityCountRateRemainder = target - targetCount;
+  return {
+    added,
+    remainder: runtime.state.infinityCountRateRemainder,
+  };
+}
+
 function offlineProgressNumericallySafe(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return false;
   if (!Number.isFinite(runtime.state.totalPlayTime + seconds)) return false;
@@ -743,7 +778,45 @@ function restoreOfflineTransaction(snapshot, error, retryBaseline) {
   }
 }
 
+function yieldToEventLoop() {
+  return new Promise((resolve) => {
+    if (typeof window.setTimeout === "function") {
+      window.setTimeout(resolve, 0);
+      return;
+    }
+    if (typeof setTimeout === "function") {
+      setTimeout(resolve, 0);
+      return;
+    }
+    Promise.resolve().then(resolve);
+  });
+}
+
+function refreshOfflineReportProgress(report, before, startedAt) {
+  const current = offlineSnapshot();
+  report.infinityCountAfter = current.infinityCount;
+  report.infinityPointsAfterLog10 = current.infinityPointsLog10;
+  report.infiniteScoreAfterLog10 = current.infiniteScoreLog10;
+  report.normalInfinityCountGain = Math.max(0, current.infinityCount - before.infinityCount);
+  report.totalInfinityCountGain = report.normalInfinityCountGain + report.aggregatedInfinityCountGain;
+  report.processingMilliseconds = Math.max(0, monotonicClockNow() - startedAt);
+  try {
+    runtime.updateOfflineReportUi?.();
+  } catch (error) {
+    // Progress rendering must not interrupt the transactional simulation.
+  }
+}
+
 function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext = {}) {
+  if (offlineProcessPromise) return offlineProcessPromise;
+  const promise = processOfflineElapsedInternal(elapsedSeconds, source, clockContext);
+  offlineProcessPromise = promise.finally(() => {
+    offlineProcessPromise = null;
+  });
+  return offlineProcessPromise;
+}
+
+async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", clockContext = {}) {
   const transactionSnapshot = snapshotOfflineTransaction();
   let retryBaseline = {
     savedAt: transactionSnapshot.offlineBaselineTimestamp,
@@ -790,8 +863,10 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
         elapsedSeconds: elapsed,
         effectiveElapsedSeconds: 0,
         simulatedSeconds: 0,
+        configuredTicks: 0,
         processedTicks: 0,
         requestedTicks: 0,
+        processingMilliseconds: 0,
         precisionReduced: false,
         capped: false,
         offlineProgressEnabled: false,
@@ -801,6 +876,9 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
       };
     }
     const before = offlineSnapshot();
+    const aggregationEligible = offlineInfinityAggregationEnabled();
+    const bestRateAtStart = runtime.state.bestInfinityCountPerSecond;
+    const rateRemainderAtStart = runtime.state.infinityCountRateRemainder;
     const usesLocalRewardCap = clockSource !== "server";
     const trustedElapsed = clockAnomaly
       ? 0
@@ -808,19 +886,21 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
         ? Math.min(elapsed, runtime.OFFLINE_LOCAL_REWARD_MAX_SECONDS)
         : elapsed;
     let simulatedSeconds = 0;
+    let configuredTicks = 0;
     let processedTicks = 0;
     let requestedTicks = 0;
+    let processingMilliseconds = 0;
     let precisionReduced = false;
 
     if (!clockAnomaly) {
       const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
+      configuredTicks = tickCount;
       simulatedSeconds = trustedElapsed;
       requestedTicks = Math.max(
         1,
         Math.min(tickCount, Math.ceil(simulatedSeconds / runtime.MAX_SIMULATION_STEP_SECONDS)),
       );
-      processedTicks = Math.min(requestedTicks, runtime.OFFLINE_PROGRESS_MAX_SIMULATION_TICKS);
-      precisionReduced = processedTicks < requestedTicks;
+      precisionReduced = false;
       if (!offlineProgressNumericallySafe(simulatedSeconds)) {
         clockAnomaly = true;
         simulatedSeconds = 0;
@@ -828,16 +908,70 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
         processedTicks = 0;
         precisionReduced = false;
       } else {
-        const tickSeconds = simulatedSeconds / processedTicks;
+        const tickSeconds = simulatedSeconds / requestedTicks;
+        const startedAt = monotonicClockNow();
+        offlineReport = {
+          source,
+          elapsedSeconds: elapsed,
+          effectiveElapsedSeconds: simulatedSeconds,
+          simulatedSeconds,
+          configuredTicks,
+          processedTicks: 0,
+          requestedTicks,
+          processingMilliseconds: 0,
+          precisionReduced,
+          capped: simulatedSeconds + 1e-9 < elapsed,
+          offlineProgressEnabled: runtime.state.offlineProgressEnabled,
+          clockSource,
+          clockAnomaly,
+          rewardSuppressed: false,
+          legacyTimestampUsed: Boolean(clockContext.legacyTimestampUsed),
+          infinityCountBefore: before.infinityCount,
+          infinityCountAfter: before.infinityCount,
+          infinityPointsBeforeLog10: before.infinityPointsLog10,
+          infinityPointsAfterLog10: before.infinityPointsLog10,
+          infiniteScoreBeforeLog10: before.infiniteScoreLog10,
+          infiniteScoreAfterLog10: before.infiniteScoreLog10,
+          normalInfinityCountGain: 0,
+          aggregatedInfinityCountGain: 0,
+          totalInfinityCountGain: 0,
+        };
         offlineProcessing = true;
         try {
-          for (let tick = 0; tick < processedTicks; tick += 1) update(tickSeconds);
+          while (processedTicks < requestedTicks) {
+            const chunkStartedAt = monotonicClockNow();
+            const chunkEnd = Math.min(
+              requestedTicks,
+              processedTicks + OFFLINE_PROCESS_MAX_TICKS_PER_CHUNK,
+            );
+            do {
+              update(tickSeconds);
+              processedTicks += 1;
+            } while (
+              processedTicks < chunkEnd
+              && monotonicClockNow() - chunkStartedAt < OFFLINE_PROCESS_TIME_BUDGET_MS
+            );
+            offlineReport.processedTicks = processedTicks;
+            refreshOfflineReportProgress(offlineReport, before, startedAt);
+            processingMilliseconds = offlineReport.processingMilliseconds;
+            if (processedTicks < requestedTicks) await yieldToEventLoop();
+          }
         } finally {
           offlineProcessing = false;
         }
       }
     }
 
+    const normalAfter = offlineSnapshot();
+    const normalInfinityCountGain = Math.max(0, normalAfter.infinityCount - before.infinityCount);
+    const aggregation = !clockAnomaly && aggregationEligible
+      ? applyOfflineInfinityAggregation(
+        simulatedSeconds,
+        normalInfinityCountGain,
+        bestRateAtStart,
+        rateRemainderAtStart,
+      )
+      : { added: 0, remainder: rateRemainderAtStart };
     const after = offlineSnapshot();
     const effectiveElapsedSeconds = clockAnomaly
       ? 0
@@ -847,8 +981,10 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
       elapsedSeconds: elapsed,
       effectiveElapsedSeconds,
       simulatedSeconds,
+      configuredTicks,
       processedTicks,
       requestedTicks,
+      processingMilliseconds,
       precisionReduced,
       capped: effectiveElapsedSeconds + 1e-9 < elapsed,
       offlineProgressEnabled: runtime.state.offlineProgressEnabled,
@@ -862,6 +998,9 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
       infinityPointsAfterLog10: after.infinityPointsLog10,
       infiniteScoreBeforeLog10: before.infiniteScoreLog10,
       infiniteScoreAfterLog10: after.infiniteScoreLog10,
+      normalInfinityCountGain,
+      aggregatedInfinityCountGain: aggregation.added,
+      totalInfinityCountGain: Math.max(0, after.infinityCount - before.infinityCount),
     };
     runtime.updateUi();
     if (!runtime.saveGame("manual")) {
@@ -896,9 +1035,9 @@ function saveSourceIsCurrent() {
   return runtime.saveSourceIsCurrent ? runtime.saveSourceIsCurrent() : true;
 }
 
-function reloadAfterSaveConflict() {
+async function reloadAfterSaveConflict() {
   offlineReport = null;
-  if (!runtime.loadGame({ allowDuringLoadRecovery: true })) {
+  if (!await runtime.loadGame({ allowDuringLoadRecovery: true })) {
     throw new Error("save changed during visibility transition and could not be reloaded");
   }
   runtime.updateUi();
@@ -915,7 +1054,7 @@ async function handleVisibilityChange() {
     };
     try {
       if (!saveSourceIsCurrent()) {
-        reloadAfterSaveConflict();
+        await reloadAfterSaveConflict();
         return;
       }
       const saved = runtime.saveGame("auto");
@@ -949,7 +1088,7 @@ async function handleVisibilityChange() {
   };
   try {
     if (!saveSourceIsCurrent()) {
-      reloadAfterSaveConflict();
+      await reloadAfterSaveConflict();
       return;
     }
     if (!runtime.state.offlineProgressEnabled) {
@@ -980,7 +1119,7 @@ async function handleVisibilityChange() {
     const currentFingerprint = runtime.currentSaveFingerprint?.() || "";
     if (currentFingerprint !== expectedSaveFingerprint) {
       offlineReport = null;
-      if (!runtime.loadGame({ allowDuringLoadRecovery: true })) {
+      if (!await runtime.loadGame({ allowDuringLoadRecovery: true })) {
         throw new Error("save changed during visibility resume and could not be reloaded");
       }
       runtime.updateUi();
@@ -993,7 +1132,7 @@ async function handleVisibilityChange() {
 
     const elapsed = offlineElapsedFromSave(resumeBaselineTimestamp, resumeBaselineServerTimestamp);
     if (elapsed.elapsedSeconds > 0 || elapsed.clockAnomaly) {
-      processOfflineElapsed(elapsed.elapsedSeconds, "visibility", {
+      await processOfflineElapsed(elapsed.elapsedSeconds, "visibility", {
         ...elapsed,
         retryBaseline,
       });
@@ -1289,7 +1428,7 @@ async function initializeGame() {
   runtime.createTowerChallengeRows();
   runtime.createInfinityUpgradeRows();
   runtime.createAchievementRows();
-  runtime.loadGame();
+  await runtime.loadGame();
   runtime.switchMainTab(activeMainTab);
   runtime.switchInfinitySubtab(activeInfinitySubtab);
   runtime.switchChallengeSubtab(activeChallengeSubtab);
