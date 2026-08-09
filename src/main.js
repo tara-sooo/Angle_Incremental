@@ -709,7 +709,10 @@ function applyOfflineInfinityAggregation(
   const targetCount = Math.floor(target);
   const additional = Math.max(0, targetCount - normalInfinityCountGain);
   const added = runtime.addAggregatedInfinityCount(additional);
-  runtime.state.infinityCountRateRemainder = target - targetCount;
+  runtime.state.infinityCountRateRemainder = Math.max(
+    0,
+    target - normalInfinityCountGain - added,
+  );
   return {
     added,
     remainder: runtime.state.infinityCountRateRemainder,
@@ -1094,7 +1097,11 @@ function saveSourceIsCurrent() {
 
 async function reloadAfterSaveConflict() {
   offlineReport = null;
-  if (!await runtime.loadGame({ allowDuringLoadRecovery: true, allowDuringSaveConflict: true })) return false;
+  if (!await runtime.loadGame({
+    allowDuringLoadRecovery: true,
+    allowDuringSaveConflict: true,
+    authoritativeSaveConflict: true,
+  })) return false;
   runtime.updateUi();
   drawActiveView();
   return true;

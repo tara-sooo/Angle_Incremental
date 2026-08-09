@@ -701,6 +701,20 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.equal(aggregationState.infinityCount, 21, "normal and aggregate Infinity gains should not double count");
 
     aggregationState.infinityCount = 1;
+    aggregationState.infinityCountRateRemainder = 0;
+    let overshootGainApplied = false;
+    aggregationRuntime.update = () => {
+      if (!overshootGainApplied) {
+        aggregationState.infinityCount += 1;
+        overshootGainApplied = true;
+      }
+    };
+    const overshootReport = await aggregationInstance.debug.processOfflineElapsed(0.25, "test", { clockSource: "server" });
+    assert.equal(overshootReport.normalInfinityCountGain, 1, "the overshoot test should include normal simulation gain");
+    assert.equal(overshootReport.aggregatedInfinityCountGain, 0, "normal gain above the aggregate target should need no extra Infinity");
+    assert.equal(aggregationState.infinityCountRateRemainder, 0, "normal gain above the aggregate target must not leave a remainder");
+
+    aggregationState.infinityCount = 1;
     aggregationState.infinityCountRateRemainder = 0.25;
     aggregationState.autoInfinityPointThresholdLog10 = 1;
     const thresholdReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });

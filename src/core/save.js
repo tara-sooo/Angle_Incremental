@@ -964,6 +964,9 @@ function quarantineSave(raw, details = {}, options = {}) {
 async function loadGame(options = {}) {
   const allowDuringLoadRecovery = Boolean(options.allowDuringLoadRecovery);
   const allowDuringSaveConflict = Boolean(options.allowDuringSaveConflict);
+  const authoritativeSaveConflict = Boolean(
+    options.authoritativeSaveConflict && allowDuringSaveConflict,
+  );
   if (saveConflictMode && !allowDuringSaveConflict) {
     runtime.setSaveStatus(runtime.t("saveConflictDetected"));
     return false;
@@ -1036,36 +1039,45 @@ async function loadGame(options = {}) {
       }
       : { savedAt, serverSavedAt, saveFingerprint: loadedSaveFingerprint };
     try {
-      const offlineElapsed = runtime.offlineElapsedFromSave
-        ? runtime.offlineElapsedFromSave(retryBaseline.savedAt, retryBaseline.serverSavedAt)
-        : {
-          elapsedSeconds: Math.max(0, (Date.now() - retryBaseline.savedAt) / 1000),
-          clockSource: "local-fallback",
-          clockAnomaly: false,
-          legacyTimestampUsed: false,
-        };
-      if (
-        runtime.processOfflineElapsed
-        && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
-      ) {
-        const offlineResult = await runtime.processOfflineElapsed(
-          offlineElapsed.elapsedSeconds,
-          "load",
-          { ...offlineElapsed, retryBaseline },
-        );
-        if (offlineResult === null) throw new Error("offline progress save failed");
-        offlineProcessed = true;
-      } else if (runtime.setOfflineBaseline) {
-        runtime.setOfflineBaseline(
-          runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
-          runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
-        );
-      }
-      if (offlineProcessed) {
-        loadTransactionActive = false;
-        loadRecoveryMode = false;
-        if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict })) {
-          throw new Error("offline progress save failed");
+      if (authoritativeSaveConflict) {
+        if (runtime.setOfflineBaseline) {
+          runtime.setOfflineBaseline(
+            runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
+            runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
+          );
+        }
+      } else {
+        const offlineElapsed = runtime.offlineElapsedFromSave
+          ? runtime.offlineElapsedFromSave(retryBaseline.savedAt, retryBaseline.serverSavedAt)
+          : {
+            elapsedSeconds: Math.max(0, (Date.now() - retryBaseline.savedAt) / 1000),
+            clockSource: "local-fallback",
+            clockAnomaly: false,
+            legacyTimestampUsed: false,
+          };
+        if (
+          runtime.processOfflineElapsed
+          && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
+        ) {
+          const offlineResult = await runtime.processOfflineElapsed(
+            offlineElapsed.elapsedSeconds,
+            "load",
+            { ...offlineElapsed, retryBaseline },
+          );
+          if (offlineResult === null) throw new Error("offline progress save failed");
+          offlineProcessed = true;
+        } else if (runtime.setOfflineBaseline) {
+          runtime.setOfflineBaseline(
+            runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
+            runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
+          );
+        }
+        if (offlineProcessed) {
+          loadTransactionActive = false;
+          loadRecoveryMode = false;
+          if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict })) {
+            throw new Error("offline progress save failed");
+          }
         }
       }
     } catch (error) {
@@ -1107,7 +1119,11 @@ async function loadGame(options = {}) {
 }
 
 async function retryLoad() {
-  const restored = await loadGame({ allowDuringLoadRecovery: true, allowDuringSaveConflict: saveConflictMode });
+  const restored = await loadGame({
+    allowDuringLoadRecovery: true,
+    allowDuringSaveConflict: saveConflictMode,
+    authoritativeSaveConflict: saveConflictMode,
+  });
   if (restored && saveConflictMode) finishSaveConflict();
   return restored;
 }

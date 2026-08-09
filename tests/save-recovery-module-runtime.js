@@ -45,7 +45,8 @@ async function runSaveRecoveryModuleRuntimeTest() {
     const latestTab = await loadRuntime(candidatePath, staleTab.storage);
     latestTab.debug.state.generationCount = 11;
     assert.equal(latestTab.debug.saveGame("manual"), true, "the replacement tab should save");
-    staleTab.storage.set(staleTab.runtime.SAVE_KEY, latestTab.storage.get(latestTab.runtime.SAVE_KEY));
+    const latestRaw = latestTab.storage.get(latestTab.runtime.SAVE_KEY);
+    staleTab.storage.set(staleTab.runtime.SAVE_KEY, latestRaw);
 
     staleTab.debug.state.generationCount = 100;
     assert.equal(staleTab.debug.saveGame("auto"), false, "a stale tab save should be rejected");
@@ -54,13 +55,32 @@ async function runSaveRecoveryModuleRuntimeTest() {
       100,
       "a rejected save should checkpoint the in-memory state before reloading",
     );
-    assert.equal(await staleTab.runtime.handleSaveConflict(), true, "a save conflict should reload after checkpointing");
+    const originalOfflineElapsedFromSave = staleTab.runtime.offlineElapsedFromSave;
+    staleTab.runtime.offlineElapsedFromSave = () => ({
+      elapsedSeconds: 1,
+      clockSource: "local-fallback",
+      clockAnomaly: false,
+      legacyTimestampUsed: false,
+    });
+    try {
+      assert.equal(await staleTab.runtime.handleSaveConflict(), true, "a save conflict should reload after checkpointing");
+    } finally {
+      staleTab.runtime.offlineElapsedFromSave = originalOfflineElapsedFromSave;
+    }
     assert.equal(staleTab.debug.state.generationCount, 11, "conflict recovery should load the latest persisted state");
+    assert.equal(staleTab.storage.get(staleTab.runtime.SAVE_KEY), latestRaw, "authoritative conflict recovery must not rewrite the shared save");
     assert.equal(staleTab.runtime.saveConflictMode, false, "successful conflict recovery should clear conflict mode");
     assert.equal(
       staleTab.runtime.recoveryEntries().checkpoints.find((entry) => entry.reason === "save-conflict")?.state.generationCount,
       100,
       "conflict recovery should retain the stale in-memory state as a checkpoint",
+    );
+    latestTab.storage.set(latestTab.runtime.SAVE_KEY, staleTab.storage.get(staleTab.runtime.SAVE_KEY));
+    await latestTab.runtime.handleStorageChange({ key: latestTab.runtime.SAVE_KEY });
+    assert.equal(
+      latestTab.runtime.recoveryEntries().checkpoints.some((entry) => entry.reason === "save-conflict"),
+      false,
+      "an authoritative conflict reload must not send a replacement storage event to the other tab",
     );
   }
 
