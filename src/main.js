@@ -50,6 +50,7 @@ let offlineProcessing = false;
 let offlineReport = null;
 let visibilityResumeInFlight = false;
 let visibilityResumeGeneration = 0;
+let saveConflictInFlight = null;
 let simulationBatchDepth = 0;
 let simulationUiPending = false;
 let simulationSaveReason = "";
@@ -91,7 +92,9 @@ function batchedUpdateUi(...args) {
     simulationUiPending = true;
     return undefined;
   }
-  return baseUpdateUi(...args);
+  const result = baseUpdateUi(...args);
+  if (runtime.saveConflictMode) setSaveConflictLock(true);
+  return result;
 }
 
 function batchedSaveGame(reason = "auto", options = {}) {
@@ -579,6 +582,7 @@ function runLayerAutomation() {
 }
 
 function update(dt, allowOffline = false) {
+  if (runtime.saveConflictMode && !(allowOffline && runtime.loadInFlight)) return;
   if (offlineProcessing && !allowOffline) return;
   runtime.state.totalPlayTime += dt;
   runtime.state.currentInfinityRunTime += dt;
@@ -634,7 +638,7 @@ function update(dt, allowOffline = false) {
 }
 
 function runRealTimeMaintenance(realSeconds) {
-  if (offlineProcessing || realSeconds <= 0) return;
+  if (offlineProcessing || runtime.saveConflictMode || realSeconds <= 0) return;
   if (runtime.loadRecoveryMode) {
     autoSaveElapsed = 0;
   } else {
@@ -651,7 +655,7 @@ function runRealTimeMaintenance(realSeconds) {
 }
 
 function advanceOnlineTime(realSeconds) {
-  if (offlineProcessing) return 0;
+  if (offlineProcessing || runtime.saveConflictMode) return 0;
   const realDt = Math.max(0, runtime.sanitizeNumber(realSeconds, 0));
   if (realDt <= 0) return 0;
   runtime.state.totalRealPlayTime += realDt;
@@ -809,6 +813,24 @@ function setOfflineProcessingLock(locked) {
   });
 }
 
+function setSaveConflictLock(locked) {
+  if (!document.querySelectorAll) return;
+  document.querySelectorAll("button, input, select, textarea").forEach((control) => {
+    if (!control.dataset) return;
+    const recoveryControl = control.closest?.(".save-recovery")
+      || ["exportSaveCodeButton", "copySaveCodeButton", "saveCodeArea", "resetSaveButton"].includes(control.id);
+    if (recoveryControl) return;
+    if (locked) {
+      if (control.disabled) return;
+      control.dataset.saveConflictLocked = "true";
+      control.disabled = true;
+    } else if (control.dataset.saveConflictLocked === "true") {
+      control.disabled = false;
+      delete control.dataset.saveConflictLocked;
+    }
+  });
+}
+
 function refreshOfflineReportProgress(report, before, startedAt) {
   const current = offlineSnapshot();
   report.infinityCountAfter = current.infinityCount;
@@ -865,6 +887,11 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       );
       runtime.updateUi();
       if (!runtime.saveGame("manual")) {
+        if (runtime.saveConflictMode) {
+          if (runtime.loadInFlight) return null;
+          await handleSaveConflict();
+          return null;
+        }
         restoreOfflineTransaction(
           transactionSnapshot,
           new Error("offline progress baseline save failed"),
@@ -1023,6 +1050,11 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     };
     runtime.updateUi();
     if (!runtime.saveGame("manual")) {
+      if (runtime.saveConflictMode) {
+        if (runtime.loadInFlight) return null;
+        await handleSaveConflict();
+        return null;
+      }
       restoreOfflineTransaction(
         transactionSnapshot,
         new Error("offline progress save failed"),
@@ -1056,15 +1088,47 @@ function saveSourceIsCurrent() {
 
 async function reloadAfterSaveConflict() {
   offlineReport = null;
-  if (!await runtime.loadGame({ allowDuringLoadRecovery: true })) {
-    throw new Error("save changed during visibility transition and could not be reloaded");
-  }
+  if (!await runtime.loadGame({ allowDuringLoadRecovery: true, allowDuringSaveConflict: true })) return false;
   runtime.updateUi();
   drawActiveView();
+  return true;
+}
+
+async function handleSaveConflict() {
+  if (saveConflictInFlight) return saveConflictInFlight;
+  if (offlineProcessing || runtime.loadInFlight) return false;
+  if (!runtime.saveConflictMode || !runtime.saveConflictCheckpointReady) {
+    if (!runtime.beginSaveConflict()) return false;
+  }
+  saveConflictInFlight = (async () => {
+    const reloaded = await reloadAfterSaveConflict();
+    if (!reloaded) return false;
+    runtime.finishSaveConflict();
+    runtime.updateUi();
+    drawActiveView();
+    return true;
+  })().catch(() => {
+    runtime.setSaveStatus(runtime.t("loadFailed"));
+    runtime.updateUi();
+    return false;
+  }).finally(() => {
+    saveConflictInFlight = null;
+  });
+  return saveConflictInFlight;
+}
+
+function handleStorageChange(event) {
+  if ((event?.key !== null && event?.key !== runtime.SAVE_KEY) || offlineProcessing || visibilityResumeInFlight) return;
+  if (saveSourceIsCurrent() && !runtime.saveConflictMode) return;
+  return handleSaveConflict();
 }
 
 async function handleVisibilityChange() {
   if (offlineProcessing) return;
+  if (runtime.saveConflictMode) {
+    if (!document.hidden) await handleSaveConflict();
+    return;
+  }
   if (document.hidden) {
     const transactionSnapshot = snapshotOfflineTransaction();
     const retryBaseline = {
@@ -1074,11 +1138,15 @@ async function handleVisibilityChange() {
     };
     try {
       if (!saveSourceIsCurrent()) {
-        await reloadAfterSaveConflict();
+        await handleSaveConflict();
         return;
       }
       const saved = runtime.saveGame("auto");
       if (!saved) {
+        if (runtime.saveConflictMode) {
+          await handleSaveConflict();
+          return;
+        }
         restoreOfflineTransaction(
           transactionSnapshot,
           new Error("visibility hide save failed"),
@@ -1108,7 +1176,7 @@ async function handleVisibilityChange() {
   };
   try {
     if (!saveSourceIsCurrent()) {
-      await reloadAfterSaveConflict();
+      await handleSaveConflict();
       return;
     }
     if (!runtime.state.offlineProgressEnabled) {
@@ -1120,6 +1188,10 @@ async function handleVisibilityChange() {
       );
       runtime.updateUi();
       if (!runtime.saveGame("manual")) {
+        if (runtime.saveConflictMode) {
+          await handleSaveConflict();
+          return;
+        }
         restoreOfflineTransaction(
           transactionSnapshot,
           new Error("disabled offline progress baseline save failed"),
@@ -1138,12 +1210,7 @@ async function handleVisibilityChange() {
       : resumeBaselineSaveFingerprint;
     const currentFingerprint = runtime.currentSaveFingerprint?.() || "";
     if (currentFingerprint !== expectedSaveFingerprint) {
-      offlineReport = null;
-      if (!await runtime.loadGame({ allowDuringLoadRecovery: true })) {
-        throw new Error("save changed during visibility resume and could not be reloaded");
-      }
-      runtime.updateUi();
-      drawActiveView();
+      await handleSaveConflict();
       return;
     }
     // A successful local save may have rebased SAVE_KEY while the clock request was pending.
@@ -1193,7 +1260,7 @@ function frame(now) {
     smoothedFps = smoothedFps === 0 ? instantFps : smoothedFps * 0.9 + instantFps * 0.1;
   }
   lastTime = now;
-  if (document.hidden || visibilityResumeInFlight || offlineProcessing) {
+  if (document.hidden || visibilityResumeInFlight || offlineProcessing || runtime.saveConflictMode) {
     requestNextFrame(frame);
     return;
   }
@@ -1517,6 +1584,9 @@ expose("update", () => update, (value) => { update = value; });
 expose("advanceOnlineTime", () => advanceOnlineTime, (value) => { advanceOnlineTime = value; });
 expose("processOfflineElapsed", () => processOfflineElapsed, (value) => { processOfflineElapsed = value; });
 expose("setOfflineBaseline", () => setOfflineBaseline, (value) => { setOfflineBaseline = value; });
+expose("setSaveConflictLock", () => setSaveConflictLock, (value) => { setSaveConflictLock = value; });
+expose("handleSaveConflict", () => handleSaveConflict, (value) => { handleSaveConflict = value; });
+expose("handleStorageChange", () => handleStorageChange, (value) => { handleStorageChange = value; });
 expose("invalidateVisibilityResume", () => invalidateVisibilityResume);
 expose("handleVisibilityChange", () => handleVisibilityChange, (value) => { handleVisibilityChange = value; });
 expose("currentFrameTime", () => currentFrameTime, (value) => { currentFrameTime = value; });
@@ -1560,6 +1630,8 @@ window.__angleDebug = {
   applySetting: runtime.applySetting,
   advanceOnlineTime,
   processOfflineElapsed,
+  handleSaveConflict,
+  handleStorageChange,
   saveGame: runtime.saveGame,
   backupCurrentSave: runtime.backupCurrentSave,
   createCheckpoint: runtime.createCheckpoint,

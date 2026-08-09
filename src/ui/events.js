@@ -56,7 +56,7 @@ function switchStatisticsSubtab(tab) {
 }
 
 function applySetting(key, value) {
-  if (runtime.offlineProcessing) return;
+  if (runtime.offlineProcessing || runtime.saveConflictMode) return;
   runtime.state[key] = value;
   if (key === "language") {
     runtime.state.language = runtime.normalizeChoice(value, ["ja", "en"], "ja");
@@ -199,6 +199,7 @@ function bindEvents() {
   });
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
+  window.addEventListener("storage", runtime.handleStorageChange);
   if (document.addEventListener) document.addEventListener("visibilitychange", runtime.handleVisibilityChange);
   window.addEventListener("resize", runtime.resizeCanvas);
   window.addEventListener("resize", runtime.resizeInfiniteAngleCanvas);

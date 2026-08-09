@@ -6,6 +6,8 @@ let renderedRecoveryRevision = -1;
 let renderedRecoveryLanguage = "";
 let renderedRecoveryNumberFormat = "";
 let renderedLoadRecoveryMode = false;
+let renderedSaveConflictMode = false;
+let renderedSaveConflictCheckpointReady = false;
 
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
@@ -62,6 +64,7 @@ function formatRecoveryTimestamp(timestamp) {
 function recoveryReasonText(reason) {
   const reasonKeys = {
     periodic: "checkpointReasonPeriodic",
+    "save-conflict": "checkpointReasonSaveConflict",
     "pre-import": "checkpointReasonPreImport",
     "pre-update": "checkpointReasonPreUpdate",
     "pre-reset": "checkpointReasonPreReset",
@@ -121,6 +124,8 @@ function updateSaveRecoveryUi() {
     && renderedRecoveryLanguage === runtime.state.language
     && renderedRecoveryNumberFormat === runtime.state.numberFormat
     && renderedLoadRecoveryMode === Boolean(runtime.loadRecoveryMode)
+    && renderedSaveConflictMode === Boolean(runtime.saveConflictMode)
+    && renderedSaveConflictCheckpointReady === Boolean(runtime.saveConflictCheckpointReady)
   ) return;
   const recovery = runtime.recoveryEntries();
   elements.preImportBackupStatus.textContent = recovery.preImport
@@ -132,6 +137,10 @@ function updateSaveRecoveryUi() {
       const stageText = runtime.t(failure.stage === "offline" ? "loadFailureOffline" : "loadFailureApply");
       const detail = failure.errorMessage ? `: ${failure.errorMessage}` : "";
       elements.loadFailureStatus.textContent = `${runtime.t("loadFailureDetected")} ${stageText}${detail}`;
+    } else if (runtime.saveConflictMode) {
+      elements.loadFailureStatus.textContent = runtime.t(
+        runtime.saveConflictCheckpointReady ? "saveConflictDetected" : "saveConflictBackupFailed",
+      );
     } else {
       elements.loadFailureStatus.textContent = runtime.loadRecoveryMode
         ? runtime.t("loadRecoveryRequired")
@@ -151,6 +160,8 @@ function updateSaveRecoveryUi() {
   renderedRecoveryLanguage = runtime.state.language;
   renderedRecoveryNumberFormat = runtime.state.numberFormat;
   renderedLoadRecoveryMode = Boolean(runtime.loadRecoveryMode);
+  renderedSaveConflictMode = Boolean(runtime.saveConflictMode);
+  renderedSaveConflictCheckpointReady = Boolean(runtime.saveConflictCheckpointReady);
   clearElement(elements.saveCheckpointList);
   if (recovery.checkpoints.length === 0) {
     elements.saveCheckpointList.textContent = runtime.t("noCheckpoints");

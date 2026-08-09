@@ -11,6 +11,8 @@ let lastPeriodicCheckpointMonotonicAt = null;
 let loadTransactionActive = false;
 let loadInFlight = false;
 let loadRecoveryMode = false;
+let saveConflictMode = false;
+let saveConflictCheckpointReady = false;
 
 function currentSaveTimestamp() {
   return runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
@@ -64,6 +66,28 @@ function currentSaveFingerprint() {
 
 function saveSourceIsCurrent() {
   return currentSaveFingerprint() === lastKnownSaveFingerprint;
+}
+
+function beginSaveConflict() {
+  saveConflictMode = true;
+  if (!saveConflictCheckpointReady) {
+    saveConflictCheckpointReady = createCheckpoint("save-conflict", {
+      force: true,
+      allowDuringLoadRecovery: true,
+    });
+  }
+  runtime.setSaveConflictLock?.(true);
+  runtime.setSaveStatus(runtime.t(
+    saveConflictCheckpointReady ? "saveConflictDetected" : "saveConflictBackupFailed",
+  ));
+  runtime.updateUi?.();
+  return saveConflictCheckpointReady;
+}
+
+function finishSaveConflict() {
+  saveConflictMode = false;
+  saveConflictCheckpointReady = false;
+  runtime.setSaveConflictLock?.(false);
 }
 
 function recoveryEntryFromSave(saveData, reason, backedUpAt = currentSaveTimestamp()) {
@@ -421,7 +445,8 @@ function restoreRecoveryEntry(entry, successMessage = "recoveryRestored") {
       recoveryEntryFromSave(currentSave, "pre-restore"),
     );
     applySaveData(entry.save.state, entry.save.version);
-    if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) throw new Error("restore save failed");
+    if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict: true })) throw new Error("restore save failed");
+    finishSaveConflict();
     finishLoadRecovery();
     runtime.updateUi();
     runtime.draw();
@@ -856,6 +881,11 @@ function serializeSaveData() {
 
 function saveGame(reason = "auto", options = {}) {
   if (loadTransactionActive) return true;
+  if (saveConflictMode && !options.allowDuringSaveConflict) {
+    runtime.autoSaveElapsed = 0;
+    runtime.setSaveStatus(runtime.t("saveConflictDetected"));
+    return false;
+  }
   if (loadRecoveryMode && !options.allowDuringLoadRecovery) {
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
@@ -863,8 +893,9 @@ function saveGame(reason = "auto", options = {}) {
   }
   if (runtime.offlineProcessing) return true;
   if (!saveSourceIsCurrent()) {
+    beginSaveConflict();
+    if (!loadInFlight) void runtime.handleSaveConflict?.();
     runtime.autoSaveElapsed = 0;
-    runtime.setSaveStatus(runtime.t("saveFailed"));
     return false;
   }
   let savedAt = Date.now();
@@ -932,6 +963,11 @@ function quarantineSave(raw, details = {}, options = {}) {
 
 async function loadGame(options = {}) {
   const allowDuringLoadRecovery = Boolean(options.allowDuringLoadRecovery);
+  const allowDuringSaveConflict = Boolean(options.allowDuringSaveConflict);
+  if (saveConflictMode && !allowDuringSaveConflict) {
+    runtime.setSaveStatus(runtime.t("saveConflictDetected"));
+    return false;
+  }
   if (loadRecoveryMode && !allowDuringLoadRecovery) {
     runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
     return false;
@@ -1028,11 +1064,16 @@ async function loadGame(options = {}) {
       if (offlineProcessed) {
         loadTransactionActive = false;
         loadRecoveryMode = false;
-        if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) {
+        if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict })) {
           throw new Error("offline progress save failed");
         }
       }
     } catch (error) {
+      runtime.autoSaveElapsed = 0;
+      if (saveConflictMode && !saveConflictCheckpointReady) {
+        runtime.setSaveStatus(runtime.t("saveConflictBackupFailed"));
+        return false;
+      }
       try {
         applySaveData(parsed.state, parsed.version);
       } catch (restoreError) {
@@ -1041,7 +1082,6 @@ async function loadGame(options = {}) {
       runtime.offlineReport = null;
       if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
       loadRecoveryMode = true;
-      runtime.autoSaveElapsed = 0;
       writeLoadFailure("offline", error, parsed, retryBaseline);
       runtime.setSaveStatus(runtime.t("loadFailed"));
       return false;
@@ -1067,7 +1107,7 @@ async function loadGame(options = {}) {
 }
 
 function retryLoad() {
-  return loadGame({ allowDuringLoadRecovery: true });
+  return loadGame({ allowDuringLoadRecovery: true, allowDuringSaveConflict: saveConflictMode });
 }
 
 async function restoreQuarantineSave() {
@@ -1089,8 +1129,9 @@ async function restoreQuarantineSave() {
     runtime.setSaveStatus(runtime.t("recoveryRestoreFailed"));
     return false;
   }
-  const restored = await loadGame({ allowDuringLoadRecovery: true });
+  const restored = await loadGame({ allowDuringLoadRecovery: true, allowDuringSaveConflict: saveConflictMode });
   if (!restored) return false;
+  finishSaveConflict();
   try {
     localStorage.removeItem(runtime.SAVE_QUARANTINE_KEY);
     recoveryRevision += 1;
@@ -1108,6 +1149,7 @@ function resetSave() {
   if (!createCheckpoint("pre-reset", { force: true, allowDuringLoadRecovery: true })) return;
   loadRecoveryMode = false;
   clearLoadFailure();
+  finishSaveConflict();
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   localStorage.removeItem(runtime.SAVE_KEY);
   lastKnownSaveFingerprint = "";
@@ -1241,6 +1283,10 @@ expose("lastLocalSaveFingerprint", () => lastLocalSaveFingerprint);
 expose("lastKnownSaveFingerprint", () => lastKnownSaveFingerprint);
 expose("loadInFlight", () => loadInFlight);
 expose("loadRecoveryMode", () => loadRecoveryMode);
+expose("saveConflictMode", () => saveConflictMode);
+expose("saveConflictCheckpointReady", () => saveConflictCheckpointReady);
+expose("beginSaveConflict", () => beginSaveConflict);
+expose("finishSaveConflict", () => finishSaveConflict);
 expose("finishLoadRecovery", () => finishLoadRecovery);
 expose("currentSaveFingerprint", () => currentSaveFingerprint);
 expose("saveSourceIsCurrent", () => saveSourceIsCurrent);
