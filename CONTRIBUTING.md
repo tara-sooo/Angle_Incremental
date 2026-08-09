@@ -92,8 +92,8 @@ Do not combine unrelated feature work, large refactors, balance experiments, and
 
 Use `0.x.y` until the game reaches a stable public contract.
 
-- Patch: `0.5.0` -> `0.5.1` for bug fixes and low-risk adjustments.
-- Minor milestone: `0.5.x` -> `0.6.0` for a bundled content or systems update.
+- Patch: `0.5.0` -> `0.5.1` for bug fixes, low-risk adjustments, improvements or extensions to existing systems, and performance, reliability, or save-recovery work.
+- Minor milestone: `0.5.x` -> `0.6.0` for a bundled update that introduces a new progression layer, a substantial content collection, or a major game system.
 - `1.0.0` when the core design, expected save compatibility, and baseline quality are considered stable.
 
 Keep the application version separate from the save-data schema version. A documentation or balance-only release may change the application version without changing the save schema. Increase the save schema version only when loading older data requires migration or would otherwise be unsafe.
