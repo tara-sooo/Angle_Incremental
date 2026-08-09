@@ -819,7 +819,13 @@ function setSaveConflictLock(locked) {
     if (!control.dataset) return;
     const recoveryControl = control.closest?.(".save-recovery")
       || ["exportSaveCodeButton", "copySaveCodeButton", "saveCodeArea", "resetSaveButton"].includes(control.id);
-    if (recoveryControl) return;
+    const navigationControl = [
+      "main-tab",
+      "infinity-subtab",
+      "challenge-subtab",
+      "statistics-subtab",
+    ].some((className) => control.classList?.contains(className));
+    if (recoveryControl || navigationControl) return;
     if (locked) {
       if (control.disabled) return;
       control.dataset.saveConflictLocked = "true";
@@ -1102,7 +1108,11 @@ async function handleSaveConflict() {
   }
   saveConflictInFlight = (async () => {
     const reloaded = await reloadAfterSaveConflict();
-    if (!reloaded) return false;
+    if (!reloaded) {
+      runtime.updateUi();
+      drawActiveView();
+      return false;
+    }
     runtime.finishSaveConflict();
     runtime.updateUi();
     drawActiveView();

@@ -991,7 +991,7 @@ async function loadGame(options = {}) {
     } catch (error) {
       loadRecoveryMode = true;
       clearLoadFailure();
-      quarantineSave(raw, { stage: "parse", error }, { removeSave: true });
+      quarantineSave(raw, { stage: "parse", error }, { removeSave: !allowDuringSaveConflict });
       runtime.setSaveStatus(runtime.t("loadFailed"));
       return false;
     }
@@ -1003,7 +1003,7 @@ async function loadGame(options = {}) {
       quarantineSave(
         raw,
         { stage: "normalize", error: new Error("invalid save format") },
-        { removeSave: true },
+        { removeSave: !allowDuringSaveConflict },
       );
       runtime.setSaveStatus(runtime.t("oldSave"));
       return false;
@@ -1106,8 +1106,10 @@ async function loadGame(options = {}) {
   }
 }
 
-function retryLoad() {
-  return loadGame({ allowDuringLoadRecovery: true, allowDuringSaveConflict: saveConflictMode });
+async function retryLoad() {
+  const restored = await loadGame({ allowDuringLoadRecovery: true, allowDuringSaveConflict: saveConflictMode });
+  if (restored && saveConflictMode) finishSaveConflict();
+  return restored;
 }
 
 async function restoreQuarantineSave() {

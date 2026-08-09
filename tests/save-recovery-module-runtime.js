@@ -130,7 +130,8 @@ async function runSaveRecoveryModuleRuntimeTest() {
     } finally {
       context.localStorage.setItem = originalSetItem;
     }
-    assert.equal(await runtime.handleSaveConflict(), true, "a conflict should be retryable after storage recovers");
+    assert.equal(await runtime.retryLoad(), true, "a conflict should be retryable after storage recovers");
+    assert.equal(runtime.saveConflictMode, false, "a successful conflict retry should unlock the tab");
     assert.equal(debug.state.generationCount, 301, "a retried conflict should load the persisted state");
   }
 
@@ -193,6 +194,64 @@ async function runSaveRecoveryModuleRuntimeTest() {
       "a newly created conflict checkpoint must not be evicted immediately",
     );
     runtime.finishSaveConflict();
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { context, runtime } = instance;
+    const mainTab = {
+      classList: { contains: (name) => name === "main-tab" },
+      dataset: {},
+      disabled: false,
+    };
+    const gameplayButton = {
+      classList: { contains: () => false },
+      dataset: {},
+      disabled: false,
+    };
+    const recoveryButton = {
+      classList: { contains: () => false },
+      closest: () => ({}),
+      dataset: {},
+      disabled: false,
+    };
+    const originalQuerySelectorAll = context.document.querySelectorAll;
+    context.document.querySelectorAll = (selector) => selector === "button, input, select, textarea"
+      ? [mainTab, gameplayButton, recoveryButton]
+      : originalQuerySelectorAll(selector);
+    try {
+      assert.equal(runtime.beginSaveConflict(), true, "a conflict should lock gameplay controls");
+      assert.equal(mainTab.disabled, false, "main tabs must remain available during conflict recovery");
+      assert.equal(gameplayButton.disabled, true, "gameplay controls should be locked during conflict recovery");
+      assert.equal(recoveryButton.disabled, false, "recovery controls must remain available during conflict recovery");
+      runtime.finishSaveConflict();
+      assert.equal(gameplayButton.disabled, false, "gameplay controls should unlock after conflict recovery");
+    } finally {
+      context.document.querySelectorAll = originalQuerySelectorAll;
+    }
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime, storage } = instance;
+    debug.state.generationCount = 500;
+    assert.equal(debug.saveGame("manual"), true, "the incompatible-save baseline should save");
+    assert.equal(runtime.beginSaveConflict(), true, "an incompatible-save conflict should be checkpointed");
+    const newerRaw = JSON.stringify({
+      version: runtime.SAVE_VERSION + 1,
+      savedAt: Date.now(),
+      state: runtime.serializeSaveData().state,
+    });
+    storage.set(runtime.SAVE_KEY, newerRaw);
+    assert.equal(await runtime.handleSaveConflict(), false, "an incompatible conflict save should remain in recovery");
+    assert.equal(storage.get(runtime.SAVE_KEY), newerRaw, "conflict recovery must not delete a newer-format shared save");
+    assert.equal(JSON.parse(storage.get(runtime.SAVE_QUARANTINE_KEY)).raw, newerRaw, "the newer save should still be quarantined");
+    runtime.updateUi();
+    assert.equal(runtime.elements.retryLoadButton.hidden, false, "a failed conflict reload should expose retry controls");
+    const compatibleRaw = JSON.stringify(runtime.serializeSaveData());
+    storage.set(runtime.SAVE_KEY, compatibleRaw);
+    assert.equal(await runtime.retryLoad(), true, "a conflict recovery retry should load a later compatible save");
+    assert.equal(runtime.saveConflictMode, false, "a successful conflict recovery retry should clear conflict mode");
   }
 
   {
