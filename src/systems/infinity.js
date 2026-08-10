@@ -211,7 +211,36 @@ function applyStartingCoreBoosts() {
   }
 }
 
-function recordInfinityRun(scoreLog, gained, challenge, noGenerationCoreBoost = false) {
+function recordInfinityCountRate(countGain, realElapsed, challenge, towerChallenge) {
+  if (
+    runtime.offlineProcessing
+    || challenge > 0
+    || towerChallenge > 0
+    || runtime.state.activeChallenge > 0
+    || runtime.state.activeTowerChallenge > 0
+  ) return;
+  const safeCountGain = Math.max(0, Math.floor(runtime.sanitizeNumber(countGain, 0)));
+  const safeRealElapsed = Math.max(
+    runtime.MAX_SIMULATION_STEP_SECONDS,
+    runtime.sanitizeNumber(realElapsed, 0),
+  );
+  const rate = safeCountGain / safeRealElapsed;
+  if (Number.isFinite(rate)) {
+    runtime.state.bestInfinityCountPerSecond = Math.max(
+      runtime.state.bestInfinityCountPerSecond,
+      rate,
+    );
+  }
+}
+
+function recordInfinityRun(
+  scoreLog,
+  gained,
+  challenge,
+  noGenerationCoreBoost = false,
+  countGain = 0,
+  towerChallenge = 0,
+) {
   const elapsed = runtime.state.currentInfinityRunTime;
   const realElapsed = runtime.state.currentInfinityRealTime;
   const recordedTime = elapsed > 0
@@ -236,10 +265,19 @@ function recordInfinityRun(scoreLog, gained, challenge, noGenerationCoreBoost = 
   if (record.realTime > 0 && (runtime.state.fastestInfinityRealTime <= 0 || record.realTime < runtime.state.fastestInfinityRealTime)) {
     runtime.state.fastestInfinityRealTime = record.realTime;
   }
+  recordInfinityCountRate(countGain, realElapsed, challenge, towerChallenge);
 }
 
 function infinityCountGain() {
   return isChallengeCompleted(6) ? 2 : 1;
+}
+
+function addAggregatedInfinityCount(amount) {
+  const count = Math.max(0, Math.floor(runtime.sanitizeNumber(amount, 0)));
+  if (count <= 0) return 0;
+  runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + count);
+  runtime.checkAchievements(true);
+  return count;
 }
 
 function runInfinity(forced = false) {
@@ -287,9 +325,17 @@ function runInfinity(forced = false) {
   }
 
   const gained = runtime.infinityPointGain();
-  runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + infinityCountGain());
+  const countGain = infinityCountGain();
+  runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + countGain);
   addInfinityPoints(gained);
-  recordInfinityRun(scoreLogBeforeReset, gained, completedChallenge, noGenerationOrCoreBoost);
+  recordInfinityRun(
+    scoreLogBeforeReset,
+    gained,
+    completedChallenge,
+    noGenerationOrCoreBoost,
+    countGain,
+    completedTowerChallenge,
+  );
   runtime.checkAchievements(true);
   runtime.resetBelowInfinity();
   runtime.state.currentInfinityRunTime = 0;
@@ -373,6 +419,7 @@ expose("resetBelowInfinity", () => resetBelowInfinity, (value) => { resetBelowIn
 expose("applyStartingCoreBoosts", () => applyStartingCoreBoosts, (value) => { applyStartingCoreBoosts = value; });
 expose("recordInfinityRun", () => recordInfinityRun, (value) => { recordInfinityRun = value; });
 expose("infinityCountGain", () => infinityCountGain, (value) => { infinityCountGain = value; });
+expose("addAggregatedInfinityCount", () => addAggregatedInfinityCount, (value) => { addAggregatedInfinityCount = value; });
 expose("runInfinity", () => runInfinity, (value) => { runInfinity = value; });
 expose("buyInfinityUpgrade", () => buyInfinityUpgrade, (value) => { buyInfinityUpgrade = value; });
 expose("toggleInfinityChallenge", () => toggleInfinityChallenge, (value) => { toggleInfinityChallenge = value; });

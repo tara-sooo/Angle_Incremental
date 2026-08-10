@@ -71,7 +71,7 @@ async function runIc7PriceCapModuleRuntimeTest() {
 
   const saved = await loadRuntime(runtimePath);
   saved.context.localStorage.setItem("angle-incremental-save", saveWithInfinityPoints(5.999999999999999));
-  saved.debug.loadGame();
+  await saved.debug.loadGame();
   assert.strictEqual(saved.debug.state.infinityPoints, 6, "loading an old near-integer IP balance must normalize it");
   assert.strictEqual(saved.debug.state.infinityPointsLog10, Math.log10(6), "loaded IP must use the canonical log value");
 

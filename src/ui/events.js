@@ -1,6 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.10.1";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.10.2";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
@@ -56,6 +56,7 @@ function switchStatisticsSubtab(tab) {
 }
 
 function applySetting(key, value) {
+  if (runtime.offlineProcessing || runtime.saveConflictMode) return;
   runtime.state[key] = value;
   if (key === "language") {
     runtime.state.language = runtime.normalizeChoice(value, ["ja", "en"], "ja");
@@ -179,14 +180,16 @@ function bindEvents() {
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
   if (runtime.elements.retryLoadButton) runtime.elements.retryLoadButton.addEventListener("click", () => {
-    runtime.retryLoad();
-    runtime.updateUi();
-    runtime.draw();
+    Promise.resolve(runtime.retryLoad()).finally(() => {
+      runtime.updateUi();
+      runtime.draw();
+    });
   });
   if (runtime.elements.restoreQuarantineButton) runtime.elements.restoreQuarantineButton.addEventListener("click", () => {
-    runtime.restoreQuarantineSave();
-    runtime.updateUi();
-    runtime.draw();
+    Promise.resolve(runtime.restoreQuarantineSave()).finally(() => {
+      runtime.updateUi();
+      runtime.draw();
+    });
   });
   if (runtime.elements.restorePreImportButton) runtime.elements.restorePreImportButton.addEventListener("click", runtime.restorePreImportSave);
   if (runtime.elements.restoreUndoButton) runtime.elements.restoreUndoButton.addEventListener("click", runtime.restoreUndoSave);
@@ -196,6 +199,7 @@ function bindEvents() {
   });
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
+  window.addEventListener("storage", runtime.handleStorageChange);
   if (document.addEventListener) document.addEventListener("visibilitychange", runtime.handleVisibilityChange);
   window.addEventListener("resize", runtime.resizeCanvas);
   window.addEventListener("resize", runtime.resizeInfiniteAngleCanvas);

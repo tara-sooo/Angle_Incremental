@@ -32,7 +32,7 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.ok(Math.abs(state.currentInfinityRealTime - 3) < 1e-9, "online real Infinity time should advance normally");
 
   state.offlineProgressEnabled = false;
-  state.offlineTickCount = 500;
+  state.offlineTickCount = 1000;
   state.timeFlux = 987654;
   state.totalPlayTime = 0;
   state.totalRealPlayTime = 0;
@@ -45,7 +45,7 @@ async function runTimeFluxModuleRuntimeTest() {
     currentInfinityRealTime: state.currentInfinityRealTime,
     timeFlux: state.timeFlux,
   };
-  const disabledOfflineResult = debug.processOfflineElapsed(1, "test", { clockSource: "server" });
+  const disabledOfflineResult = await debug.processOfflineElapsed(1, "test", { clockSource: "server" });
   assert.equal(state.offlineProgressEnabled, false, "the offline progress setting should remain disabled");
   assert.deepEqual({
     totalPlayTime: state.totalPlayTime,
@@ -67,14 +67,14 @@ async function runTimeFluxModuleRuntimeTest() {
   try {
     state.offlineTickCount = runtime.OFFLINE_PROGRESS_MIN_TICKS;
     const longSeconds = 8 * 86400;
-    const trustedLongReport = debug.processOfflineElapsed(longSeconds, "test", { clockSource: "server" });
+    const trustedLongReport = await debug.processOfflineElapsed(longSeconds, "test", { clockSource: "server" });
     assert.equal(trustedLongReport.capped, false, "server-clock offline progress should not use the local seven-day cap");
     assert.equal(trustedLongReport.effectiveElapsedSeconds, longSeconds, "trusted server time should be processed in full");
     assert.equal(trustedLongReport.requestedTicks, runtime.OFFLINE_PROGRESS_MIN_TICKS, "long intervals should respect configured ticks");
     assert.equal(boundedUpdateCalls, trustedLongReport.processedTicks, "long intervals should use bounded simulation work");
 
     boundedUpdateCalls = 0;
-    const localReport = debug.processOfflineElapsed(longSeconds, "test", { clockSource: "local-fallback" });
+    const localReport = await debug.processOfflineElapsed(longSeconds, "test", { clockSource: "local-fallback" });
     assert.equal(localReport.capped, true, "local fallback progress should retain the seven-day cap");
     assert.equal(localReport.effectiveElapsedSeconds, 7 * 86400, "local fallback progress should use seven days");
   } finally {
@@ -82,14 +82,14 @@ async function runTimeFluxModuleRuntimeTest() {
   }
 
   const timeFluxBeforeClockAnomaly = state.timeFlux;
-  const clockAnomalyReport = debug.processOfflineElapsed(3600, "test", {
+  const clockAnomalyReport = await debug.processOfflineElapsed(3600, "test", {
     clockSource: "server",
     clockAnomaly: true,
   });
   assert.equal(clockAnomalyReport.clockAnomaly, true, "clock anomalies should be reported");
   assert.equal(clockAnomalyReport.rewardSuppressed, true, "clock anomalies should suppress progress");
   assert.equal(state.timeFlux, timeFluxBeforeClockAnomaly, "clock anomalies should not change dormant Time Flux");
-  const invalidElapsedReport = debug.processOfflineElapsed(Infinity, "test", { clockSource: "server" });
+  const invalidElapsedReport = await debug.processOfflineElapsed(Infinity, "test", { clockSource: "server" });
   assert.equal(invalidElapsedReport.clockAnomaly, true, "non-finite intervals should be treated as anomalies");
   assert.equal(state.timeFlux, timeFluxBeforeClockAnomaly, "invalid intervals should not change dormant Time Flux");
 
@@ -118,6 +118,12 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(serialized.state.timeFluxSpeed, 120, "dormant speeds should be saved");
   assert.equal(serialized.state.timeFluxCustomSpeed, 99, "dormant custom speeds should be saved");
   assert.equal(serialized.state.showTimeFluxQuickBar, false, "dormant visibility settings should be saved");
+
+  state.bestInfinityCountPerSecond = 12.5;
+  state.infinityCountRateRemainder = 0.75;
+  const rateSerialized = runtime.serializeSaveData();
+  assert.equal(rateSerialized.state.bestInfinityCountPerSecond, 12.5, "the best Infinity rate should be saved");
+  assert.equal(rateSerialized.state.infinityCountRateRemainder, 0.75, "the Infinity rate remainder should be saved");
 
   state.timeFlux = 123;
   state.timeFluxCapacityLevel = 2;
@@ -379,7 +385,7 @@ async function runTimeFluxModuleRuntimeTest() {
       if (key === visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY) throw new Error("diagnostic removal unavailable");
       return visibilitySaveFailureOriginalRemoveItem(key);
     };
-    assert.equal(visibilitySaveFailureDebug.retryLoad(), true, "retry should apply the captured interval");
+    assert.equal(await visibilitySaveFailureDebug.retryLoad(), true, "retry should apply the captured interval");
     assert.ok(visibilitySaveFailureDebug.state.totalPlayTime > 0, "retry should restore normal offline progress");
     const recoveredSave = JSON.parse(
       visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY),
@@ -391,7 +397,7 @@ async function runTimeFluxModuleRuntimeTest() {
       return originalProcessOfflineElapsed(elapsed, source, clockContext);
     };
     try {
-      assert.equal(visibilitySaveFailureDebug.loadGame(), true, "a recovered save should remain loadable");
+      assert.equal(await visibilitySaveFailureDebug.loadGame(), true, "a recovered save should remain loadable");
     } finally {
       visibilitySaveFailureRuntime.processOfflineElapsed = originalProcessOfflineElapsed;
     }
@@ -538,7 +544,7 @@ async function runTimeFluxModuleRuntimeTest() {
   };
   try {
     assert.equal(
-      automationRollbackDebug.processOfflineElapsed(0.01, "test", { clockSource: "server" }),
+      await automationRollbackDebug.processOfflineElapsed(0.01, "test", { clockSource: "server" }),
       null,
       "an automation save failure should abort offline processing",
     );
@@ -567,6 +573,177 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(resetResumeDebug.state.totalPlayTime, 0, "reset should not receive stale offline progress");
   assert.equal(resetResumeDebug.state.timeFlux, 0, "reset should clear dormant Time Flux");
   assert.equal(resetResumeRuntime.offlineReport, null, "reset should clear the pending offline report");
+
+  const millionTickInstance = await loadRuntime(candidatePath);
+  const millionTickRuntime = millionTickInstance.runtime;
+  const millionTickDebug = millionTickInstance.debug;
+  millionTickDebug.state.offlineTickCount = millionTickRuntime.OFFLINE_PROGRESS_MAX_TICKS;
+  const millionTickOriginalUpdate = millionTickRuntime.update;
+  let millionTickUpdateCalls = 0;
+  let millionTickProgressUpdates = 0;
+  let millionTickProgressValue = 0;
+  Object.defineProperty(millionTickRuntime.elements.offlineReportProgress, "value", {
+    configurable: true,
+    get: () => millionTickProgressValue,
+    set: (value) => {
+      millionTickProgressValue = value;
+      millionTickProgressUpdates += 1;
+    },
+  });
+  millionTickRuntime.update = () => {
+    millionTickUpdateCalls += 1;
+  };
+  try {
+    const millionTickReport = await millionTickDebug.processOfflineElapsed(
+      millionTickRuntime.OFFLINE_PROGRESS_MAX_TICKS * millionTickRuntime.MAX_SIMULATION_STEP_SECONDS,
+      "test",
+      { clockSource: "server" },
+    );
+    assert.equal(millionTickReport.configuredTicks, 1000000, "offline settings should allow one million configured ticks");
+    assert.equal(millionTickReport.requestedTicks, 1000000, "offline processing should request one million ticks");
+    assert.equal(millionTickReport.processedTicks, 1000000, "offline processing should not retain a hidden ten-thousand tick cap");
+    assert.equal(millionTickUpdateCalls, 1000000, "one million ticks should be simulated exactly once");
+    assert.ok(millionTickProgressUpdates > 1, "large offline processing should publish incremental progress");
+  } finally {
+    millionTickRuntime.update = millionTickOriginalUpdate;
+  }
+
+  const reentrancyInstance = await loadRuntime(candidatePath);
+  const reentrancyRuntime = reentrancyInstance.runtime;
+  const reentrancyDebug = reentrancyInstance.debug;
+  const reentrancyOriginalUpdate = reentrancyRuntime.update;
+  const reentrancyOriginalSetTimeout = reentrancyInstance.context.window.setTimeout;
+  let reentrancyYielded = false;
+  reentrancyDebug.state.generationCount = 7;
+  reentrancyDebug.state.offlineTickCount = reentrancyRuntime.OFFLINE_PROGRESS_MAX_TICKS;
+  reentrancyRuntime.update = () => {};
+  reentrancyInstance.context.window.setTimeout = (callback) => {
+    if (!reentrancyYielded) {
+      reentrancyYielded = true;
+      reentrancyDebug.resetSave();
+      reentrancyDebug.applySetting("offlineProgressEnabled", false);
+      reentrancyRuntime.offlineReport = null;
+    }
+    callback();
+    return 0;
+  };
+  try {
+    const reentrancyReport = await reentrancyDebug.processOfflineElapsed(
+      2000 * reentrancyRuntime.MAX_SIMULATION_STEP_SECONDS,
+      "test",
+      { clockSource: "server" },
+    );
+    assert.ok(reentrancyReport.processedTicks >= 2000, "chunked offline processing should survive a cleared shared report");
+    assert.equal(reentrancyDebug.state.generationCount, 7, "offline processing should lock reset actions while yielding");
+    assert.equal(reentrancyDebug.state.offlineProgressEnabled, true, "offline processing should lock settings while yielding");
+  } finally {
+    reentrancyRuntime.update = reentrancyOriginalUpdate;
+    reentrancyInstance.context.window.setTimeout = reentrancyOriginalSetTimeout;
+  }
+
+  const rateInstance = await loadRuntime(candidatePath);
+  const rateRuntime = rateInstance.runtime;
+  const rateState = rateInstance.debug.state;
+  rateRuntime.recordInfinityRun(0, 0, 1, false, 1, 0);
+  rateRuntime.recordInfinityRun(0, 0, 0, false, 1, 2);
+  rateRuntime.offlineProcessing = true;
+  rateRuntime.recordInfinityRun(0, 0, 0, false, 1, 0);
+  rateRuntime.offlineProcessing = false;
+  rateState.activeTowerChallenge = 2;
+  rateRuntime.recordInfinityRun(0, 0, 0, false, 1, 0);
+  rateState.activeTowerChallenge = 0;
+  assert.equal(rateState.bestInfinityCountPerSecond, 0, "challenge Infinity runs should not set the best rate");
+  rateState.infinityCount = 1;
+  rateState.score = Number.MAX_VALUE;
+  rateState.scoreLog10 = 309;
+  rateState.currentInfinityRealTime = 0.01;
+  rateState.activeChallenge = 0;
+  rateState.activeTowerChallenge = 0;
+  rateRuntime.runInfinity(false);
+  assert.equal(rateState.bestInfinityCountPerSecond, 30, "Infinity rate should use the one-thirtieth-second minimum");
+
+  const aggregationInstance = await loadRuntime(candidatePath);
+  const aggregationRuntime = aggregationInstance.runtime;
+  const aggregationState = aggregationInstance.debug.state;
+  const infinityAutomationUpgrade = aggregationRuntime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "8-1");
+  aggregationState.infinityUpgradeMask = 1 << infinityAutomationUpgrade.bit;
+  aggregationState.infinityCount = 1;
+  aggregationState.bestInfinityCountPerSecond = 2;
+  aggregationState.infinityCountRateRemainder = 0.5;
+  aggregationState.automationEnabled = true;
+  aggregationState.autoRunInfinity = true;
+  aggregationState.autoInfinityPointThresholdLog10 = 0;
+  aggregationState.offlineTickCount = 1000;
+  aggregationState.lastInfinityRuns = [];
+  const aggregationOriginalUpdate = aggregationRuntime.update;
+  aggregationRuntime.update = () => {};
+  try {
+    const aggregateReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });
+    assert.equal(aggregateReport.normalInfinityCountGain, 0, "the aggregate test should have no normal Infinity gain");
+    assert.equal(aggregateReport.aggregatedInfinityCountGain, 20, "aggregation should add only the target shortfall");
+    assert.equal(aggregateReport.totalInfinityCountGain, 20, "the report should include normal and aggregate gains");
+    assert.equal(aggregationState.infinityCount, 21, "aggregated Infinity should be added directly");
+    assert.equal(aggregationState.infinityCountRateRemainder, 0.5, "fractional Infinity gain should carry forward");
+    assert.equal(aggregationState.lastInfinityRuns.length, 0, "aggregation should not create Infinity history entries");
+
+    aggregationState.infinityCount = 1;
+    aggregationState.infinityCountRateRemainder = 0;
+    let normalGainApplied = false;
+    aggregationRuntime.update = () => {
+      if (!normalGainApplied) {
+        aggregationState.infinityCount += 5;
+        normalGainApplied = true;
+      }
+    };
+    const mixedReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });
+    assert.equal(mixedReport.normalInfinityCountGain, 5, "the report should separate simulated Infinity gain");
+    assert.equal(mixedReport.aggregatedInfinityCountGain, 15, "aggregation should subtract simulated Infinity gain");
+    assert.equal(aggregationState.infinityCount, 21, "normal and aggregate Infinity gains should not double count");
+
+    aggregationState.infinityCount = 1;
+    aggregationState.infinityCountRateRemainder = 0;
+    let overshootGainApplied = false;
+    aggregationRuntime.update = () => {
+      if (!overshootGainApplied) {
+        aggregationState.infinityCount += 1;
+        overshootGainApplied = true;
+      }
+    };
+    const overshootReport = await aggregationInstance.debug.processOfflineElapsed(0.25, "test", { clockSource: "server" });
+    assert.equal(overshootReport.normalInfinityCountGain, 1, "the overshoot test should include normal simulation gain");
+    assert.equal(overshootReport.aggregatedInfinityCountGain, 0, "normal gain above the aggregate target should need no extra Infinity");
+    assert.equal(aggregationState.infinityCountRateRemainder, 0, "normal gain above the aggregate target must not leave a remainder");
+
+    aggregationState.infinityCount = 1;
+    aggregationState.infinityCountRateRemainder = 0.25;
+    aggregationState.autoInfinityPointThresholdLog10 = 1;
+    const thresholdReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });
+    assert.equal(thresholdReport.aggregatedInfinityCountGain, 0, "non-minimum Infinity thresholds should disable aggregation");
+    assert.equal(aggregationState.infinityCount, 1, "disabled aggregation should not add Infinity");
+    assert.equal(aggregationState.infinityCountRateRemainder, 0.25, "disabled aggregation should preserve the remainder");
+
+    for (const [field, value, message] of [
+      ["automationEnabled", false, "disabled automation"],
+      ["autoRunInfinity", false, "disabled Infinity automation"],
+      ["activeChallenge", 1, "active Infinity Challenges"],
+      ["activeTowerChallenge", 1, "active Tower Challenges"],
+    ]) {
+      aggregationState.automationEnabled = true;
+      aggregationState.autoRunInfinity = true;
+      aggregationState.autoInfinityPointThresholdLog10 = 0;
+      aggregationState.activeChallenge = 0;
+      aggregationState.activeTowerChallenge = 0;
+      aggregationState.infinityCount = 1;
+      aggregationState.infinityCountRateRemainder = 0.25;
+      aggregationState[field] = value;
+      const gatedReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });
+      assert.equal(gatedReport.aggregatedInfinityCountGain, 0, `${message} should disable aggregation`);
+      assert.equal(aggregationState.infinityCount, 1, `${message} should not add Infinity`);
+      assert.equal(aggregationState.infinityCountRateRemainder, 0.25, `${message} should preserve the remainder`);
+    }
+  } finally {
+    aggregationRuntime.update = aggregationOriginalUpdate;
+  }
 
   console.log("Time Flux removal and offline compatibility tests passed");
 }

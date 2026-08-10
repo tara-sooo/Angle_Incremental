@@ -39,6 +39,242 @@ async function runSaveRecoveryModuleRuntimeTest() {
   }
 
   {
+    const staleTab = await loadRuntime(candidatePath);
+    staleTab.debug.state.generationCount = 10;
+    assert.equal(staleTab.debug.saveGame("manual"), true, "the stale tab baseline should save");
+    const latestTab = await loadRuntime(candidatePath, staleTab.storage);
+    latestTab.debug.state.generationCount = 11;
+    assert.equal(latestTab.debug.saveGame("manual"), true, "the replacement tab should save");
+    const latestRaw = latestTab.storage.get(latestTab.runtime.SAVE_KEY);
+    staleTab.storage.set(staleTab.runtime.SAVE_KEY, latestRaw);
+
+    staleTab.debug.state.generationCount = 100;
+    assert.equal(staleTab.debug.saveGame("auto"), false, "a stale tab save should be rejected");
+    assert.equal(
+      staleTab.runtime.recoveryEntries().checkpoints.find((entry) => entry.reason === "save-conflict")?.state.generationCount,
+      100,
+      "a rejected save should checkpoint the in-memory state before reloading",
+    );
+    const originalOfflineElapsedFromSave = staleTab.runtime.offlineElapsedFromSave;
+    staleTab.runtime.offlineElapsedFromSave = () => ({
+      elapsedSeconds: 1,
+      clockSource: "local-fallback",
+      clockAnomaly: false,
+      legacyTimestampUsed: false,
+    });
+    try {
+      assert.equal(await staleTab.runtime.handleSaveConflict(), true, "a save conflict should reload after checkpointing");
+    } finally {
+      staleTab.runtime.offlineElapsedFromSave = originalOfflineElapsedFromSave;
+    }
+    assert.equal(staleTab.debug.state.generationCount, 11, "conflict recovery should load the latest persisted state");
+    assert.equal(staleTab.storage.get(staleTab.runtime.SAVE_KEY), latestRaw, "authoritative conflict recovery must not rewrite the shared save");
+    assert.equal(staleTab.runtime.saveConflictMode, false, "successful conflict recovery should clear conflict mode");
+    assert.equal(
+      staleTab.runtime.recoveryEntries().checkpoints.find((entry) => entry.reason === "save-conflict")?.state.generationCount,
+      100,
+      "conflict recovery should retain the stale in-memory state as a checkpoint",
+    );
+    latestTab.storage.set(latestTab.runtime.SAVE_KEY, staleTab.storage.get(staleTab.runtime.SAVE_KEY));
+    await latestTab.runtime.handleStorageChange({ key: latestTab.runtime.SAVE_KEY });
+    assert.equal(
+      latestTab.runtime.recoveryEntries().checkpoints.some((entry) => entry.reason === "save-conflict"),
+      false,
+      "an authoritative conflict reload must not send a replacement storage event to the other tab",
+    );
+  }
+
+  {
+    const staleTab = await loadRuntime(candidatePath);
+    staleTab.debug.state.generationCount = 20;
+    assert.equal(staleTab.debug.saveGame("manual"), true, "the storage-event baseline should save");
+    const latestTab = await loadRuntime(candidatePath, staleTab.storage);
+    latestTab.debug.state.generationCount = 21;
+    assert.equal(latestTab.debug.saveGame("manual"), true, "the storage-event replacement should save");
+    staleTab.storage.set(staleTab.runtime.SAVE_KEY, latestTab.storage.get(latestTab.runtime.SAVE_KEY));
+    staleTab.debug.state.generationCount = 200;
+    await staleTab.runtime.handleStorageChange({ key: staleTab.runtime.SAVE_KEY });
+    assert.equal(staleTab.debug.state.generationCount, 21, "a storage event should use the shared conflict recovery");
+    assert.equal(
+      staleTab.runtime.recoveryEntries().checkpoints.find((entry) => entry.reason === "save-conflict")?.state.generationCount,
+      200,
+      "a storage-event conflict should checkpoint the current in-memory state",
+    );
+    latestTab.debug.state.generationCount = 22;
+    assert.equal(latestTab.debug.saveGame("manual"), true, "a storage clear replacement should save");
+    staleTab.storage.set(staleTab.runtime.SAVE_KEY, latestTab.storage.get(latestTab.runtime.SAVE_KEY));
+    staleTab.debug.state.generationCount = 220;
+    await staleTab.runtime.handleStorageChange({ key: null });
+    assert.equal(staleTab.debug.state.generationCount, 22, "a storage clear event should use the shared conflict recovery");
+  }
+
+  {
+    const staleTab = await loadRuntime(candidatePath);
+    staleTab.debug.state.generationCount = 30;
+    assert.equal(staleTab.debug.saveGame("manual"), true, "the visibility baseline should save");
+    const latestTab = await loadRuntime(candidatePath, staleTab.storage);
+    latestTab.debug.state.generationCount = 31;
+    assert.equal(latestTab.debug.saveGame("manual"), true, "the visibility replacement should save");
+    staleTab.storage.set(staleTab.runtime.SAVE_KEY, latestTab.storage.get(latestTab.runtime.SAVE_KEY));
+    staleTab.debug.state.generationCount = 300;
+    staleTab.context.document.hidden = true;
+    await staleTab.runtime.handleVisibilityChange();
+    assert.equal(staleTab.debug.state.generationCount, 31, "visibility conflict recovery should load the latest persisted state");
+    assert.equal(
+      staleTab.runtime.recoveryEntries().checkpoints.find((entry) => entry.reason === "save-conflict")?.state.generationCount,
+      300,
+      "visibility conflict recovery should checkpoint the stale in-memory state",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { context, debug, runtime, storage } = instance;
+    debug.state.generationCount = 300;
+    assert.equal(debug.saveGame("manual"), true, "the backup-failure baseline should save");
+    const replacement = await loadRuntime(candidatePath, storage);
+    replacement.debug.state.generationCount = 301;
+    assert.equal(replacement.debug.saveGame("manual"), true, "the backup-failure replacement should save");
+    storage.set(runtime.SAVE_KEY, replacement.storage.get(runtime.SAVE_KEY));
+    debug.state.generationCount = 999;
+    const originalSetItem = context.localStorage.setItem;
+    context.localStorage.setItem = (key, value) => {
+      if (key === runtime.SAVE_CHECKPOINTS_KEY) throw new Error("storage full");
+      return originalSetItem(key, value);
+    };
+    try {
+      assert.equal(await runtime.handleStorageChange({ key: runtime.SAVE_KEY }), false, "a failed conflict backup must stop before reload");
+      assert.equal(debug.state.generationCount, 999, "a failed conflict backup must preserve in-memory progress");
+      assert.equal(runtime.saveConflictMode, true, "a failed conflict backup must keep the tab stopped");
+      assert.equal(JSON.parse(storage.get(runtime.SAVE_KEY)).state.generationCount, 301, "backup failure must keep the latest persisted save");
+    } finally {
+      context.localStorage.setItem = originalSetItem;
+    }
+    assert.equal(await runtime.retryLoad(), true, "a conflict should be retryable after storage recovers");
+    assert.equal(runtime.saveConflictMode, false, "a successful conflict retry should unlock the tab");
+    assert.equal(debug.state.generationCount, 301, "a retried conflict should load the persisted state");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { context, debug, runtime, storage } = instance;
+    debug.state.generationCount = 400;
+    assert.equal(debug.saveGame("manual"), true, "the offline conflict baseline should save");
+    const staleSave = JSON.parse(storage.get(runtime.SAVE_KEY));
+    staleSave.savedAt = Math.max(1, Date.now() - 10000);
+    staleSave.serverSavedAt = 0;
+    const staleRaw = JSON.stringify(staleSave);
+    storage.set(runtime.SAVE_KEY, staleRaw);
+
+    const latestTab = await loadRuntime(candidatePath, storage);
+    latestTab.debug.state.generationCount = 401;
+    assert.equal(latestTab.debug.saveGame("manual"), true, "the offline conflict replacement should save");
+    const latestRaw = latestTab.storage.get(runtime.SAVE_KEY);
+    storage.set(runtime.SAVE_KEY, staleRaw);
+
+    const originalProcessOfflineElapsed = runtime.processOfflineElapsed;
+    const originalSetItem = context.localStorage.setItem;
+    runtime.processOfflineElapsed = (elapsedSeconds, source, clockContext) => {
+      debug.state.generationCount = 999;
+      storage.set(runtime.SAVE_KEY, latestRaw);
+      return originalProcessOfflineElapsed(elapsedSeconds, source, clockContext);
+    };
+    context.localStorage.setItem = (key, value) => {
+      if (key === runtime.SAVE_CHECKPOINTS_KEY) throw new Error("storage full");
+      return originalSetItem(key, value);
+    };
+    try {
+      assert.equal(await debug.loadGame(), false, "a conflict during offline processing must fail safely");
+      assert.equal(debug.state.generationCount, 999, "failed conflict backup must preserve processed memory state");
+      assert.equal(runtime.saveConflictMode, true, "failed conflict backup must keep conflict mode active");
+      assert.equal(runtime.saveConflictCheckpointReady, false, "failed conflict backup must report no checkpoint");
+      assert.equal(runtime.loadRecoveryMode, false, "failed conflict backup must not enter ordinary load recovery");
+    } finally {
+      runtime.processOfflineElapsed = originalProcessOfflineElapsed;
+      context.localStorage.setItem = originalSetItem;
+    }
+    assert.equal(await runtime.handleSaveConflict(), true, "the offline conflict should be retryable after storage recovers");
+    assert.equal(debug.state.generationCount, 401, "retrying the offline conflict should load the latest save");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    for (let index = 0; index < runtime.MAX_EVENT_SAVE_CHECKPOINTS; index += 1) {
+      debug.state.generationCount = index;
+      assert.equal(debug.createCheckpoint(`test-event-${index}`, { force: true }), true, "event checkpoints should fill their retention limit");
+    }
+    debug.state.generationCount = 1234;
+    assert.equal(runtime.beginSaveConflict(), true, "a conflict checkpoint should fit a full event history");
+    const checkpoints = runtime.recoveryEntries().checkpoints;
+    assert.equal(checkpoints.length, runtime.MAX_EVENT_SAVE_CHECKPOINTS, "conflict retention should stay within the event limit");
+    assert.equal(
+      checkpoints.some((entry) => entry.reason === "save-conflict" && entry.state.generationCount === 1234),
+      true,
+      "a newly created conflict checkpoint must not be evicted immediately",
+    );
+    runtime.finishSaveConflict();
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { context, runtime } = instance;
+    const mainTab = {
+      classList: { contains: (name) => name === "main-tab" },
+      dataset: {},
+      disabled: false,
+    };
+    const gameplayButton = {
+      classList: { contains: () => false },
+      dataset: {},
+      disabled: false,
+    };
+    const recoveryButton = {
+      classList: { contains: () => false },
+      closest: () => ({}),
+      dataset: {},
+      disabled: false,
+    };
+    const originalQuerySelectorAll = context.document.querySelectorAll;
+    context.document.querySelectorAll = (selector) => selector === "button, input, select, textarea"
+      ? [mainTab, gameplayButton, recoveryButton]
+      : originalQuerySelectorAll(selector);
+    try {
+      assert.equal(runtime.beginSaveConflict(), true, "a conflict should lock gameplay controls");
+      assert.equal(mainTab.disabled, false, "main tabs must remain available during conflict recovery");
+      assert.equal(gameplayButton.disabled, true, "gameplay controls should be locked during conflict recovery");
+      assert.equal(recoveryButton.disabled, false, "recovery controls must remain available during conflict recovery");
+      runtime.finishSaveConflict();
+      assert.equal(gameplayButton.disabled, false, "gameplay controls should unlock after conflict recovery");
+    } finally {
+      context.document.querySelectorAll = originalQuerySelectorAll;
+    }
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime, storage } = instance;
+    debug.state.generationCount = 500;
+    assert.equal(debug.saveGame("manual"), true, "the incompatible-save baseline should save");
+    assert.equal(runtime.beginSaveConflict(), true, "an incompatible-save conflict should be checkpointed");
+    const newerRaw = JSON.stringify({
+      version: runtime.SAVE_VERSION + 1,
+      savedAt: Date.now(),
+      state: runtime.serializeSaveData().state,
+    });
+    storage.set(runtime.SAVE_KEY, newerRaw);
+    assert.equal(await runtime.handleSaveConflict(), false, "an incompatible conflict save should remain in recovery");
+    assert.equal(storage.get(runtime.SAVE_KEY), newerRaw, "conflict recovery must not delete a newer-format shared save");
+    assert.equal(JSON.parse(storage.get(runtime.SAVE_QUARANTINE_KEY)).raw, newerRaw, "the newer save should still be quarantined");
+    runtime.updateUi();
+    assert.equal(runtime.elements.retryLoadButton.hidden, false, "a failed conflict reload should expose retry controls");
+    const compatibleRaw = JSON.stringify(runtime.serializeSaveData());
+    storage.set(runtime.SAVE_KEY, compatibleRaw);
+    assert.equal(await runtime.retryLoad(), true, "a conflict recovery retry should load a later compatible save");
+    assert.equal(runtime.saveConflictMode, false, "a successful conflict recovery retry should clear conflict mode");
+  }
+
+  {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     const purchasedMask = (1 << 19) | (1 << 20);
@@ -68,7 +304,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       throw new Error("test apply failure");
     };
     try {
-      assert.equal(debug.loadGame(), false, "an apply failure should fail the load transaction");
+      assert.equal(await debug.loadGame(), false, "an apply failure should fail the load transaction");
       assert.equal(storage.get(runtime.SAVE_KEY), rawSave, "an apply failure must keep the normal save");
       assert.equal(storage.has(runtime.SAVE_QUARANTINE_KEY), false, "an apply failure must not quarantine the save");
       const failure = JSON.parse(storage.get(runtime.SAVE_LOAD_FAILURE_KEY));
@@ -80,9 +316,39 @@ async function runSaveRecoveryModuleRuntimeTest() {
     } finally {
       runtime.applySaveData = originalApply;
     }
-    assert.equal(debug.retryLoad(), true, "a successful retry should finish the load recovery");
+    assert.equal(await debug.retryLoad(), true, "a successful retry should finish the load recovery");
     assert.equal(runtime.loadRecoveryMode, false, "successful retry should resume normal saving");
     assert.equal(storage.has(runtime.SAVE_LOAD_FAILURE_KEY), false, "successful retry should clear the diagnostic");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime, storage } = instance;
+    const save = runtime.serializeSaveData();
+    save.savedAt = Date.now() - 1000;
+    storage.set(runtime.SAVE_KEY, JSON.stringify(save));
+    const originalOfflineElapsedFromSave = runtime.offlineElapsedFromSave;
+    const originalProcessOfflineElapsed = runtime.processOfflineElapsed;
+    let resolveOffline;
+    runtime.offlineElapsedFromSave = () => ({
+      elapsedSeconds: 1,
+      clockSource: "server",
+      clockAnomaly: false,
+      legacyTimestampUsed: false,
+    });
+    runtime.processOfflineElapsed = () => new Promise((resolve) => {
+      resolveOffline = resolve;
+    });
+    try {
+      const firstLoad = debug.loadGame();
+      while (!resolveOffline) await Promise.resolve();
+      assert.equal(await debug.loadGame(), false, "a concurrent recovery load should be rejected while the first load is active");
+      resolveOffline({});
+      assert.equal(await firstLoad, true, "the first recovery load should finish normally");
+    } finally {
+      runtime.offlineElapsedFromSave = originalOfflineElapsedFromSave;
+      runtime.processOfflineElapsed = originalProcessOfflineElapsed;
+    }
   }
 
   {
@@ -109,7 +375,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       throw new Error("test checkpoint apply failure");
     };
     try {
-      assert.equal(debug.loadGame(), false, "an apply failure should enter recovery before checkpoint restore");
+      assert.equal(await debug.loadGame(), false, "an apply failure should enter recovery before checkpoint restore");
     } finally {
       runtime.applySaveData = originalApply;
     }
@@ -184,7 +450,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
         legacyTimestampUsed: false,
       });
       try {
-        assert.equal(debug.loadGame(), false, "an offline failure should fail the load transaction");
+        assert.equal(await debug.loadGame(), false, "an offline failure should fail the load transaction");
       } finally {
         runtime.offlineElapsedFromSave = originalOfflineElapsedFromSave;
       }
@@ -223,7 +489,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       return originalSetItem(key, value);
     };
     try {
-      assert.equal(debug.loadGame(), false, "offline progress must fail when the post-progress save fails");
+      assert.equal(await debug.loadGame(), false, "offline progress must fail when the post-progress save fails");
       assert.equal(state.generationCount, 8, "a failed post-offline save must roll back the applied reward");
       assert.equal(storage.get(runtime.SAVE_KEY), rawSave, "a failed post-offline save must keep the original save");
       assert.equal(runtime.loadRecoveryMode, true, "a failed post-offline save must require recovery");
@@ -231,7 +497,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       assert.equal(failure.stage, "offline", "post-offline save failures should use offline diagnostics");
 
       context.localStorage.setItem = originalSetItem;
-      assert.equal(debug.retryLoad(), true, "retry should succeed after the storage failure is removed");
+      assert.equal(await debug.retryLoad(), true, "retry should succeed after the storage failure is removed");
       assert.equal(state.generationCount, 9, "retry should apply the offline reward exactly once");
       assert.equal(JSON.parse(storage.get(runtime.SAVE_KEY)).state.generationCount, 9, "retry should persist the applied reward");
     } finally {
@@ -246,7 +512,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     const { debug, runtime, storage } = instance;
     const invalidRaw = "{not-json";
     storage.set(runtime.SAVE_KEY, invalidRaw);
-    assert.equal(debug.loadGame(), false, "invalid JSON should fail the load");
+    assert.equal(await debug.loadGame(), false, "invalid JSON should fail the load");
     assert.equal(storage.has(runtime.SAVE_KEY), false, "invalid JSON should remove the normal save after quarantine");
     const quarantine = JSON.parse(storage.get(runtime.SAVE_QUARANTINE_KEY));
     assert.equal(quarantine.raw, invalidRaw, "invalid JSON should be preserved verbatim");
@@ -265,7 +531,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       if (key === runtime.SAVE_QUARANTINE_KEY) throw new Error("storage full");
       return originalSetItem(key, value);
     };
-    assert.equal(debug.loadGame(), false, "a format failure should still fail when quarantine storage is full");
+    assert.equal(await debug.loadGame(), false, "a format failure should still fail when quarantine storage is full");
     assert.equal(
       storage.get(runtime.SAVE_KEY),
       invalidRaw,
@@ -282,7 +548,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
       appVersion: runtime.APP_VERSION,
       raw: recoverableRaw,
     }));
-    assert.equal(debug.restoreQuarantineSave(), true, "a quarantined valid save should be restorable");
+    assert.equal(await debug.restoreQuarantineSave(), true, "a quarantined valid save should be restorable");
     assert.equal(storage.has(runtime.SAVE_QUARANTINE_KEY), false, "successful quarantine restore should consume the quarantine copy");
     assert.equal(storage.has(runtime.SAVE_KEY), true, "successful quarantine restore should write the normal save");
   }
@@ -299,7 +565,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     state.score = Number.MAX_VALUE;
     state.scoreLog10 = 309;
     try {
-      debug.processOfflineElapsed(1, "test");
+      await debug.processOfflineElapsed(1, "test");
       assert.equal(state.activeChallenge, 0, "offline automation should complete the active Infinity Challenge");
       assert.equal(state.completedChallenges & 1, 1, "offline challenge completion should persist its reward state");
       assert.equal(state.infinityCount, 2, "offline challenge completion should continue with a fresh Infinity run");

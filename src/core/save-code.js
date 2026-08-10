@@ -65,6 +65,10 @@ async function exportSaveCode() {
 }
 
 async function importSaveCode(code) {
+  if (runtime.saveConflictMode) {
+    runtime.setSaveStatus(runtime.t("saveConflictDetected"));
+    return false;
+  }
   let backupFailed = false;
   try {
     const trimmed = String(code || "").trim();

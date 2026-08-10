@@ -9,7 +9,10 @@ let lastLocalSaveFingerprint = "";
 let lastKnownSaveFingerprint = "";
 let lastPeriodicCheckpointMonotonicAt = null;
 let loadTransactionActive = false;
+let loadInFlight = false;
 let loadRecoveryMode = false;
+let saveConflictMode = false;
+let saveConflictCheckpointReady = false;
 
 function currentSaveTimestamp() {
   return runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now();
@@ -63,6 +66,28 @@ function currentSaveFingerprint() {
 
 function saveSourceIsCurrent() {
   return currentSaveFingerprint() === lastKnownSaveFingerprint;
+}
+
+function beginSaveConflict() {
+  saveConflictMode = true;
+  if (!saveConflictCheckpointReady) {
+    saveConflictCheckpointReady = createCheckpoint("save-conflict", {
+      force: true,
+      allowDuringLoadRecovery: true,
+    });
+  }
+  runtime.setSaveConflictLock?.(true);
+  runtime.setSaveStatus(runtime.t(
+    saveConflictCheckpointReady ? "saveConflictDetected" : "saveConflictBackupFailed",
+  ));
+  runtime.updateUi?.();
+  return saveConflictCheckpointReady;
+}
+
+function finishSaveConflict() {
+  saveConflictMode = false;
+  saveConflictCheckpointReady = false;
+  runtime.setSaveConflictLock?.(false);
 }
 
 function recoveryEntryFromSave(saveData, reason, backedUpAt = currentSaveTimestamp()) {
@@ -420,7 +445,8 @@ function restoreRecoveryEntry(entry, successMessage = "recoveryRestored") {
       recoveryEntryFromSave(currentSave, "pre-restore"),
     );
     applySaveData(entry.save.state, entry.save.version);
-    if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) throw new Error("restore save failed");
+    if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict: true })) throw new Error("restore save failed");
+    finishSaveConflict();
     finishLoadRecovery();
     runtime.updateUi();
     runtime.draw();
@@ -691,6 +717,14 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.fastestInfinityTime = runtime.sanitizeNumber(data.fastestInfinityTime, 0);
   runtime.state.fastestInfinityRealTime = runtime.sanitizeNumber(data.fastestInfinityRealTime, 0);
   runtime.state.lastInfinityRuns = runtime.sanitizeInfinityRunRecords(data.lastInfinityRuns);
+  runtime.state.bestInfinityCountPerSecond = Math.max(
+    0,
+    runtime.sanitizeNumber(data.bestInfinityCountPerSecond, 0),
+  );
+  runtime.state.infinityCountRateRemainder = Math.max(
+    0,
+    Math.min(0.9999999999999999, runtime.sanitizeNumber(data.infinityCountRateRemainder, 0)),
+  );
   runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(data.offlineProgressEnabled, true);
   runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
   runtime.state.timeFluxCapacityLevel = dormantTimeFluxValue(data.timeFluxCapacityLevel, 0);
@@ -847,6 +881,11 @@ function serializeSaveData() {
 
 function saveGame(reason = "auto", options = {}) {
   if (loadTransactionActive) return true;
+  if (saveConflictMode && !options.allowDuringSaveConflict) {
+    runtime.autoSaveElapsed = 0;
+    runtime.setSaveStatus(runtime.t("saveConflictDetected"));
+    return false;
+  }
   if (loadRecoveryMode && !options.allowDuringLoadRecovery) {
     runtime.autoSaveElapsed = 0;
     runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
@@ -854,8 +893,9 @@ function saveGame(reason = "auto", options = {}) {
   }
   if (runtime.offlineProcessing) return true;
   if (!saveSourceIsCurrent()) {
+    beginSaveConflict();
+    if (!loadInFlight) void runtime.handleSaveConflict?.();
     runtime.autoSaveElapsed = 0;
-    runtime.setSaveStatus(runtime.t("saveFailed"));
     return false;
   }
   let savedAt = Date.now();
@@ -921,15 +961,25 @@ function quarantineSave(raw, details = {}, options = {}) {
   if (changed) recoveryRevision += 1;
 }
 
-function loadGame(options = {}) {
+async function loadGame(options = {}) {
   const allowDuringLoadRecovery = Boolean(options.allowDuringLoadRecovery);
+  const allowDuringSaveConflict = Boolean(options.allowDuringSaveConflict);
+  const authoritativeSaveConflict = Boolean(
+    options.authoritativeSaveConflict && allowDuringSaveConflict,
+  );
+  if (saveConflictMode && !allowDuringSaveConflict) {
+    runtime.setSaveStatus(runtime.t("saveConflictDetected"));
+    return false;
+  }
   if (loadRecoveryMode && !allowDuringLoadRecovery) {
     runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
     return false;
   }
+  if (loadInFlight) return false;
   let raw = null;
   let parsed = null;
   let offlineProcessed = false;
+  loadInFlight = true;
   loadTransactionActive = true;
   try {
     raw = localStorage.getItem(runtime.SAVE_KEY);
@@ -944,7 +994,7 @@ function loadGame(options = {}) {
     } catch (error) {
       loadRecoveryMode = true;
       clearLoadFailure();
-      quarantineSave(raw, { stage: "parse", error }, { removeSave: true });
+      quarantineSave(raw, { stage: "parse", error }, { removeSave: !allowDuringSaveConflict });
       runtime.setSaveStatus(runtime.t("loadFailed"));
       return false;
     }
@@ -956,7 +1006,7 @@ function loadGame(options = {}) {
       quarantineSave(
         raw,
         { stage: "normalize", error: new Error("invalid save format") },
-        { removeSave: true },
+        { removeSave: !allowDuringSaveConflict },
       );
       runtime.setSaveStatus(runtime.t("oldSave"));
       return false;
@@ -989,39 +1039,53 @@ function loadGame(options = {}) {
       }
       : { savedAt, serverSavedAt, saveFingerprint: loadedSaveFingerprint };
     try {
-      const offlineElapsed = runtime.offlineElapsedFromSave
-        ? runtime.offlineElapsedFromSave(retryBaseline.savedAt, retryBaseline.serverSavedAt)
-        : {
-          elapsedSeconds: Math.max(0, (Date.now() - retryBaseline.savedAt) / 1000),
-          clockSource: "local-fallback",
-          clockAnomaly: false,
-          legacyTimestampUsed: false,
-        };
-      if (
-        runtime.processOfflineElapsed
-        && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
-      ) {
-        const offlineResult = runtime.processOfflineElapsed(
-          offlineElapsed.elapsedSeconds,
-          "load",
-          { ...offlineElapsed, retryBaseline },
-        );
-        if (offlineResult === null) throw new Error("offline progress save failed");
-        offlineProcessed = true;
-      } else if (runtime.setOfflineBaseline) {
-        runtime.setOfflineBaseline(
-          runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
-          runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
-        );
-      }
-      if (offlineProcessed) {
-        loadTransactionActive = false;
-        loadRecoveryMode = false;
-        if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) {
-          throw new Error("offline progress save failed");
+      if (authoritativeSaveConflict) {
+        if (runtime.setOfflineBaseline) {
+          runtime.setOfflineBaseline(
+            runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
+            runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
+          );
+        }
+      } else {
+        const offlineElapsed = runtime.offlineElapsedFromSave
+          ? runtime.offlineElapsedFromSave(retryBaseline.savedAt, retryBaseline.serverSavedAt)
+          : {
+            elapsedSeconds: Math.max(0, (Date.now() - retryBaseline.savedAt) / 1000),
+            clockSource: "local-fallback",
+            clockAnomaly: false,
+            legacyTimestampUsed: false,
+          };
+        if (
+          runtime.processOfflineElapsed
+          && (offlineElapsed.elapsedSeconds > 0 || offlineElapsed.clockAnomaly)
+        ) {
+          const offlineResult = await runtime.processOfflineElapsed(
+            offlineElapsed.elapsedSeconds,
+            "load",
+            { ...offlineElapsed, retryBaseline },
+          );
+          if (offlineResult === null) throw new Error("offline progress save failed");
+          offlineProcessed = true;
+        } else if (runtime.setOfflineBaseline) {
+          runtime.setOfflineBaseline(
+            runtime.localClockNowMs ? runtime.localClockNowMs() : Date.now(),
+            runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
+          );
+        }
+        if (offlineProcessed) {
+          loadTransactionActive = false;
+          loadRecoveryMode = false;
+          if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict })) {
+            throw new Error("offline progress save failed");
+          }
         }
       }
     } catch (error) {
+      runtime.autoSaveElapsed = 0;
+      if (saveConflictMode && !saveConflictCheckpointReady) {
+        runtime.setSaveStatus(runtime.t("saveConflictBackupFailed"));
+        return false;
+      }
       try {
         applySaveData(parsed.state, parsed.version);
       } catch (restoreError) {
@@ -1030,7 +1094,6 @@ function loadGame(options = {}) {
       runtime.offlineReport = null;
       if (runtime.setOfflineBaseline) runtime.setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
       loadRecoveryMode = true;
-      runtime.autoSaveElapsed = 0;
       writeLoadFailure("offline", error, parsed, retryBaseline);
       runtime.setSaveStatus(runtime.t("loadFailed"));
       return false;
@@ -1051,14 +1114,22 @@ function loadGame(options = {}) {
     return false;
   } finally {
     loadTransactionActive = false;
+    loadInFlight = false;
   }
 }
 
-function retryLoad() {
-  return loadGame({ allowDuringLoadRecovery: true });
+async function retryLoad() {
+  const restored = await loadGame({
+    allowDuringLoadRecovery: true,
+    allowDuringSaveConflict: saveConflictMode,
+    authoritativeSaveConflict: saveConflictMode,
+  });
+  if (restored && saveConflictMode) finishSaveConflict();
+  return restored;
 }
 
-function restoreQuarantineSave() {
+async function restoreQuarantineSave() {
+  if (loadInFlight) return false;
   const entry = readQuarantineEntry();
   if (!entry?.raw) {
     runtime.setSaveStatus(runtime.t("recoveryInvalid"));
@@ -1076,8 +1147,9 @@ function restoreQuarantineSave() {
     runtime.setSaveStatus(runtime.t("recoveryRestoreFailed"));
     return false;
   }
-  const restored = loadGame({ allowDuringLoadRecovery: true });
+  const restored = await loadGame({ allowDuringLoadRecovery: true, allowDuringSaveConflict: saveConflictMode });
   if (!restored) return false;
+  finishSaveConflict();
   try {
     localStorage.removeItem(runtime.SAVE_QUARANTINE_KEY);
     recoveryRevision += 1;
@@ -1089,11 +1161,13 @@ function restoreQuarantineSave() {
 }
 
 function resetSave() {
+  if (runtime.offlineProcessing) return;
   const confirmed = window.confirm(runtime.t("resetConfirm"));
   if (!confirmed) return;
   if (!createCheckpoint("pre-reset", { force: true, allowDuringLoadRecovery: true })) return;
   loadRecoveryMode = false;
   clearLoadFailure();
+  finishSaveConflict();
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   localStorage.removeItem(runtime.SAVE_KEY);
   lastKnownSaveFingerprint = "";
@@ -1167,6 +1241,8 @@ function resetSave() {
     fastestInfinityTime: 0,
     fastestInfinityRealTime: 0,
     lastInfinityRuns: [],
+    bestInfinityCountPerSecond: 0,
+    infinityCountRateRemainder: 0,
     offlineProgressEnabled: true,
     offlineTickCount: 1000,
     timeFlux: 0,
@@ -1223,7 +1299,12 @@ expose("recoveryRevision", () => recoveryRevision);
 expose("saveRevision", () => saveRevision);
 expose("lastLocalSaveFingerprint", () => lastLocalSaveFingerprint);
 expose("lastKnownSaveFingerprint", () => lastKnownSaveFingerprint);
+expose("loadInFlight", () => loadInFlight);
 expose("loadRecoveryMode", () => loadRecoveryMode);
+expose("saveConflictMode", () => saveConflictMode);
+expose("saveConflictCheckpointReady", () => saveConflictCheckpointReady);
+expose("beginSaveConflict", () => beginSaveConflict);
+expose("finishSaveConflict", () => finishSaveConflict);
 expose("finishLoadRecovery", () => finishLoadRecovery);
 expose("currentSaveFingerprint", () => currentSaveFingerprint);
 expose("saveSourceIsCurrent", () => saveSourceIsCurrent);

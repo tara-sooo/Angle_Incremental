@@ -125,10 +125,10 @@ try {
   });
   assert.equal(updateModal.visible, true, "the current-version update modal should appear for a fresh browser profile");
   assert.equal(updateModal.title, `${EXPECTED_ASSET_VERSION} アップデート`, "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /タッチ端末/);
   assert.match(updateModal.summary, /オフライン進行/);
-  assert.match(updateModal.canvas, /押下表示/);
-  assert.match(updateModal.canvas, /オフライン進行/);
+  assert.match(updateModal.summary, /セーブ競合/);
+  assert.match(updateModal.canvas, /競合/);
+  assert.match(updateModal.canvas, /最新セーブ/);
   const desktopButtonInteraction = await page.evaluate(() => {
     const selectors = ["[data-tab=angle]", "#speedUpgrade"];
     return selectors.map((selector) => {
@@ -725,7 +725,7 @@ try {
   assert.equal(towerRewardDisplay.tc2.effective, "^1.499", "TC2 should expose the soft-capped requirement growth power");
   assert.equal(towerRewardDisplay.englishLabels.tc1Base, "TC1 base exponent", "TC1 exponent labels should be translated to English");
   assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth (effective)", "TC2 exponent labels should be translated to English");
-  const timeFluxRemoval = await page.evaluate(() => {
+  const timeFluxRemoval = await page.evaluate(async () => {
     const { state, advanceOnlineTime, processOfflineElapsed } = window.__angleDebug;
     state.totalPlayTime = 0;
     state.totalRealPlayTime = 0;
@@ -757,7 +757,7 @@ try {
       mainTabsHeight: layoutRect(".main-tabs")?.height ?? 0,
       mainPanelsHeight: layoutRect(".main-panels")?.height ?? 0,
     };
-    const report = processOfflineElapsed(1, "test", { clockSource: "server" });
+    const report = await processOfflineElapsed(1, "test", { clockSource: "server" });
     const reportPanel = document.querySelector("#offlineReportPanel");
     const layoutAfter = {
       shellHeight: layoutRect("#shell")?.height ?? 0,

@@ -122,6 +122,8 @@ Original prompt: では、中核ループを完成させてください
 - Updated TC1 and TC2 for Tower-floor scaling: TC1 now adds `+0.077` Infinity Score exponent per floor after Floor 3, while TC2 targets `1e1555` and soft-caps Core Boost requirement growth below `^1.50` without changing the save format.
 - Prepared the 0.10.0 release candidate with Time Flux removal, achievements 32-37, IU14-1, unified vertex-gain formatting, and floor-scaled Tower Challenge rewards while keeping SAVE_VERSION 10 compatible.
 - Prepared the 0.10.1 release candidate with responsive touch button feedback, configurable offline progress, and automated version consistency checks while keeping SAVE_VERSION 10 compatible.
+- Expanded offline processing to 1,000,000 asynchronous ticks with progress reporting, and added saved best-rate Infinity aggregation for eligible automated resumes while keeping SAVE_VERSION 10 compatible.
+- Prepared the 0.10.2 release candidate with asynchronous offline processing up to 1,000,000 ticks, best-rate Infinity aggregation, multi-tab save conflict recovery, and SAVE_VERSION 10 compatibility.
 
 ## TODO
 
