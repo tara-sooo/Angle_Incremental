@@ -1035,11 +1035,21 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           let batchTicks = Math.min(requestedTicks, OFFLINE_PROCESS_INITIAL_BATCH_TICKS);
           let estimatedTicksPerMs = 0;
           let zeroClockTicksSinceYield = 0;
+          let lastBatchFinishedAt = null;
           let budgetStartedAt = monotonicClockNow();
           let lastProgressUiAt = budgetStartedAt;
           while (processedTicks < requestedTicks) {
             const batchStartedAt = monotonicClockNow();
-            const currentBatchTicks = Math.min(batchTicks, requestedTicks - processedTicks);
+            const remainingTicks = requestedTicks - processedTicks;
+            const clockHasNotAdvanced = lastBatchFinishedAt !== null
+              && batchStartedAt === lastBatchFinishedAt;
+            const currentBatchTicks = Math.min(
+              batchTicks,
+              remainingTicks,
+              clockHasNotAdvanced
+                ? Math.max(1, OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT - zeroClockTicksSinceYield)
+                : remainingTicks,
+            );
             const batchEnd = processedTicks + currentBatchTicks;
             while (processedTicks < batchEnd) {
               update(tickSeconds, true);
@@ -1078,6 +1088,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
               zeroClockTicksSinceYield = 0;
               batchTicks = Math.max(1, Math.floor(batchTicks / 2));
             }
+            lastBatchFinishedAt = batchFinishedAt;
             progressReport.processedTicks = processedTicks;
             const progressElapsed = batchFinishedAt - lastProgressUiAt;
             const shouldUpdateUi = processedTicks >= requestedTicks

@@ -583,6 +583,7 @@ async function runTimeFluxModuleRuntimeTest() {
   const millionTickOriginalSetTimeout = millionTickInstance.context.window.setTimeout;
   let millionTickClock = 0;
   let millionTickClockFlat = false;
+  let millionTickClockFlatAfter = Infinity;
   let millionTickUpdateCalls = 0;
   let millionTickProgressUpdates = 0;
   let millionTickProgressValue = 0;
@@ -600,6 +601,7 @@ async function runTimeFluxModuleRuntimeTest() {
   millionTickInstance.context.window.setTimeout = (callback) => {
     millionTickYieldBatches.push({
       updates: millionTickUpdateCalls - millionTickUpdatesAtLastYield,
+      start: millionTickUpdatesAtLastYield,
       end: millionTickUpdateCalls,
     });
     millionTickUpdatesAtLastYield = millionTickUpdateCalls;
@@ -608,7 +610,7 @@ async function runTimeFluxModuleRuntimeTest() {
   };
   millionTickRuntime.update = () => {
     millionTickUpdateCalls += 1;
-    if (millionTickClockFlat) return;
+    if (millionTickClockFlat || millionTickUpdateCalls >= millionTickClockFlatAfter) return;
     millionTickClock += millionTickUpdateCalls <= 448
       ? 0
       : millionTickUpdateCalls < 20000
@@ -631,6 +633,23 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.ok(millionTickYieldBatches.length > 0, "flat clocks should trigger a bounded fallback yield");
     assert.ok(millionTickYieldBatches[0].end < 10000, "flat clocks should yield before the whole batch completes");
 
+    millionTickClockFlat = false;
+    millionTickClockFlatAfter = 9000;
+    millionTickClock = 0;
+    millionTickUpdateCalls = 0;
+    millionTickYieldBatches.length = 0;
+    millionTickUpdatesAtLastYield = 0;
+    const transitionClockReport = await millionTickDebug.processOfflineElapsed(
+      100000 * millionTickRuntime.MAX_SIMULATION_STEP_SECONDS,
+      "test",
+      { clockSource: "server" },
+    );
+    assert.equal(transitionClockReport.processedTicks, 100000, "a clock transition should still process the requested ticks");
+    const flatTransitionBatches = millionTickYieldBatches.filter((batch) => batch.start >= 9000);
+    assert.ok(flatTransitionBatches.length > 0, "a clock transition should trigger the fallback path");
+    assert.ok(flatTransitionBatches[0].updates <= 4096, "a clock transition should clamp the batch before execution");
+
+    millionTickClockFlatAfter = Infinity;
     millionTickClockFlat = false;
     millionTickClock = 0;
     millionTickUpdateCalls = 0;
