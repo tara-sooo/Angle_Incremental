@@ -96,6 +96,7 @@ function updateTowerChallengeRows() {
     runtime.state.towerFloor,
     runtime.state.activeTowerChallenge,
     runtime.state.completedTowerChallenges,
+    runtime.state.infinityCount,
     runtime.state.language,
     runtime.state.numberFormat,
   ].join("|");

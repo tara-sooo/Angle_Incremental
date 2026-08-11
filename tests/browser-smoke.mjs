@@ -614,11 +614,15 @@ try {
       towerState,
       challengePanelActive: Boolean(document.querySelector('[data-challenge-panel="tc"]')?.classList.contains("is-active")),
       towerChallengeRows: document.querySelectorAll("#towerChallengeList .tower-challenge-row").length,
+      towerChallengeReleaseStatus: document.querySelector('[data-i18n="towerChallengeReleaseStatus"]')?.textContent?.trim() ?? "",
       towerChallengeButton: document.querySelector("#towerChallengeList .tower-challenge-row button")?.textContent?.trim() ?? "",
       towerChallengeButtonDisabled: Boolean(document.querySelector("#towerChallengeList .tower-challenge-row button")?.disabled),
       towerChallengeRestriction: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-restriction")?.textContent?.trim() ?? "",
       towerChallengeTarget: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-target")?.textContent?.trim() ?? "",
       towerChallenge2Target: document.querySelector('#towerChallengeList [data-tower-challenge="2"] .challenge-target')?.textContent?.trim() ?? "",
+      towerChallenge3Name: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-name')?.textContent?.trim() ?? "",
+      towerChallenge3Target: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-target')?.textContent?.trim() ?? "",
+      towerChallenge3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
     };
   });
   assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
@@ -627,15 +631,47 @@ try {
   assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
   assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
   assert.equal(towerInitial.towerChallengeRows, 4, "TC1-TC4 rows should be visible");
+  assert.equal(towerInitial.towerChallengeReleaseStatus, "TC1〜TC3実装済み", "Tower Challenge status should reflect the implemented TC range");
   assert.equal(towerInitial.towerChallengeButton, "挑戦開始", "implemented TC rows should expose a start button");
   assert.equal(towerInitial.towerChallengeButtonDisabled, true, "locked TC rows should disable their start button");
   assert.match(towerInitial.towerChallengeRestriction, /通常強化/);
-  assert.match(towerInitial.towerChallengeTarget, /1\.00e308/);
-  assert.match(towerInitial.towerChallenge2Target, /1\.00e1,555/);
+  assert.match(towerInitial.towerChallengeTarget, /1\.00e1,000/);
+  assert.match(towerInitial.towerChallenge2Target, /1\.00e3,000/);
+  assert.match(towerInitial.towerChallenge3Name, /TC3/);
+  assert.match(towerInitial.towerChallenge3Target, /1\.00e5,000/);
+  assert.match(towerInitial.towerChallenge3Restriction, /\^0\.001/);
+  assert.match(towerInitial.towerChallenge3Restriction, /\^0\.100/);
   assert.equal(towerInitial.towerState.scoreExponent, "^1.00");
   assert.equal(towerInitial.towerState.tc1Base, "^0.300");
   assert.equal(towerInitial.towerState.tc1Bonus, "+^0.000");
   assert.equal(towerInitial.towerState.tc1Total, "^0.300");
+  const towerChallenge3Flow = await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    const original = {
+      towerFloor: state.towerFloor,
+      infinityCount: state.infinityCount,
+      completedTowerChallenges: state.completedTowerChallenges,
+      activeTowerChallenge: state.activeTowerChallenge,
+    };
+    state.towerFloor = 8;
+    state.infinityCount = 600000;
+    state.completedTowerChallenges = 0;
+    state.activeTowerChallenge = 0;
+    window.advanceTime(0);
+    const row = document.querySelector('#towerChallengeList [data-tower-challenge="3"]');
+    const result = {
+      button: row?.querySelector("button")?.textContent?.trim() ?? "",
+      disabled: Boolean(row?.querySelector("button")?.disabled),
+      restriction: row?.querySelector(".challenge-restriction")?.textContent?.trim() ?? "",
+    };
+    Object.assign(state, original);
+    window.advanceTime(0);
+    return result;
+  });
+  assert.equal(towerChallenge3Flow.button, "挑戦開始", "TC3 should expose a start button at Floor 8");
+  assert.equal(towerChallenge3Flow.disabled, false, "TC3 should be available at Floor 8");
+  assert.match(towerChallenge3Flow.restriction, /\^0\.800/);
+  assert.match(towerChallenge3Flow.restriction, /\^0\.500/);
   const towerChallengeFlow = await page.evaluate(() => {
     const { state, toggleTowerChallenge, completeTowerChallengeIfReady } = window.__angleDebug;
     state.towerFloor = 3;
@@ -650,7 +686,7 @@ try {
       button: startButton?.textContent?.trim() ?? "",
       disabled: Boolean(startButton?.disabled),
     };
-    state.scoreLog10 = 308;
+    state.scoreLog10 = 1000;
     state.score = Number.MAX_VALUE;
     const completed = completeTowerChallengeIfReady();
     const result = {
@@ -667,7 +703,7 @@ try {
       button: replayButton?.textContent?.trim() ?? "",
       disabled: Boolean(replayButton?.disabled),
     };
-    state.scoreLog10 = 308;
+    state.scoreLog10 = 1000;
     state.score = Number.MAX_VALUE;
     const replayCompleted = completeTowerChallengeIfReady();
     state.towerFloor = 0;
@@ -713,6 +749,8 @@ try {
     const englishLabels = {
       tc1Base: document.querySelector('[data-i18n="towerChallenge1ScorePowerBase"]')?.textContent?.trim() ?? "",
       tc2Effective: document.querySelector('[data-i18n="coreBoostGrowthPower"]')?.textContent?.trim() ?? "",
+      tc3Name: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-name')?.textContent?.trim() ?? "",
+      tc3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
     };
     Object.assign(state, original);
     window.advanceTime(0);
@@ -725,6 +763,8 @@ try {
   assert.equal(towerRewardDisplay.tc2.effective, "^1.499", "TC2 should expose the soft-capped requirement growth power");
   assert.equal(towerRewardDisplay.englishLabels.tc1Base, "TC1 base exponent", "TC1 exponent labels should be translated to English");
   assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth (effective)", "TC2 exponent labels should be translated to English");
+  assert.match(towerRewardDisplay.englishLabels.tc3Name, /Age When Infinity Was a Concept/, "TC3 name should be translated to English");
+  assert.match(towerRewardDisplay.englishLabels.tc3Restriction, /Score gain starts/, "TC3 restriction should be translated to English");
   const timeFluxRemoval = await page.evaluate(async () => {
     const { state, advanceOnlineTime, processOfflineElapsed } = window.__angleDebug;
     state.totalPlayTime = 0;

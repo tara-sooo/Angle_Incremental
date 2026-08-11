@@ -88,8 +88,12 @@ function infiniteAngleGainExpressionParts() {
 
 function infiniteAngleScoreGainLog10(baseLog10 = infiniteAngleCurrentGainLog10()) {
   const parts = infiniteAngleGainExpressionParts();
-  if (parts <= 1) return baseLog10;
-  return (baseLog10 - runtime.log10Value(parts)) * parts;
+  const scoreLog10 = parts <= 1
+    ? baseLog10
+    : (baseLog10 - runtime.log10Value(parts)) * parts;
+  return runtime.state.activeTowerChallenge === 3
+    ? scoreLog10 * runtime.towerChallenge3InfinityScorePower()
+    : scoreLog10;
 }
 
 function addInfiniteAngleScoreLog(amountLog10) {

@@ -34,7 +34,7 @@
 | Infinity Point / IP | Infinity Upgrade購入とInfinity Angleの解放・通常強化購入に使うリソース。 |
 | Infinity Upgrade / IU | IPで購入する恒久強化。 |
 | Infinity Challenge / IC | 制約付きでInfinity到達を目指すチャレンジ。 |
-| Tower Challenge / TC | Towerの次階建設を制限するチャレンジ。TC1・TC2を実装済み、TC3・TC4は未実装。 |
+| Tower Challenge / TC | Towerの次階建設を制限するチャレンジ。TC1〜TC3を実装済み、TC4は未実装。 |
 | Infinity Angle / IA | e20 IPで解放する、Infinity内の独立した図形進行。 |
 | Infinity Score | IAの核到達で得るInfinity内スコア。^0.3後に通常の頂点獲得量へ乗算する。 |
 | Tower | IPで建設し、階数に応じてスコア累乗を強化するInfinity後の恒久要素。 |
@@ -365,6 +365,8 @@ Infinity Scoreはlog空間で加算する。通常の頂点獲得量に適用す
 IA倍率 = max(1, Infinity Score ^ 0.3)
 ```
 
+TC3挑戦中は、IAが生成するInfinity Scoreのlog10獲得量へ、TC3のInfinity Score緩和指数を乗算する。TC1報酬とIU13-1によるIA倍率の指数は、生成後のInfinity Scoreが通常の頂点獲得量へ与える倍率として従来どおり適用する。
+
 ### 11.3 IA通常強化
 
 IA通常強化はIPで購入し、IA側のレベルだけで独立に計算する。IAの初回価格は解放コストと同じIP帯へ移し、高レベルでもIA Scoreによる加速が機能するよう専用の緩やかなコスト曲線を使う。
@@ -427,14 +429,29 @@ Floor 13より後の必要IPは、必要IPのlog10を `345 * 1.15^(階数 - 13)`
 
 ### 12.2 Tower Challengeの現行状態
 
-TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。TC1/TC2をクリアするまで対応する次の階数を建設できない。TCはInfinity Challengeと併用でき、開始・中止時にInfinity以下をリセットする。クリア済みのTCも再挑戦でき、恒久報酬は初回クリア時のみ解放される。TC1・TC2の報酬はクリア後、通常プレイと後続TC内で有効になる。
+TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。TC1〜TC3をクリアするまで対応する次の階数を建設できない。TCはInfinity Challengeと併用でき、開始・中止時にInfinity以下をリセットする。クリア済みのTCも再挑戦でき、恒久報酬は初回クリア時のみ解放される。TC1〜TC3の報酬はクリア後、通常プレイと後続TC内で有効になる。
 
 | TC | 制約 | 目標 | 報酬 |
 | --- | --- | --- | --- |
-| TC1 親友より知り合い | TAの通常強化は購入できず、IU11-1の効果上限は`/5`される。 | `1e308 Score` | 「Infinity Score累乗」を解放。Floor 3以降の追加階層ごとに指数へ`+0.077`する。到達時はTC専用リセットを行い、IP/Infinity回数は増えない。再挑戦時も同じリセットを行う。 |
-| TC2 核家族世帯撲滅委員会 | CBは封印され、GRスコア倍率は`^0.1`、GRコスト倍率は`x0.90`を下限とする。 | `1e1555 Score` | 「Core Boost強化」を解放。Floor 5以降、CB要求量の生指数を1階層ごとに`-0.03`し、`1.50`未満では強いソフトキャップを適用する。初回・再挑戦とも通常Infinity報酬を付与する。 |
-| TC3 | 未定 | 未定 | 未定 |
+| TC1 親友より知り合い | TAの通常強化は購入できず、IU11-1の効果上限は`/5`される。 | `1e1000 Score` | 「Infinity Score累乗」を解放。Floor 3以降の追加階層ごとに指数へ`+0.077`する。到達時はTC専用リセットを行い、IP/Infinity回数は増えない。再挑戦時も同じリセットを行う。 |
+| TC2 核家族世帯撲滅委員会 | CBは封印され、GRスコア倍率は`^0.1`、GRコスト倍率は`x0.90`を下限とする。 | `1e3000 Score` | 「Core Boost強化」を解放。Floor 5以降、CB要求量の生指数を1階層ごとに`-0.03`し、`1.50`未満では強いソフトキャップを適用する。初回・再挑戦とも通常Infinity報酬を付与する。 |
+| TC3 「『無限』が概念である時代はとうに越した」 | Score獲得量を`^0.001`、Infinity Score獲得量を`^0.1`から開始し、Infinity回数に応じて緩和する。 | `1e5000 Score` | 「通常強化強化」を解放。Floor 8以降、追加階層ごとにSpeed・Vertex・Gainの有効購入数へ`×1.05`を適用する。初回・再挑戦とも通常Infinity報酬を付与する。 |
 | TC4 | 未定 | 未定 | 未定 |
+
+TC3の緩和指数は、`c = infinityCount`、`C = 600000`、`e = max(0, c - C)`として次の式で計算する。`p0`と`p1`はそれぞれScore獲得量では`0.001`と`0.8`、Infinity Score獲得量では`0.1`と`0.5`を使う。
+
+```text
+p(c) = p0 + (p1 - p0) * c / C                         (c <= C)
+p(c) = p1 + (1 - p1) * e / (e + C)                    (c > C)
+```
+
+TC3クリア後の通常強化強化は保存済み購入数と購入コストを変更せず、効果計算時だけ次の倍率を使う。
+
+```text
+通常強化倍率 = 1.05 ^ max(0, Tower階数 - 8)
+実効Speed/Gainレベル = 保存購入数 * 通常強化倍率 + IU11-1追加レベル
+実効Vertex数 = 3 + floor((保存Vertex数 - 3) * 通常強化倍率) + IU11-1追加レベル
+```
 
 TC2のCore Boost要求量増加指数は、TC2未クリア時またはFloor 5では`2.00`である。TC2クリア後の生指数は次の式で計算する。
 
