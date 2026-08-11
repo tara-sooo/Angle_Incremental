@@ -86,19 +86,53 @@ const browser = await chromium.launch({
 });
 const errors = [];
 const moduleRequests = [];
+const httpFailures = [];
 const report = {
   result: "running",
   expectedAssetVersion: EXPECTED_ASSET_VERSION,
   errors,
+  httpFailures,
   moduleRequests: [],
 };
+
+async function stubExternalFonts(target) {
+  await target.route("https://fonts.googleapis.com/**", (route) => route.fulfill({
+    status: 200,
+    contentType: "text/css",
+    body: "",
+  }));
+  await target.route("https://fonts.gstatic.com/**", (route) => route.fulfill({
+    status: 200,
+    contentType: "font/woff2",
+    body: "",
+  }));
+}
+
+function trackPage(page, scope, errorSink) {
+  page.on("pageerror", (error) => errorSink.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errorSink.push(message.text());
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      httpFailures.push({ scope, type: "response", status: response.status(), url: response.url() });
+    }
+  });
+  page.on("requestfailed", (request) => {
+    httpFailures.push({
+      scope,
+      type: "requestfailed",
+      status: 0,
+      url: request.url(),
+      error: request.failure()?.errorText ?? "unknown",
+    });
+  });
+}
 try {
   const page = await browser.newPage();
   const localOrigin = `http://127.0.0.1:${address.port}`;
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
+  await stubExternalFonts(page);
+  trackPage(page, "main", errors);
   page.on("request", (request) => {
     const url = new URL(request.url());
     if (url.origin === localOrigin && url.pathname.startsWith("/src/") && url.pathname.endsWith(".js")) {
@@ -237,10 +271,8 @@ try {
       state: fixture.state,
     });
     const existingPage = await existingContext.newPage();
-    existingPage.on("pageerror", (error) => existingErrors.push(error.message));
-    existingPage.on("console", (message) => {
-      if (message.type() === "error") existingErrors.push(message.text());
-    });
+    await stubExternalFonts(existingContext);
+    trackPage(existingPage, `fixture:${fixture.name}`, existingErrors);
     try {
       await existingPage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
       await existingPage.waitForFunction(() => (
@@ -294,10 +326,8 @@ try {
     }],
   });
   const serverClockPage = await serverClockContext.newPage();
-  serverClockPage.on("pageerror", (error) => serverClockErrors.push(error.message));
-  serverClockPage.on("console", (message) => {
-    if (message.type() === "error") serverClockErrors.push(message.text());
-  });
+  await stubExternalFonts(serverClockContext);
+  trackPage(serverClockPage, "server-clock", serverClockErrors);
   try {
     await serverClockPage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
     await serverClockPage.waitForFunction(() => Boolean(window.__angleDebug?.ready));
@@ -1394,10 +1424,8 @@ try {
   });
   const mobileErrors = [];
   const mobilePage = await mobileContext.newPage();
-  mobilePage.on("pageerror", (error) => mobileErrors.push(error.message));
-  mobilePage.on("console", (message) => {
-    if (message.type() === "error") mobileErrors.push(message.text());
-  });
+  await stubExternalFonts(mobileContext);
+  trackPage(mobilePage, "mobile", mobileErrors);
   try {
     await mobilePage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
     await mobilePage.waitForFunction(() => (

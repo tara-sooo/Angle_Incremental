@@ -632,6 +632,7 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.equal(flatClockReport.processedTicks, 10000, "flat clocks should still process the requested ticks");
     assert.ok(millionTickYieldBatches.length > 0, "flat clocks should trigger a bounded fallback yield");
     assert.ok(millionTickYieldBatches[0].end < 10000, "flat clocks should yield before the whole batch completes");
+    assert.ok(millionTickProgressUpdates > 1, "flat clocks should update offline progress before completion");
 
     millionTickClockFlat = false;
     millionTickClockFlatAfter = 9000;

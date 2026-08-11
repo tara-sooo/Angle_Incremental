@@ -1091,9 +1091,11 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             lastBatchFinishedAt = batchFinishedAt;
             progressReport.processedTicks = processedTicks;
             const progressElapsed = batchFinishedAt - lastProgressUiAt;
+            const zeroClockFallback = zeroClockTicksSinceYield >= OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT;
             const shouldUpdateUi = processedTicks >= requestedTicks
               || (Number.isFinite(progressElapsed)
-                && progressElapsed >= OFFLINE_PROCESS_PROGRESS_UPDATE_INTERVAL_MS);
+                && progressElapsed >= OFFLINE_PROCESS_PROGRESS_UPDATE_INTERVAL_MS)
+              || zeroClockFallback;
             refreshOfflineReportProgress(
               progressReport,
               before,
@@ -1107,7 +1109,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             const shouldYield = !Number.isFinite(budgetElapsed)
               || budgetElapsed < 0
               || budgetElapsed >= OFFLINE_PROCESS_TIME_BUDGET_MS
-              || zeroClockTicksSinceYield >= OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT;
+              || zeroClockFallback;
             if (processedTicks < requestedTicks && shouldYield) {
               await yieldToEventLoop();
               budgetStartedAt = monotonicClockNow();

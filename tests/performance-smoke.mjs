@@ -19,6 +19,7 @@ const budgets = Object.freeze({
   simulationP95Ms: 12,
   normalFrameP95Ms: 30,
   highLoadFrameP95Ms: 50,
+  offlineProcessingWallMs: 1000,
 });
 const viewports = Object.freeze([
   Object.freeze({ name: "desktop", width: 1280, height: 800 }),
@@ -48,6 +49,11 @@ function summarize(samples) {
 
 function collectBudgetViolations(report) {
   const violations = [];
+  if (report.offlineProcessing?.wallMilliseconds > budgets.offlineProcessingWallMs) {
+    violations.push(
+      `offline processing wall ${report.offlineProcessing.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineProcessingWallMs}ms`,
+    );
+  }
   report.results.forEach((result) => {
     result.scenarios.forEach((scenario) => {
       if (scenario.angle.simulation.p95Ms > budgets.simulationP95Ms) {
@@ -398,6 +404,11 @@ try {
     Number.isFinite(report.offlineProcessing.processingMilliseconds)
       && report.offlineProcessing.processingMilliseconds >= 0,
     "the real offline path should report a finite processing duration",
+  );
+  assert.ok(
+    Number.isFinite(report.offlineProcessing.wallMilliseconds)
+      && report.offlineProcessing.wallMilliseconds >= 0,
+    "the real offline path should report a finite wall duration",
   );
   await mkdir(path.dirname(reportPath), { recursive: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
