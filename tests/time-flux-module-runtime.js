@@ -607,7 +607,11 @@ async function runTimeFluxModuleRuntimeTest() {
   };
   millionTickRuntime.update = () => {
     millionTickUpdateCalls += 1;
-    millionTickClock += millionTickUpdateCalls < 20000 ? 0.0005 : 0.01;
+    millionTickClock += millionTickUpdateCalls <= 448
+      ? 0
+      : millionTickUpdateCalls < 20000
+        ? 0.0005
+        : 0.01;
   };
   try {
     const millionTickReport = await millionTickDebug.processOfflineElapsed(
@@ -620,6 +624,10 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.equal(millionTickReport.processedTicks, 1000000, "offline processing should not retain a hidden tick cap");
     assert.equal(millionTickUpdateCalls, 1000000, "one million ticks should be simulated exactly once");
     assert.ok(millionTickProgressUpdates > 1, "large offline processing should publish incremental progress");
+    assert.ok(
+      millionTickYieldBatches[0]?.end > 448,
+      "zero-duration batches should grow without yielding until the clock advances",
+    );
     assert.ok(
       millionTickYieldBatches.some((batch) => batch.updates > 1000),
       "fast offline processing should grow beyond the removed fixed batch size",
@@ -650,11 +658,18 @@ async function runTimeFluxModuleRuntimeTest() {
   const reentrancyRuntime = reentrancyInstance.runtime;
   const reentrancyDebug = reentrancyInstance.debug;
   const reentrancyOriginalUpdate = reentrancyRuntime.update;
+  const reentrancyOriginalNow = reentrancyInstance.context.performance.now;
   const reentrancyOriginalSetTimeout = reentrancyInstance.context.window.setTimeout;
   let reentrancyYielded = false;
+  let reentrancyClock = 0;
+  let reentrancyUpdateCalls = 0;
   reentrancyDebug.state.generationCount = 7;
   reentrancyDebug.state.offlineTickCount = reentrancyRuntime.OFFLINE_PROGRESS_MAX_TICKS;
-  reentrancyRuntime.update = () => {};
+  reentrancyInstance.context.performance.now = () => reentrancyClock;
+  reentrancyRuntime.update = () => {
+    reentrancyUpdateCalls += 1;
+    reentrancyClock += reentrancyUpdateCalls <= 448 ? 0 : 0.1;
+  };
   reentrancyInstance.context.window.setTimeout = (callback) => {
     if (!reentrancyYielded) {
       reentrancyYielded = true;
@@ -676,6 +691,7 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.equal(reentrancyDebug.state.offlineProgressEnabled, true, "offline processing should lock settings while yielding");
   } finally {
     reentrancyRuntime.update = reentrancyOriginalUpdate;
+    reentrancyInstance.context.performance.now = reentrancyOriginalNow;
     reentrancyInstance.context.window.setTimeout = reentrancyOriginalSetTimeout;
   }
 

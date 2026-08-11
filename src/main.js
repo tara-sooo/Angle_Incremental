@@ -1061,6 +1061,11 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
                   Math.min(Math.floor(batchTicks * 2), targetBatchTicks),
                 );
               }
+            } else if (batchElapsed === 0) {
+              batchTicks = Math.max(
+                1,
+                Math.min(requestedTicks - processedTicks, batchTicks * 2),
+              );
             } else {
               batchTicks = Math.max(1, Math.floor(batchTicks / 2));
             }
@@ -1080,7 +1085,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             processingMilliseconds = progressReport.processingMilliseconds;
             const budgetElapsed = batchFinishedAt - budgetStartedAt;
             const shouldYield = !Number.isFinite(budgetElapsed)
-              || budgetElapsed <= 0
+              || budgetElapsed < 0
               || budgetElapsed >= OFFLINE_PROCESS_TIME_BUDGET_MS;
             if (processedTicks < requestedTicks && shouldYield) {
               await yieldToEventLoop();

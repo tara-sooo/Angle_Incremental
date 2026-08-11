@@ -22,6 +22,7 @@ const TOWER_FLOOR_COST_LOG10 = Object.freeze({
 const TOWER_CHALLENGE_UNLOCK_FLOORS = Object.freeze([3, 5, 8, 12]);
 const TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP = 0.077;
 const TOWER_CHALLENGE_3_RELAXATION_COUNT = 600000;
+const TOWER_CHALLENGE_3_INFINITY_SCORE_SOFTCAP_SPAN = 750000;
 const TOWER_CHALLENGE_3_SCORE_GAIN_POWER_START = 0.001;
 const TOWER_CHALLENGE_3_SCORE_GAIN_POWER_TARGET = 0.8;
 const TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_START = 0.1;
@@ -110,14 +111,18 @@ function towerScoreExponent() {
   return 1 + towerFloor() * runtime.TOWER_SCORE_EXPONENT_STEP;
 }
 
-function towerChallenge3RelaxedPower(startPower, targetPower) {
+function towerChallenge3RelaxedPower(
+  startPower,
+  targetPower,
+  postTargetSpan = TOWER_CHALLENGE_3_RELAXATION_COUNT,
+) {
   const rawCount = Number(runtime.state.infinityCount);
   const count = Number.isFinite(rawCount) ? Math.max(0, rawCount) : 0;
   if (count <= TOWER_CHALLENGE_3_RELAXATION_COUNT) {
     return startPower + (targetPower - startPower) * count / TOWER_CHALLENGE_3_RELAXATION_COUNT;
   }
   const excess = count - TOWER_CHALLENGE_3_RELAXATION_COUNT;
-  return targetPower + (1 - targetPower) * excess / (excess + TOWER_CHALLENGE_3_RELAXATION_COUNT);
+  return targetPower + (1 - targetPower) * excess / (excess + postTargetSpan);
 }
 
 function towerChallenge3ScoreGainPower() {
@@ -131,6 +136,7 @@ function towerChallenge3InfinityScorePower() {
   return towerChallenge3RelaxedPower(
     TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_START,
     TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_TARGET,
+    TOWER_CHALLENGE_3_INFINITY_SCORE_SOFTCAP_SPAN,
   );
 }
 

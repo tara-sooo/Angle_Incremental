@@ -729,6 +729,10 @@ try {
       completedTowerChallenges: state.completedTowerChallenges,
       language: state.language,
       towerFloor: state.towerFloor,
+      speedLevel: state.speedLevel,
+      gainLevel: state.gainLevel,
+      infinityUpgradeMask: state.infinityUpgradeMask,
+      numberFormat: state.numberFormat,
     };
     state.completedTowerChallenges = 3;
     state.towerFloor = 5;
@@ -744,8 +748,18 @@ try {
       raw: document.querySelector("#coreBoostRequirementGrowthPowerRaw")?.textContent?.trim() ?? "",
       effective: document.querySelector("#coreBoostRequirementGrowthPower")?.textContent?.trim() ?? "",
     };
+    state.completedTowerChallenges = 4;
+    state.towerFloor = 13;
+    state.speedLevel = 100;
+    state.gainLevel = 100;
+    state.infinityUpgradeMask = 0;
+    state.numberFormat = "detailed";
     state.language = "en";
     window.advanceTime(0);
+    const effectiveUpgradeLevels = {
+      speed: document.querySelector("#speedLevel")?.textContent?.trim() ?? "",
+      gain: document.querySelector("#gainLevel")?.textContent?.trim() ?? "",
+    };
     const englishLabels = {
       tc1Base: document.querySelector('[data-i18n="towerChallenge1ScorePowerBase"]')?.textContent?.trim() ?? "",
       tc2Effective: document.querySelector('[data-i18n="coreBoostGrowthPower"]')?.textContent?.trim() ?? "",
@@ -754,13 +768,15 @@ try {
     };
     Object.assign(state, original);
     window.advanceTime(0);
-    return { tc1, tc2, englishLabels };
+    return { tc1, tc2, effectiveUpgradeLevels, englishLabels };
   });
   assert.equal(towerRewardDisplay.tc1.base, "^0.300", "TC1 should expose its base exponent in the Tower panel");
   assert.equal(towerRewardDisplay.tc1.bonus, "+^0.154", "TC1 should expose its floor-scaled bonus in the Tower panel");
   assert.equal(towerRewardDisplay.tc1.total, "^0.454", "TC1 should expose the combined exponent in the Tower panel");
   assert.equal(towerRewardDisplay.tc2.raw, "^1.490", "TC2 should expose the raw requirement growth power");
   assert.equal(towerRewardDisplay.tc2.effective, "^1.499", "TC2 should expose the soft-capped requirement growth power");
+  assert.match(towerRewardDisplay.effectiveUpgradeLevels.speed, /Level 100 .*Effective 127\.628/, "TC3 should expose effective Speed levels");
+  assert.match(towerRewardDisplay.effectiveUpgradeLevels.gain, /Level 100 .*Effective 127\.628/, "TC3 should expose effective Gain levels");
   assert.equal(towerRewardDisplay.englishLabels.tc1Base, "TC1 base exponent", "TC1 exponent labels should be translated to English");
   assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth (effective)", "TC2 exponent labels should be translated to English");
   assert.match(towerRewardDisplay.englishLabels.tc3Name, /Age When Infinity Was a Concept/, "TC3 name should be translated to English");

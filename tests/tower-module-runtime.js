@@ -203,7 +203,10 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(runtime.towerChallenge3InfinityScorePower(), 0.5, "TC3 should relax Infinity Score gain to ^0.5 at 600000 Infinity");
     debug.state.infinityCount = 1200000;
     assert.ok(runtime.towerChallenge3ScoreGainPower() > 0.8 && runtime.towerChallenge3ScoreGainPower() < 1, "TC3 Score gain should soft-cap above 600000 Infinity");
-    assert.ok(runtime.towerChallenge3InfinityScorePower() > 0.5 && runtime.towerChallenge3InfinityScorePower() < 1, "TC3 Infinity Score gain should soft-cap above 600000 Infinity");
+    assert.ok(
+      Math.abs(runtime.towerChallenge3InfinityScorePower() - (0.5 + 0.5 * 600000 / 1350000)) < 1e-12,
+      "TC3 Infinity Score gain should use the continuous 750000 post-target span",
+    );
     debug.state.activeTowerChallenge = 3;
     debug.state.infinityCount = 0;
     assert.equal(runtime.finalScoreGainPower(), 0.001, "TC3 should compress active Score gain");
@@ -211,6 +214,19 @@ async function runTowerModuleRuntimeTest() {
     debug.state.infinityCount = 600000;
     assert.equal(runtime.finalScoreGainPower(), 0.8, "TC3 Score compression should use the relaxed power");
     assert.equal(runtime.infiniteAngleScoreGainLog10(100), 50, "TC3 Infinity Score compression should use the relaxed power");
+    debug.state.towerFloor = 4;
+    debug.state.completedTowerChallenges = 1;
+    debug.state.infinityCount = 0;
+    const iu13 = runtime.infinityUpgradeById("13-1");
+    debug.state.infinityUpgradeMask = 1 << iu13.bit;
+    const generatedInfinityScoreLog10 = runtime.infiniteAngleScoreGainLog10(100);
+    debug.state.infiniteScoreLog10 = generatedInfinityScoreLog10;
+    debug.state.infiniteScore = 10 ** generatedInfinityScoreLog10;
+    assert.equal(generatedInfinityScoreLog10, 10, "TC3 should compress the generated Infinity Score before boost effects");
+    assert.ok(
+      Math.abs(runtime.infiniteAngleBoostLog10() - 10 * (0.5 + 0.077)) < 1e-12,
+      "TC1 and IU13-1 should apply to the generated TC3 Infinity Score in the final boost",
+    );
     debug.state.activeTowerChallenge = 0;
     debug.state.towerFloor = 13;
     debug.state.completedTowerChallenges = 0;

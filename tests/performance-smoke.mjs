@@ -172,7 +172,7 @@ try {
       await page.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
       await page.evaluate(() => window.__angleDebug.ready);
 
-      const result = await page.evaluate(({ viewportName, viewportWidth, viewportHeight, scaleFactor }) => {
+      const result = await page.evaluate(async ({ viewportName, viewportWidth, viewportHeight, scaleFactor }) => {
         const debug = window.__angleDebug;
         const state = debug.state;
         const vertexScenarios = [3, 720, 10000];
@@ -321,6 +321,31 @@ try {
         automaticTransitions.recoveredHigh = debug.renderQualityState();
         debug.setRenderQualityForTest("auto");
 
+        let offlineProcessing = null;
+        if (viewportName === "desktop" && scaleFactor === 1) {
+          resetScenario(3);
+          state.offlineProgressEnabled = true;
+          state.offlineTickCount = 100000;
+          state.speedLevel = 0;
+          state.gainLevel = 0;
+          state.infiniteAngleUnlocked = false;
+          state.automationEnabled = false;
+          state.autoRunInfinity = false;
+          state.autoRunGeneration = false;
+          state.autoRunCoreBoost = false;
+          state.autoCompleteChallenges = false;
+          state.activeChallenge = 0;
+          state.activeTowerChallenge = 0;
+          const offlineStartedAt = performance.now();
+          const report = await debug.processOfflineElapsed(100000 / 30, "performance", { clockSource: "server" });
+          offlineProcessing = {
+            requestedTicks: report?.requestedTicks ?? 0,
+            processedTicks: report?.processedTicks ?? 0,
+            processingMilliseconds: report?.processingMilliseconds ?? NaN,
+            wallMilliseconds: performance.now() - offlineStartedAt,
+          };
+        }
+
         return {
           viewport: { name: viewportName, width: viewportWidth, height: viewportHeight },
           deviceScaleFactor: scaleFactor,
@@ -335,6 +360,7 @@ try {
           },
           qualityModes,
           automaticTransitions,
+          offlineProcessing,
         };
       }, {
         viewportName: viewport.name,
@@ -357,6 +383,7 @@ try {
       vertexScenarios,
     },
     results,
+    offlineProcessing: results.find((result) => result.offlineProcessing)?.offlineProcessing || null,
   };
   const violations = [
     ...collectBudgetViolations(report),
@@ -364,6 +391,14 @@ try {
   ];
   report.status = violations.length === 0 ? "passed" : "failed";
   report.violations = violations;
+  assert.ok(report.offlineProcessing, "the performance smoke should measure the real offline processing path");
+  assert.equal(report.offlineProcessing.requestedTicks, 100000, "the real offline path should request 100000 ticks");
+  assert.equal(report.offlineProcessing.processedTicks, 100000, "the real offline path should process 100000 ticks exactly");
+  assert.ok(
+    Number.isFinite(report.offlineProcessing.processingMilliseconds)
+      && report.offlineProcessing.processingMilliseconds >= 0,
+    "the real offline path should report a finite processing duration",
+  );
   await mkdir(path.dirname(reportPath), { recursive: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));

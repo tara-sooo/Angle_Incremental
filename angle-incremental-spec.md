@@ -438,12 +438,14 @@ TC1〜TC4はそれぞれFloor 3、5、8、12で解放される。TC1〜TC3をク
 | TC3 「『無限』が概念である時代はとうに越した」 | Score獲得量を`^0.001`、Infinity Score獲得量を`^0.1`から開始し、Infinity回数に応じて緩和する。 | `1e5000 Score` | 「通常強化強化」を解放。Floor 8以降、追加階層ごとにSpeed・Vertex・Gainの有効購入数へ`×1.05`を適用する。初回・再挑戦とも通常Infinity報酬を付与する。 |
 | TC4 | 未定 | 未定 | 未定 |
 
-TC3の緩和指数は、`c = infinityCount`、`C = 600000`、`e = max(0, c - C)`として次の式で計算する。`p0`と`p1`はそれぞれScore獲得量では`0.001`と`0.8`、Infinity Score獲得量では`0.1`と`0.5`を使う。
+TC3の緩和指数は、`c = infinityCount`、`C = 600000`、`e = max(0, c - C)`として次の式で計算する。`p0`と`p1`はそれぞれScore獲得量では`0.001`と`0.8`、Infinity Score獲得量では`0.1`と`0.5`を使う。Scoreの後半分母は`C`、Infinity Scoreの後半分母は`D = 750000`とする。これによりInfinity Score側は`c = 600000`地点で緩和の傾きが不連続に加速しない。
 
 ```text
 p(c) = p0 + (p1 - p0) * c / C                         (c <= C)
-p(c) = p1 + (1 - p1) * e / (e + C)                    (c > C)
+p(c) = p1 + (1 - p1) * e / (e + D)                    (c > C)
 ```
+
+`D = 600000`（Score）、`D = 750000`（Infinity Score）である。
 
 TC3クリア後の通常強化強化は保存済み購入数と購入コストを変更せず、効果計算時だけ次の倍率を使う。
 
