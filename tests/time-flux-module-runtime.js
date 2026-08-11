@@ -582,6 +582,7 @@ async function runTimeFluxModuleRuntimeTest() {
   const millionTickOriginalNow = millionTickInstance.context.performance.now;
   const millionTickOriginalSetTimeout = millionTickInstance.context.window.setTimeout;
   let millionTickClock = 0;
+  let millionTickClockFlat = false;
   let millionTickUpdateCalls = 0;
   let millionTickProgressUpdates = 0;
   let millionTickProgressValue = 0;
@@ -607,6 +608,7 @@ async function runTimeFluxModuleRuntimeTest() {
   };
   millionTickRuntime.update = () => {
     millionTickUpdateCalls += 1;
+    if (millionTickClockFlat) return;
     millionTickClock += millionTickUpdateCalls <= 448
       ? 0
       : millionTickUpdateCalls < 20000
@@ -614,6 +616,27 @@ async function runTimeFluxModuleRuntimeTest() {
         : 0.01;
   };
   try {
+    millionTickClockFlat = true;
+    millionTickClock = 0;
+    millionTickUpdateCalls = 0;
+    millionTickYieldBatches.length = 0;
+    millionTickUpdatesAtLastYield = 0;
+    millionTickProgressUpdates = 0;
+    const flatClockReport = await millionTickDebug.processOfflineElapsed(
+      10000 * millionTickRuntime.MAX_SIMULATION_STEP_SECONDS,
+      "test",
+      { clockSource: "server" },
+    );
+    assert.equal(flatClockReport.processedTicks, 10000, "flat clocks should still process the requested ticks");
+    assert.ok(millionTickYieldBatches.length > 0, "flat clocks should trigger a bounded fallback yield");
+    assert.ok(millionTickYieldBatches[0].end < 10000, "flat clocks should yield before the whole batch completes");
+
+    millionTickClockFlat = false;
+    millionTickClock = 0;
+    millionTickUpdateCalls = 0;
+    millionTickYieldBatches.length = 0;
+    millionTickUpdatesAtLastYield = 0;
+    millionTickProgressUpdates = 0;
     const millionTickReport = await millionTickDebug.processOfflineElapsed(
       millionTickRuntime.OFFLINE_PROGRESS_MAX_TICKS * millionTickRuntime.MAX_SIMULATION_STEP_SECONDS,
       "test",

@@ -67,6 +67,7 @@ const OFFLINE_PROCESS_TIME_BUDGET_MS = 8;
 const OFFLINE_PROCESS_INITIAL_BATCH_TICKS = 64;
 const OFFLINE_PROCESS_TARGET_BATCH_MS = 2;
 const OFFLINE_PROCESS_PROGRESS_UPDATE_INTERVAL_MS = 100;
+const OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT = 4096;
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
@@ -1033,6 +1034,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         try {
           let batchTicks = Math.min(requestedTicks, OFFLINE_PROCESS_INITIAL_BATCH_TICKS);
           let estimatedTicksPerMs = 0;
+          let zeroClockTicksSinceYield = 0;
           let budgetStartedAt = monotonicClockNow();
           let lastProgressUiAt = budgetStartedAt;
           while (processedTicks < requestedTicks) {
@@ -1047,6 +1049,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             const batchElapsed = batchFinishedAt - batchStartedAt;
             const validBatchElapsed = Number.isFinite(batchElapsed) && batchElapsed > 0;
             if (validBatchElapsed) {
+              zeroClockTicksSinceYield = 0;
               const measuredTicksPerMs = currentBatchTicks / batchElapsed;
               if (Number.isFinite(measuredTicksPerMs) && measuredTicksPerMs > 0) {
                 estimatedTicksPerMs = estimatedTicksPerMs > 0
@@ -1062,11 +1065,17 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
                 );
               }
             } else if (batchElapsed === 0) {
+              zeroClockTicksSinceYield += currentBatchTicks;
               batchTicks = Math.max(
                 1,
-                Math.min(requestedTicks - processedTicks, batchTicks * 2),
+                Math.min(
+                  requestedTicks - processedTicks,
+                  batchTicks * 2,
+                  Math.max(1, OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT - zeroClockTicksSinceYield),
+                ),
               );
             } else {
+              zeroClockTicksSinceYield = 0;
               batchTicks = Math.max(1, Math.floor(batchTicks / 2));
             }
             progressReport.processedTicks = processedTicks;
@@ -1086,10 +1095,12 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             const budgetElapsed = batchFinishedAt - budgetStartedAt;
             const shouldYield = !Number.isFinite(budgetElapsed)
               || budgetElapsed < 0
-              || budgetElapsed >= OFFLINE_PROCESS_TIME_BUDGET_MS;
+              || budgetElapsed >= OFFLINE_PROCESS_TIME_BUDGET_MS
+              || zeroClockTicksSinceYield >= OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT;
             if (processedTicks < requestedTicks && shouldYield) {
               await yieldToEventLoop();
               budgetStartedAt = monotonicClockNow();
+              zeroClockTicksSinceYield = 0;
             }
           }
         } finally {
