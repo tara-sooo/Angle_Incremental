@@ -21,12 +21,18 @@ const TOWER_FLOOR_COST_LOG10 = Object.freeze({
 
 const TOWER_CHALLENGE_UNLOCK_FLOORS = Object.freeze([3, 5, 8, 12]);
 const TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP = 0.077;
+const TOWER_CHALLENGE_3_RELAXATION_COUNT = 600000;
+const TOWER_CHALLENGE_3_SCORE_GAIN_POWER_START = 0.001;
+const TOWER_CHALLENGE_3_SCORE_GAIN_POWER_TARGET = 0.8;
+const TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_START = 0.1;
+const TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_TARGET = 0.5;
+const TOWER_NORMAL_UPGRADE_MULTIPLIER_STEP = 1.05;
 
 const TOWER_CHALLENGES = Object.freeze([
   {
     index: 1,
     unlockFloor: 3,
-    targetLog10: 308,
+    targetLog10: 1000,
     name: { ja: "TC1 親友より知り合い", en: "TC1 Better Acquaintances Than Friends" },
     restriction: {
       ja: "TAの通常強化は購入できず、IU11-1の効果上限は/5される",
@@ -41,7 +47,7 @@ const TOWER_CHALLENGES = Object.freeze([
   {
     index: 2,
     unlockFloor: 5,
-    targetLog10: 1555,
+    targetLog10: 3000,
     name: { ja: "TC2 核家族世帯撲滅委員会", en: "TC2 Nuclear Family Eradication Committee" },
     restriction: {
       ja: "CBは封印され、GRのスコア倍率は^0.1、コスト倍率は×0.90を下限とする",
@@ -56,11 +62,17 @@ const TOWER_CHALLENGES = Object.freeze([
   {
     index: 3,
     unlockFloor: 8,
-    targetLog10: Infinity,
-    name: { ja: "TC3", en: "TC3" },
-    restriction: { ja: "内容は今後のリリースで公開", en: "Details planned for a future release." },
-    reward: { ja: "報酬は今後のリリースで公開", en: "Reward planned for a future release." },
-    implemented: false,
+    targetLog10: 5000,
+    name: { ja: "TC3 「『無限』が概念である時代はとうに越した」", en: "TC3 The Age When Infinity Was a Concept Is Long Gone" },
+    restriction: {
+      ja: "Score獲得は^0.001、Infinity Score獲得は^0.100から開始し、Infinity回数で緩和（現在: Score ^{scoreGainPower} / Infinity Score ^{infinityScorePower}）",
+      en: "Score gain starts at ^0.001 and Infinity Score gain at ^0.100; both relax with Infinity count (now: Score ^{scoreGainPower} / Infinity Score ^{infinityScorePower}).",
+    },
+    reward: {
+      ja: "通常強化強化。Floor 8以降、追加階層ごとにSpeed・Vertex・Gainの有効購入数を×1.05する",
+      en: "Enhances normal upgrades. Each additional floor after Floor 8 multiplies effective Speed, Vertex, and Gain purchases by x1.05.",
+    },
+    implemented: true,
   },
   {
     index: 4,
@@ -98,6 +110,30 @@ function towerScoreExponent() {
   return 1 + towerFloor() * runtime.TOWER_SCORE_EXPONENT_STEP;
 }
 
+function towerChallenge3RelaxedPower(startPower, targetPower) {
+  const rawCount = Number(runtime.state.infinityCount);
+  const count = Number.isFinite(rawCount) ? Math.max(0, rawCount) : 0;
+  if (count <= TOWER_CHALLENGE_3_RELAXATION_COUNT) {
+    return startPower + (targetPower - startPower) * count / TOWER_CHALLENGE_3_RELAXATION_COUNT;
+  }
+  const excess = count - TOWER_CHALLENGE_3_RELAXATION_COUNT;
+  return targetPower + (1 - targetPower) * excess / (excess + TOWER_CHALLENGE_3_RELAXATION_COUNT);
+}
+
+function towerChallenge3ScoreGainPower() {
+  return towerChallenge3RelaxedPower(
+    TOWER_CHALLENGE_3_SCORE_GAIN_POWER_START,
+    TOWER_CHALLENGE_3_SCORE_GAIN_POWER_TARGET,
+  );
+}
+
+function towerChallenge3InfinityScorePower() {
+  return towerChallenge3RelaxedPower(
+    TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_START,
+    TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_TARGET,
+  );
+}
+
 function towerChallenge1InfinityScorePowerBonus() {
   if (!towerChallengeCompleted(1)) return 0;
   return Math.max(0, towerFloor() - 3) * TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP;
@@ -116,6 +152,14 @@ function towerChallengeCompleted(index) {
   const normalizedIndex = Math.floor(index);
   if (normalizedIndex < 1 || normalizedIndex > runtime.TOWER_CHALLENGE_COUNT) return false;
   return (runtime.state.completedTowerChallenges & (1 << (normalizedIndex - 1))) !== 0;
+}
+
+function towerNormalUpgradeMultiplier() {
+  if (!towerChallengeCompleted(3)) return 1;
+  return Math.pow(
+    TOWER_NORMAL_UPGRADE_MULTIPLIER_STEP,
+    Math.max(0, towerFloor() - 8),
+  );
 }
 
 function towerChallengeDefinition(index) {
@@ -144,7 +188,11 @@ function towerChallengeName(index) {
 }
 
 function towerChallengeRestriction(index) {
-  return towerChallengeText(index, "restriction");
+  const text = towerChallengeText(index, "restriction");
+  if (Math.floor(index) !== 3) return text;
+  return text
+    .replace("{scoreGainPower}", towerChallenge3ScoreGainPower().toFixed(3))
+    .replace("{infinityScorePower}", towerChallenge3InfinityScorePower().toFixed(3));
 }
 
 function towerChallengeReward(index) {
@@ -254,6 +302,12 @@ function buildTower() {
 expose("TOWER_FLOOR_COST_LOG10", () => TOWER_FLOOR_COST_LOG10);
 expose("TOWER_CHALLENGE_UNLOCK_FLOORS", () => TOWER_CHALLENGE_UNLOCK_FLOORS);
 expose("TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP", () => TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP);
+expose("TOWER_CHALLENGE_3_RELAXATION_COUNT", () => TOWER_CHALLENGE_3_RELAXATION_COUNT);
+expose("TOWER_CHALLENGE_3_SCORE_GAIN_POWER_START", () => TOWER_CHALLENGE_3_SCORE_GAIN_POWER_START);
+expose("TOWER_CHALLENGE_3_SCORE_GAIN_POWER_TARGET", () => TOWER_CHALLENGE_3_SCORE_GAIN_POWER_TARGET);
+expose("TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_START", () => TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_START);
+expose("TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_TARGET", () => TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_TARGET);
+expose("TOWER_NORMAL_UPGRADE_MULTIPLIER_STEP", () => TOWER_NORMAL_UPGRADE_MULTIPLIER_STEP);
 expose("TOWER_CHALLENGES", () => TOWER_CHALLENGES);
 expose("towerFloor", () => towerFloor);
 expose("towerFloorCostLog10", () => towerFloorCostLog10);
@@ -261,6 +315,9 @@ expose("towerNextFloor", () => towerNextFloor);
 expose("towerNextFloorCostLog10", () => towerNextFloorCostLog10);
 expose("towerScoreExponent", () => towerScoreExponent);
 expose("towerChallenge1InfinityScorePowerBonus", () => towerChallenge1InfinityScorePowerBonus);
+expose("towerChallenge3ScoreGainPower", () => towerChallenge3ScoreGainPower);
+expose("towerChallenge3InfinityScorePower", () => towerChallenge3InfinityScorePower);
+expose("towerNormalUpgradeMultiplier", () => towerNormalUpgradeMultiplier);
 expose("towerChallengeUnlockFloor", () => towerChallengeUnlockFloor);
 expose("towerChallengeUnlocked", () => towerChallengeUnlocked);
 expose("towerChallengeCompleted", () => towerChallengeCompleted);
