@@ -1665,6 +1665,7 @@ try {
   }
 
   assert.deepEqual(errors, []);
+  assert.deepEqual(httpFailures, [], "browser smoke should not have HTTP failures");
   report.result = "passed";
   console.log("browser ESM smoke test passed");
 } catch (error) {
