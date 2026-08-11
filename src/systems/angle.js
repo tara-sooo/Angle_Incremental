@@ -155,16 +155,20 @@ function iu11_2EffectiveInfinityCount() {
 }
 
 function effectiveSpeedLevel() {
-  return runtime.state.speedLevel + sponsoredNormalUpgradeBonusLevel();
+  return runtime.state.speedLevel * runtime.towerNormalUpgradeMultiplier()
+    + sponsoredNormalUpgradeBonusLevel();
 }
 
 function effectiveGainLevel() {
-  return runtime.state.gainLevel + sponsoredNormalUpgradeBonusLevel();
+  return runtime.state.gainLevel * runtime.towerNormalUpgradeMultiplier()
+    + sponsoredNormalUpgradeBonusLevel();
 }
 
 function effectiveVertexCount() {
   if (runtime.state.activeChallenge === 8) return 3;
-  const count = runtime.state.vertices + sponsoredNormalUpgradeBonusLevel();
+  const purchasedVertices = Math.max(0, runtime.state.vertices - 3);
+  const count = 3 + Math.floor(purchasedVertices * runtime.towerNormalUpgradeMultiplier())
+    + sponsoredNormalUpgradeBonusLevel();
   if (runtime.state.activeChallenge === 2) return Math.min(200, count);
   return count;
 }
@@ -206,7 +210,9 @@ function vertexGainIncrease() {
 }
 
 function finalScoreGainPower() {
-  return 1;
+  return runtime.state.activeTowerChallenge === 3
+    ? runtime.towerChallenge3ScoreGainPower()
+    : 1;
 }
 
 function finalScoreGainDivisor() {

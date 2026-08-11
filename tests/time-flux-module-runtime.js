@@ -579,9 +579,16 @@ async function runTimeFluxModuleRuntimeTest() {
   const millionTickDebug = millionTickInstance.debug;
   millionTickDebug.state.offlineTickCount = millionTickRuntime.OFFLINE_PROGRESS_MAX_TICKS;
   const millionTickOriginalUpdate = millionTickRuntime.update;
+  const millionTickOriginalNow = millionTickInstance.context.performance.now;
+  const millionTickOriginalSetTimeout = millionTickInstance.context.window.setTimeout;
+  let millionTickClock = 0;
+  let millionTickClockFlat = false;
+  let millionTickClockFlatAfter = Infinity;
   let millionTickUpdateCalls = 0;
   let millionTickProgressUpdates = 0;
   let millionTickProgressValue = 0;
+  let millionTickUpdatesAtLastYield = 0;
+  const millionTickYieldBatches = [];
   Object.defineProperty(millionTickRuntime.elements.offlineReportProgress, "value", {
     configurable: true,
     get: () => millionTickProgressValue,
@@ -590,10 +597,66 @@ async function runTimeFluxModuleRuntimeTest() {
       millionTickProgressUpdates += 1;
     },
   });
+  millionTickInstance.context.performance.now = () => millionTickClock;
+  millionTickInstance.context.window.setTimeout = (callback) => {
+    millionTickYieldBatches.push({
+      updates: millionTickUpdateCalls - millionTickUpdatesAtLastYield,
+      start: millionTickUpdatesAtLastYield,
+      end: millionTickUpdateCalls,
+    });
+    millionTickUpdatesAtLastYield = millionTickUpdateCalls;
+    callback();
+    return 0;
+  };
   millionTickRuntime.update = () => {
     millionTickUpdateCalls += 1;
+    if (millionTickClockFlat || millionTickUpdateCalls >= millionTickClockFlatAfter) return;
+    millionTickClock += millionTickUpdateCalls <= 448
+      ? 0
+      : millionTickUpdateCalls < 20000
+        ? 0.0005
+        : 0.01;
   };
   try {
+    millionTickClockFlat = true;
+    millionTickClock = 0;
+    millionTickUpdateCalls = 0;
+    millionTickYieldBatches.length = 0;
+    millionTickUpdatesAtLastYield = 0;
+    millionTickProgressUpdates = 0;
+    const flatClockReport = await millionTickDebug.processOfflineElapsed(
+      10000 * millionTickRuntime.MAX_SIMULATION_STEP_SECONDS,
+      "test",
+      { clockSource: "server" },
+    );
+    assert.equal(flatClockReport.processedTicks, 10000, "flat clocks should still process the requested ticks");
+    assert.ok(millionTickYieldBatches.length > 0, "flat clocks should trigger a bounded fallback yield");
+    assert.ok(millionTickYieldBatches[0].end < 10000, "flat clocks should yield before the whole batch completes");
+    assert.ok(millionTickProgressUpdates > 1, "flat clocks should update offline progress before completion");
+
+    millionTickClockFlat = false;
+    millionTickClockFlatAfter = 9000;
+    millionTickClock = 0;
+    millionTickUpdateCalls = 0;
+    millionTickYieldBatches.length = 0;
+    millionTickUpdatesAtLastYield = 0;
+    const transitionClockReport = await millionTickDebug.processOfflineElapsed(
+      100000 * millionTickRuntime.MAX_SIMULATION_STEP_SECONDS,
+      "test",
+      { clockSource: "server" },
+    );
+    assert.equal(transitionClockReport.processedTicks, 100000, "a clock transition should still process the requested ticks");
+    const flatTransitionBatches = millionTickYieldBatches.filter((batch) => batch.start >= 9000);
+    assert.ok(flatTransitionBatches.length > 0, "a clock transition should trigger the fallback path");
+    assert.ok(flatTransitionBatches[0].updates <= 4096, "a clock transition should clamp the batch before execution");
+
+    millionTickClockFlatAfter = Infinity;
+    millionTickClockFlat = false;
+    millionTickClock = 0;
+    millionTickUpdateCalls = 0;
+    millionTickYieldBatches.length = 0;
+    millionTickUpdatesAtLastYield = 0;
+    millionTickProgressUpdates = 0;
     const millionTickReport = await millionTickDebug.processOfflineElapsed(
       millionTickRuntime.OFFLINE_PROGRESS_MAX_TICKS * millionTickRuntime.MAX_SIMULATION_STEP_SECONDS,
       "test",
@@ -601,22 +664,55 @@ async function runTimeFluxModuleRuntimeTest() {
     );
     assert.equal(millionTickReport.configuredTicks, 1000000, "offline settings should allow one million configured ticks");
     assert.equal(millionTickReport.requestedTicks, 1000000, "offline processing should request one million ticks");
-    assert.equal(millionTickReport.processedTicks, 1000000, "offline processing should not retain a hidden ten-thousand tick cap");
+    assert.equal(millionTickReport.processedTicks, 1000000, "offline processing should not retain a hidden tick cap");
     assert.equal(millionTickUpdateCalls, 1000000, "one million ticks should be simulated exactly once");
     assert.ok(millionTickProgressUpdates > 1, "large offline processing should publish incremental progress");
+    assert.ok(
+      millionTickYieldBatches[0]?.end > 448,
+      "zero-duration batches should grow without yielding until the clock advances",
+    );
+    assert.ok(
+      millionTickYieldBatches.some((batch) => batch.updates > 1000),
+      "fast offline processing should grow beyond the removed fixed batch size",
+    );
+    assert.ok(
+      millionTickYieldBatches.some((batch) => batch.end >= 20000 && batch.updates < 1000),
+      "adaptive offline processing should shrink after simulated work slows down",
+    );
+    assert.ok(millionTickProgressUpdates < 1000, "offline progress DOM updates should be throttled");
   } finally {
     millionTickRuntime.update = millionTickOriginalUpdate;
+    millionTickInstance.context.performance.now = millionTickOriginalNow;
+    millionTickInstance.context.window.setTimeout = millionTickOriginalSetTimeout;
   }
+
+  const floatingTextInstance = await loadRuntime(candidatePath);
+  const floatingTextRuntime = floatingTextInstance.runtime;
+  const floatingTextState = floatingTextInstance.debug.state;
+  floatingTextState.floatingTexts = [{ life: 1, y: 10 }];
+  floatingTextRuntime.offlineProcessing = true;
+  floatingTextInstance.debug.update(1 / 60);
+  assert.equal(floatingTextState.floatingTexts[0].life, 1, "offline processing should pause Floating Text updates");
+  floatingTextRuntime.offlineProcessing = false;
+  floatingTextInstance.debug.update(1 / 60);
+  assert.ok(floatingTextState.floatingTexts[0].life < 1, "online processing should continue Floating Text updates");
 
   const reentrancyInstance = await loadRuntime(candidatePath);
   const reentrancyRuntime = reentrancyInstance.runtime;
   const reentrancyDebug = reentrancyInstance.debug;
   const reentrancyOriginalUpdate = reentrancyRuntime.update;
+  const reentrancyOriginalNow = reentrancyInstance.context.performance.now;
   const reentrancyOriginalSetTimeout = reentrancyInstance.context.window.setTimeout;
   let reentrancyYielded = false;
+  let reentrancyClock = 0;
+  let reentrancyUpdateCalls = 0;
   reentrancyDebug.state.generationCount = 7;
   reentrancyDebug.state.offlineTickCount = reentrancyRuntime.OFFLINE_PROGRESS_MAX_TICKS;
-  reentrancyRuntime.update = () => {};
+  reentrancyInstance.context.performance.now = () => reentrancyClock;
+  reentrancyRuntime.update = () => {
+    reentrancyUpdateCalls += 1;
+    reentrancyClock += reentrancyUpdateCalls <= 448 ? 0 : 0.1;
+  };
   reentrancyInstance.context.window.setTimeout = (callback) => {
     if (!reentrancyYielded) {
       reentrancyYielded = true;
@@ -638,6 +734,7 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.equal(reentrancyDebug.state.offlineProgressEnabled, true, "offline processing should lock settings while yielding");
   } finally {
     reentrancyRuntime.update = reentrancyOriginalUpdate;
+    reentrancyInstance.context.performance.now = reentrancyOriginalNow;
     reentrancyInstance.context.window.setTimeout = reentrancyOriginalSetTimeout;
   }
 

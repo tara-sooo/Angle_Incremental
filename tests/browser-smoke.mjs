@@ -86,19 +86,53 @@ const browser = await chromium.launch({
 });
 const errors = [];
 const moduleRequests = [];
+const httpFailures = [];
 const report = {
   result: "running",
   expectedAssetVersion: EXPECTED_ASSET_VERSION,
   errors,
+  httpFailures,
   moduleRequests: [],
 };
+
+async function stubExternalFonts(target) {
+  await target.route("https://fonts.googleapis.com/**", (route) => route.fulfill({
+    status: 200,
+    contentType: "text/css",
+    body: "",
+  }));
+  await target.route("https://fonts.gstatic.com/**", (route) => route.fulfill({
+    status: 200,
+    contentType: "font/woff2",
+    body: "",
+  }));
+}
+
+function trackPage(page, scope, errorSink) {
+  page.on("pageerror", (error) => errorSink.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errorSink.push(message.text());
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) {
+      httpFailures.push({ scope, type: "response", status: response.status(), url: response.url() });
+    }
+  });
+  page.on("requestfailed", (request) => {
+    httpFailures.push({
+      scope,
+      type: "requestfailed",
+      status: 0,
+      url: request.url(),
+      error: request.failure()?.errorText ?? "unknown",
+    });
+  });
+}
 try {
   const page = await browser.newPage();
   const localOrigin = `http://127.0.0.1:${address.port}`;
-  page.on("pageerror", (error) => errors.push(error.message));
-  page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
-  });
+  await stubExternalFonts(page);
+  trackPage(page, "main", errors);
   page.on("request", (request) => {
     const url = new URL(request.url());
     if (url.origin === localOrigin && url.pathname.startsWith("/src/") && url.pathname.endsWith(".js")) {
@@ -125,10 +159,10 @@ try {
   });
   assert.equal(updateModal.visible, true, "the current-version update modal should appear for a fresh browser profile");
   assert.equal(updateModal.title, `${EXPECTED_ASSET_VERSION} アップデート`, "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /オフライン進行/);
-  assert.match(updateModal.summary, /セーブ競合/);
-  assert.match(updateModal.canvas, /競合/);
-  assert.match(updateModal.canvas, /最新セーブ/);
+  assert.match(updateModal.summary, /Tower Challenge 3/);
+  assert.match(updateModal.summary, /Tower/);
+  assert.match(updateModal.canvas, /TC3/);
+  assert.match(updateModal.canvas, /Floor 8/);
   const desktopButtonInteraction = await page.evaluate(() => {
     const selectors = ["[data-tab=angle]", "#speedUpgrade"];
     return selectors.map((selector) => {
@@ -237,10 +271,8 @@ try {
       state: fixture.state,
     });
     const existingPage = await existingContext.newPage();
-    existingPage.on("pageerror", (error) => existingErrors.push(error.message));
-    existingPage.on("console", (message) => {
-      if (message.type() === "error") existingErrors.push(message.text());
-    });
+    await stubExternalFonts(existingContext);
+    trackPage(existingPage, `fixture:${fixture.name}`, existingErrors);
     try {
       await existingPage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
       await existingPage.waitForFunction(() => (
@@ -294,10 +326,8 @@ try {
     }],
   });
   const serverClockPage = await serverClockContext.newPage();
-  serverClockPage.on("pageerror", (error) => serverClockErrors.push(error.message));
-  serverClockPage.on("console", (message) => {
-    if (message.type() === "error") serverClockErrors.push(message.text());
-  });
+  await stubExternalFonts(serverClockContext);
+  trackPage(serverClockPage, "server-clock", serverClockErrors);
   try {
     await serverClockPage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
     await serverClockPage.waitForFunction(() => Boolean(window.__angleDebug?.ready));
@@ -614,11 +644,15 @@ try {
       towerState,
       challengePanelActive: Boolean(document.querySelector('[data-challenge-panel="tc"]')?.classList.contains("is-active")),
       towerChallengeRows: document.querySelectorAll("#towerChallengeList .tower-challenge-row").length,
+      towerChallengeReleaseStatus: document.querySelector('[data-i18n="towerChallengeReleaseStatus"]')?.textContent?.trim() ?? "",
       towerChallengeButton: document.querySelector("#towerChallengeList .tower-challenge-row button")?.textContent?.trim() ?? "",
       towerChallengeButtonDisabled: Boolean(document.querySelector("#towerChallengeList .tower-challenge-row button")?.disabled),
       towerChallengeRestriction: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-restriction")?.textContent?.trim() ?? "",
       towerChallengeTarget: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-target")?.textContent?.trim() ?? "",
       towerChallenge2Target: document.querySelector('#towerChallengeList [data-tower-challenge="2"] .challenge-target')?.textContent?.trim() ?? "",
+      towerChallenge3Name: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-name')?.textContent?.trim() ?? "",
+      towerChallenge3Target: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-target')?.textContent?.trim() ?? "",
+      towerChallenge3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
     };
   });
   assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
@@ -627,15 +661,47 @@ try {
   assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
   assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
   assert.equal(towerInitial.towerChallengeRows, 4, "TC1-TC4 rows should be visible");
+  assert.equal(towerInitial.towerChallengeReleaseStatus, "TC1〜TC3実装済み", "Tower Challenge status should reflect the implemented TC range");
   assert.equal(towerInitial.towerChallengeButton, "挑戦開始", "implemented TC rows should expose a start button");
   assert.equal(towerInitial.towerChallengeButtonDisabled, true, "locked TC rows should disable their start button");
   assert.match(towerInitial.towerChallengeRestriction, /通常強化/);
-  assert.match(towerInitial.towerChallengeTarget, /1\.00e308/);
-  assert.match(towerInitial.towerChallenge2Target, /1\.00e1,555/);
+  assert.match(towerInitial.towerChallengeTarget, /1\.00e1,000/);
+  assert.match(towerInitial.towerChallenge2Target, /1\.00e3,000/);
+  assert.match(towerInitial.towerChallenge3Name, /TC3/);
+  assert.match(towerInitial.towerChallenge3Target, /1\.00e5,000/);
+  assert.match(towerInitial.towerChallenge3Restriction, /\^0\.001/);
+  assert.match(towerInitial.towerChallenge3Restriction, /\^0\.100/);
   assert.equal(towerInitial.towerState.scoreExponent, "^1.00");
   assert.equal(towerInitial.towerState.tc1Base, "^0.300");
   assert.equal(towerInitial.towerState.tc1Bonus, "+^0.000");
   assert.equal(towerInitial.towerState.tc1Total, "^0.300");
+  const towerChallenge3Flow = await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    const original = {
+      towerFloor: state.towerFloor,
+      infinityCount: state.infinityCount,
+      completedTowerChallenges: state.completedTowerChallenges,
+      activeTowerChallenge: state.activeTowerChallenge,
+    };
+    state.towerFloor = 8;
+    state.infinityCount = 600000;
+    state.completedTowerChallenges = 0;
+    state.activeTowerChallenge = 0;
+    window.advanceTime(0);
+    const row = document.querySelector('#towerChallengeList [data-tower-challenge="3"]');
+    const result = {
+      button: row?.querySelector("button")?.textContent?.trim() ?? "",
+      disabled: Boolean(row?.querySelector("button")?.disabled),
+      restriction: row?.querySelector(".challenge-restriction")?.textContent?.trim() ?? "",
+    };
+    Object.assign(state, original);
+    window.advanceTime(0);
+    return result;
+  });
+  assert.equal(towerChallenge3Flow.button, "挑戦開始", "TC3 should expose a start button at Floor 8");
+  assert.equal(towerChallenge3Flow.disabled, false, "TC3 should be available at Floor 8");
+  assert.match(towerChallenge3Flow.restriction, /\^0\.800/);
+  assert.match(towerChallenge3Flow.restriction, /\^0\.500/);
   const towerChallengeFlow = await page.evaluate(() => {
     const { state, toggleTowerChallenge, completeTowerChallengeIfReady } = window.__angleDebug;
     state.towerFloor = 3;
@@ -650,7 +716,7 @@ try {
       button: startButton?.textContent?.trim() ?? "",
       disabled: Boolean(startButton?.disabled),
     };
-    state.scoreLog10 = 308;
+    state.scoreLog10 = 1000;
     state.score = Number.MAX_VALUE;
     const completed = completeTowerChallengeIfReady();
     const result = {
@@ -667,7 +733,7 @@ try {
       button: replayButton?.textContent?.trim() ?? "",
       disabled: Boolean(replayButton?.disabled),
     };
-    state.scoreLog10 = 308;
+    state.scoreLog10 = 1000;
     state.score = Number.MAX_VALUE;
     const replayCompleted = completeTowerChallengeIfReady();
     state.towerFloor = 0;
@@ -693,6 +759,10 @@ try {
       completedTowerChallenges: state.completedTowerChallenges,
       language: state.language,
       towerFloor: state.towerFloor,
+      speedLevel: state.speedLevel,
+      gainLevel: state.gainLevel,
+      infinityUpgradeMask: state.infinityUpgradeMask,
+      numberFormat: state.numberFormat,
     };
     state.completedTowerChallenges = 3;
     state.towerFloor = 5;
@@ -708,23 +778,39 @@ try {
       raw: document.querySelector("#coreBoostRequirementGrowthPowerRaw")?.textContent?.trim() ?? "",
       effective: document.querySelector("#coreBoostRequirementGrowthPower")?.textContent?.trim() ?? "",
     };
+    state.completedTowerChallenges = 4;
+    state.towerFloor = 13;
+    state.speedLevel = 100;
+    state.gainLevel = 100;
+    state.infinityUpgradeMask = 0;
+    state.numberFormat = "detailed";
     state.language = "en";
     window.advanceTime(0);
+    const effectiveUpgradeLevels = {
+      speed: document.querySelector("#speedLevel")?.textContent?.trim() ?? "",
+      gain: document.querySelector("#gainLevel")?.textContent?.trim() ?? "",
+    };
     const englishLabels = {
       tc1Base: document.querySelector('[data-i18n="towerChallenge1ScorePowerBase"]')?.textContent?.trim() ?? "",
       tc2Effective: document.querySelector('[data-i18n="coreBoostGrowthPower"]')?.textContent?.trim() ?? "",
+      tc3Name: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-name')?.textContent?.trim() ?? "",
+      tc3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
     };
     Object.assign(state, original);
     window.advanceTime(0);
-    return { tc1, tc2, englishLabels };
+    return { tc1, tc2, effectiveUpgradeLevels, englishLabels };
   });
   assert.equal(towerRewardDisplay.tc1.base, "^0.300", "TC1 should expose its base exponent in the Tower panel");
   assert.equal(towerRewardDisplay.tc1.bonus, "+^0.154", "TC1 should expose its floor-scaled bonus in the Tower panel");
   assert.equal(towerRewardDisplay.tc1.total, "^0.454", "TC1 should expose the combined exponent in the Tower panel");
   assert.equal(towerRewardDisplay.tc2.raw, "^1.490", "TC2 should expose the raw requirement growth power");
   assert.equal(towerRewardDisplay.tc2.effective, "^1.499", "TC2 should expose the soft-capped requirement growth power");
+  assert.match(towerRewardDisplay.effectiveUpgradeLevels.speed, /Level 100 .*Effective 127\.628/, "TC3 should expose effective Speed levels");
+  assert.match(towerRewardDisplay.effectiveUpgradeLevels.gain, /Level 100 .*Effective 127\.628/, "TC3 should expose effective Gain levels");
   assert.equal(towerRewardDisplay.englishLabels.tc1Base, "TC1 base exponent", "TC1 exponent labels should be translated to English");
   assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth (effective)", "TC2 exponent labels should be translated to English");
+  assert.match(towerRewardDisplay.englishLabels.tc3Name, /Age When Infinity Was a Concept/, "TC3 name should be translated to English");
+  assert.match(towerRewardDisplay.englishLabels.tc3Restriction, /Score gain starts/, "TC3 restriction should be translated to English");
   const timeFluxRemoval = await page.evaluate(async () => {
     const { state, advanceOnlineTime, processOfflineElapsed } = window.__angleDebug;
     state.totalPlayTime = 0;
@@ -1338,10 +1424,8 @@ try {
   });
   const mobileErrors = [];
   const mobilePage = await mobileContext.newPage();
-  mobilePage.on("pageerror", (error) => mobileErrors.push(error.message));
-  mobilePage.on("console", (message) => {
-    if (message.type() === "error") mobileErrors.push(message.text());
-  });
+  await stubExternalFonts(mobileContext);
+  trackPage(mobilePage, "mobile", mobileErrors);
   try {
     await mobilePage.goto(`${localOrigin}/index.html`, { waitUntil: "networkidle" });
     await mobilePage.waitForFunction(() => (
@@ -1581,6 +1665,7 @@ try {
   }
 
   assert.deepEqual(errors, []);
+  assert.deepEqual(httpFailures, [], "browser smoke should not have HTTP failures");
   report.result = "passed";
   console.log("browser ESM smoke test passed");
 } catch (error) {

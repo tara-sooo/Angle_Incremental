@@ -220,16 +220,17 @@ function updateUi() {
   runtime.elements.lapSpeedValue.textContent = runtime.isLapSpeedSoftcapped()
     ? `${formatMultiplierLog(runtime.effectiveLapSpeedLog10())} ${runtime.t("lapSpeedSoftcapped")} / raw ${formatMultiplierLog(runtime.rawLapSpeedLog10())}`
     : formatMultiplierLog(runtime.effectiveLapSpeedLog10());
-  const sponsorBonus = runtime.sponsoredNormalUpgradeBonusLevel();
-  runtime.elements.speedLevel.textContent = sponsorBonus > 0
-    ? `${runtime.t("level")} ${runtime.state.speedLevel} + ${sponsorBonus}`
-    : `${runtime.t("level")} ${runtime.state.speedLevel}`;
+  runtime.elements.speedLevel.textContent = formatEffectiveLevel(
+    runtime.state.speedLevel,
+    runtime.effectiveSpeedLevel(),
+  );
   runtime.elements.vertexCount.textContent = runtime.effectiveVertexCount() === runtime.state.vertices
     ? `${runtime.state.vertices} ${runtime.t("vertices")}`
     : `${runtime.effectiveVertexCount()} ${runtime.t("vertices")} (${runtime.state.vertices} + ${runtime.effectiveVertexCount() - runtime.state.vertices})`;
-  runtime.elements.gainLevel.textContent = sponsorBonus > 0
-    ? `${runtime.t("level")} ${runtime.state.gainLevel} + ${sponsorBonus}`
-    : `${runtime.t("level")} ${runtime.state.gainLevel}`;
+  runtime.elements.gainLevel.textContent = formatEffectiveLevel(
+    runtime.state.gainLevel,
+    runtime.effectiveGainLevel(),
+  );
   runtime.elements.speedCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.speed)}`;
   runtime.elements.vertexCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.vertex)}`;
   runtime.elements.gainCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.gain)}`;
@@ -389,6 +390,15 @@ function formatGainExpression(valueLog10) {
   const base = runtime.formatUiLogNumber(valueLog10);
   if (config.divisor <= 1) return `(${base})^${config.parts}`;
   return `(${base} / ${config.divisor})^${config.parts}`;
+}
+
+function formatEffectiveLevel(rawLevel, effectiveLevel) {
+  const label = `${runtime.t("level")} ${rawLevel}`;
+  return effectiveLevel === rawLevel
+    ? label
+    : `${label} → ${runtime.t("effectiveLevel")} ${effectiveLevel < 1000
+      ? runtime.formatSmallDecimal(effectiveLevel)
+      : runtime.formatUiNumber(effectiveLevel)}`;
 }
 
 function gainExpressionParts() {

@@ -64,7 +64,10 @@ let localClockAnomaly = false;
 let localClockAnchor = null;
 let offlineProcessPromise = null;
 const OFFLINE_PROCESS_TIME_BUDGET_MS = 8;
-const OFFLINE_PROCESS_MAX_TICKS_PER_CHUNK = 1000;
+const OFFLINE_PROCESS_INITIAL_BATCH_TICKS = 64;
+const OFFLINE_PROCESS_TARGET_BATCH_MS = 2;
+const OFFLINE_PROCESS_PROGRESS_UPDATE_INTERVAL_MS = 100;
+const OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT = 4096;
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
@@ -632,9 +635,11 @@ function update(dt, allowOffline = false) {
 
   runtime.normalizeVertexProgress();
   runtime.state.lastVertexIndex = Math.floor(runtime.state.pointProgress * vertices) % vertices;
-  runtime.state.floatingTexts = runtime.state.floatingTexts
-    .map((item) => ({ ...item, life: item.life - dt, y: item.y - dt * 26 }))
-    .filter((item) => item.life > 0);
+  if (!offlineProcessing) {
+    runtime.state.floatingTexts = runtime.state.floatingTexts
+      .map((item) => ({ ...item, life: item.life - dt, y: item.y - dt * 26 }))
+      .filter((item) => item.life > 0);
+  }
 }
 
 function runRealTimeMaintenance(realSeconds) {
@@ -788,6 +793,29 @@ function restoreOfflineTransaction(snapshot, error, retryBaseline) {
 }
 
 function yieldToEventLoop() {
+  if (typeof window.scheduler?.yield === "function") {
+    try {
+      return window.scheduler.yield();
+    } catch (error) {
+      // Fall through to the broadly supported task queues.
+    }
+  }
+  if (typeof window.MessageChannel === "function") {
+    try {
+      const channel = new window.MessageChannel();
+      const promise = new Promise((resolve) => {
+        channel.port1.onmessage = () => {
+          channel.port1.close();
+          channel.port2.close();
+          resolve();
+        };
+      });
+      channel.port2.postMessage(0);
+      return promise;
+    } catch (error) {
+      // Fall through to setTimeout when MessageChannel is unavailable.
+    }
+  }
   return new Promise((resolve) => {
     if (typeof window.setTimeout === "function") {
       window.setTimeout(resolve, 0);
@@ -797,7 +825,7 @@ function yieldToEventLoop() {
       setTimeout(resolve, 0);
       return;
     }
-    Promise.resolve().then(resolve);
+    resolve();
   });
 }
 
@@ -840,14 +868,24 @@ function setSaveConflictLock(locked) {
   });
 }
 
-function refreshOfflineReportProgress(report, before, startedAt) {
+function refreshOfflineReportProgress(
+  report,
+  before,
+  startedAt,
+  updateUi = true,
+  currentTime = monotonicClockNow(),
+) {
   const current = offlineSnapshot();
   report.infinityCountAfter = current.infinityCount;
   report.infinityPointsAfterLog10 = current.infinityPointsLog10;
   report.infiniteScoreAfterLog10 = current.infiniteScoreLog10;
   report.normalInfinityCountGain = Math.max(0, current.infinityCount - before.infinityCount);
   report.totalInfinityCountGain = report.normalInfinityCountGain + report.aggregatedInfinityCountGain;
-  report.processingMilliseconds = Math.max(0, monotonicClockNow() - startedAt);
+  const processingElapsed = currentTime - startedAt;
+  if (Number.isFinite(processingElapsed) && processingElapsed >= 0) {
+    report.processingMilliseconds = processingElapsed;
+  }
+  if (!updateUi) return;
   try {
     runtime.updateOfflineReportUi?.();
   } catch (error) {
@@ -991,26 +1029,95 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         };
         offlineProcessing = true;
         setOfflineProcessingLock(true);
+        const offlineFloatingTextSetting = runtime.state.showFloatingText;
+        runtime.state.showFloatingText = false;
         try {
+          let batchTicks = Math.min(requestedTicks, OFFLINE_PROCESS_INITIAL_BATCH_TICKS);
+          let estimatedTicksPerMs = 0;
+          let zeroClockTicksSinceYield = 0;
+          let lastBatchFinishedAt = null;
+          let budgetStartedAt = monotonicClockNow();
+          let lastProgressUiAt = budgetStartedAt;
           while (processedTicks < requestedTicks) {
-            const chunkStartedAt = monotonicClockNow();
-            const chunkEnd = Math.min(
-              requestedTicks,
-              processedTicks + OFFLINE_PROCESS_MAX_TICKS_PER_CHUNK,
+            const batchStartedAt = monotonicClockNow();
+            const remainingTicks = requestedTicks - processedTicks;
+            const clockHasNotAdvanced = lastBatchFinishedAt !== null
+              && batchStartedAt === lastBatchFinishedAt;
+            const currentBatchTicks = Math.min(
+              batchTicks,
+              remainingTicks,
+              clockHasNotAdvanced
+                ? Math.max(1, OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT - zeroClockTicksSinceYield)
+                : remainingTicks,
             );
-            do {
+            const batchEnd = processedTicks + currentBatchTicks;
+            while (processedTicks < batchEnd) {
               update(tickSeconds, true);
               processedTicks += 1;
-            } while (
-              processedTicks < chunkEnd
-              && monotonicClockNow() - chunkStartedAt < OFFLINE_PROCESS_TIME_BUDGET_MS
-            );
+            }
+            const batchFinishedAt = monotonicClockNow();
+            const batchElapsed = batchFinishedAt - batchStartedAt;
+            const validBatchElapsed = Number.isFinite(batchElapsed) && batchElapsed > 0;
+            if (validBatchElapsed) {
+              zeroClockTicksSinceYield = 0;
+              const measuredTicksPerMs = currentBatchTicks / batchElapsed;
+              if (Number.isFinite(measuredTicksPerMs) && measuredTicksPerMs > 0) {
+                estimatedTicksPerMs = estimatedTicksPerMs > 0
+                  ? estimatedTicksPerMs * 0.75 + measuredTicksPerMs * 0.25
+                  : measuredTicksPerMs;
+                const targetBatchTicks = Math.max(
+                  1,
+                  Math.round(estimatedTicksPerMs * OFFLINE_PROCESS_TARGET_BATCH_MS),
+                );
+                batchTicks = Math.max(
+                  Math.ceil(batchTicks / 2),
+                  Math.min(Math.floor(batchTicks * 2), targetBatchTicks),
+                );
+              }
+            } else if (batchElapsed === 0) {
+              zeroClockTicksSinceYield += currentBatchTicks;
+              batchTicks = Math.max(
+                1,
+                Math.min(
+                  requestedTicks - processedTicks,
+                  batchTicks * 2,
+                  Math.max(1, OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT - zeroClockTicksSinceYield),
+                ),
+              );
+            } else {
+              zeroClockTicksSinceYield = 0;
+              batchTicks = Math.max(1, Math.floor(batchTicks / 2));
+            }
+            lastBatchFinishedAt = batchFinishedAt;
             progressReport.processedTicks = processedTicks;
-            refreshOfflineReportProgress(progressReport, before, startedAt);
+            const progressElapsed = batchFinishedAt - lastProgressUiAt;
+            const zeroClockFallback = zeroClockTicksSinceYield >= OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT;
+            const shouldUpdateUi = processedTicks >= requestedTicks
+              || (Number.isFinite(progressElapsed)
+                && progressElapsed >= OFFLINE_PROCESS_PROGRESS_UPDATE_INTERVAL_MS)
+              || zeroClockFallback;
+            refreshOfflineReportProgress(
+              progressReport,
+              before,
+              startedAt,
+              shouldUpdateUi,
+              batchFinishedAt,
+            );
+            if (shouldUpdateUi) lastProgressUiAt = batchFinishedAt;
             processingMilliseconds = progressReport.processingMilliseconds;
-            if (processedTicks < requestedTicks) await yieldToEventLoop();
+            const budgetElapsed = batchFinishedAt - budgetStartedAt;
+            const shouldYield = !Number.isFinite(budgetElapsed)
+              || budgetElapsed < 0
+              || budgetElapsed >= OFFLINE_PROCESS_TIME_BUDGET_MS
+              || zeroClockFallback;
+            if (processedTicks < requestedTicks && shouldYield) {
+              await yieldToEventLoop();
+              budgetStartedAt = monotonicClockNow();
+              zeroClockTicksSinceYield = 0;
+            }
           }
         } finally {
+          runtime.state.showFloatingText = offlineFloatingTextSetting;
           setOfflineProcessingLock(false);
           offlineProcessing = false;
         }

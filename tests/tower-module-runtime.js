@@ -128,9 +128,9 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(runtime.canBuyNormalUpgrade("speed"), false, "TC1 should seal normal upgrades");
     setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
     assert.equal(runtime.sponsoredNormalUpgradeBonusLevel(), 10, "TC1 should divide IU 11-1's effective-level cap by five");
-    debug.state.scoreLog10 = 308;
+    debug.state.scoreLog10 = 1000;
     debug.state.score = Number.MAX_VALUE;
-    assert.equal(runtime.towerChallengeCanComplete(), true, "TC1 should complete at 1e308 Score");
+    assert.equal(runtime.towerChallengeCanComplete(), true, "TC1 should complete at 1e1000 Score");
     assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC1 should perform its dedicated completion reset");
     assert.equal(debug.state.completedTowerChallenges & 1, 1, "TC1 completion should persist its reward flag");
     assert.equal(debug.state.activeTowerChallenge, 0, "TC1 should stop after completion");
@@ -142,7 +142,7 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(debug.state.activeTowerChallenge, 1, "TC1 replay should become active");
     assert.equal(runtime.canBuyNormalUpgrade("speed"), false, "TC1 restrictions should apply during a replay");
     runtime.advanceOnlineTime(1 / 60);
-    debug.state.scoreLog10 = 308;
+    debug.state.scoreLog10 = 1000;
     debug.state.score = Number.MAX_VALUE;
     assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC1 replay should complete at its target");
     assert.equal(debug.state.completedTowerChallenges & 1, 1, "TC1 replay should preserve its reward flag");
@@ -168,9 +168,9 @@ async function runTowerModuleRuntimeTest() {
     debug.state.scoreLog10 = 20;
     debug.state.score = 1e20;
     assert.equal(runtime.canCoreBoost(), false, "TC2 should seal Core Boost");
-    debug.state.scoreLog10 = 1555;
+    debug.state.scoreLog10 = 3000;
     debug.state.score = Number.MAX_VALUE;
-    assert.equal(runtime.towerChallengeCanComplete(), true, "TC2 should complete at 1e1555 Score");
+    assert.equal(runtime.towerChallengeCanComplete(), true, "TC2 should complete at 1e3000 Score");
     assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC2 should use the normal Infinity completion path");
     assert.equal(debug.state.completedTowerChallenges & 2, 2, "TC2 completion should persist its reward flag");
     assert.equal(debug.state.activeTowerChallenge, 0, "TC2 should stop after completion");
@@ -179,13 +179,93 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(runtime.toggleTowerChallenge(2), true, "a cleared TC2 should be replayable");
     assert.equal(debug.state.activeTowerChallenge, 2, "TC2 replay should become active");
     runtime.advanceOnlineTime(1);
-    debug.state.scoreLog10 = 1555;
+    debug.state.scoreLog10 = 3000;
     debug.state.score = Number.MAX_VALUE;
     assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC2 replay should complete at its target");
     assert.equal(debug.state.completedTowerChallenges & 2, 2, "TC2 replay should preserve its reward flag");
     assert.equal(debug.state.infinityCount, 7, "TC2 replay should grant another normal Infinity count");
     assert.ok(runtime.currentExactInfinityPoints() > replayIpBefore, "TC2 replay should grant normal Infinity points");
     assert.ok(debug.state.fastestTowerChallengeTimes[1] > 0, "TC2 should record its clear time");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    assert.equal(runtime.towerChallengeTargetLog10(1), 1000, "TC1 should target e1000 Score");
+    assert.equal(runtime.towerChallengeTargetLog10(2), 3000, "TC2 should target e3000 Score");
+    assert.equal(runtime.towerChallengeTargetLog10(3), 5000, "TC3 should target e5000 Score");
+    assert.equal(runtime.towerChallengeImplemented(3), true, "TC3 should be implemented");
+    debug.state.infinityCount = 0;
+    assert.equal(runtime.towerChallenge3ScoreGainPower(), 0.001, "TC3 should start Score gain at ^0.001");
+    assert.equal(runtime.towerChallenge3InfinityScorePower(), 0.1, "TC3 should start Infinity Score gain at ^0.1");
+    debug.state.infinityCount = 600000;
+    assert.equal(runtime.towerChallenge3ScoreGainPower(), 0.8, "TC3 should relax Score gain to ^0.8 at 600000 Infinity");
+    assert.equal(runtime.towerChallenge3InfinityScorePower(), 0.5, "TC3 should relax Infinity Score gain to ^0.5 at 600000 Infinity");
+    debug.state.infinityCount = 1200000;
+    assert.ok(runtime.towerChallenge3ScoreGainPower() > 0.8 && runtime.towerChallenge3ScoreGainPower() < 1, "TC3 Score gain should soft-cap above 600000 Infinity");
+    assert.ok(
+      Math.abs(runtime.towerChallenge3InfinityScorePower() - (0.5 + 0.5 * 600000 / 1350000)) < 1e-12,
+      "TC3 Infinity Score gain should use the continuous 750000 post-target span",
+    );
+    debug.state.activeTowerChallenge = 3;
+    debug.state.infinityCount = 0;
+    assert.equal(runtime.finalScoreGainPower(), 0.001, "TC3 should compress active Score gain");
+    assert.equal(runtime.infiniteAngleScoreGainLog10(100), 10, "TC3 should compress generated Infinity Score");
+    debug.state.infinityCount = 600000;
+    assert.equal(runtime.finalScoreGainPower(), 0.8, "TC3 Score compression should use the relaxed power");
+    assert.equal(runtime.infiniteAngleScoreGainLog10(100), 50, "TC3 Infinity Score compression should use the relaxed power");
+    debug.state.towerFloor = 4;
+    debug.state.completedTowerChallenges = 1;
+    debug.state.infinityCount = 0;
+    const iu13 = runtime.infinityUpgradeById("13-1");
+    debug.state.infinityUpgradeMask = 1 << iu13.bit;
+    const generatedInfinityScoreLog10 = runtime.infiniteAngleScoreGainLog10(100);
+    debug.state.infiniteScoreLog10 = generatedInfinityScoreLog10;
+    debug.state.infiniteScore = 10 ** generatedInfinityScoreLog10;
+    assert.equal(generatedInfinityScoreLog10, 10, "TC3 should compress the generated Infinity Score before boost effects");
+    assert.ok(
+      Math.abs(runtime.infiniteAngleBoostLog10() - 10 * (0.5 + 0.077)) < 1e-12,
+      "TC1 and IU13-1 should apply to the generated TC3 Infinity Score in the final boost",
+    );
+    debug.state.activeTowerChallenge = 0;
+    debug.state.towerFloor = 13;
+    debug.state.completedTowerChallenges = 0;
+    debug.state.speedLevel = 100;
+    debug.state.gainLevel = 100;
+    debug.state.vertices = 103;
+    const savedPurchaseCosts = runtime.costLogs();
+    assert.equal(runtime.towerNormalUpgradeMultiplier(), 1, "uncleared TC3 should not enhance normal upgrades");
+    assert.equal(runtime.effectiveSpeedLevel(), 100, "uncleared TC3 should preserve Speed levels");
+    assert.equal(runtime.effectiveGainLevel(), 100, "uncleared TC3 should preserve Gain levels");
+    assert.equal(runtime.effectiveVertexCount(), 103, "uncleared TC3 should preserve purchased vertices");
+    debug.state.completedTowerChallenges = 4;
+    assert.ok(Math.abs(runtime.towerNormalUpgradeMultiplier() - 1.2762815625) < 1e-12, "Floor 13 should use the TC3 x1.2762815625 multiplier");
+    assert.ok(Math.abs(runtime.effectiveSpeedLevel() - 127.62815625) < 1e-12, "TC3 should scale Speed purchases without rounding");
+    assert.ok(Math.abs(runtime.effectiveGainLevel() - 127.62815625) < 1e-12, "TC3 should scale Gain purchases without rounding");
+    assert.equal(runtime.effectiveVertexCount(), 130, "TC3 should floor scaled purchased vertices while preserving the base three");
+    assert.deepEqual(runtime.costLogs(), savedPurchaseCosts, "TC3 should not change normal upgrade purchase costs");
+    const iu11 = runtime.infinityUpgradeById("11-1");
+    debug.state.infinityUpgradeMask = 1 << iu11.bit;
+    setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
+    assert.ok(Math.abs(runtime.effectiveSpeedLevel() - 177.62815625) < 1e-12, "IU11-1 should add after TC3 scales Speed purchases");
+    assert.equal(runtime.effectiveVertexCount(), 180, "IU11-1 should add after TC3 scales Vertex purchases");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    debug.state.towerFloor = 8;
+    debug.state.infinityCount = 12;
+    assert.equal(runtime.toggleTowerChallenge(3), true, "TC3 should start at Floor 8");
+    assert.equal(debug.state.activeTowerChallenge, 3, "TC3 should become active");
+    assert.equal(debug.state.infinityCount, 12, "starting TC3 should preserve Infinity count");
+    debug.state.scoreLog10 = 5000;
+    debug.state.score = Number.MAX_VALUE;
+    assert.equal(runtime.towerChallengeCanComplete(), true, "TC3 should complete at 1e5000 Score");
+    assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC3 should use the normal Infinity completion path");
+    assert.equal(debug.state.completedTowerChallenges & 4, 4, "TC3 completion should persist its reward flag");
+    assert.equal(debug.state.activeTowerChallenge, 0, "TC3 should stop after completion");
+    assert.equal(debug.state.infinityCount, 13, "TC3 should grant the normal Infinity count reward");
   }
 
   {
