@@ -54,6 +54,7 @@ let saveConflictInFlight = null;
 let simulationBatchDepth = 0;
 let simulationUiPending = false;
 let simulationSaveReason = "";
+let uiUpdateCount = 0;
 let simulationFlushActive = false;
 let simulationFlushSavePerformed = false;
 let serverClockAnchor = null;
@@ -91,10 +92,11 @@ function queueSimulationSave(reason = "auto") {
 }
 
 function batchedUpdateUi(...args) {
-  if (simulationBatchActive()) {
+  if (simulationBatchActive() || offlineProcessing) {
     simulationUiPending = true;
     return undefined;
   }
+  uiUpdateCount += 1;
   const result = baseUpdateUi(...args);
   if (runtime.saveConflictMode) setSaveConflictLock(true);
   return result;
@@ -1120,6 +1122,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           runtime.state.showFloatingText = offlineFloatingTextSetting;
           setOfflineProcessingLock(false);
           offlineProcessing = false;
+          simulationUiPending = false;
         }
       }
     }
@@ -1726,7 +1729,9 @@ window.advanceTime = (ms) => {
   drawActiveView();
 };
 window.__angleDebug = {
+  runtime,
   state: runtime.state,
+  uiUpdateCount: () => uiUpdateCount,
   addScore: runtime.addScore,
   update,
   buySpeed: runtime.buySpeed,

@@ -257,7 +257,10 @@ function processInfiniteAngleVertices(start, end) {
       earnedLog10 = runtime.combineLog10(earnedLog10, infiniteAngleScoreGainLog10(gainLog10));
     };
 
-    if (coreHits > runtime.MAX_EXACT_CORE_HITS) {
+    const maxExactCoreHits = runtime.offlineProcessing
+      ? runtime.CORE_HIT_APPROX_SEGMENTS
+      : runtime.MAX_EXACT_CORE_HITS;
+    if (coreHits > maxExactCoreHits) {
       const segmentSize = coreHits / runtime.CORE_HIT_APPROX_SEGMENTS;
       for (let segment = 0; segment < runtime.CORE_HIT_APPROX_SEGMENTS; segment += 1) {
         const midHit = (segment + 0.5) * segmentSize;
