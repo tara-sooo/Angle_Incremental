@@ -579,9 +579,14 @@ async function runTimeFluxModuleRuntimeTest() {
   const millionTickDebug = millionTickInstance.debug;
   millionTickDebug.state.offlineTickCount = millionTickRuntime.OFFLINE_PROGRESS_MAX_TICKS;
   const millionTickOriginalUpdate = millionTickRuntime.update;
+  const millionTickOriginalNow = millionTickInstance.context.performance.now;
+  const millionTickOriginalSetTimeout = millionTickInstance.context.window.setTimeout;
+  let millionTickClock = 0;
   let millionTickUpdateCalls = 0;
   let millionTickProgressUpdates = 0;
   let millionTickProgressValue = 0;
+  let millionTickUpdatesAtLastYield = 0;
+  const millionTickYieldBatches = [];
   Object.defineProperty(millionTickRuntime.elements.offlineReportProgress, "value", {
     configurable: true,
     get: () => millionTickProgressValue,
@@ -590,8 +595,19 @@ async function runTimeFluxModuleRuntimeTest() {
       millionTickProgressUpdates += 1;
     },
   });
+  millionTickInstance.context.performance.now = () => millionTickClock;
+  millionTickInstance.context.window.setTimeout = (callback) => {
+    millionTickYieldBatches.push({
+      updates: millionTickUpdateCalls - millionTickUpdatesAtLastYield,
+      end: millionTickUpdateCalls,
+    });
+    millionTickUpdatesAtLastYield = millionTickUpdateCalls;
+    callback();
+    return 0;
+  };
   millionTickRuntime.update = () => {
     millionTickUpdateCalls += 1;
+    millionTickClock += millionTickUpdateCalls < 20000 ? 0.0005 : 0.01;
   };
   try {
     const millionTickReport = await millionTickDebug.processOfflineElapsed(
@@ -601,12 +617,34 @@ async function runTimeFluxModuleRuntimeTest() {
     );
     assert.equal(millionTickReport.configuredTicks, 1000000, "offline settings should allow one million configured ticks");
     assert.equal(millionTickReport.requestedTicks, 1000000, "offline processing should request one million ticks");
-    assert.equal(millionTickReport.processedTicks, 1000000, "offline processing should not retain a hidden ten-thousand tick cap");
+    assert.equal(millionTickReport.processedTicks, 1000000, "offline processing should not retain a hidden tick cap");
     assert.equal(millionTickUpdateCalls, 1000000, "one million ticks should be simulated exactly once");
     assert.ok(millionTickProgressUpdates > 1, "large offline processing should publish incremental progress");
+    assert.ok(
+      millionTickYieldBatches.some((batch) => batch.updates > 1000),
+      "fast offline processing should grow beyond the removed fixed batch size",
+    );
+    assert.ok(
+      millionTickYieldBatches.some((batch) => batch.end >= 20000 && batch.updates < 1000),
+      "adaptive offline processing should shrink after simulated work slows down",
+    );
+    assert.ok(millionTickProgressUpdates < 1000, "offline progress DOM updates should be throttled");
   } finally {
     millionTickRuntime.update = millionTickOriginalUpdate;
+    millionTickInstance.context.performance.now = millionTickOriginalNow;
+    millionTickInstance.context.window.setTimeout = millionTickOriginalSetTimeout;
   }
+
+  const floatingTextInstance = await loadRuntime(candidatePath);
+  const floatingTextRuntime = floatingTextInstance.runtime;
+  const floatingTextState = floatingTextInstance.debug.state;
+  floatingTextState.floatingTexts = [{ life: 1, y: 10 }];
+  floatingTextRuntime.offlineProcessing = true;
+  floatingTextInstance.debug.update(1 / 60);
+  assert.equal(floatingTextState.floatingTexts[0].life, 1, "offline processing should pause Floating Text updates");
+  floatingTextRuntime.offlineProcessing = false;
+  floatingTextInstance.debug.update(1 / 60);
+  assert.ok(floatingTextState.floatingTexts[0].life < 1, "online processing should continue Floating Text updates");
 
   const reentrancyInstance = await loadRuntime(candidatePath);
   const reentrancyRuntime = reentrancyInstance.runtime;

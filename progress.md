@@ -126,6 +126,7 @@ Original prompt: では、中核ループを完成させてください
 - Prepared the 0.10.2 release candidate with asynchronous offline processing up to 1,000,000 ticks, best-rate Infinity aggregation, multi-tab save conflict recovery, and SAVE_VERSION 10 compatibility.
 - Implemented TC3 with raised TC1/TC2 targets, Infinity-count-based Score and Infinity Score compression, floor-scaled normal upgrade effects, bilingual challenge UI, and SAVE_VERSION 10 compatibility.
 - Prepared the 0.11.0 release candidate for TC3 and the updated Tower Challenge progression while keeping SAVE_VERSION 10 compatible.
+- Added adaptive offline batches for exact 1,000,000-tick processing, throttled progress rendering, and offline Floating Text suppression while keeping SAVE_VERSION 10 compatible.
 
 ## TODO
 
