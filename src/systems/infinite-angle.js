@@ -258,7 +258,7 @@ function processInfiniteAngleVertices(start, end) {
     };
 
     const maxExactCoreHits = runtime.offlineProcessing
-      ? runtime.CORE_HIT_APPROX_SEGMENTS
+      ? runtime.CORE_HIT_APPROX_SEGMENTS * 2
       : runtime.MAX_EXACT_CORE_HITS;
     if (coreHits > maxExactCoreHits) {
       const segmentSize = coreHits / runtime.CORE_HIT_APPROX_SEGMENTS;
