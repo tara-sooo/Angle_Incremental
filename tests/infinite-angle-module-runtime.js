@@ -279,6 +279,34 @@ async function runInfiniteAngleModuleRuntimeTest() {
     const { debug, runtime } = instance;
     const { state } = debug;
     state.infiniteAngleUnlocked = true;
+    state.infiniteAngleVertexLevel = 717;
+    state.infiniteAngleSpeedLevel = 302;
+    state.infiniteAngleGainLevel = 0;
+    resetInfiniteAngleState(state);
+    const coreHitsPerTick = runtime.CORE_HIT_APPROX_SEGMENTS * 2;
+    const exactWorkBudget = runtime.OFFLINE_INFINITE_ANGLE_EXACT_WORK_BUDGET;
+    const simulatedTicks = Math.ceil(exactWorkBudget / coreHitsPerTick) + 1;
+    const tickSeconds = coreHitsPerTick * runtime.infiniteAngleLapDuration();
+    runtime.offlineProcessing = true;
+    try {
+      for (let tick = 0; tick < simulatedTicks; tick += 1) {
+        debug.updateInfiniteAngle(tickSeconds);
+      }
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+    assert.equal(
+      runtime.infiniteAngleOfflineExactIterations,
+      Math.floor(exactWorkBudget / coreHitsPerTick) * coreHitsPerTick,
+      "offline IA exact iterations should stop at the total work budget",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
     state.infiniteAngleSpeedLevel = 4;
     state.infiniteAngleVertexLevel = 5;
     state.infiniteAngleGainLevel = 6;

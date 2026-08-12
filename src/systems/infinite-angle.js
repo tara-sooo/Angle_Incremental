@@ -17,6 +17,23 @@ const DEFAULT_INFINITE_ANGLE_COST_CURVE = Object.freeze({
   postLevelScale: 0.35,
 });
 let infiniteAngleCostCurve = DEFAULT_INFINITE_ANGLE_COST_CURVE;
+let offlineExactCoreHitBudgetRemaining = 0;
+let offlineExactCoreHitIterations = 0;
+
+function beginOfflineInfiniteAngleProcessing() {
+  const configuredBudget = runtime.OFFLINE_INFINITE_ANGLE_EXACT_WORK_BUDGET;
+  offlineExactCoreHitBudgetRemaining = Number.isFinite(configuredBudget)
+    ? Math.max(0, Math.floor(configuredBudget))
+    : 0;
+  offlineExactCoreHitIterations = 0;
+}
+
+function maxExactOfflineCoreHits() {
+  return Math.min(
+    runtime.CORE_HIT_APPROX_SEGMENTS * 2,
+    offlineExactCoreHitBudgetRemaining,
+  );
+}
 
 function setInfiniteAngleCostCurve(value) {
   if (!value || !Number.isFinite(value.growthPower) || !Number.isFinite(value.postLevelScale)) return;
@@ -258,7 +275,7 @@ function processInfiniteAngleVertices(start, end) {
     };
 
     const maxExactCoreHits = runtime.offlineProcessing
-      ? runtime.CORE_HIT_APPROX_SEGMENTS * 2
+      ? maxExactOfflineCoreHits()
       : runtime.MAX_EXACT_CORE_HITS;
     if (coreHits > maxExactCoreHits) {
       const segmentSize = coreHits / runtime.CORE_HIT_APPROX_SEGMENTS;
@@ -275,6 +292,10 @@ function processInfiniteAngleVertices(start, end) {
         );
       }
     } else {
+      if (runtime.offlineProcessing) {
+        offlineExactCoreHitBudgetRemaining -= coreHits;
+        offlineExactCoreHitIterations += coreHits;
+      }
       for (let hit = 0; hit < coreHits; hit += 1) {
         addCoreGain(coreOffset + 1 + hit * vertices);
       }
@@ -338,6 +359,8 @@ expose("unlockInfiniteAngle", () => unlockInfiniteAngle);
 expose("canBuyInfiniteAngleUpgrade", () => canBuyInfiniteAngleUpgrade);
 expose("buyInfiniteAngleUpgrade", () => buyInfiniteAngleUpgrade);
 expose("buyAllInfiniteAngleUpgrades", () => buyAllInfiniteAngleUpgrades);
+expose("beginOfflineInfiniteAngleProcessing", () => beginOfflineInfiniteAngleProcessing);
+expose("infiniteAngleOfflineExactIterations", () => offlineExactCoreHitIterations);
 expose("infiniteAngleBoostLog10", () => infiniteAngleBoostLog10);
 expose("infiniteAngleBoost", () => infiniteAngleBoost);
 expose("infiniteAngleScorePower", () => infiniteAngleScorePower);

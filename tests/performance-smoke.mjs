@@ -87,6 +87,12 @@ function collectBudgetViolations(report) {
       );
     }
   });
+  const infiniteAngleExactWork = report.offlineStress?.infiniteAngleExactWork;
+  if (infiniteAngleExactWork?.wallMilliseconds > budgets.offlineCoreHitWallMs) {
+    violations.push(
+      `offline Infinite Angle exact-work wall ${infiniteAngleExactWork.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineCoreHitWallMs}ms`,
+    );
+  }
   report.results.forEach((result) => {
     result.scenarios.forEach((scenario) => {
       if (scenario.angle.simulation.p95Ms > budgets.simulationP95Ms) {
@@ -329,6 +335,47 @@ try {
           };
         }
 
+        function measureInfiniteAngleExactWorkBudget() {
+          resetScenario(720);
+          state.activeChallenge = 0;
+          state.activeTowerChallenge = 0;
+          state.automationEnabled = false;
+          state.autoRunInfinity = false;
+          state.autoRunGeneration = false;
+          state.autoRunCoreBoost = false;
+          state.infinityUpgradeMask = 0;
+          state.infinityCount = 0;
+          state.infiniteAngleSpeedLevel = 302;
+          state.infiniteAngleGainLevel = 0;
+          state.infiniteAnglePointProgress = 0;
+          state.infiniteAngleTotalVertexProgress = 0;
+          state.infiniteAngleCurrentGain = 1;
+          state.infiniteAngleCurrentGainLog10 = 0;
+          state.infiniteScore = 0;
+          state.infiniteScoreLog10 = -Infinity;
+          state.offlineProgressEnabled = true;
+          state.offlineTickCount = runtime.OFFLINE_PROGRESS_MAX_TICKS;
+          const coreHitsPerTick = runtime.CORE_HIT_APPROX_SEGMENTS * 2;
+          const exactWorkBudget = runtime.OFFLINE_INFINITE_ANGLE_EXACT_WORK_BUDGET;
+          const simulatedTicks = Math.ceil(exactWorkBudget / coreHitsPerTick) + 1;
+          const tickSeconds = coreHitsPerTick * runtime.infiniteAngleLapDuration();
+          const startedAt = performance.now();
+          runtime.offlineProcessing = true;
+          try {
+            for (let tick = 0; tick < simulatedTicks; tick += 1) {
+              debug.updateInfiniteAngle(tickSeconds);
+            }
+          } finally {
+            runtime.offlineProcessing = false;
+          }
+          return {
+            exactWorkBudget,
+            exactIterations: runtime.infiniteAngleOfflineExactIterations,
+            simulatedTicks,
+            wallMilliseconds: performance.now() - startedAt,
+          };
+        }
+
         async function measureAutoInfinityStress() {
           resetScenario(3);
           state.offlineProgressEnabled = true;
@@ -501,6 +548,7 @@ try {
               angle: await measureCoreHitBoundary("angle"),
               infiniteAngle: await measureCoreHitBoundary("infiniteAngle"),
             },
+            infiniteAngleExactWork: measureInfiniteAngleExactWorkBudget(),
           };
         }
 
@@ -577,6 +625,18 @@ try {
     assert.ok(Number.isFinite(boundary.exactScoreLog10), `${track} exact boundary score should be finite`);
     assert.ok(Number.isFinite(boundary.offlineScoreLog10), `${track} offline boundary score should be finite`);
   }
+  const infiniteAngleExactWork = report.offlineStress.infiniteAngleExactWork;
+  assert.ok(infiniteAngleExactWork, "the performance smoke should measure the offline IA exact-work budget");
+  assert.ok(
+    infiniteAngleExactWork.exactIterations > 0
+      && infiniteAngleExactWork.exactIterations <= infiniteAngleExactWork.exactWorkBudget,
+    "offline IA exact work must stay within its total budget",
+  );
+  assert.ok(
+    Number.isFinite(infiniteAngleExactWork.wallMilliseconds)
+      && infiniteAngleExactWork.wallMilliseconds >= 0,
+    "offline IA exact-work measurement should report a finite duration",
+  );
   await mkdir(path.dirname(reportPath), { recursive: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
