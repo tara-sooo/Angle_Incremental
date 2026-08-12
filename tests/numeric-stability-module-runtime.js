@@ -540,10 +540,42 @@ async function runNumericStabilityModuleRuntimeTest() {
 
     const online = await runAchievementOrderingScenario(false);
     const offline = await runAchievementOrderingScenario(true);
-    assert.equal(offline.batchCalls, 0, "small offline batches should preserve per-vertex ordering");
-    assert.equal(offline.passVertexCalls, 1, "small offline batches should process the core vertex directly");
+    assert.equal(offline.batchCalls, 1, "small offline batches should use the bounded aggregate path");
+    assert.equal(offline.passVertexCalls, 0, "small offline batches should not visit every vertex");
     assert.equal(offline.achievementMask, online.achievementMask, "offline achievement unlocks should match online processing");
     assert.equal(offline.currentGainLog10, online.currentGainLog10, "offline gain should use the pre-achievement vertex multiplier");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug } = instance;
+    const { state } = debug;
+    prepareVertexScenario(instance, {
+      scoreLog10: 30,
+      currentGainLog10: 8,
+      infiniteCapBroken: true,
+    });
+    state.vertices = 720;
+    state.totalVertexProgress = 0;
+    state.pointProgress = 0;
+    runtime.checkAchievements = () => [];
+    const tickSeconds = runtime.lapDuration() * 5000 / state.vertices;
+    let passVertexCalls = 0;
+    runtime.passVertex = () => {
+      passVertexCalls += 1;
+      return false;
+    };
+    runtime.beginOfflineWorkBudget(1000);
+    runtime.offlineProcessing = true;
+    try {
+      for (let tick = 0; tick < 1000; tick += 1) debug.update(tickSeconds, true);
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+    const work = runtime.offlineWorkStats;
+    assert.equal(passVertexCalls, 0, "long direct offline ticks should not visit every vertex");
+    assert.ok(work.totalIterations <= work.hardCap, "long direct offline ticks should stay within the work budget");
+    assert.ok(work.tracks.angle.exactIterations <= runtime.OFFLINE_CORE_HIT_WORK_BUDGET, "direct offline exact work should stay bounded");
   }
 
   {

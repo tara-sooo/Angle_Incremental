@@ -116,10 +116,10 @@ function coreBatchesBetween(start, end) {
     .filter((batch) => batch.coreHits > 0);
 }
 
-function coreBatchScoreLog10(firstCoreStep, coreHits, increaseLog10) {
+function coreBatchScoreLog10(firstCoreStep, coreHits, increaseLog10, selectedPlan = null) {
   const vertices = Math.max(3, runtime.effectiveVertexCount());
   let totalLog = -Infinity;
-  const plan = runtime.offlineCoreHitPlan(
+  const plan = selectedPlan || runtime.offlineCoreHitPlan(
     "angle",
     coreHits,
     MAX_EXACT_BATCH_CORE_HITS,
@@ -265,6 +265,46 @@ function processFirstInfinityCrossingBatch(batches, increaseLog10) {
   return runtime.addScore(runtime.valueFromLog10(crossingScoreLog), crossingScoreLog);
 }
 
+function processOfflineVerticesInOrder(start, end, batches) {
+  const count = end - start + 1;
+  const vertices = Math.max(3, runtime.effectiveVertexCount());
+  const coreSteps = [];
+  batches.forEach((batch) => {
+    for (let hit = 0; hit < batch.coreHits; hit += 1) {
+      coreSteps.push(batch.firstCoreStep + hit * vertices);
+    }
+  });
+  coreSteps.sort((a, b) => a - b);
+
+  let processedSteps = 0;
+  for (const coreStep of coreSteps) {
+    addCurrentGainForVertexSteps(coreStep - processedSteps);
+    const earned = runtime.finalScoreGain();
+    if (runtime.addScore(earned, runtime.finalScoreGainLog10())) return true;
+    processedSteps = coreStep;
+  }
+  addCurrentGainForVertexSteps(count - processedSteps);
+  return false;
+}
+
+function offlineBatchesCanProcessExactly(batches) {
+  const track = runtime.offlineWorkStats?.tracks?.angle;
+  if (!track) return false;
+  const smallLimit = Math.max(0, Math.floor(runtime.OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT));
+  let smallRemaining = track.smallExactRemaining;
+  let bulkRemaining = track.bulkRemaining;
+  for (const batch of batches) {
+    if (batch.coreHits <= smallLimit && smallRemaining >= batch.coreHits) {
+      smallRemaining -= batch.coreHits;
+    } else if (bulkRemaining >= batch.coreHits) {
+      bulkRemaining -= batch.coreHits;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
 function processManyVerticesExactly(start, end) {
   const count = end - start + 1;
   if (count <= 0) return false;
@@ -274,8 +314,30 @@ function processManyVerticesExactly(start, end) {
   const batches = coreBatchesBetween(start, end);
 
   if (batches.length > 0) {
+    const plannedBatches = runtime.offlineProcessing && offlineBatchesCanProcessExactly(batches)
+      ? batches.map((batch) => ({
+        ...batch,
+        plan: runtime.offlineCoreHitPlan(
+          "angle",
+          batch.coreHits,
+          MAX_EXACT_BATCH_CORE_HITS,
+          CORE_HIT_BATCH_APPROX_SEGMENTS,
+        ),
+      }))
+      : batches;
+    if (plannedBatches !== batches && plannedBatches.every((batch) => batch.plan.mode === "exact")) {
+      return processOfflineVerticesInOrder(start, end, plannedBatches);
+    }
     const scoreLog = batches.reduce(
-      (totalLog, batch) => runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, batch.coreHits, increaseLog10)),
+      (totalLog, batch, index) => runtime.combineLog10(
+        totalLog,
+        coreBatchScoreLog10(
+          batch.firstCoreStep,
+          batch.coreHits,
+          increaseLog10,
+          plannedBatches[index]?.plan,
+        ),
+      ),
       -Infinity,
     );
     const projectedScoreLog = runtime.clampLog10(
