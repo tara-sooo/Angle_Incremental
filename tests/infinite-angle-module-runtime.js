@@ -303,6 +303,40 @@ async function runInfiniteAngleModuleRuntimeTest() {
   }
 
   {
+    const configureDirectOfflineScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 99;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+    };
+    const exactInstance = await loadRuntime(candidatePath);
+    configureDirectOfflineScenario(exactInstance);
+    const tickSeconds = 1 / 30;
+    assert.ok(
+      tickSeconds / exactInstance.runtime.infiniteAngleLapDuration() * 720
+        < exactInstance.runtime.MAX_VERTEX_STEPS_PER_FRAME,
+      "direct offline IA regression should stay below the batched vertex threshold",
+    );
+    exactInstance.debug.updateInfiniteAngle(tickSeconds);
+    const exactScoreLog10 = exactInstance.debug.state.infiniteScoreLog10;
+
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureDirectOfflineScenario(offlineInstance);
+    const report = await offlineInstance.debug.processOfflineElapsed(tickSeconds, "test", { clockSource: "server" });
+    assert.equal(report.requestedTicks, 1, "direct offline IA regression should fit in one offline tick");
+    assert.ok(
+      Math.abs(offlineInstance.debug.state.infiniteScoreLog10 - exactScoreLog10) < 1e-10,
+      "direct offline IA batches should preserve exact score results",
+    );
+    assert.ok(
+      offlineInstance.runtime.infiniteAngleOfflineExactIterations > 0,
+      "direct offline IA batches should use the budgeted processing path",
+    );
+  }
+
+  {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     const { state } = debug;

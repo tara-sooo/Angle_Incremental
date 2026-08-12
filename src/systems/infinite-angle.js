@@ -325,7 +325,7 @@ function updateInfiniteAngle(dt) {
   const start = Math.floor(previousAbsolute + runtime.VERTEX_EPSILON) + 1;
   const end = Math.floor(runtime.state.infiniteAngleTotalVertexProgress + runtime.VERTEX_EPSILON);
   const vertexSteps = end - start + 1;
-  if (vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME) {
+  if (runtime.offlineProcessing || vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME) {
     processInfiniteAngleVertices(start, end);
   } else {
     for (let vertex = start; vertex <= end; vertex += 1) {
