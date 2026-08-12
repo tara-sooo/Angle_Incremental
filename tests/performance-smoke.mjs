@@ -379,6 +379,7 @@ try {
           }
           const batched = {
             exactIterations: runtime.infiniteAngleOfflineExactIterations,
+            approximationIterations: runtime.infiniteAngleOfflineApproximationIterations,
             simulatedTicks,
             wallMilliseconds: performance.now() - startedAt,
           };
@@ -387,9 +388,11 @@ try {
           const directTickSeconds = 1 / 30;
           const directCoreHitsPerTick = Math.max(
             1,
-            Math.floor(directTickSeconds / runtime.infiniteAngleLapDuration()),
+            Math.ceil(directTickSeconds / runtime.infiniteAngleLapDuration()),
           );
-          const directSimulatedTicks = Math.ceil(exactWorkBudget / directCoreHitsPerTick) + 1;
+          const directSimulatedTicks = Math.ceil(
+            exactWorkBudget / Math.max(1, Math.floor(directTickSeconds / runtime.infiniteAngleLapDuration())),
+          ) + 1;
           const directStartedAt = performance.now();
           runtime.offlineProcessing = true;
           try {
@@ -402,10 +405,13 @@ try {
           return {
             exactWorkBudget,
             exactIterations: batched.exactIterations,
+            approximationIterations: batched.approximationIterations,
             simulatedTicks: batched.simulatedTicks,
             wallMilliseconds: batched.wallMilliseconds,
             direct: {
               exactIterations: runtime.infiniteAngleOfflineExactIterations,
+              approximationIterations: runtime.infiniteAngleOfflineApproximationIterations,
+              coreHitsPerTick: directCoreHitsPerTick,
               simulatedTicks: directSimulatedTicks,
               wallMilliseconds: performance.now() - directStartedAt,
             },
@@ -678,6 +684,12 @@ try {
     infiniteAngleExactWork.direct.exactIterations > 0
       && infiniteAngleExactWork.direct.exactIterations <= infiniteAngleExactWork.exactWorkBudget,
     "direct offline IA exact work must stay within its total budget",
+  );
+  assert.ok(
+    infiniteAngleExactWork.direct.approximationIterations > 0
+      && infiniteAngleExactWork.direct.approximationIterations
+        <= infiniteAngleExactWork.direct.simulatedTicks * infiniteAngleExactWork.direct.coreHitsPerTick,
+    "direct offline IA approximation work should scale with its small core-hit batches",
   );
   assert.ok(
     Number.isFinite(infiniteAngleExactWork.direct.wallMilliseconds)

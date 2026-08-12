@@ -19,6 +19,7 @@ const DEFAULT_INFINITE_ANGLE_COST_CURVE = Object.freeze({
 let infiniteAngleCostCurve = DEFAULT_INFINITE_ANGLE_COST_CURVE;
 let offlineExactCoreHitBudgetRemaining = 0;
 let offlineExactCoreHitIterations = 0;
+let offlineApproximationIterations = 0;
 
 function beginOfflineInfiniteAngleProcessing() {
   const configuredBudget = runtime.OFFLINE_INFINITE_ANGLE_EXACT_WORK_BUDGET;
@@ -26,6 +27,7 @@ function beginOfflineInfiniteAngleProcessing() {
     ? Math.max(0, Math.floor(configuredBudget))
     : 0;
   offlineExactCoreHitIterations = 0;
+  offlineApproximationIterations = 0;
 }
 
 function maxExactOfflineCoreHits() {
@@ -278,8 +280,10 @@ function processInfiniteAngleVertices(start, end) {
       ? maxExactOfflineCoreHits()
       : runtime.MAX_EXACT_CORE_HITS;
     if (coreHits > maxExactCoreHits) {
-      const segmentSize = coreHits / runtime.CORE_HIT_APPROX_SEGMENTS;
-      for (let segment = 0; segment < runtime.CORE_HIT_APPROX_SEGMENTS; segment += 1) {
+      const approximationSegments = Math.min(runtime.CORE_HIT_APPROX_SEGMENTS, coreHits);
+      if (runtime.offlineProcessing) offlineApproximationIterations += approximationSegments;
+      const segmentSize = coreHits / approximationSegments;
+      for (let segment = 0; segment < approximationSegments; segment += 1) {
         const midHit = (segment + 0.5) * segmentSize;
         const step = coreOffset + 1 + midHit * vertices;
         const gainLog10 = runtime.combineLog10(
@@ -361,6 +365,7 @@ expose("buyInfiniteAngleUpgrade", () => buyInfiniteAngleUpgrade);
 expose("buyAllInfiniteAngleUpgrades", () => buyAllInfiniteAngleUpgrades);
 expose("beginOfflineInfiniteAngleProcessing", () => beginOfflineInfiniteAngleProcessing);
 expose("infiniteAngleOfflineExactIterations", () => offlineExactCoreHitIterations);
+expose("infiniteAngleOfflineApproximationIterations", () => offlineApproximationIterations);
 expose("infiniteAngleBoostLog10", () => infiniteAngleBoostLog10);
 expose("infiniteAngleBoost", () => infiniteAngleBoost);
 expose("infiniteAngleScorePower", () => infiniteAngleScorePower);
