@@ -487,6 +487,66 @@ async function runNumericStabilityModuleRuntimeTest() {
   }
 
   {
+    const runAchievementOrderingScenario = async (offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      state.vertices = 3;
+      state.speedLevel = 0;
+      state.gainLevel = 0;
+      state.generationCount = 0;
+      state.coreBoostCount = 0;
+      state.infinityCount = 1;
+      state.infinityUpgradeMask = 0;
+      state.activeChallenge = 0;
+      state.activeTowerChallenge = 0;
+      state.completedChallenges = 0;
+      state.achievementMask = 0;
+      state.achievementMaskHigh = 0;
+      state.infiniteCapBroken = true;
+      state.showFloatingText = false;
+      state.lightEffects = true;
+      state.totalVertexProgress = 2;
+      state.pointProgress = 2 / 3;
+      state.lastVertexIndex = 2;
+      setLogResource(state, "score", 30);
+      setLogResource(state, "totalScore", 30);
+      setLogResource(state, "generationScore", 30);
+      setLogResource(state, "currentGain", 8);
+
+      let batchCalls = 0;
+      const baseProcessManyVertices = runtime.processManyVertices;
+      runtime.processManyVertices = (...args) => {
+        batchCalls += 1;
+        return baseProcessManyVertices(...args);
+      };
+      let passVertexCalls = 0;
+      const basePassVertex = runtime.passVertex;
+      runtime.passVertex = (...args) => {
+        passVertexCalls += 1;
+        return basePassVertex(...args);
+      };
+
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() / 3, true);
+      runtime.offlineProcessing = false;
+      return {
+        batchCalls,
+        passVertexCalls,
+        currentGainLog10: state.currentGainLog10,
+        achievementMask: state.achievementMask,
+      };
+    };
+
+    const online = await runAchievementOrderingScenario(false);
+    const offline = await runAchievementOrderingScenario(true);
+    assert.equal(offline.batchCalls, 0, "small offline batches should preserve per-vertex ordering");
+    assert.equal(offline.passVertexCalls, 1, "small offline batches should process the core vertex directly");
+    assert.equal(offline.achievementMask, online.achievementMask, "offline achievement unlocks should match online processing");
+    assert.equal(offline.currentGainLog10, online.currentGainLog10, "offline gain should use the pre-achievement vertex multiplier");
+  }
+
+  {
     const instance = await loadRuntime(candidatePath);
     const { runtime } = instance;
     const { state } = instance.debug;

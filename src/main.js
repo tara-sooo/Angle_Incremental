@@ -749,8 +749,7 @@ function update(dt, allowOffline = false) {
     : 0;
   const useOfflineApproximation = offlineProcessing
     && dt > runtime.OFFLINE_PROGRESS_APPROXIMATION_THRESHOLD_SECONDS_PER_TICK;
-  if (offlineProcessing
-    || useOfflineApproximation
+  if (useOfflineApproximation
     || vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME
     || estimatedCoreHits > runtime.MAX_CORE_HITS_PER_FRAME) {
     if (runtime.processManyVertices(start, end)) return;
