@@ -247,6 +247,96 @@ async function runInfiniteAngleModuleRuntimeTest() {
   }
 
   {
+    const configureNearApproximationScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 302;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+      state.offlineProgressEnabled = true;
+      state.offlineTickCount = 1000;
+    };
+    const exactInstance = await loadRuntime(candidatePath);
+    configureNearApproximationScenario(exactInstance);
+    const tickSeconds = 2049 * exactInstance.runtime.infiniteAngleLapDuration();
+    exactInstance.debug.updateInfiniteAngle(tickSeconds);
+    const exactScoreLog10 = exactInstance.debug.state.infiniteScoreLog10;
+
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureNearApproximationScenario(offlineInstance);
+    const report = await offlineInstance.debug.processOfflineElapsed(tickSeconds, "test", { clockSource: "server" });
+    assert.equal(report.requestedTicks, 1, "near-threshold IA batches should fit in one offline tick");
+    assert.equal(
+      offlineInstance.debug.state.infiniteScoreLog10,
+      exactScoreLog10,
+      "near-threshold offline IA batches should remain exact",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    state.infiniteAngleVertexLevel = 717;
+    state.infiniteAngleSpeedLevel = 302;
+    state.infiniteAngleGainLevel = 0;
+    resetInfiniteAngleState(state);
+    const coreHitsPerTick = runtime.CORE_HIT_APPROX_SEGMENTS * 2;
+    const exactWorkBudget = runtime.OFFLINE_INFINITE_ANGLE_EXACT_WORK_BUDGET;
+    const simulatedTicks = Math.ceil(exactWorkBudget / coreHitsPerTick) + 1;
+    const tickSeconds = coreHitsPerTick * runtime.infiniteAngleLapDuration();
+    runtime.offlineProcessing = true;
+    try {
+      for (let tick = 0; tick < simulatedTicks; tick += 1) {
+        debug.updateInfiniteAngle(tickSeconds);
+      }
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+    assert.equal(
+      runtime.infiniteAngleOfflineExactIterations,
+      Math.floor(exactWorkBudget / coreHitsPerTick) * coreHitsPerTick,
+      "offline IA exact iterations should stop at the total work budget",
+    );
+  }
+
+  {
+    const configureDirectOfflineScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 99;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+    };
+    const exactInstance = await loadRuntime(candidatePath);
+    configureDirectOfflineScenario(exactInstance);
+    const tickSeconds = 1 / 30;
+    assert.ok(
+      tickSeconds / exactInstance.runtime.infiniteAngleLapDuration() * 720
+        < exactInstance.runtime.MAX_VERTEX_STEPS_PER_FRAME,
+      "direct offline IA regression should stay below the batched vertex threshold",
+    );
+    exactInstance.debug.updateInfiniteAngle(tickSeconds);
+    const exactScoreLog10 = exactInstance.debug.state.infiniteScoreLog10;
+
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureDirectOfflineScenario(offlineInstance);
+    const report = await offlineInstance.debug.processOfflineElapsed(tickSeconds, "test", { clockSource: "server" });
+    assert.equal(report.requestedTicks, 1, "direct offline IA regression should fit in one offline tick");
+    assert.ok(
+      Math.abs(offlineInstance.debug.state.infiniteScoreLog10 - exactScoreLog10) < 1e-10,
+      "direct offline IA batches should preserve exact score results",
+    );
+    assert.ok(
+      offlineInstance.runtime.infiniteAngleOfflineExactIterations > 0,
+      "direct offline IA batches should use the budgeted processing path",
+    );
+  }
+
+  {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     const { state } = debug;

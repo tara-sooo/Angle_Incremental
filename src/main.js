@@ -54,6 +54,7 @@ let saveConflictInFlight = null;
 let simulationBatchDepth = 0;
 let simulationUiPending = false;
 let simulationSaveReason = "";
+let uiUpdateCount = 0;
 let simulationFlushActive = false;
 let simulationFlushSavePerformed = false;
 let serverClockAnchor = null;
@@ -85,16 +86,24 @@ function simulationBatchActive() {
   return simulationBatchDepth > 0;
 }
 
+function setOfflineProcessing(value) {
+  const nextValue = Boolean(value);
+  if (nextValue === offlineProcessing) return;
+  offlineProcessing = nextValue;
+  if (nextValue) runtime.beginOfflineInfiniteAngleProcessing();
+}
+
 function queueSimulationSave(reason = "auto") {
   const normalizedReason = reason === "manual" ? "manual" : "auto";
   if (!simulationSaveReason || normalizedReason === "manual") simulationSaveReason = normalizedReason;
 }
 
 function batchedUpdateUi(...args) {
-  if (simulationBatchActive()) {
+  if (simulationBatchActive() || offlineProcessing) {
     simulationUiPending = true;
     return undefined;
   }
+  uiUpdateCount += 1;
   const result = baseUpdateUi(...args);
   if (runtime.saveConflictMode) setSaveConflictLock(true);
   return result;
@@ -771,7 +780,7 @@ function restoreOfflineTransaction(snapshot, error, retryBaseline) {
   }
   normalAutobuyElapsed = snapshot.normalAutobuyElapsed;
   offlineReport = snapshot.offlineReport;
-  offlineProcessing = false;
+  setOfflineProcessing(false);
   try {
     setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
   } catch (baselineError) {
@@ -1027,7 +1036,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           aggregatedInfinityCountGain: 0,
           totalInfinityCountGain: 0,
         };
-        offlineProcessing = true;
+        setOfflineProcessing(true);
         setOfflineProcessingLock(true);
         const offlineFloatingTextSetting = runtime.state.showFloatingText;
         runtime.state.showFloatingText = false;
@@ -1119,7 +1128,8 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         } finally {
           runtime.state.showFloatingText = offlineFloatingTextSetting;
           setOfflineProcessingLock(false);
-          offlineProcessing = false;
+          setOfflineProcessing(false);
+          simulationUiPending = false;
         }
       }
     }
@@ -1682,7 +1692,7 @@ expose("renderFrameIntervalMs", () => renderFrameIntervalMs);
 expose("setRenderQualityForTest", () => setRenderQualityForTest);
 expose("offlineBaselineTimestamp", () => offlineBaselineTimestamp, (value) => { offlineBaselineTimestamp = value; });
 expose("offlineBaselineServerTimestamp", () => offlineBaselineServerTimestamp, (value) => { offlineBaselineServerTimestamp = value; });
-expose("offlineProcessing", () => offlineProcessing, (value) => { offlineProcessing = value; });
+expose("offlineProcessing", () => offlineProcessing, setOfflineProcessing);
 expose("offlineReport", () => offlineReport, (value) => { offlineReport = value; });
 expose("serverClockSource", () => serverClockSource);
 expose("serverClockAnomaly", () => serverClockAnomaly);
@@ -1726,7 +1736,9 @@ window.advanceTime = (ms) => {
   drawActiveView();
 };
 window.__angleDebug = {
+  runtime,
   state: runtime.state,
+  uiUpdateCount: () => uiUpdateCount,
   addScore: runtime.addScore,
   update,
   buySpeed: runtime.buySpeed,
