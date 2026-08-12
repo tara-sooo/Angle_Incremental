@@ -24,6 +24,7 @@ const budgets = Object.freeze({
   offlineAutoInfinityUiUpdates: 2,
   offlineCoreHitWallMs: 250,
   offlineCoreHitErrorLog10: 0.001,
+  offlineLongResumeWallMs: 120000,
 });
 const viewports = Object.freeze([
   Object.freeze({ name: "desktop", width: 1280, height: 800 }),
@@ -97,6 +98,13 @@ function collectBudgetViolations(report) {
     violations.push(
       `offline Infinite Angle direct exact-work wall ${infiniteAngleExactWork.direct.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineCoreHitWallMs}ms`,
     );
+  }
+  for (const [name, resume] of Object.entries(report.offlineStress?.longResumeWork || {})) {
+    if (resume.wallMilliseconds > budgets.offlineLongResumeWallMs) {
+      violations.push(
+        `offline ${name} long-resume wall ${resume.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineLongResumeWallMs}ms`,
+      );
+    }
   }
   report.results.forEach((result) => {
     result.scenarios.forEach((scenario) => {
@@ -364,11 +372,12 @@ try {
 
         function measureInfiniteAngleExactWorkBudget() {
           const coreHitsPerTick = runtime.CORE_HIT_APPROX_SEGMENTS * 2;
-          const exactWorkBudget = runtime.OFFLINE_INFINITE_ANGLE_EXACT_WORK_BUDGET;
+          const exactWorkBudget = runtime.OFFLINE_CORE_HIT_WORK_BUDGET;
           const simulatedTicks = Math.ceil(exactWorkBudget / coreHitsPerTick) + 1;
           configureInfiniteAngleOfflineScenario(302);
           const tickSeconds = coreHitsPerTick * runtime.infiniteAngleLapDuration();
           const startedAt = performance.now();
+          runtime.beginOfflineWorkBudget(simulatedTicks);
           runtime.offlineProcessing = true;
           try {
             for (let tick = 0; tick < simulatedTicks; tick += 1) {
@@ -380,6 +389,7 @@ try {
           const batched = {
             exactIterations: runtime.infiniteAngleOfflineExactIterations,
             approximationIterations: runtime.infiniteAngleOfflineApproximationIterations,
+            work: runtime.offlineWorkStats,
             simulatedTicks,
             wallMilliseconds: performance.now() - startedAt,
           };
@@ -394,6 +404,7 @@ try {
             exactWorkBudget / Math.max(1, Math.floor(directTickSeconds / runtime.infiniteAngleLapDuration())),
           ) + 1;
           const directStartedAt = performance.now();
+          runtime.beginOfflineWorkBudget(directSimulatedTicks);
           runtime.offlineProcessing = true;
           try {
             for (let tick = 0; tick < directSimulatedTicks; tick += 1) {
@@ -411,11 +422,75 @@ try {
             direct: {
               exactIterations: runtime.infiniteAngleOfflineExactIterations,
               approximationIterations: runtime.infiniteAngleOfflineApproximationIterations,
+              work: runtime.offlineWorkStats,
               coreHitsPerTick: directCoreHitsPerTick,
               simulatedTicks: directSimulatedTicks,
               wallMilliseconds: performance.now() - directStartedAt,
             },
           };
+        }
+
+        function configureCombinedOfflineScenario() {
+          resetScenario(720);
+          state.activeChallenge = 0;
+          state.activeTowerChallenge = 0;
+          state.automationEnabled = false;
+          state.autoRunInfinity = false;
+          state.autoRunGeneration = false;
+          state.autoRunCoreBoost = false;
+          state.autoCompleteChallenges = false;
+          state.infinityUpgradeMask = 0;
+          state.infinityCount = 1;
+          state.gainLevel = 0;
+          state.infiniteAngleGainLevel = 0;
+          state.score = 0;
+          state.scoreLog10 = -Infinity;
+          state.totalScore = 0;
+          state.totalScoreLog10 = -Infinity;
+          state.infiniteScore = 0;
+          state.infiniteScoreLog10 = -Infinity;
+          state.currentGain = 1;
+          state.currentGainLog10 = 0;
+          state.infiniteAngleCurrentGain = 1;
+          state.infiniteAngleCurrentGainLog10 = 0;
+          state.pointProgress = 0;
+          state.totalVertexProgress = 0;
+          state.infiniteAnglePointProgress = 0;
+          state.infiniteAngleTotalVertexProgress = 0;
+          state.offlineProgressEnabled = true;
+          state.offlineTickCount = runtime.OFFLINE_PROGRESS_MAX_TICKS;
+
+          const tickSeconds = 1 / 30;
+          let normalSpeed = 0;
+          let infiniteSpeed = 0;
+          for (let level = 0; level <= 500; level += 1) {
+            state.speedLevel = level;
+            if (Math.ceil(tickSeconds / runtime.lapDuration()) <= 8) normalSpeed = level;
+            state.infiniteAngleSpeedLevel = level;
+            if (Math.ceil(tickSeconds / runtime.infiniteAngleLapDuration()) <= 8) infiniteSpeed = level;
+          }
+          state.speedLevel = normalSpeed;
+          state.infiniteAngleSpeedLevel = infiniteSpeed;
+          return tickSeconds;
+        }
+
+        async function measureLongOfflineResumeWork() {
+          const requestedTicks = runtime.OFFLINE_PROGRESS_MAX_TICKS;
+          const eightTickSeconds = configureCombinedOfflineScenario();
+          const eightStartedAt = performance.now();
+          const eightReport = await debug.processOfflineElapsed(
+            eightTickSeconds * requestedTicks,
+            "performance-eight-hit-offline-work",
+            { clockSource: "server" },
+          );
+          const eight = {
+            requestedTicks: eightReport?.requestedTicks ?? 0,
+            processedTicks: eightReport?.processedTicks ?? 0,
+            precisionReduced: eightReport?.precisionReduced ?? false,
+            work: runtime.offlineWorkStats,
+            wallMilliseconds: performance.now() - eightStartedAt,
+          };
+          return { eight };
         }
 
         async function measureAutoInfinityStress() {
@@ -591,6 +666,7 @@ try {
               infiniteAngle: await measureCoreHitBoundary("infiniteAngle"),
             },
             infiniteAngleExactWork: measureInfiniteAngleExactWorkBudget(),
+            longResumeWork: await measureLongOfflineResumeWork(),
           };
         }
 
@@ -680,21 +756,49 @@ try {
     "offline IA exact-work measurement should report a finite duration",
   );
   assert.ok(infiniteAngleExactWork.direct, "the performance smoke should measure direct offline IA work");
+  const directWork = infiniteAngleExactWork.direct.work;
+  assert.ok(directWork, "direct offline IA work should expose its work ledger");
   assert.ok(
     infiniteAngleExactWork.direct.exactIterations > 0
-      && infiniteAngleExactWork.direct.exactIterations <= infiniteAngleExactWork.exactWorkBudget,
-    "direct offline IA exact work must stay within its total budget",
+      && directWork.totalIterations <= directWork.hardCap,
+    "direct offline IA exact and approximation work must stay within its total budget",
   );
   assert.ok(
     infiniteAngleExactWork.direct.approximationIterations > 0
       && infiniteAngleExactWork.direct.approximationIterations
-        <= infiniteAngleExactWork.direct.simulatedTicks * infiniteAngleExactWork.direct.coreHitsPerTick,
-    "direct offline IA approximation work should scale with its small core-hit batches",
+        <= directWork.hardCap
+      && directWork.tracks.infiniteAngle.fallbackIterations <= infiniteAngleExactWork.direct.simulatedTicks,
+    "direct offline IA approximation work should stay bounded by its batch count",
   );
   assert.ok(
     Number.isFinite(infiniteAngleExactWork.direct.wallMilliseconds)
       && infiniteAngleExactWork.direct.wallMilliseconds >= 0,
     "direct offline IA exact-work measurement should report a finite duration",
+  );
+  const longResumeWork = report.offlineStress.longResumeWork;
+  assert.ok(longResumeWork?.eight, "the performance smoke should measure long offline work budgets");
+  for (const [name, resume] of Object.entries(longResumeWork)) {
+    assert.equal(resume.requestedTicks, 1000000, `${name} long resume should request the maximum tick count`);
+    assert.equal(resume.processedTicks, 1000000, `${name} long resume should process the maximum tick count`);
+    assert.ok(resume.work.totalIterations <= resume.work.hardCap, `${name} offline work must stay within its hard cap`);
+    assert.ok(Number.isFinite(resume.wallMilliseconds), `${name} long resume should report finite wall time`);
+  }
+  assert.equal(longResumeWork.eight.precisionReduced, true, "eight-hit offline batches should report bounded approximation");
+  assert.equal(
+    longResumeWork.eight.work.precisionReduced,
+    true,
+    "eight-hit offline work should mark the report as precision-reduced after its bulk reserve",
+  );
+  assert.equal(
+    longResumeWork.eight.work.tracks.angle.approximationIterations > 0
+      && longResumeWork.eight.work.tracks.infiniteAngle.approximationIterations > 0,
+    true,
+    "eight-hit batches on both tracks should use bounded approximation after the reserve",
+  );
+  assert.ok(
+    longResumeWork.eight.work.tracks.angle.fallbackIterations <= 1000000
+      && longResumeWork.eight.work.tracks.infiniteAngle.fallbackIterations <= 1000000,
+    "eight-hit fallback work should stay bounded by the resume length",
   );
   await mkdir(path.dirname(reportPath), { recursive: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);

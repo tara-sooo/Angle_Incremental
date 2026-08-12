@@ -337,6 +337,55 @@ async function runInfiniteAngleModuleRuntimeTest() {
   }
 
   {
+    const configureHighLoadScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 302;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+    };
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureHighLoadScenario(offlineInstance);
+    const { debug, runtime } = offlineInstance;
+    const coreHitsPerTick = runtime.CORE_HIT_APPROX_SEGMENTS * 2;
+    const tickSeconds = coreHitsPerTick * runtime.infiniteAngleLapDuration();
+    runtime.offlineProcessing = true;
+    try {
+      debug.updateInfiniteAngle(tickSeconds);
+      debug.updateInfiniteAngle(tickSeconds);
+      assert.ok(
+        runtime.offlineWorkStats.tracks.infiniteAngle.bulkRemaining === 0,
+        "offline IA bulk budget should be exhausted before the reset regression",
+      );
+
+      runtime.resetBelowInfinity();
+      debug.state.infiniteAngleVertexLevel = 717;
+      debug.state.infiniteAngleSpeedLevel = 85;
+      resetInfiniteAngleState(debug.state);
+      debug.updateInfiniteAngle(1 / 30);
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+
+    const exactInstance = await loadRuntime(candidatePath);
+    exactInstance.debug.state.infiniteAngleUnlocked = true;
+    exactInstance.debug.state.infiniteAngleVertexLevel = 717;
+    exactInstance.debug.state.infiniteAngleSpeedLevel = 85;
+    resetInfiniteAngleState(exactInstance.debug.state);
+    exactInstance.debug.updateInfiniteAngle(1 / 30);
+
+    assert.ok(
+      Math.abs(debug.state.infiniteScoreLog10 - exactInstance.debug.state.infiniteScoreLog10) < 1e-10,
+      "small IA batches should remain exact after the offline budget is exhausted and Infinity reset",
+    );
+    assert.ok(
+      runtime.offlineWorkStats.tracks.infiniteAngle.smallExactIterations > 0,
+      "post-reset small IA batches should consume the small exact-work allowance",
+    );
+  }
+
+  {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     const { state } = debug;

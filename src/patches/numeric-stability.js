@@ -119,8 +119,14 @@ function coreBatchesBetween(start, end) {
 function coreBatchScoreLog10(firstCoreStep, coreHits, increaseLog10) {
   const vertices = Math.max(3, runtime.effectiveVertexCount());
   let totalLog = -Infinity;
+  const plan = runtime.offlineCoreHitPlan(
+    "angle",
+    coreHits,
+    MAX_EXACT_BATCH_CORE_HITS,
+    CORE_HIT_BATCH_APPROX_SEGMENTS,
+  );
 
-  if (coreHits <= MAX_EXACT_BATCH_CORE_HITS) {
+  if (plan.mode === "exact") {
     for (let hit = 0; hit < coreHits; hit += 1) {
       const step = firstCoreStep + hit * vertices;
       const gainLog = runtime.gainAfterIncreaseLog10FromLog(increaseLog10, step);
@@ -129,7 +135,7 @@ function coreBatchScoreLog10(firstCoreStep, coreHits, increaseLog10) {
     return totalLog;
   }
 
-  const segments = Math.min(CORE_HIT_BATCH_APPROX_SEGMENTS, coreHits);
+  const segments = plan.iterations;
   const segmentSize = coreHits / segments;
   for (let segment = 0; segment < segments; segment += 1) {
     const midHit = (segment + 0.5) * segmentSize;

@@ -64,6 +64,7 @@ let serverClockAnomaly = false;
 let localClockAnomaly = false;
 let localClockAnchor = null;
 let offlineProcessPromise = null;
+let offlineWorkLedger = null;
 const OFFLINE_PROCESS_TIME_BUDGET_MS = 8;
 const OFFLINE_PROCESS_INITIAL_BATCH_TICKS = 64;
 const OFFLINE_PROCESS_TARGET_BATCH_MS = 2;
@@ -86,11 +87,130 @@ function simulationBatchActive() {
   return simulationBatchDepth > 0;
 }
 
+function beginOfflineWorkBudget(requestedTicks = runtime.OFFLINE_PROGRESS_MAX_TICKS) {
+  const parsedTicks = Number(requestedTicks);
+  const ticks = Number.isFinite(parsedTicks)
+    ? Math.max(1, Math.min(runtime.OFFLINE_PROGRESS_MAX_TICKS, Math.floor(parsedTicks)))
+    : runtime.OFFLINE_PROGRESS_MAX_TICKS;
+  const bulkBudget = Math.max(0, Math.floor(runtime.OFFLINE_CORE_HIT_WORK_BUDGET));
+  const smallBudget = ticks * Math.max(0, Math.floor(runtime.OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT));
+  const fallbackBudget = ticks * Math.max(1, Math.floor(runtime.OFFLINE_FALLBACK_APPROX_SEGMENTS));
+  const createTrack = () => ({
+    bulkRemaining: bulkBudget,
+    smallExactRemaining: smallBudget,
+    fallbackRemaining: fallbackBudget,
+    exactIterations: 0,
+    approximationIterations: 0,
+    bulkIterations: 0,
+    smallExactIterations: 0,
+    fallbackIterations: 0,
+  });
+  offlineWorkLedger = {
+    requestedTicks: ticks,
+    hardCap: (bulkBudget + smallBudget + fallbackBudget) * 2,
+    totalIterations: 0,
+    precisionReduced: false,
+    tracks: {
+      angle: createTrack(),
+      infiniteAngle: createTrack(),
+    },
+  };
+}
+
+function consumeOfflineWork(trackName, bucket, requested, approximation = false) {
+  const track = offlineWorkLedger?.tracks?.[trackName];
+  const count = Math.max(0, Math.floor(Number(requested) || 0));
+  if (!track || count <= 0) return 0;
+  const remainingKey = bucket === "small"
+    ? "smallExactRemaining"
+    : bucket === "fallback"
+      ? "fallbackRemaining"
+      : "bulkRemaining";
+  const allowed = Math.min(count, track[remainingKey]);
+  track[remainingKey] -= allowed;
+  track[approximation ? "approximationIterations" : "exactIterations"] += allowed;
+  if (bucket === "small") track.smallExactIterations += allowed;
+  else if (bucket === "fallback") track.fallbackIterations += allowed;
+  else track.bulkIterations += allowed;
+  offlineWorkLedger.totalIterations += allowed;
+  if (approximation && allowed > 0) offlineWorkLedger.precisionReduced = true;
+  return allowed;
+}
+
+function offlineCoreHitPlan(trackName, coreHits, onlineExactLimit, onlineApproximationSegments) {
+  const hits = Math.max(0, Math.floor(Number(coreHits) || 0));
+  if (!runtime.offlineProcessing) {
+    return hits <= onlineExactLimit
+      ? { mode: "exact", iterations: hits }
+      : {
+        mode: "approximation",
+        iterations: Math.min(runtime.CORE_HIT_APPROX_SEGMENTS, onlineApproximationSegments, hits),
+      };
+  }
+  if (!offlineWorkLedger) beginOfflineWorkBudget();
+  const track = offlineWorkLedger.tracks[trackName];
+  const smallLimit = Math.max(0, Math.floor(runtime.OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT));
+  if (hits <= smallLimit && track.smallExactRemaining >= hits) {
+    consumeOfflineWork(trackName, "small", hits);
+    return { mode: "exact", iterations: hits };
+  }
+  if (hits <= track.bulkRemaining) {
+    consumeOfflineWork(trackName, "bulk", hits);
+    return { mode: "exact", iterations: hits };
+  }
+  const approximationSegments = Math.min(
+    runtime.CORE_HIT_APPROX_SEGMENTS,
+    hits,
+    track.bulkRemaining,
+  );
+  if (approximationSegments > 0) {
+    consumeOfflineWork(trackName, "bulk", approximationSegments, true);
+    return { mode: "approximation", iterations: approximationSegments };
+  }
+  const fallbackSegments = Math.min(
+    Math.max(1, Math.floor(runtime.OFFLINE_FALLBACK_APPROX_SEGMENTS)),
+    hits,
+    track.fallbackRemaining,
+  );
+  if (fallbackSegments > 0) {
+    consumeOfflineWork(trackName, "fallback", fallbackSegments, true);
+    return { mode: "approximation", iterations: fallbackSegments };
+  }
+  // The real resume loop allows one fallback batch per track per tick. This is
+  // only a defensive path for direct debug calls beyond the configured resume.
+  offlineWorkLedger.precisionReduced = true;
+  return { mode: "approximation", iterations: 1 };
+}
+
+function offlineWorkStatsSnapshot() {
+  if (!offlineWorkLedger) return null;
+  const copyTrack = (track) => ({
+    exactIterations: track.exactIterations,
+    approximationIterations: track.approximationIterations,
+    bulkIterations: track.bulkIterations,
+    smallExactIterations: track.smallExactIterations,
+    fallbackIterations: track.fallbackIterations,
+    bulkRemaining: track.bulkRemaining,
+    smallExactRemaining: track.smallExactRemaining,
+    fallbackRemaining: track.fallbackRemaining,
+  });
+  return {
+    requestedTicks: offlineWorkLedger.requestedTicks,
+    hardCap: offlineWorkLedger.hardCap,
+    totalIterations: offlineWorkLedger.totalIterations,
+    precisionReduced: offlineWorkLedger.precisionReduced,
+    tracks: {
+      angle: copyTrack(offlineWorkLedger.tracks.angle),
+      infiniteAngle: copyTrack(offlineWorkLedger.tracks.infiniteAngle),
+    },
+  };
+}
+
 function setOfflineProcessing(value) {
   const nextValue = Boolean(value);
   if (nextValue === offlineProcessing) return;
   offlineProcessing = nextValue;
-  if (nextValue) runtime.beginOfflineInfiniteAngleProcessing();
+  if (nextValue && !offlineWorkLedger) beginOfflineWorkBudget();
 }
 
 function queueSimulationSave(reason = "auto") {
@@ -629,7 +749,8 @@ function update(dt, allowOffline = false) {
     : 0;
   const useOfflineApproximation = offlineProcessing
     && dt > runtime.OFFLINE_PROGRESS_APPROXIMATION_THRESHOLD_SECONDS_PER_TICK;
-  if (useOfflineApproximation
+  if (offlineProcessing
+    || useOfflineApproximation
     || vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME
     || estimatedCoreHits > runtime.MAX_CORE_HITS_PER_FRAME) {
     if (runtime.processManyVertices(start, end)) return;
@@ -1036,6 +1157,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           aggregatedInfinityCountGain: 0,
           totalInfinityCountGain: 0,
         };
+        beginOfflineWorkBudget(requestedTicks);
         setOfflineProcessing(true);
         setOfflineProcessingLock(true);
         const offlineFloatingTextSetting = runtime.state.showFloatingText;
@@ -1064,6 +1186,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
               update(tickSeconds, true);
               processedTicks += 1;
             }
+            precisionReduced = Boolean(runtime.offlinePrecisionReduced);
             const batchFinishedAt = monotonicClockNow();
             const batchElapsed = batchFinishedAt - batchStartedAt;
             const validBatchElapsed = Number.isFinite(batchElapsed) && batchElapsed > 0;
@@ -1099,6 +1222,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             }
             lastBatchFinishedAt = batchFinishedAt;
             progressReport.processedTicks = processedTicks;
+            progressReport.precisionReduced = precisionReduced;
             const progressElapsed = batchFinishedAt - lastProgressUiAt;
             const zeroClockFallback = zeroClockTicksSinceYield >= OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT;
             const shouldUpdateUi = processedTicks >= requestedTicks
@@ -1133,6 +1257,8 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         }
       }
     }
+
+    precisionReduced = !clockAnomaly && Boolean(runtime.offlinePrecisionReduced);
 
     const normalAfter = offlineSnapshot();
     const normalInfinityCountGain = Math.max(0, normalAfter.infinityCount - before.infinityCount);
@@ -1694,6 +1820,10 @@ expose("offlineBaselineTimestamp", () => offlineBaselineTimestamp, (value) => { 
 expose("offlineBaselineServerTimestamp", () => offlineBaselineServerTimestamp, (value) => { offlineBaselineServerTimestamp = value; });
 expose("offlineProcessing", () => offlineProcessing, setOfflineProcessing);
 expose("offlineReport", () => offlineReport, (value) => { offlineReport = value; });
+expose("beginOfflineWorkBudget", () => beginOfflineWorkBudget);
+expose("offlineCoreHitPlan", () => offlineCoreHitPlan);
+expose("offlineWorkStats", () => offlineWorkStatsSnapshot());
+expose("offlinePrecisionReduced", () => Boolean(offlineWorkLedger?.precisionReduced));
 expose("serverClockSource", () => serverClockSource);
 expose("serverClockAnomaly", () => serverClockAnomaly);
 expose("serverClockAvailable", () => serverClockAvailable);
