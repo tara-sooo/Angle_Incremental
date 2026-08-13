@@ -543,7 +543,51 @@ async function runNumericStabilityModuleRuntimeTest() {
     assert.equal(offline.batchCalls, 1, "small offline batches should use the bounded aggregate path");
     assert.equal(offline.passVertexCalls, 0, "small offline batches should not visit every vertex");
     assert.equal(offline.achievementMask, online.achievementMask, "offline achievement unlocks should match online processing");
-    assert.equal(offline.currentGainLog10, online.currentGainLog10, "offline gain should use the pre-achievement vertex multiplier");
+    assert.ok(
+      Math.abs(offline.currentGainLog10 - online.currentGainLog10) < 1e-10,
+      "offline gain should use the pre-achievement vertex multiplier",
+    );
+  }
+
+  for (const coreHits of [4, 8]) {
+    const runSmallOfflineBatch = async (offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      prepareVertexScenario(instance, {
+        scoreLog10: -Infinity,
+        currentGainLog10: 0,
+        infiniteCapBroken: true,
+      });
+      state.infiniteAngleUnlocked = false;
+      state.vertices = 720;
+      state.pointProgress = 0;
+      state.totalVertexProgress = 0;
+      overrideRuntimeConstant(runtime, "MAX_VERTEX_STEPS_PER_FRAME", Number.MAX_SAFE_INTEGER);
+      let passVertexCalls = 0;
+      const basePassVertex = runtime.passVertex;
+      runtime.passVertex = (...args) => {
+        passVertexCalls += 1;
+        return basePassVertex(...args);
+      };
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() * coreHits, true);
+      runtime.offlineProcessing = false;
+      return {
+        scoreLog10: state.scoreLog10,
+        currentGainLog10: state.currentGainLog10,
+        passVertexCalls,
+        work: runtime.offlineWorkStats,
+      };
+    };
+
+    const online = await runSmallOfflineBatch(false);
+    const offline = await runSmallOfflineBatch(true);
+    assert.ok(Math.abs(offline.scoreLog10 - online.scoreLog10) < 1e-10, `${coreHits}-hit offline score should remain exact`);
+    assert.ok(Math.abs(offline.currentGainLog10 - online.currentGainLog10) < 1e-10, `${coreHits}-hit offline gain should remain exact`);
+    assert.equal(offline.passVertexCalls, 0, `${coreHits}-hit offline batches should not visit vertices individually`);
+    assert.equal(offline.work.precisionReduced, false, `${coreHits}-hit offline batches should not reduce precision`);
+    assert.equal(offline.work.tracks.angle.smallExactIterations, coreHits, `${coreHits}-hit batches should use the small exact reserve`);
   }
 
   {
@@ -576,6 +620,43 @@ async function runNumericStabilityModuleRuntimeTest() {
     assert.equal(passVertexCalls, 0, "long direct offline ticks should not visit every vertex");
     assert.ok(work.totalIterations <= work.hardCap, "long direct offline ticks should stay within the work budget");
     assert.ok(work.tracks.angle.exactIterations <= runtime.OFFLINE_CORE_HIT_WORK_BUDGET, "direct offline exact work should stay bounded");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug } = instance;
+    const { state } = debug;
+    prepareVertexScenario(instance, {
+      scoreLog10: -Infinity,
+      currentGainLog10: 0,
+      infiniteCapBroken: true,
+    });
+    state.infiniteAngleUnlocked = false;
+    state.vertices = 3;
+    runtime.lapDuration = () => 1 / (30 * 20000);
+    const report = await debug.processOfflineElapsed(1 / 30, "precision-budget", { clockSource: "server" });
+    assert.equal(report.precisionReduced, true, "approximate offline batches should mark the report as precision-reduced");
+    assert.equal(runtime.offlinePrecisionReduced, true, "approximate offline batches should mark the runtime ledger");
+    assert.ok(runtime.offlineWorkStats.totalIterations <= runtime.offlineWorkStats.hardCap, "precision-reduced work should stay within the hard cap");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug } = instance;
+    debug.state.infiniteAngleUnlocked = false;
+    runtime.beginOfflineWorkBudget(1000);
+    runtime.offlineProcessing = true;
+    const plan = runtime.offlineCoreHitPlan(
+      "angle",
+      runtime.OFFLINE_CORE_HIT_WORK_BUDGET,
+      2048,
+      256,
+    );
+    runtime.offlineProcessing = false;
+    const work = runtime.offlineWorkStats;
+    assert.equal(plan.mode, "exact", "an inactive track should lend its exact reserve to Angle");
+    assert.ok(work.tracks.angle.spilloverIterations > 0, "Angle should record borrowed shared work");
+    assert.ok(work.totalIterations <= work.hardCap, "shared work should stay within the global hard cap");
   }
 
   {

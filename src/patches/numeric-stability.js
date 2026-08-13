@@ -6,6 +6,7 @@ const MAX_GAME_VERTICES = 1_000_000_000_000;
 const MAX_EXACT_BATCH_CORE_HITS = 2048;
 const CORE_HIT_BATCH_APPROX_SEGMENTS = 256;
 const MAX_SAFE_CORE_HIT_SEARCH = Number.MAX_SAFE_INTEGER;
+const SCORE_ORDERING_ACHIEVEMENT_IDS = [7, 18, 28, 36];
 let installed = false;
 
 function clampGameLog10(value) {
@@ -287,22 +288,20 @@ function processOfflineVerticesInOrder(start, end, batches) {
   return false;
 }
 
-function offlineBatchesCanProcessExactly(batches) {
-  const track = runtime.offlineWorkStats?.tracks?.angle;
-  if (!track) return false;
-  const smallLimit = Math.max(0, Math.floor(runtime.OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT));
-  let smallRemaining = track.smallExactRemaining;
-  let bulkRemaining = track.bulkRemaining;
-  for (const batch of batches) {
-    if (batch.coreHits <= smallLimit && smallRemaining >= batch.coreHits) {
-      smallRemaining -= batch.coreHits;
-    } else if (bulkRemaining >= batch.coreHits) {
-      bulkRemaining -= batch.coreHits;
-    } else {
-      return false;
-    }
+function scoreAchievementNeedsOrderedProcessing(projectedScoreLog) {
+  if (!Array.isArray(runtime.ACHIEVEMENTS) || typeof runtime.isAchievementUnlocked !== "function") return false;
+  const currentScoreLog10 = runtime.currentScoreLog10;
+  runtime.currentScoreLog10 = () => projectedScoreLog;
+  try {
+    return SCORE_ORDERING_ACHIEVEMENT_IDS.some((id) => {
+      const achievement = runtime.ACHIEVEMENTS[id - 1];
+      return achievement
+        && !runtime.isAchievementUnlocked(id)
+        && achievement.isUnlocked();
+    });
+  } finally {
+    runtime.currentScoreLog10 = currentScoreLog10;
   }
-  return true;
 }
 
 function processManyVerticesExactly(start, end) {
@@ -314,7 +313,7 @@ function processManyVerticesExactly(start, end) {
   const batches = coreBatchesBetween(start, end);
 
   if (batches.length > 0) {
-    const plannedBatches = runtime.offlineProcessing && offlineBatchesCanProcessExactly(batches)
+    const plannedBatches = runtime.offlineProcessing && runtime.state.infinityCount > 0
       ? batches.map((batch) => ({
         ...batch,
         plan: runtime.offlineCoreHitPlan(
@@ -325,9 +324,6 @@ function processManyVerticesExactly(start, end) {
         ),
       }))
       : batches;
-    if (plannedBatches !== batches && plannedBatches.every((batch) => batch.plan.mode === "exact")) {
-      return processOfflineVerticesInOrder(start, end, plannedBatches);
-    }
     const scoreLog = batches.reduce(
       (totalLog, batch, index) => runtime.combineLog10(
         totalLog,
@@ -345,6 +341,12 @@ function processManyVerticesExactly(start, end) {
     );
     if (runtime.state.infinityCount === 0 && projectedScoreLog >= runtime.INFINITY_REQUIREMENT_LOG10) {
       return processFirstInfinityCrossingBatch(batches, increaseLog10);
+    }
+
+    if (plannedBatches !== batches
+      && plannedBatches.every((batch) => batch.plan.mode === "exact")
+      && scoreAchievementNeedsOrderedProcessing(projectedScoreLog)) {
+      return processOfflineVerticesInOrder(start, end, plannedBatches);
     }
 
     const scoreValue = runtime.valueFromLog10(scoreLog);

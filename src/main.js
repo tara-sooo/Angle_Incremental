@@ -95,26 +95,67 @@ function beginOfflineWorkBudget(requestedTicks = runtime.OFFLINE_PROGRESS_MAX_TI
   const bulkBudget = Math.max(0, Math.floor(runtime.OFFLINE_CORE_HIT_WORK_BUDGET));
   const smallBudget = ticks * Math.max(0, Math.floor(runtime.OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT));
   const fallbackBudget = ticks * Math.max(1, Math.floor(runtime.OFFLINE_FALLBACK_APPROX_SEGMENTS));
-  const createTrack = () => ({
-    bulkRemaining: bulkBudget,
-    smallExactRemaining: smallBudget,
-    fallbackRemaining: fallbackBudget,
+  // ponytail: tracks stay fixed for one resume; dynamic reserve reallocation can wait for a real need.
+  const activeTrackNames = ["angle"];
+  if (runtime.state?.infiniteAngleUnlocked) activeTrackNames.push("infiniteAngle");
+  const activeTrackCount = activeTrackNames.length;
+  const minimumReserve = (budget) => Math.floor(budget / 2);
+  const sharedBudget = {
+    bulkRemaining: bulkBudget * 2 - activeTrackNames.length * minimumReserve(bulkBudget),
+    smallExactRemaining: smallBudget * 2 - activeTrackNames.length * minimumReserve(smallBudget),
+    fallbackRemaining: fallbackBudget * 2 - activeTrackNames.length * minimumReserve(fallbackBudget),
+  };
+  const createTrack = (name) => ({
+    active: activeTrackNames.includes(name),
+    bulkRemaining: activeTrackNames.includes(name) ? minimumReserve(bulkBudget) : 0,
+    smallExactRemaining: activeTrackNames.includes(name) ? minimumReserve(smallBudget) : 0,
+    fallbackRemaining: activeTrackNames.includes(name) ? minimumReserve(fallbackBudget) : 0,
     exactIterations: 0,
     approximationIterations: 0,
     bulkIterations: 0,
     smallExactIterations: 0,
     fallbackIterations: 0,
+    spilloverIterations: 0,
   });
   offlineWorkLedger = {
     requestedTicks: ticks,
     hardCap: (bulkBudget + smallBudget + fallbackBudget) * 2,
     totalIterations: 0,
     precisionReduced: false,
+    activeTrackNames,
+    activeTrackCount,
+    shared: sharedBudget,
     tracks: {
-      angle: createTrack(),
-      infiniteAngle: createTrack(),
+      angle: createTrack("angle"),
+      infiniteAngle: createTrack("infiniteAngle"),
     },
   };
+}
+
+function sharedWorkLimit(trackName, bucket) {
+  if (!offlineWorkLedger) return 0;
+  const track = offlineWorkLedger.tracks?.[trackName];
+  if (!track?.active) return 0;
+  const remainingKey = bucket === "small"
+    ? "smallExactRemaining"
+    : bucket === "fallback"
+      ? "fallbackRemaining"
+      : "bulkRemaining";
+  const remaining = offlineWorkLedger.shared[remainingKey];
+  return offlineWorkLedger.activeTrackCount > 1
+    ? Math.ceil(remaining / offlineWorkLedger.activeTrackCount)
+    : remaining;
+}
+
+function offlineWorkAvailable(trackName, bucket) {
+  const track = offlineWorkLedger?.tracks?.[trackName];
+  if (!track) return 0;
+  const remainingKey = bucket === "small"
+    ? "smallExactRemaining"
+    : bucket === "fallback"
+      ? "fallbackRemaining"
+      : "bulkRemaining";
+  return track[remainingKey] + sharedWorkLimit(trackName, bucket);
 }
 
 function consumeOfflineWork(trackName, bucket, requested, approximation = false) {
@@ -126,12 +167,16 @@ function consumeOfflineWork(trackName, bucket, requested, approximation = false)
     : bucket === "fallback"
       ? "fallbackRemaining"
       : "bulkRemaining";
-  const allowed = Math.min(count, track[remainingKey]);
-  track[remainingKey] -= allowed;
+  const ownAllowed = Math.min(count, track[remainingKey]);
+  track[remainingKey] -= ownAllowed;
+  const sharedAllowed = Math.min(count - ownAllowed, sharedWorkLimit(trackName, bucket));
+  offlineWorkLedger.shared[remainingKey] -= sharedAllowed;
+  const allowed = ownAllowed + sharedAllowed;
   track[approximation ? "approximationIterations" : "exactIterations"] += allowed;
   if (bucket === "small") track.smallExactIterations += allowed;
   else if (bucket === "fallback") track.fallbackIterations += allowed;
   else track.bulkIterations += allowed;
+  track.spilloverIterations += sharedAllowed;
   offlineWorkLedger.totalIterations += allowed;
   if (approximation && allowed > 0) offlineWorkLedger.precisionReduced = true;
   return allowed;
@@ -150,18 +195,18 @@ function offlineCoreHitPlan(trackName, coreHits, onlineExactLimit, onlineApproxi
   if (!offlineWorkLedger) beginOfflineWorkBudget();
   const track = offlineWorkLedger.tracks[trackName];
   const smallLimit = Math.max(0, Math.floor(runtime.OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT));
-  if (hits <= smallLimit && track.smallExactRemaining >= hits) {
+  if (hits <= smallLimit && offlineWorkAvailable(trackName, "small") >= hits) {
     consumeOfflineWork(trackName, "small", hits);
     return { mode: "exact", iterations: hits };
   }
-  if (hits <= track.bulkRemaining) {
+  if (hits <= offlineWorkAvailable(trackName, "bulk")) {
     consumeOfflineWork(trackName, "bulk", hits);
     return { mode: "exact", iterations: hits };
   }
   const approximationSegments = Math.min(
     runtime.CORE_HIT_APPROX_SEGMENTS,
     hits,
-    track.bulkRemaining,
+    offlineWorkAvailable(trackName, "bulk"),
   );
   if (approximationSegments > 0) {
     consumeOfflineWork(trackName, "bulk", approximationSegments, true);
@@ -170,7 +215,7 @@ function offlineCoreHitPlan(trackName, coreHits, onlineExactLimit, onlineApproxi
   const fallbackSegments = Math.min(
     Math.max(1, Math.floor(runtime.OFFLINE_FALLBACK_APPROX_SEGMENTS)),
     hits,
-    track.fallbackRemaining,
+    offlineWorkAvailable(trackName, "fallback"),
   );
   if (fallbackSegments > 0) {
     consumeOfflineWork(trackName, "fallback", fallbackSegments, true);
@@ -185,11 +230,13 @@ function offlineCoreHitPlan(trackName, coreHits, onlineExactLimit, onlineApproxi
 function offlineWorkStatsSnapshot() {
   if (!offlineWorkLedger) return null;
   const copyTrack = (track) => ({
+    active: track.active,
     exactIterations: track.exactIterations,
     approximationIterations: track.approximationIterations,
     bulkIterations: track.bulkIterations,
     smallExactIterations: track.smallExactIterations,
     fallbackIterations: track.fallbackIterations,
+    spilloverIterations: track.spilloverIterations,
     bulkRemaining: track.bulkRemaining,
     smallExactRemaining: track.smallExactRemaining,
     fallbackRemaining: track.fallbackRemaining,
@@ -199,6 +246,8 @@ function offlineWorkStatsSnapshot() {
     hardCap: offlineWorkLedger.hardCap,
     totalIterations: offlineWorkLedger.totalIterations,
     precisionReduced: offlineWorkLedger.precisionReduced,
+    activeTrackNames: [...offlineWorkLedger.activeTrackNames],
+    shared: { ...offlineWorkLedger.shared },
     tracks: {
       angle: copyTrack(offlineWorkLedger.tracks.angle),
       infiniteAngle: copyTrack(offlineWorkLedger.tracks.infiniteAngle),

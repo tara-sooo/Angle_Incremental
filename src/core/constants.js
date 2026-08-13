@@ -47,7 +47,7 @@ const MAX_EXACT_CORE_HITS = 50000;
 const CORE_HIT_APPROX_SEGMENTS = 2048;
 // Offline work is reserved per track, then bounded again for small batches and fallbacks.
 const OFFLINE_CORE_HIT_WORK_BUDGET = CORE_HIT_APPROX_SEGMENTS * 4;
-const OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT = 4;
+const OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT = 8;
 const OFFLINE_FALLBACK_APPROX_SEGMENTS = 1;
 // Kept for runtime/debug compatibility with the previous Infinite Angle-only budget.
 const OFFLINE_INFINITE_ANGLE_EXACT_WORK_BUDGET = OFFLINE_CORE_HIT_WORK_BUDGET;

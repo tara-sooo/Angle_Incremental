@@ -361,8 +361,10 @@ async function runInfiniteAngleModuleRuntimeTest() {
 
       runtime.resetBelowInfinity();
       debug.state.infiniteAngleVertexLevel = 717;
-      debug.state.infiniteAngleSpeedLevel = 85;
+      debug.state.infiniteAngleSpeedLevel = 102;
       resetInfiniteAngleState(debug.state);
+      const postResetCoreHits = Math.floor((1 / 30) / runtime.infiniteAngleLapDuration());
+      assert.ok(postResetCoreHits >= 5 && postResetCoreHits <= 8, "post-reset regression should use a 5-8 hit IA batch");
       debug.updateInfiniteAngle(1 / 30);
     } finally {
       runtime.offlineProcessing = false;
@@ -371,7 +373,7 @@ async function runInfiniteAngleModuleRuntimeTest() {
     const exactInstance = await loadRuntime(candidatePath);
     exactInstance.debug.state.infiniteAngleUnlocked = true;
     exactInstance.debug.state.infiniteAngleVertexLevel = 717;
-    exactInstance.debug.state.infiniteAngleSpeedLevel = 85;
+    exactInstance.debug.state.infiniteAngleSpeedLevel = 102;
     resetInfiniteAngleState(exactInstance.debug.state);
     exactInstance.debug.updateInfiniteAngle(1 / 30);
 

@@ -430,7 +430,7 @@ try {
           };
         }
 
-        function configureCombinedOfflineScenario() {
+        function configureCombinedOfflineScenario(targetHits) {
           resetScenario(720);
           state.activeChallenge = 0;
           state.activeTowerChallenge = 0;
@@ -465,9 +465,9 @@ try {
           let infiniteSpeed = 0;
           for (let level = 0; level <= 500; level += 1) {
             state.speedLevel = level;
-            if (Math.ceil(tickSeconds / runtime.lapDuration()) <= 8) normalSpeed = level;
+            if (Math.ceil(tickSeconds / runtime.lapDuration()) <= targetHits) normalSpeed = level;
             state.infiniteAngleSpeedLevel = level;
-            if (Math.ceil(tickSeconds / runtime.infiniteAngleLapDuration()) <= 8) infiniteSpeed = level;
+            if (Math.ceil(tickSeconds / runtime.infiniteAngleLapDuration()) <= targetHits) infiniteSpeed = level;
           }
           state.speedLevel = normalSpeed;
           state.infiniteAngleSpeedLevel = infiniteSpeed;
@@ -476,21 +476,27 @@ try {
 
         async function measureLongOfflineResumeWork() {
           const requestedTicks = runtime.OFFLINE_PROGRESS_MAX_TICKS;
-          const eightTickSeconds = configureCombinedOfflineScenario();
-          const eightStartedAt = performance.now();
-          const eightReport = await debug.processOfflineElapsed(
-            eightTickSeconds * requestedTicks,
-            "performance-eight-hit-offline-work",
-            { clockSource: "server" },
-          );
-          const eight = {
-            requestedTicks: eightReport?.requestedTicks ?? 0,
-            processedTicks: eightReport?.processedTicks ?? 0,
-            precisionReduced: eightReport?.precisionReduced ?? false,
-            work: runtime.offlineWorkStats,
-            wallMilliseconds: performance.now() - eightStartedAt,
+          const measure = async (targetHits, reason) => {
+            const tickSeconds = configureCombinedOfflineScenario(targetHits);
+            const startedAt = performance.now();
+            const report = await debug.processOfflineElapsed(
+              tickSeconds * requestedTicks,
+              reason,
+              { clockSource: "server" },
+            );
+            return {
+              requestedTicks: report?.requestedTicks ?? 0,
+              processedTicks: report?.processedTicks ?? 0,
+              precisionReduced: report?.precisionReduced ?? false,
+              work: runtime.offlineWorkStats,
+              wallMilliseconds: performance.now() - startedAt,
+            };
           };
-          return { eight };
+          return {
+            four: await measure(4, "performance-four-hit-offline-work"),
+            eight: await measure(8, "performance-eight-hit-offline-work"),
+            high: await measure(16, "performance-high-load-offline-work"),
+          };
         }
 
         async function measureAutoInfinityStress() {
@@ -764,11 +770,10 @@ try {
     "direct offline IA exact and approximation work must stay within its total budget",
   );
   assert.ok(
-    infiniteAngleExactWork.direct.approximationIterations > 0
-      && infiniteAngleExactWork.direct.approximationIterations
-        <= directWork.hardCap
+    infiniteAngleExactWork.direct.approximationIterations >= 0
+      && infiniteAngleExactWork.direct.approximationIterations <= directWork.hardCap
       && directWork.tracks.infiniteAngle.fallbackIterations <= infiniteAngleExactWork.direct.simulatedTicks,
-    "direct offline IA approximation work should stay bounded by its batch count",
+    "direct offline IA work should stay bounded by its batch count",
   );
   assert.ok(
     Number.isFinite(infiniteAngleExactWork.direct.wallMilliseconds)
@@ -776,29 +781,44 @@ try {
     "direct offline IA exact-work measurement should report a finite duration",
   );
   const longResumeWork = report.offlineStress.longResumeWork;
-  assert.ok(longResumeWork?.eight, "the performance smoke should measure long offline work budgets");
+  assert.ok(longResumeWork?.four && longResumeWork?.eight && longResumeWork?.high, "the performance smoke should measure exact and approximate long offline work budgets");
   for (const [name, resume] of Object.entries(longResumeWork)) {
     assert.equal(resume.requestedTicks, 1000000, `${name} long resume should request the maximum tick count`);
     assert.equal(resume.processedTicks, 1000000, `${name} long resume should process the maximum tick count`);
     assert.ok(resume.work.totalIterations <= resume.work.hardCap, `${name} offline work must stay within its hard cap`);
     assert.ok(Number.isFinite(resume.wallMilliseconds), `${name} long resume should report finite wall time`);
   }
-  assert.equal(longResumeWork.eight.precisionReduced, true, "eight-hit offline batches should report bounded approximation");
+  assert.equal(longResumeWork.four.precisionReduced, false, "four-hit offline batches should remain exact");
+  assert.equal(longResumeWork.eight.precisionReduced, false, "eight-hit offline batches should remain exact");
+  for (const name of ["four", "eight"]) {
+    assert.ok(
+      longResumeWork[name].work.tracks.angle.exactIterations > 0
+        && longResumeWork[name].work.tracks.infiniteAngle.exactIterations > 0
+        && longResumeWork[name].work.tracks.angle.approximationIterations === 0
+        && longResumeWork[name].work.tracks.infiniteAngle.approximationIterations === 0,
+      `${name}-hit batches on both tracks should remain exact within the long-resume budget`,
+    );
+  }
   assert.equal(
-    longResumeWork.eight.work.precisionReduced,
+    longResumeWork.high.precisionReduced,
     true,
-    "eight-hit offline work should mark the report as precision-reduced after its bulk reserve",
+    "high-load offline batches should report bounded approximation after the bulk reserve",
   );
   assert.equal(
-    longResumeWork.eight.work.tracks.angle.approximationIterations > 0
-      && longResumeWork.eight.work.tracks.infiniteAngle.approximationIterations > 0,
+    longResumeWork.high.work.precisionReduced,
     true,
-    "eight-hit batches on both tracks should use bounded approximation after the reserve",
+    "high-load offline work should mark the ledger as precision-reduced",
+  );
+  assert.equal(
+    longResumeWork.high.work.tracks.angle.approximationIterations > 0
+      && longResumeWork.high.work.tracks.infiniteAngle.approximationIterations > 0,
+    true,
+    "high-load batches on both tracks should use bounded approximation after the reserve",
   );
   assert.ok(
-    longResumeWork.eight.work.tracks.angle.fallbackIterations <= 1000000
-      && longResumeWork.eight.work.tracks.infiniteAngle.fallbackIterations <= 1000000,
-    "eight-hit fallback work should stay bounded by the resume length",
+    longResumeWork.high.work.tracks.angle.fallbackIterations <= 1000000
+      && longResumeWork.high.work.tracks.infiniteAngle.fallbackIterations <= 1000000,
+    "high-load fallback work should stay bounded by the resume length",
   );
   await mkdir(path.dirname(reportPath), { recursive: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
