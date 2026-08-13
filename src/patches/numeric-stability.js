@@ -6,7 +6,7 @@ const MAX_GAME_VERTICES = 1_000_000_000_000;
 const MAX_EXACT_BATCH_CORE_HITS = 2048;
 const CORE_HIT_BATCH_APPROX_SEGMENTS = 256;
 const MAX_SAFE_CORE_HIT_SEARCH = Number.MAX_SAFE_INTEGER;
-const SCORE_ORDERING_ACHIEVEMENT_IDS = [7, 18, 28, 36];
+const SCORE_ORDERING_ACHIEVEMENT_IDS = [7, 18, 29, 35];
 let installed = false;
 
 function clampGameLog10(value) {
@@ -313,7 +313,7 @@ function processManyVerticesExactly(start, end) {
   const batches = coreBatchesBetween(start, end);
 
   if (batches.length > 0) {
-    const plannedBatches = runtime.offlineProcessing && runtime.state.infinityCount > 0
+    const plannedBatches = runtime.offlineProcessing
       ? batches.map((batch) => ({
         ...batch,
         plan: runtime.offlineCoreHitPlan(

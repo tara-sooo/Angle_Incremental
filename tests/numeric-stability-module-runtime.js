@@ -549,6 +549,67 @@ async function runNumericStabilityModuleRuntimeTest() {
     );
   }
 
+  {
+    const runScoreThresholdScenario = async (threshold, unlockedIds, offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      state.vertices = 3;
+      state.speedLevel = 0;
+      state.gainLevel = 0;
+      state.generationCount = 0;
+      state.coreBoostCount = 0;
+      state.infinityCount = 1;
+      state.infinityUpgradeMask = 0;
+      state.activeChallenge = 0;
+      state.activeTowerChallenge = 0;
+      state.completedChallenges = 0;
+      state.achievementMask = unlockedIds.reduce((mask, id) => mask | (1 << (id - 1)), 0) >>> 0;
+      state.achievementMaskHigh = 0;
+      state.infiniteAngleUnlocked = false;
+      state.infiniteCapBroken = true;
+      state.showFloatingText = false;
+      state.lightEffects = true;
+      state.totalVertexProgress = 2;
+      state.pointProgress = 2 / 3;
+      state.lastVertexIndex = 2;
+      setLogResource(state, "score", threshold - 0.01);
+      setLogResource(state, "totalScore", threshold - 0.01);
+      setLogResource(state, "generationScore", threshold - 0.01);
+      setLogResource(state, "currentGain", threshold);
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() / 3, true);
+      runtime.offlineProcessing = false;
+      return {
+        scoreLog10: state.scoreLog10,
+        currentGainLog10: state.currentGainLog10,
+        achievementMask: state.achievementMask,
+        achievementMaskHigh: state.achievementMaskHigh,
+      };
+    };
+
+    for (const [threshold, unlockedIds, targetId] of [
+      [30, [], 7],
+      [628, [7, 18], 29],
+      [2450, [7, 18, 29], 35],
+    ]) {
+      const online = await runScoreThresholdScenario(threshold, unlockedIds, false);
+      const offline = await runScoreThresholdScenario(threshold, unlockedIds, true);
+      assert.ok(Math.abs(offline.scoreLog10 - online.scoreLog10) < 1e-10, `e${threshold} offline score should preserve online ordering`);
+      assert.ok(Math.abs(offline.currentGainLog10 - online.currentGainLog10) < 1e-10, `e${threshold} offline gain should preserve online ordering`);
+      const targetMask = targetId <= 31
+        ? (1 << (targetId - 1))
+        : 0;
+      const targetHighMask = targetId > 31 ? (1 << (targetId - 32)) : 0;
+      assert.equal(
+        (targetId <= 31 ? offline.achievementMask : offline.achievementMaskHigh)
+          & (targetId <= 31 ? targetMask : targetHighMask),
+        targetId <= 31 ? targetMask : targetHighMask,
+        `e${threshold} should unlock achievement ${targetId}`,
+      );
+    }
+  }
+
   for (const coreHits of [4, 8]) {
     const runSmallOfflineBatch = async (offline) => {
       const instance = await loadRuntime(candidatePath);
