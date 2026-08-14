@@ -349,6 +349,77 @@ async function runNumericStabilityModuleRuntimeTest() {
   }
 
   {
+    const runFirstInfinityScenario = async (offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      prepareVertexScenario(instance, {
+        scoreLog10: 307.99,
+        currentGainLog10: 306.5,
+        infiniteCapBroken: false,
+      });
+      state.infinityCount = 0;
+      state.achievementMask = 1 << 6;
+      state.vertices = 3;
+      if (offline) runtime.beginOfflineWorkBudget(1);
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() * 6_006 / state.vertices, true);
+      runtime.offlineProcessing = false;
+      return {
+        infinityCount: state.infinityCount,
+        scoreLog10: state.lastInfinityRuns[0]?.scoreLog10,
+        ipGain: state.lastInfinityRuns[0]?.ipGain,
+        work: runtime.offlineWorkStats,
+      };
+    };
+
+    const online = await runFirstInfinityScenario(false);
+    const offline = await runFirstInfinityScenario(true);
+    assert.equal(offline.infinityCount, online.infinityCount, "offline first Infinity should cross at the same point");
+    assertClose(offline.scoreLog10, online.scoreLog10, 1e-10, "offline first Infinity crossing score");
+    assert.equal(offline.ipGain, online.ipGain, "offline first Infinity IP gain should match online processing");
+    assert.equal(offline.work.precisionReduced, false, "offline first Infinity probes should remain exact");
+    assert.equal(offline.work.totalIterations, 2_002, "first Infinity probes must not consume additional offline work");
+  }
+
+  {
+    const runCombinedThresholdScenario = async (offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      prepareVertexScenario(instance, {
+        scoreLog10: 29.99,
+        currentGainLog10: 309,
+        infiniteCapBroken: true,
+      });
+      state.infinityCount = 0;
+      state.vertices = 3;
+      state.totalVertexProgress = 2;
+      state.pointProgress = 2 / 3;
+      state.lastVertexIndex = 2;
+      if (offline) runtime.beginOfflineWorkBudget(1);
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() / 3, true);
+      runtime.offlineProcessing = false;
+      return {
+        infinityCount: state.infinityCount,
+        scoreLog10: state.lastInfinityRuns[0]?.scoreLog10,
+        ipGain: state.lastInfinityRuns[0]?.ipGain,
+        achievementMask: state.achievementMask,
+        work: runtime.offlineWorkStats,
+      };
+    };
+
+    const online = await runCombinedThresholdScenario(false);
+    const offline = await runCombinedThresholdScenario(true);
+    assert.equal(offline.infinityCount, online.infinityCount, "combined threshold processing should reach Infinity once");
+    assertClose(offline.scoreLog10, online.scoreLog10, 1e-10, "combined e30/e308 crossing score");
+    assert.equal(offline.ipGain, online.ipGain, "combined e30/e308 crossing IP gain");
+    assert.equal(offline.achievementMask, online.achievementMask, "e30 should unlock before first Infinity reset");
+    assert.equal(offline.work.precisionReduced, false, "combined threshold processing should remain exact");
+  }
+
+  {
     const exact = await simulateVertexSteps({
       targetVertexSteps: 6_006,
       batch: false,
@@ -484,6 +555,241 @@ async function runNumericStabilityModuleRuntimeTest() {
       gainProjectionCalls <= 2000,
       `e308 first-Infinity crossing search must stay bounded; got ${gainProjectionCalls} gain projections`,
     );
+  }
+
+  {
+    const runAchievementOrderingScenario = async (offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      state.vertices = 3;
+      state.speedLevel = 0;
+      state.gainLevel = 0;
+      state.generationCount = 0;
+      state.coreBoostCount = 0;
+      state.infinityCount = 1;
+      state.infinityUpgradeMask = 0;
+      state.activeChallenge = 0;
+      state.activeTowerChallenge = 0;
+      state.completedChallenges = 0;
+      state.achievementMask = 0;
+      state.achievementMaskHigh = 0;
+      state.infiniteCapBroken = true;
+      state.showFloatingText = false;
+      state.lightEffects = true;
+      state.totalVertexProgress = 2;
+      state.pointProgress = 2 / 3;
+      state.lastVertexIndex = 2;
+      setLogResource(state, "score", 30);
+      setLogResource(state, "totalScore", 30);
+      setLogResource(state, "generationScore", 30);
+      setLogResource(state, "currentGain", 8);
+
+      let batchCalls = 0;
+      const baseProcessManyVertices = runtime.processManyVertices;
+      runtime.processManyVertices = (...args) => {
+        batchCalls += 1;
+        return baseProcessManyVertices(...args);
+      };
+      let passVertexCalls = 0;
+      const basePassVertex = runtime.passVertex;
+      runtime.passVertex = (...args) => {
+        passVertexCalls += 1;
+        return basePassVertex(...args);
+      };
+
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() / 3, true);
+      runtime.offlineProcessing = false;
+      return {
+        batchCalls,
+        passVertexCalls,
+        currentGainLog10: state.currentGainLog10,
+        achievementMask: state.achievementMask,
+      };
+    };
+
+    const online = await runAchievementOrderingScenario(false);
+    const offline = await runAchievementOrderingScenario(true);
+    assert.equal(offline.batchCalls, 1, "small offline batches should use the bounded aggregate path");
+    assert.equal(offline.passVertexCalls, 0, "small offline batches should not visit every vertex");
+    assert.equal(offline.achievementMask, online.achievementMask, "offline achievement unlocks should match online processing");
+    assert.ok(
+      Math.abs(offline.currentGainLog10 - online.currentGainLog10) < 1e-10,
+      "offline gain should use the pre-achievement vertex multiplier",
+    );
+  }
+
+  {
+    const runScoreThresholdScenario = async (threshold, unlockedIds, offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      state.vertices = 3;
+      state.speedLevel = 0;
+      state.gainLevel = 0;
+      state.generationCount = 0;
+      state.coreBoostCount = 0;
+      state.infinityCount = 1;
+      state.infinityUpgradeMask = 0;
+      state.activeChallenge = 0;
+      state.activeTowerChallenge = 0;
+      state.completedChallenges = 0;
+      state.achievementMask = unlockedIds.reduce((mask, id) => mask | (1 << (id - 1)), 0) >>> 0;
+      state.achievementMaskHigh = 0;
+      state.infiniteAngleUnlocked = false;
+      state.infiniteCapBroken = true;
+      state.showFloatingText = false;
+      state.lightEffects = true;
+      state.totalVertexProgress = 2;
+      state.pointProgress = 2 / 3;
+      state.lastVertexIndex = 2;
+      setLogResource(state, "score", threshold - 0.01);
+      setLogResource(state, "totalScore", threshold - 0.01);
+      setLogResource(state, "generationScore", threshold - 0.01);
+      setLogResource(state, "currentGain", threshold);
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() / 3, true);
+      runtime.offlineProcessing = false;
+      return {
+        scoreLog10: state.scoreLog10,
+        currentGainLog10: state.currentGainLog10,
+        achievementMask: state.achievementMask,
+        achievementMaskHigh: state.achievementMaskHigh,
+      };
+    };
+
+    for (const [threshold, unlockedIds, targetId] of [
+      [30, [], 7],
+      [314, [7], 18],
+      [628, [7, 18], 29],
+      [2450, [7, 18, 29], 35],
+    ]) {
+      const online = await runScoreThresholdScenario(threshold, unlockedIds, false);
+      const offline = await runScoreThresholdScenario(threshold, unlockedIds, true);
+      assert.ok(Math.abs(offline.scoreLog10 - online.scoreLog10) < 1e-10, `e${threshold} offline score should preserve online ordering`);
+      assert.ok(Math.abs(offline.currentGainLog10 - online.currentGainLog10) < 1e-10, `e${threshold} offline gain should preserve online ordering`);
+      const targetMask = targetId <= 31
+        ? (1 << (targetId - 1))
+        : 0;
+      const targetHighMask = targetId > 31 ? (1 << (targetId - 32)) : 0;
+      assert.equal(
+        (targetId <= 31 ? offline.achievementMask : offline.achievementMaskHigh)
+          & (targetId <= 31 ? targetMask : targetHighMask),
+        targetId <= 31 ? targetMask : targetHighMask,
+        `e${threshold} should unlock achievement ${targetId}`,
+      );
+    }
+  }
+
+  for (const coreHits of [4, 8]) {
+    const runSmallOfflineBatch = async (offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      prepareVertexScenario(instance, {
+        scoreLog10: -Infinity,
+        currentGainLog10: 0,
+        infiniteCapBroken: true,
+      });
+      state.infiniteAngleUnlocked = false;
+      state.vertices = 720;
+      state.pointProgress = 0;
+      state.totalVertexProgress = 0;
+      overrideRuntimeConstant(runtime, "MAX_VERTEX_STEPS_PER_FRAME", Number.MAX_SAFE_INTEGER);
+      let passVertexCalls = 0;
+      const basePassVertex = runtime.passVertex;
+      runtime.passVertex = (...args) => {
+        passVertexCalls += 1;
+        return basePassVertex(...args);
+      };
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() * coreHits, true);
+      runtime.offlineProcessing = false;
+      return {
+        scoreLog10: state.scoreLog10,
+        currentGainLog10: state.currentGainLog10,
+        passVertexCalls,
+        work: runtime.offlineWorkStats,
+      };
+    };
+
+    const online = await runSmallOfflineBatch(false);
+    const offline = await runSmallOfflineBatch(true);
+    assert.ok(Math.abs(offline.scoreLog10 - online.scoreLog10) < 1e-10, `${coreHits}-hit offline score should remain exact`);
+    assert.ok(Math.abs(offline.currentGainLog10 - online.currentGainLog10) < 1e-10, `${coreHits}-hit offline gain should remain exact`);
+    assert.equal(offline.passVertexCalls, 0, `${coreHits}-hit offline batches should not visit vertices individually`);
+    assert.equal(offline.work.precisionReduced, false, `${coreHits}-hit offline batches should not reduce precision`);
+    assert.equal(offline.work.tracks.angle.smallExactIterations, coreHits, `${coreHits}-hit batches should use the small exact reserve`);
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug } = instance;
+    const { state } = debug;
+    prepareVertexScenario(instance, {
+      scoreLog10: 30,
+      currentGainLog10: 8,
+      infiniteCapBroken: true,
+    });
+    state.vertices = 720;
+    state.totalVertexProgress = 0;
+    state.pointProgress = 0;
+    runtime.checkAchievements = () => [];
+    const tickSeconds = runtime.lapDuration() * 5000 / state.vertices;
+    let passVertexCalls = 0;
+    runtime.passVertex = () => {
+      passVertexCalls += 1;
+      return false;
+    };
+    runtime.beginOfflineWorkBudget(1000);
+    runtime.offlineProcessing = true;
+    try {
+      for (let tick = 0; tick < 1000; tick += 1) debug.update(tickSeconds, true);
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+    const work = runtime.offlineWorkStats;
+    assert.equal(passVertexCalls, 0, "long direct offline ticks should not visit every vertex");
+    assert.ok(work.totalIterations <= work.hardCap, "long direct offline ticks should stay within the work budget");
+    assert.ok(work.tracks.angle.exactIterations <= runtime.OFFLINE_CORE_HIT_WORK_BUDGET, "direct offline exact work should stay bounded");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug } = instance;
+    const { state } = debug;
+    prepareVertexScenario(instance, {
+      scoreLog10: -Infinity,
+      currentGainLog10: 0,
+      infiniteCapBroken: true,
+    });
+    state.infiniteAngleUnlocked = false;
+    state.vertices = 3;
+    runtime.lapDuration = () => 1 / (30 * 20000);
+    const report = await debug.processOfflineElapsed(1 / 30, "precision-budget", { clockSource: "server" });
+    assert.equal(report.precisionReduced, true, "approximate offline batches should mark the report as precision-reduced");
+    assert.equal(runtime.offlinePrecisionReduced, true, "approximate offline batches should mark the runtime ledger");
+    assert.ok(runtime.offlineWorkStats.totalIterations <= runtime.offlineWorkStats.hardCap, "precision-reduced work should stay within the hard cap");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug } = instance;
+    debug.state.infiniteAngleUnlocked = false;
+    runtime.beginOfflineWorkBudget(1000);
+    runtime.offlineProcessing = true;
+    const plan = runtime.offlineCoreHitPlan(
+      "angle",
+      runtime.OFFLINE_CORE_HIT_WORK_BUDGET,
+      2048,
+      256,
+    );
+    runtime.offlineProcessing = false;
+    const work = runtime.offlineWorkStats;
+    assert.equal(plan.mode, "exact", "an inactive track should lend its exact reserve to Angle");
+    assert.ok(work.tracks.angle.spilloverIterations > 0, "Angle should record borrowed shared work");
+    assert.ok(work.totalIterations <= work.hardCap, "shared work should stay within the global hard cap");
   }
 
   {

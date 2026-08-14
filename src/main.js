@@ -54,6 +54,7 @@ let saveConflictInFlight = null;
 let simulationBatchDepth = 0;
 let simulationUiPending = false;
 let simulationSaveReason = "";
+let uiUpdateCount = 0;
 let simulationFlushActive = false;
 let simulationFlushSavePerformed = false;
 let serverClockAnchor = null;
@@ -63,6 +64,7 @@ let serverClockAnomaly = false;
 let localClockAnomaly = false;
 let localClockAnchor = null;
 let offlineProcessPromise = null;
+let offlineWorkLedger = null;
 const OFFLINE_PROCESS_TIME_BUDGET_MS = 8;
 const OFFLINE_PROCESS_INITIAL_BATCH_TICKS = 64;
 const OFFLINE_PROCESS_TARGET_BATCH_MS = 2;
@@ -85,16 +87,192 @@ function simulationBatchActive() {
   return simulationBatchDepth > 0;
 }
 
+function beginOfflineWorkBudget(requestedTicks = runtime.OFFLINE_PROGRESS_MAX_TICKS) {
+  const parsedTicks = Number(requestedTicks);
+  const ticks = Number.isFinite(parsedTicks)
+    ? Math.max(1, Math.min(runtime.OFFLINE_PROGRESS_MAX_TICKS, Math.floor(parsedTicks)))
+    : runtime.OFFLINE_PROGRESS_MAX_TICKS;
+  const bulkBudget = Math.max(0, Math.floor(runtime.OFFLINE_CORE_HIT_WORK_BUDGET));
+  const smallBudget = ticks * Math.max(0, Math.floor(runtime.OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT));
+  const fallbackBudget = ticks * Math.max(1, Math.floor(runtime.OFFLINE_FALLBACK_APPROX_SEGMENTS));
+  // ponytail: tracks stay fixed for one resume; dynamic reserve reallocation can wait for a real need.
+  const activeTrackNames = ["angle"];
+  if (runtime.state?.infiniteAngleUnlocked) activeTrackNames.push("infiniteAngle");
+  const activeTrackCount = activeTrackNames.length;
+  const minimumReserve = (budget) => Math.floor(budget / 2);
+  const sharedBudget = {
+    bulkRemaining: bulkBudget * 2 - activeTrackNames.length * minimumReserve(bulkBudget),
+    smallExactRemaining: smallBudget * 2 - activeTrackNames.length * minimumReserve(smallBudget),
+    fallbackRemaining: fallbackBudget * 2 - activeTrackNames.length * minimumReserve(fallbackBudget),
+  };
+  const createTrack = (name) => ({
+    active: activeTrackNames.includes(name),
+    bulkRemaining: activeTrackNames.includes(name) ? minimumReserve(bulkBudget) : 0,
+    smallExactRemaining: activeTrackNames.includes(name) ? minimumReserve(smallBudget) : 0,
+    fallbackRemaining: activeTrackNames.includes(name) ? minimumReserve(fallbackBudget) : 0,
+    exactIterations: 0,
+    approximationIterations: 0,
+    bulkIterations: 0,
+    smallExactIterations: 0,
+    fallbackIterations: 0,
+    spilloverIterations: 0,
+  });
+  offlineWorkLedger = {
+    requestedTicks: ticks,
+    hardCap: (bulkBudget + smallBudget + fallbackBudget) * 2,
+    totalIterations: 0,
+    precisionReduced: false,
+    activeTrackNames,
+    activeTrackCount,
+    shared: sharedBudget,
+    tracks: {
+      angle: createTrack("angle"),
+      infiniteAngle: createTrack("infiniteAngle"),
+    },
+  };
+}
+
+function sharedWorkLimit(trackName, bucket) {
+  if (!offlineWorkLedger) return 0;
+  const track = offlineWorkLedger.tracks?.[trackName];
+  if (!track?.active) return 0;
+  const remainingKey = bucket === "small"
+    ? "smallExactRemaining"
+    : bucket === "fallback"
+      ? "fallbackRemaining"
+      : "bulkRemaining";
+  const remaining = offlineWorkLedger.shared[remainingKey];
+  return offlineWorkLedger.activeTrackCount > 1
+    ? Math.ceil(remaining / offlineWorkLedger.activeTrackCount)
+    : remaining;
+}
+
+function offlineWorkAvailable(trackName, bucket) {
+  const track = offlineWorkLedger?.tracks?.[trackName];
+  if (!track) return 0;
+  const remainingKey = bucket === "small"
+    ? "smallExactRemaining"
+    : bucket === "fallback"
+      ? "fallbackRemaining"
+      : "bulkRemaining";
+  return track[remainingKey] + sharedWorkLimit(trackName, bucket);
+}
+
+function consumeOfflineWork(trackName, bucket, requested, approximation = false) {
+  const track = offlineWorkLedger?.tracks?.[trackName];
+  const count = Math.max(0, Math.floor(Number(requested) || 0));
+  if (!track || count <= 0) return 0;
+  const remainingKey = bucket === "small"
+    ? "smallExactRemaining"
+    : bucket === "fallback"
+      ? "fallbackRemaining"
+      : "bulkRemaining";
+  const ownAllowed = Math.min(count, track[remainingKey]);
+  track[remainingKey] -= ownAllowed;
+  const sharedAllowed = Math.min(count - ownAllowed, sharedWorkLimit(trackName, bucket));
+  offlineWorkLedger.shared[remainingKey] -= sharedAllowed;
+  const allowed = ownAllowed + sharedAllowed;
+  track[approximation ? "approximationIterations" : "exactIterations"] += allowed;
+  if (bucket === "small") track.smallExactIterations += allowed;
+  else if (bucket === "fallback") track.fallbackIterations += allowed;
+  else track.bulkIterations += allowed;
+  track.spilloverIterations += sharedAllowed;
+  offlineWorkLedger.totalIterations += allowed;
+  if (approximation && allowed > 0) offlineWorkLedger.precisionReduced = true;
+  return allowed;
+}
+
+function offlineCoreHitPlan(trackName, coreHits, onlineExactLimit, onlineApproximationSegments) {
+  const hits = Math.max(0, Math.floor(Number(coreHits) || 0));
+  if (!runtime.offlineProcessing) {
+    return hits <= onlineExactLimit
+      ? { mode: "exact", iterations: hits }
+      : {
+        mode: "approximation",
+        iterations: Math.min(runtime.CORE_HIT_APPROX_SEGMENTS, onlineApproximationSegments, hits),
+      };
+  }
+  if (!offlineWorkLedger) beginOfflineWorkBudget();
+  const track = offlineWorkLedger.tracks[trackName];
+  const smallLimit = Math.max(0, Math.floor(runtime.OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT));
+  if (hits <= smallLimit && offlineWorkAvailable(trackName, "small") >= hits) {
+    consumeOfflineWork(trackName, "small", hits);
+    return { mode: "exact", iterations: hits };
+  }
+  if (hits <= offlineWorkAvailable(trackName, "bulk")) {
+    consumeOfflineWork(trackName, "bulk", hits);
+    return { mode: "exact", iterations: hits };
+  }
+  const approximationSegments = Math.min(
+    runtime.CORE_HIT_APPROX_SEGMENTS,
+    hits,
+    offlineWorkAvailable(trackName, "bulk"),
+  );
+  if (approximationSegments > 0) {
+    consumeOfflineWork(trackName, "bulk", approximationSegments, true);
+    return { mode: "approximation", iterations: approximationSegments };
+  }
+  const fallbackSegments = Math.min(
+    Math.max(1, Math.floor(runtime.OFFLINE_FALLBACK_APPROX_SEGMENTS)),
+    hits,
+    offlineWorkAvailable(trackName, "fallback"),
+  );
+  if (fallbackSegments > 0) {
+    consumeOfflineWork(trackName, "fallback", fallbackSegments, true);
+    return { mode: "approximation", iterations: fallbackSegments };
+  }
+  // The real resume loop allows one fallback batch per track per tick. This is
+  // only a defensive path for direct debug calls beyond the configured resume.
+  offlineWorkLedger.precisionReduced = true;
+  return { mode: "approximation", iterations: 1 };
+}
+
+function offlineWorkStatsSnapshot() {
+  if (!offlineWorkLedger) return null;
+  const copyTrack = (track) => ({
+    active: track.active,
+    exactIterations: track.exactIterations,
+    approximationIterations: track.approximationIterations,
+    bulkIterations: track.bulkIterations,
+    smallExactIterations: track.smallExactIterations,
+    fallbackIterations: track.fallbackIterations,
+    spilloverIterations: track.spilloverIterations,
+    bulkRemaining: track.bulkRemaining,
+    smallExactRemaining: track.smallExactRemaining,
+    fallbackRemaining: track.fallbackRemaining,
+  });
+  return {
+    requestedTicks: offlineWorkLedger.requestedTicks,
+    hardCap: offlineWorkLedger.hardCap,
+    totalIterations: offlineWorkLedger.totalIterations,
+    precisionReduced: offlineWorkLedger.precisionReduced,
+    activeTrackNames: [...offlineWorkLedger.activeTrackNames],
+    shared: { ...offlineWorkLedger.shared },
+    tracks: {
+      angle: copyTrack(offlineWorkLedger.tracks.angle),
+      infiniteAngle: copyTrack(offlineWorkLedger.tracks.infiniteAngle),
+    },
+  };
+}
+
+function setOfflineProcessing(value) {
+  const nextValue = Boolean(value);
+  if (nextValue === offlineProcessing) return;
+  offlineProcessing = nextValue;
+  if (nextValue && !offlineWorkLedger) beginOfflineWorkBudget();
+}
+
 function queueSimulationSave(reason = "auto") {
   const normalizedReason = reason === "manual" ? "manual" : "auto";
   if (!simulationSaveReason || normalizedReason === "manual") simulationSaveReason = normalizedReason;
 }
 
 function batchedUpdateUi(...args) {
-  if (simulationBatchActive()) {
+  if (simulationBatchActive() || offlineProcessing) {
     simulationUiPending = true;
     return undefined;
   }
+  uiUpdateCount += 1;
   const result = baseUpdateUi(...args);
   if (runtime.saveConflictMode) setSaveConflictLock(true);
   return result;
@@ -620,7 +798,8 @@ function update(dt, allowOffline = false) {
     : 0;
   const useOfflineApproximation = offlineProcessing
     && dt > runtime.OFFLINE_PROGRESS_APPROXIMATION_THRESHOLD_SECONDS_PER_TICK;
-  if (useOfflineApproximation
+  if (offlineProcessing
+    || useOfflineApproximation
     || vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME
     || estimatedCoreHits > runtime.MAX_CORE_HITS_PER_FRAME) {
     if (runtime.processManyVertices(start, end)) return;
@@ -771,7 +950,7 @@ function restoreOfflineTransaction(snapshot, error, retryBaseline) {
   }
   normalAutobuyElapsed = snapshot.normalAutobuyElapsed;
   offlineReport = snapshot.offlineReport;
-  offlineProcessing = false;
+  setOfflineProcessing(false);
   try {
     setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
   } catch (baselineError) {
@@ -1027,7 +1206,8 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           aggregatedInfinityCountGain: 0,
           totalInfinityCountGain: 0,
         };
-        offlineProcessing = true;
+        beginOfflineWorkBudget(requestedTicks);
+        setOfflineProcessing(true);
         setOfflineProcessingLock(true);
         const offlineFloatingTextSetting = runtime.state.showFloatingText;
         runtime.state.showFloatingText = false;
@@ -1055,6 +1235,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
               update(tickSeconds, true);
               processedTicks += 1;
             }
+            precisionReduced = Boolean(runtime.offlinePrecisionReduced);
             const batchFinishedAt = monotonicClockNow();
             const batchElapsed = batchFinishedAt - batchStartedAt;
             const validBatchElapsed = Number.isFinite(batchElapsed) && batchElapsed > 0;
@@ -1090,6 +1271,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             }
             lastBatchFinishedAt = batchFinishedAt;
             progressReport.processedTicks = processedTicks;
+            progressReport.precisionReduced = precisionReduced;
             const progressElapsed = batchFinishedAt - lastProgressUiAt;
             const zeroClockFallback = zeroClockTicksSinceYield >= OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT;
             const shouldUpdateUi = processedTicks >= requestedTicks
@@ -1119,10 +1301,13 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         } finally {
           runtime.state.showFloatingText = offlineFloatingTextSetting;
           setOfflineProcessingLock(false);
-          offlineProcessing = false;
+          setOfflineProcessing(false);
+          simulationUiPending = false;
         }
       }
     }
+
+    precisionReduced = !clockAnomaly && Boolean(runtime.offlinePrecisionReduced);
 
     const normalAfter = offlineSnapshot();
     const normalInfinityCountGain = Math.max(0, normalAfter.infinityCount - before.infinityCount);
@@ -1682,8 +1867,12 @@ expose("renderFrameIntervalMs", () => renderFrameIntervalMs);
 expose("setRenderQualityForTest", () => setRenderQualityForTest);
 expose("offlineBaselineTimestamp", () => offlineBaselineTimestamp, (value) => { offlineBaselineTimestamp = value; });
 expose("offlineBaselineServerTimestamp", () => offlineBaselineServerTimestamp, (value) => { offlineBaselineServerTimestamp = value; });
-expose("offlineProcessing", () => offlineProcessing, (value) => { offlineProcessing = value; });
+expose("offlineProcessing", () => offlineProcessing, setOfflineProcessing);
 expose("offlineReport", () => offlineReport, (value) => { offlineReport = value; });
+expose("beginOfflineWorkBudget", () => beginOfflineWorkBudget);
+expose("offlineCoreHitPlan", () => offlineCoreHitPlan);
+expose("offlineWorkStats", () => offlineWorkStatsSnapshot());
+expose("offlinePrecisionReduced", () => Boolean(offlineWorkLedger?.precisionReduced));
 expose("serverClockSource", () => serverClockSource);
 expose("serverClockAnomaly", () => serverClockAnomaly);
 expose("serverClockAvailable", () => serverClockAvailable);
@@ -1726,7 +1915,9 @@ window.advanceTime = (ms) => {
   drawActiveView();
 };
 window.__angleDebug = {
+  runtime,
   state: runtime.state,
+  uiUpdateCount: () => uiUpdateCount,
   addScore: runtime.addScore,
   update,
   buySpeed: runtime.buySpeed,

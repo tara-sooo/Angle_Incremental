@@ -247,6 +247,147 @@ async function runInfiniteAngleModuleRuntimeTest() {
   }
 
   {
+    const configureNearApproximationScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 302;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+      state.offlineProgressEnabled = true;
+      state.offlineTickCount = 1000;
+    };
+    const exactInstance = await loadRuntime(candidatePath);
+    configureNearApproximationScenario(exactInstance);
+    const tickSeconds = 2049 * exactInstance.runtime.infiniteAngleLapDuration();
+    exactInstance.debug.updateInfiniteAngle(tickSeconds);
+    const exactScoreLog10 = exactInstance.debug.state.infiniteScoreLog10;
+
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureNearApproximationScenario(offlineInstance);
+    const report = await offlineInstance.debug.processOfflineElapsed(tickSeconds, "test", { clockSource: "server" });
+    assert.equal(report.requestedTicks, 1, "near-threshold IA batches should fit in one offline tick");
+    assert.equal(
+      offlineInstance.debug.state.infiniteScoreLog10,
+      exactScoreLog10,
+      "near-threshold offline IA batches should remain exact",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    state.infiniteAngleVertexLevel = 717;
+    state.infiniteAngleSpeedLevel = 302;
+    state.infiniteAngleGainLevel = 0;
+    resetInfiniteAngleState(state);
+    const coreHitsPerTick = runtime.CORE_HIT_APPROX_SEGMENTS * 2;
+    const exactWorkBudget = runtime.OFFLINE_INFINITE_ANGLE_EXACT_WORK_BUDGET;
+    const simulatedTicks = Math.ceil(exactWorkBudget / coreHitsPerTick) + 1;
+    const tickSeconds = coreHitsPerTick * runtime.infiniteAngleLapDuration();
+    runtime.offlineProcessing = true;
+    try {
+      for (let tick = 0; tick < simulatedTicks; tick += 1) {
+        debug.updateInfiniteAngle(tickSeconds);
+      }
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+    assert.equal(
+      runtime.infiniteAngleOfflineExactIterations,
+      Math.floor(exactWorkBudget / coreHitsPerTick) * coreHitsPerTick,
+      "offline IA exact iterations should stop at the total work budget",
+    );
+  }
+
+  {
+    const configureDirectOfflineScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 99;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+    };
+    const exactInstance = await loadRuntime(candidatePath);
+    configureDirectOfflineScenario(exactInstance);
+    const tickSeconds = 1 / 30;
+    assert.ok(
+      tickSeconds / exactInstance.runtime.infiniteAngleLapDuration() * 720
+        < exactInstance.runtime.MAX_VERTEX_STEPS_PER_FRAME,
+      "direct offline IA regression should stay below the batched vertex threshold",
+    );
+    exactInstance.debug.updateInfiniteAngle(tickSeconds);
+    const exactScoreLog10 = exactInstance.debug.state.infiniteScoreLog10;
+
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureDirectOfflineScenario(offlineInstance);
+    const report = await offlineInstance.debug.processOfflineElapsed(tickSeconds, "test", { clockSource: "server" });
+    assert.equal(report.requestedTicks, 1, "direct offline IA regression should fit in one offline tick");
+    assert.ok(
+      Math.abs(offlineInstance.debug.state.infiniteScoreLog10 - exactScoreLog10) < 1e-10,
+      "direct offline IA batches should preserve exact score results",
+    );
+    assert.ok(
+      offlineInstance.runtime.infiniteAngleOfflineExactIterations > 0,
+      "direct offline IA batches should use the budgeted processing path",
+    );
+  }
+
+  {
+    const configureHighLoadScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 302;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+    };
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureHighLoadScenario(offlineInstance);
+    const { debug, runtime } = offlineInstance;
+    const coreHitsPerTick = runtime.CORE_HIT_APPROX_SEGMENTS * 2;
+    const tickSeconds = coreHitsPerTick * runtime.infiniteAngleLapDuration();
+    runtime.offlineProcessing = true;
+    try {
+      debug.updateInfiniteAngle(tickSeconds);
+      debug.updateInfiniteAngle(tickSeconds);
+      assert.ok(
+        runtime.offlineWorkStats.tracks.infiniteAngle.bulkRemaining === 0,
+        "offline IA bulk budget should be exhausted before the reset regression",
+      );
+
+      runtime.resetBelowInfinity();
+      debug.state.infiniteAngleVertexLevel = 717;
+      debug.state.infiniteAngleSpeedLevel = 102;
+      resetInfiniteAngleState(debug.state);
+      const postResetCoreHits = Math.floor((1 / 30) / runtime.infiniteAngleLapDuration());
+      assert.ok(postResetCoreHits >= 5 && postResetCoreHits <= 8, "post-reset regression should use a 5-8 hit IA batch");
+      debug.updateInfiniteAngle(1 / 30);
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+
+    const exactInstance = await loadRuntime(candidatePath);
+    exactInstance.debug.state.infiniteAngleUnlocked = true;
+    exactInstance.debug.state.infiniteAngleVertexLevel = 717;
+    exactInstance.debug.state.infiniteAngleSpeedLevel = 102;
+    resetInfiniteAngleState(exactInstance.debug.state);
+    exactInstance.debug.updateInfiniteAngle(1 / 30);
+
+    assert.ok(
+      Math.abs(debug.state.infiniteScoreLog10 - exactInstance.debug.state.infiniteScoreLog10) < 1e-10,
+      "small IA batches should remain exact after the offline budget is exhausted and Infinity reset",
+    );
+    assert.ok(
+      runtime.offlineWorkStats.tracks.infiniteAngle.smallExactIterations > 0,
+      "post-reset small IA batches should consume the small exact-work allowance",
+    );
+  }
+
+  {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     const { state } = debug;

@@ -6,6 +6,7 @@ const MAX_GAME_VERTICES = 1_000_000_000_000;
 const MAX_EXACT_BATCH_CORE_HITS = 2048;
 const CORE_HIT_BATCH_APPROX_SEGMENTS = 256;
 const MAX_SAFE_CORE_HIT_SEARCH = Number.MAX_SAFE_INTEGER;
+const SCORE_ORDERING_ACHIEVEMENT_IDS = [7, 18, 29, 35];
 let installed = false;
 
 function clampGameLog10(value) {
@@ -116,11 +117,17 @@ function coreBatchesBetween(start, end) {
     .filter((batch) => batch.coreHits > 0);
 }
 
-function coreBatchScoreLog10(firstCoreStep, coreHits, increaseLog10) {
+function coreBatchScoreLog10(firstCoreStep, coreHits, increaseLog10, selectedPlan = null) {
   const vertices = Math.max(3, runtime.effectiveVertexCount());
   let totalLog = -Infinity;
+  const plan = selectedPlan || runtime.offlineCoreHitPlan(
+    "angle",
+    coreHits,
+    MAX_EXACT_BATCH_CORE_HITS,
+    CORE_HIT_BATCH_APPROX_SEGMENTS,
+  );
 
-  if (coreHits <= MAX_EXACT_BATCH_CORE_HITS) {
+  if (plan.mode === "exact") {
     for (let hit = 0; hit < coreHits; hit += 1) {
       const step = firstCoreStep + hit * vertices;
       const gainLog = runtime.gainAfterIncreaseLog10FromLog(increaseLog10, step);
@@ -129,7 +136,7 @@ function coreBatchScoreLog10(firstCoreStep, coreHits, increaseLog10) {
     return totalLog;
   }
 
-  const segments = Math.min(CORE_HIT_BATCH_APPROX_SEGMENTS, coreHits);
+  const segments = plan.iterations;
   const segmentSize = coreHits / segments;
   for (let segment = 0; segment < segments; segment += 1) {
     const midHit = (segment + 0.5) * segmentSize;
@@ -179,30 +186,43 @@ function coreStepForChronologicalHit(batches, hitIndex) {
   return step;
 }
 
-function coreScoreLogForFirstHits(batches, hitLimit, increaseLog10) {
+function coreScoreLogForFirstHits(batches, hitLimit, increaseLog10, plannedBatches = null) {
   const cutoffStep = coreStepForChronologicalHit(batches, hitLimit);
   if (cutoffStep === null) return -Infinity;
   const vertices = Math.max(3, runtime.effectiveVertexCount());
 
-  return batches.reduce((totalLog, batch) => {
+  return batches.reduce((totalLog, batch, index) => {
     const hits = coreHitsThroughStep(batch, cutoffStep, vertices);
     if (hits <= 0) return totalLog;
-    return runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, hits, increaseLog10));
+    return runtime.combineLog10(
+      totalLog,
+      coreBatchScoreLog10(
+        batch.firstCoreStep,
+        hits,
+        increaseLog10,
+        plannedBatches?.[index]?.plan || null,
+      ),
+    );
   }, -Infinity);
 }
 
-function projectedScoreLogAfterCoreHits(batches, hitLimit, increaseLog10) {
-  const scoreLog = coreScoreLogForFirstHits(batches, hitLimit, increaseLog10);
+function projectedScoreLogAfterCoreHits(batches, hitLimit, increaseLog10, plannedBatches = null) {
+  const scoreLog = coreScoreLogForFirstHits(batches, hitLimit, increaseLog10, plannedBatches);
   return runtime.clampLog10(
     runtime.applyInfinitySoftcap(runtime.combineLog10(runtime.currentScoreLog10(), scoreLog)),
   );
 }
 
-function firstInfinityCrossingCoreHit(batches, increaseLog10) {
+function firstInfinityCrossingCoreHit(batches, increaseLog10, plannedBatches = null) {
   const maxHit = totalCoreHitsInBatches(batches);
   let low = 1;
   let high = 1;
-  while (high < maxHit && projectedScoreLogAfterCoreHits(batches, high, increaseLog10) < runtime.INFINITY_REQUIREMENT_LOG10) {
+  while (high < maxHit && projectedScoreLogAfterCoreHits(
+    batches,
+    high,
+    increaseLog10,
+    plannedBatches,
+  ) < runtime.INFINITY_REQUIREMENT_LOG10) {
     low = high + 1;
     high = Math.min(maxHit, high * 2);
   }
@@ -211,11 +231,26 @@ function firstInfinityCrossingCoreHit(batches, increaseLog10) {
   while (low <= high) {
     const mid = low + Math.floor((high - low) / 2);
     if (mid === low || mid === high) {
-      if (projectedScoreLogAfterCoreHits(batches, low, increaseLog10) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = low;
-      else if (projectedScoreLogAfterCoreHits(batches, high, increaseLog10) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = high;
+      if (projectedScoreLogAfterCoreHits(
+        batches,
+        low,
+        increaseLog10,
+        plannedBatches,
+      ) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = low;
+      else if (projectedScoreLogAfterCoreHits(
+        batches,
+        high,
+        increaseLog10,
+        plannedBatches,
+      ) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = high;
       break;
     }
-    if (projectedScoreLogAfterCoreHits(batches, mid, increaseLog10) >= runtime.INFINITY_REQUIREMENT_LOG10) {
+    if (projectedScoreLogAfterCoreHits(
+      batches,
+      mid,
+      increaseLog10,
+      plannedBatches,
+    ) >= runtime.INFINITY_REQUIREMENT_LOG10) {
       crossingHit = mid;
       high = mid - 1;
     } else {
@@ -240,15 +275,20 @@ function addFirstInfinityThresholdScore() {
   return runtime.addScore(runtime.valueFromLog10(requiredScoreLog), requiredScoreLog);
 }
 
-function processFirstInfinityCrossingBatch(batches, increaseLog10) {
+function processFirstInfinityCrossingBatch(batches, increaseLog10, plannedBatches = null) {
   if (firstInfinityCrossingExceedsSafeHitCount(batches)) {
     return addFirstInfinityThresholdScore();
   }
 
-  const crossing = firstInfinityCrossingCoreHit(batches, increaseLog10);
+  const crossing = firstInfinityCrossingCoreHit(batches, increaseLog10, plannedBatches);
   if (!crossing || crossing.step === null) return false;
 
-  const previousCoreScoreLog = coreScoreLogForFirstHits(batches, crossing.hit - 1, increaseLog10);
+  const previousCoreScoreLog = coreScoreLogForFirstHits(
+    batches,
+    crossing.hit - 1,
+    increaseLog10,
+    plannedBatches,
+  );
   if (previousCoreScoreLog > -Infinity) {
     const resetBeforeCrossing = runtime.addScore(runtime.valueFromLog10(previousCoreScoreLog), previousCoreScoreLog);
     if (resetBeforeCrossing) return true;
@@ -257,6 +297,44 @@ function processFirstInfinityCrossingBatch(batches, increaseLog10) {
   addCurrentGainForVertexSteps(crossing.step);
   const crossingScoreLog = runtime.finalScoreGainFromBaseLog10(runtime.currentGainLog10());
   return runtime.addScore(runtime.valueFromLog10(crossingScoreLog), crossingScoreLog);
+}
+
+function processOfflineVerticesInOrder(start, end, batches) {
+  const count = end - start + 1;
+  const vertices = Math.max(3, runtime.effectiveVertexCount());
+  const coreSteps = [];
+  batches.forEach((batch) => {
+    for (let hit = 0; hit < batch.coreHits; hit += 1) {
+      coreSteps.push(batch.firstCoreStep + hit * vertices);
+    }
+  });
+  coreSteps.sort((a, b) => a - b);
+
+  let processedSteps = 0;
+  for (const coreStep of coreSteps) {
+    addCurrentGainForVertexSteps(coreStep - processedSteps);
+    const earned = runtime.finalScoreGain();
+    if (runtime.addScore(earned, runtime.finalScoreGainLog10())) return true;
+    processedSteps = coreStep;
+  }
+  addCurrentGainForVertexSteps(count - processedSteps);
+  return false;
+}
+
+function scoreAchievementNeedsOrderedProcessing(projectedScoreLog) {
+  if (!Array.isArray(runtime.ACHIEVEMENTS) || typeof runtime.isAchievementUnlocked !== "function") return false;
+  const currentScoreLog10 = runtime.currentScoreLog10;
+  runtime.currentScoreLog10 = () => projectedScoreLog;
+  try {
+    return SCORE_ORDERING_ACHIEVEMENT_IDS.some((id) => {
+      const achievement = runtime.ACHIEVEMENTS[id - 1];
+      return achievement
+        && !runtime.isAchievementUnlocked(id)
+        && achievement.isUnlocked();
+    });
+  } finally {
+    runtime.currentScoreLog10 = currentScoreLog10;
+  }
 }
 
 function processManyVerticesExactly(start, end) {
@@ -268,15 +346,40 @@ function processManyVerticesExactly(start, end) {
   const batches = coreBatchesBetween(start, end);
 
   if (batches.length > 0) {
+    const plannedBatches = runtime.offlineProcessing
+      ? batches.map((batch) => ({
+        ...batch,
+        plan: runtime.offlineCoreHitPlan(
+          "angle",
+          batch.coreHits,
+          MAX_EXACT_BATCH_CORE_HITS,
+          CORE_HIT_BATCH_APPROX_SEGMENTS,
+        ),
+      }))
+      : batches;
     const scoreLog = batches.reduce(
-      (totalLog, batch) => runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, batch.coreHits, increaseLog10)),
+      (totalLog, batch, index) => runtime.combineLog10(
+        totalLog,
+        coreBatchScoreLog10(
+          batch.firstCoreStep,
+          batch.coreHits,
+          increaseLog10,
+          plannedBatches[index]?.plan,
+        ),
+      ),
       -Infinity,
     );
     const projectedScoreLog = runtime.clampLog10(
       runtime.applyInfinitySoftcap(runtime.combineLog10(runtime.currentScoreLog10(), scoreLog)),
     );
+    if (plannedBatches !== batches
+      && plannedBatches.every((batch) => batch.plan.mode === "exact")
+      && scoreAchievementNeedsOrderedProcessing(projectedScoreLog)) {
+      return processOfflineVerticesInOrder(start, end, plannedBatches);
+    }
+
     if (runtime.state.infinityCount === 0 && projectedScoreLog >= runtime.INFINITY_REQUIREMENT_LOG10) {
-      return processFirstInfinityCrossingBatch(batches, increaseLog10);
+      return processFirstInfinityCrossingBatch(batches, increaseLog10, plannedBatches);
     }
 
     const scoreValue = runtime.valueFromLog10(scoreLog);

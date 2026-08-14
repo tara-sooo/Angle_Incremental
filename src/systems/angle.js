@@ -259,11 +259,17 @@ function isCoreVertex(index) {
 
 function sumCoreHitGainsFromLog10(firstCoreStep, coreHits, increaseLog10) {
   const stride = runtime.effectiveVertexCount();
+  const plan = runtime.offlineCoreHitPlan(
+    "angle",
+    coreHits,
+    runtime.MAX_EXACT_CORE_HITS,
+    runtime.CORE_HIT_APPROX_SEGMENTS,
+  );
 
-  if (coreHits > runtime.MAX_EXACT_CORE_HITS) {
+  if (plan.mode === "approximation") {
     let earned = 0;
-    const segmentSize = coreHits / runtime.CORE_HIT_APPROX_SEGMENTS;
-    for (let segment = 0; segment < runtime.CORE_HIT_APPROX_SEGMENTS; segment += 1) {
+    const segmentSize = coreHits / plan.iterations;
+    for (let segment = 0; segment < plan.iterations; segment += 1) {
       const midHit = (segment + 0.5) * segmentSize;
       const stepAtMid = firstCoreStep + midHit * stride;
       const gainLog = gainAfterIncreaseLog10FromLog(increaseLog10, stepAtMid);

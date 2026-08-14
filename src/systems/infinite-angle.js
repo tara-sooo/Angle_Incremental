@@ -257,9 +257,16 @@ function processInfiniteAngleVertices(start, end) {
       earnedLog10 = runtime.combineLog10(earnedLog10, infiniteAngleScoreGainLog10(gainLog10));
     };
 
-    if (coreHits > runtime.MAX_EXACT_CORE_HITS) {
-      const segmentSize = coreHits / runtime.CORE_HIT_APPROX_SEGMENTS;
-      for (let segment = 0; segment < runtime.CORE_HIT_APPROX_SEGMENTS; segment += 1) {
+    const plan = runtime.offlineCoreHitPlan(
+      "infiniteAngle",
+      coreHits,
+      runtime.MAX_EXACT_CORE_HITS,
+      runtime.CORE_HIT_APPROX_SEGMENTS,
+    );
+    if (plan.mode === "approximation") {
+      const approximationSegments = plan.iterations;
+      const segmentSize = coreHits / approximationSegments;
+      for (let segment = 0; segment < approximationSegments; segment += 1) {
         const midHit = (segment + 0.5) * segmentSize;
         const step = coreOffset + 1 + midHit * vertices;
         const gainLog10 = runtime.combineLog10(
@@ -301,7 +308,7 @@ function updateInfiniteAngle(dt) {
   const start = Math.floor(previousAbsolute + runtime.VERTEX_EPSILON) + 1;
   const end = Math.floor(runtime.state.infiniteAngleTotalVertexProgress + runtime.VERTEX_EPSILON);
   const vertexSteps = end - start + 1;
-  if (vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME) {
+  if (runtime.offlineProcessing || vertexSteps > runtime.MAX_VERTEX_STEPS_PER_FRAME) {
     processInfiniteAngleVertices(start, end);
   } else {
     for (let vertex = start; vertex <= end; vertex += 1) {
@@ -335,6 +342,8 @@ expose("unlockInfiniteAngle", () => unlockInfiniteAngle);
 expose("canBuyInfiniteAngleUpgrade", () => canBuyInfiniteAngleUpgrade);
 expose("buyInfiniteAngleUpgrade", () => buyInfiniteAngleUpgrade);
 expose("buyAllInfiniteAngleUpgrades", () => buyAllInfiniteAngleUpgrades);
+expose("infiniteAngleOfflineExactIterations", () => runtime.offlineWorkStats?.tracks?.infiniteAngle?.exactIterations ?? 0);
+expose("infiniteAngleOfflineApproximationIterations", () => runtime.offlineWorkStats?.tracks?.infiniteAngle?.approximationIterations ?? 0);
 expose("infiniteAngleBoostLog10", () => infiniteAngleBoostLog10);
 expose("infiniteAngleBoost", () => infiniteAngleBoost);
 expose("infiniteAngleScorePower", () => infiniteAngleScorePower);

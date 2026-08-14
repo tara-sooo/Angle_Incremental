@@ -1,6 +1,6 @@
 # Angle Incremental 開発仕様書
 
-対象リリース: **0.11.0**
+対象リリース: **0.11.1**
 
 この文書は、現行公開版のゲーム仕様と実装基準をまとめる。プレイヤー向けの遊び方は [angle-incremental-guide.md](angle-incremental-guide.md) を参照する。
 
@@ -597,7 +597,7 @@ major.minor.patch
 - `APP_VERSION`: 公開アプリのバージョン。`version.json` の `appVersion` と一致させる。
 - `SAVE_VERSION`: セーブデータの移行が必要な場合に上げる保存形式バージョン。
 
-0.11.0では、`APP_VERSION = 0.11.0`、`SAVE_VERSION = 10` とする。TC1とTC2の目標を更新し、TC3を追加する。TC3ではInfinity回数に応じてScoreとInfinity Scoreの獲得制約を緩和し、クリア後はFloor 8以降の通常強化の有効購入数を強化する。最大1,000,000ティックのオフライン進行、条件を満たす自動Infinityの高速周回集約、複数タブのセーブ競合復旧、既存セーブの形式、Time Flux関連の休眠フィールド、オフライン進行のサーバー時刻優先とローカル時刻フォールバックは維持する。
+0.11.1では、`APP_VERSION = 0.11.1`、`SAVE_VERSION = 10` とする。0.11.0のTC3とTower進行を維持し、オフライン進行を最大1,000,000ティックの非同期チャンクで処理する。Auto InfinityのUI更新を抑制し、Normal AngleとInfinite Angleのcore-hit処理には負荷上限と近似処理を適用する。既存セーブの形式、Time Flux関連の休眠フィールド、オフライン進行のサーバー時刻優先とローカル時刻フォールバックは維持する。
 
 ブラウザのキャッシュ対策として、CSS/JSのURLにはアプリバージョンのクエリを付ける。起動中クライアントは `version.json` を定期確認し、新しい `appVersion` を検出したら保存してリロードを促す。
 
