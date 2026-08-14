@@ -63,3 +63,9 @@ Pull requests should include a concise summary, verification steps, screenshots 
 ## Agent-Specific Instructions
 
 Before editing, check `git status --short --branch`. Do not overwrite user changes. Prefer `rg` for searches. Use `apply_patch` for manual edits. If changing UI or gameplay, run the relevant browser verification and inspect screenshots before finalizing.
+
+## IDD Workflow
+
+This project uses Issue-Driven Development (IDD) with explicit issue targets. Start with [docs/idd-workflow.md](docs/idd-workflow.md) for the cross-agent entry path and phase routing.
+
+Before starting IDD work, open `.github/instructions/idd-overview-core.instructions.md`. Open the routed phase file manually when the current step changes. Repository-specific policy is recorded in [docs/idd-policy.md](docs/idd-policy.md).
