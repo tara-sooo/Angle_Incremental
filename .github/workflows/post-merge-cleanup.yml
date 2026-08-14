@@ -4,12 +4,12 @@
 # future edit to this file must preserve them:
 #   - No unreviewed PR-head content is ever checked out: the sole
 #     `actions/checkout` step below checks out the trusted base branch for
-#     pull-request events and the selected merged PR's merge SHA (falling
-#     back to its base ref) for manual runs. Because the job only proceeds
-#     when `merged == true`, that SHA is the repository's recorded merge
-#     result, never the PR's own head SHA or content that has not already
-#     passed through the merge decision. Release and hotfix PRs therefore
-#     keep their legitimate `main` base, while normal PRs use `next`.
+#     pull-request events and the selected merged PR's current base branch
+#     for manual runs. The PR metadata is used only to verify the target is
+#     merged and to select `next` or `main`; cleanup helpers and config are
+#     always loaded from that branch's current tip, never the historical PR
+#     merge tree. Release and hotfix PRs therefore keep their legitimate
+#     `main` base, while normal PRs use `next`.
 #   - No PR-head code, workflow, or action is ever executed; nothing from
 #     the PR diff ever runs. Under `vendored-node` and `package-manager`,
 #     the cleanup-audit invocation names only a script or package this
@@ -111,14 +111,16 @@ jobs:
             echo "::error::PR #${PR_NUMBER} has no base ref; refusing cleanup"
             exit 1
           fi
-          MERGE_SHA=$(printf '%s' "$PR_JSON" | jq -r '.merge_commit_sha // empty')
-          CHECKOUT_REF="$BASE_REF"
-          if printf '%s' "$MERGE_SHA" | grep -Eq '^[0-9a-fA-F]{40}$'; then
-            CHECKOUT_REF="$MERGE_SHA"
-          fi
+          case "$BASE_REF" in
+            next | main) ;;
+            *)
+              echo "::error::PR #${PR_NUMBER} targets unsupported base ${BASE_REF}; refusing cleanup"
+              exit 1
+              ;;
+          esac
           {
             echo 'merged=true'
-            echo "checkout_ref=$CHECKOUT_REF"
+            echo "checkout_ref=$BASE_REF"
           } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
