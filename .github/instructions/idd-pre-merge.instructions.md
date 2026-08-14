@@ -4,8 +4,9 @@ Read after the E-phase branch-sync check confirms no sync is required,
 or when returning to merge-gate checks after a sync cycle. Covers F1
 (read-only branch-state check) and F2 (pre-merge checklist).
 
-This phase's GitHub Copilot advisory review gate depends on GitHub
-review state, not the local CLI, so follow it under any local agent.
+This repository uses the `no-advisory` profile. The merge gate uses live
+review-currency, human-review, unresolved-conversation, claim, branch, and
+CI evidence; it does not require an external reviewer.
 
 F2's merge-gate timing defaults are named in
 [IDD policy constants](../../docs/policy-constants.md) — canonical,
@@ -18,7 +19,7 @@ After a forced handoff on an open PR, the successor must rebuild
 review state through E1/E2 under its own `{claim-id}` before
 merge-bound routing continues — a live status digest or prior-claim
 marker is UI/audit context only, and cannot satisfy review currency,
-claim ownership, advisory wait, or CI gates.
+claim ownership, or CI gates.
 
 When all F2 conditions are satisfied, proceed to
 `idd-merge-handoff.instructions.md`.
@@ -67,18 +68,11 @@ Verify **all** conditions below; each states its required evidence and
 failure route. The F2 snapshot at the end records the final
 activity-universe values the handoff phase consumes.
 
-Do not treat "one bot says clean" as sufficient evidence — checks must
-cover the full activity universe (human reviewers plus advisory bot
-surfaces such as Copilot, CodeRabbit, Codex connectors, and CI bots).
-
-The advisory-wait window is Copilot-only
-(`idd-advisory-wait.instructions.md`) and does not cover any
-repository-configured non-Copilot `advisoryBotLogins` (e.g. CodeRabbit
-or a Codex connector). F2/F3 MUST NOT merge on a bare CI-green signal:
-the **Review currency** check below must confirm a fresh snapshot whose
-`review-watermark` covers the latest activity timestamp, so a
-non-Copilot finding landing shortly after CI still returns the
-workflow to E1 instead of merging over it.
+Do not treat an automated status as sufficient evidence — checks must cover
+the full activity universe of human reviewers, ordinary PR comments, review
+threads, and CI. F2/F3 MUST NOT merge on a bare CI-green signal: the
+**Review currency** check below must confirm a fresh snapshot whose
+`review-watermark` covers the latest activity timestamp.
 
 **Nonce passthrough**: when invoking the readiness collector below
 (directly, or via the documented merge-gate helper reference), pass
@@ -114,7 +108,7 @@ nonce was recorded for the active claim.
   [`docs/idd-helper-scripts.md`](../../docs/idd-helper-scripts.md#stable-helper-evidence-outputs)
   to collect this evidence, consuming `reviewCurrency` (including
   `comparisonRoute`), `threads`, `unrepliedComments`, `reviewerStates`,
-  `advisoryWait`, `ci`, `claim`, and optional `dispositionEvidence`.
+  `ci`, `claim`, and optional `dispositionEvidence`.
   Helpers remain read-only evidence collectors: if execution fails,
   output is invalid JSON, required sections are missing, or live GitHub
   state disagrees with it, discard helper output and fetch the activity
@@ -137,16 +131,6 @@ nonce was recorded for the active claim.
     re-evaluation) — commonly a late label-triggered job; sequence it
     before E1, this is not a fault.
 
-  Structural ack-only carve-out: when the only trigger above is newer
-  activity/count growth that helper evidence proves is solely
-  post-disposition advisory-bot acknowledgement
-  (`reviewCurrency.live.ackOnly.items` all ack-only, sibling
-  `reviewCurrency.live.effective` current,
-  `reviewCurrency.comparisonReason: ack-only-post-disposition`), the advisory
-  courtesy-ack convergence rule in `idd-review-triage.instructions.md`
-  applies — do not return to E1 for that activity alone (still confirm
-  the semantic residual; every other trigger/gate is unaffected).
-
   A current-claim agent's own post-watermark disposition replies are
   expected convergence activity, not reviewer input, and the watermark
   refresh on the E-phase branch-sync `clean` / `behind-no-conflict`
@@ -160,52 +144,6 @@ nonce was recorded for the active claim.
   procedural or status comments of that kind, or both, refresh the
   watermark directly instead; every other F2 trigger and gate is
   unaffected.
-- **Advisory bot wait** (restart-safe enforcement): schedule a wake, or
-  background only if the topology-safety condition holds (confirmed to
-  route completion back to this turn) — otherwise wait synchronously:
-  no single `gh` command blocks on Copilot review state (unlike a CI
-  run), so run the AW poll loop below as a foreground wait, never via
-  `run_in_background` absent the confirmed condition — see
-  [idd-ci.instructions.md's Wake-up
-  discipline](idd-ci.instructions.md#wake-up-discipline).
-  `PR_HEAD_SHA` is already available from the review-currency check
-  above. Apply the advisory-wait protocol
-  (`idd-advisory-wait.instructions.md`):
-
-  1. Run **AW1**. If **SATISFIED** → this check is **satisfied**;
-     continue to the **CI** check.
-  2. Run **AW2** to fetch markers.
-  3. Apply the **AW3** decision table:
-     - **SATISFIED** → this check is **satisfied**; continue to the CI
-       check.
-     - **HOLD** → post the hold comment from **AW4** and stop.
-     - **RECOVERY_NEEDED** → post the recovery marker from **AW3-R**
-       without requesting another Copilot review, then enter the normal
-       WAIT polling path using refreshed AW2/AW3 state. Then **go back
-       to the first condition in F2**.
-     - **CAP_EXHAUSTED** → post the cap-exhausted hold comment from
-       **AW4** and stop.
-     - **REQUEST_NEEDED** → return to E14 to request Copilot review and
-       post a fresh marker. Do not post a new request in F2.
-     - **WAIT** (`COPILOT_PENDING` is `"true"`, elapsed <
-       `PENDING_WINDOW_MINUTES` min) → wait the remainder of the window
-       (poll every `POLL_INTERVAL_MINUTES` min, refreshing
-       `EARLIEST_SAME_HEAD_AT` per **AW2** each iteration, applying
-       **AW5** if the marker disappears), then **go back to the first
-       condition in F2** to re-evaluate all conditions.
-     - **WAIT** (`COPILOT_PENDING` is `"false"`, elapsed <
-       `SETTLED_WINDOW_MINUTES` min) → wait the remainder of the settled
-       window (same polling rules), then **go back to the first
-       condition in F2**.
-
-  GitHub removes a reviewer from `requested_reviewers` on review
-  submission or manual cancellation — either counts as no longer
-  pending for merge purposes.
-
-  **Terminal Copilot unavailability**: not gated above — see
-  [Terminal routing](idd-advisory-wait.instructions.md#terminal-routing-1570);
-  an unwaived `copilot-terminal-unavailable` in `blockers[]` stops here
-  with that section's hold regardless.
 - **CI**: Current PR head SHA has all required CI checks generated and
   all passing (→ run CI wait per `idd-ci.instructions.md` using the
   same resolved `ciWait.runningTimeout`, `ciWait.generationTimeout`, and
@@ -230,7 +168,7 @@ nonce was recorded for the active claim.
   - The waiver `claimId` matches the active claim
   - The waiver `expiresAt` is in the future
 
-  Waivers never bypass review currency, advisory wait, unresolved
+  Waivers never bypass review currency, unresolved
   threads, unreplied comments, required reviews, disposition evidence,
   or claim ownership. Non-empty `waiverEvidence.wrongHead`, `wrongClaim`,
   `unauthorized`, `expired`, or `malformed` are suspicious context, never
@@ -246,13 +184,11 @@ nonce was recorded for the active claim.
   CODEOWNER/required reviewers directly (if not already requested),
   post a hold comment, and stop. Return to E1 only when actual review
   threads or comments exist (→ `idd-review-snapshot.instructions.md`).
-- **No `CHANGES_REQUESTED`** (human/required/CODEOWNER reviewers only):
+- **No `CHANGES_REQUESTED`** (human/required/CODEOWNER reviewers):
   no such reviewer's latest state is `CHANGES_REQUESTED` (→ if not yet
   addressed, return to review triage; if addressed and re-review
   requested, wait up to 30 min, then post a hold comment and stop if
-  still no response). Advisory bot reviewers (Copilot, CI bots) are
-  exempt — their `CHANGES_REQUESTED` does not block merge once the
-  advisory wait window completes.
+  still no response).
 - **Unresolved threads = 0** (backlog gate, orthogonal to the currency
   check above): no unresolved review threads remain, excluding
   **awaiting-reviewer threads**. Classify each unresolved thread:
@@ -284,50 +220,16 @@ nonce was recorded for the active claim.
   lacks a subsequent IDD-agent comment — "subsequent" meaning any
   IDD-agent regular comment posted at a strictly later timestamp (→
   return to review triage). Mirrors E1's regular-comment filter for
-  non-advisory discussion. Copilot and CI advisory bot comments are
-  handled earlier in the PATH B triage flow (E4-E7) and excluded here.
-- **Advisory convergence** (exit-code obligation for Copilot-authored
-  review threads, not a judgment call): run `node
-  scripts/advisory-convergence.mjs --pr {pr-number} --assert` (or the
-  profile-selected `idd-advisory-convergence` command). Non-zero exit is
-  a hard merge block — route to E1/E4 (check **AW6** first when
-  `sameHeadReroll.eligible`) using `reasons`; zero exit (`ready: true`)
-  satisfies this condition.
-  Separately, require `dispositionEvidence.route` to be `proceed`
-  (`dispositionEvidence.blockingCount == 0` — both
-  `missingRegularComments` (any outstanding non-thread regular PR
-  comment from a non-agent author, including the PR author, lacking a
-  fresh disposition marker) and `missingThreads` (any review thread,
-  resolved or unresolved, still lacking one) are empty). The
-  `advisory-convergence.mjs --assert` check above only enforces the
-  _unresolved_ Copilot-authored subset of `missingThreads` (resolution
-  alone satisfies its own Clause 2 without a fresh disposition); it
-  never covers a non-Copilot thread or any `missingRegularComments`
-  entry, so this check stays necessary even when that one passes. Treat
-  a missing or malformed `dispositionEvidence` object, or a non-list
-  `missingRegularComments`/`missingThreads`, as unmet, never vacuously
-  satisfied. A `route: return-to-e1` result routes to E1/E4 with that
-  evidence — except the ack-only override below.
-
-  Disposition-evidence ack-only override: when
-  `dispositionEvidence.soleCauseAckOnlyPostDisposition` is `true` (every
-  blocking item is a `missingThreads` entry with
-  `ackOnlyPostDisposition: true`, `missingRegularComments` empty — full
-  condition in `idd-review-triage.instructions.md`'s "Disposition-evidence
-  parity (advisory-only)" paragraph), autopilot may deterministically
-  override `return-to-e1` and proceed on the current HEAD SHA. Distinct
-  from the `reviewCurrency` carve-out above (that covers E1-snapshot
-  staleness; this covers disposition evidence on already-resolved
-  threads) and applied by the agent, not `pre-merge-readiness`'s own
-  rollup. The signal never changes `route` itself; any other blocking
-  cause makes it `false`, and the gate still routes to E1/E4. Fails
-  closed: an unusable check makes this condition unmet.
+  ordinary PR discussion. Human and ordinary review threads/comments
+  remain in this same activity and disposition gate. When configured, the
+  internal `idd-advisory-convergence` CI check remains part of the CI gate;
+  it represents the bounded Codex critique result, not an external reviewer.
 
 When any F2 condition routes to a hold/stop or back to E1/E14, update
 the digest after recording the blocking evidence and before
 stopping/returning: `Phase` to the failing check, `Open blockers` to
 the unmet condition, `Next action` to the required
-reviewer/CI/advisory/maintainer/agent action, `Authoritative by` to the
+reviewer/CI/maintainer/agent action, `Authoritative by` to the
 F2 evidence fetched. If every condition is satisfied, do **not** edit
 the digest before F3 — carry the F2 snapshot forward unchanged for
 F3's freshness check.

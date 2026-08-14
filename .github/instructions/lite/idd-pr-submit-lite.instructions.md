@@ -385,7 +385,7 @@ than the run it supersedes. Once both have completed, the later
    downstream of D4.
    - **Bot-gated `action_required`**: if instead `idd-advisory-convergence`
      is stuck at `action_required` from a gated bot-triggered run (for
-     example Copilot's review event) pending approval, this is a
+     example external integration event) pending approval, this is a
      stalled run, not a downstream-of-D4 state. A rerun of the gated
      run itself keeps the original actor's privileges and re-enters
      `action_required`, and `checks[]` carries no actor/event field to

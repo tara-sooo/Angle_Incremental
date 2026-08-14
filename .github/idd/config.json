@@ -3,7 +3,7 @@
   "iddVersion": "0.6.0",
   "markerPrefix": "angle-incremental",
   "mergePolicy": "human_merge",
-  "reviewPolicy": "copilot-advisory",
+  "reviewPolicy": "no-advisory",
   "threadResolutionPolicy": "fast-agent-resolve",
   "claimTiming": {
     "staleAge": "PT24H",
@@ -39,9 +39,6 @@
   },
   "issueScope": "roadmap",
   "orphanFirstPolicy": "none",
-  "advisoryWait": {
-    "convergenceScope": "all-prs"
-  },
   "autopilotSuitability": {
     "floor": 3
   }

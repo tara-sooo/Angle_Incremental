@@ -8,14 +8,20 @@ repository no longer uses.
 
 ## Adopter-Owned Values
 
-Record these values before editing phase behavior:
+These values are adopted by Angle Incremental:
 
-- Reason no IDD-managed advisory reviewer is used:
-- Branch protection rule:
-- Human review rule outside IDD, if any:
-- Review-thread resolution profile:
-- Merge policy:
-- Verification PR or dry-run reference:
+- Reason no IDD-managed advisory reviewer is used: the repository uses the
+  internal Codex critique loop, deterministic CI, and maintainer review; no
+  external review bot is part of the development loop.
+- Branch protection rule: no repository ruleset is currently registered;
+  when configured, branch protection remains a merge gate.
+- Human review rule outside IDD, if any: maintainers review PRs and own the
+  final integration decision.
+- Review-thread resolution profile: `fast-agent-resolve`, while unresolved
+  conversations remain a pre-merge blocker.
+- Merge policy: `human_merge`.
+- Verification PR or dry-run reference: Issue #93 policy self-check and the
+  full repository validation run on the implementing PR.
 
 ## Patch Surface
 
@@ -44,13 +50,22 @@ Capture all of these before marking onboarding complete:
 - The final local diff showing every file in the patch surface was
   reviewed.
 
+For this repository, the self-check also verifies that the active runtime
+surfaces contain no external reviewer request, wait, recovery, or merge-gate
+path; that `human_merge` and `next`/`main` semantics remain present; and that
+the Codex critique contract remains available.
+
 ## Completion Note
 
 ```markdown
 PR review policy profile: no-advisory
-Reason:
-Branch protection rule:
-Review-thread resolution profile:
-Verification evidence:
+Reason: Internal Codex critique plus CI and maintainer review; no external
+advisory reviewer is requested or awaited.
+Branch protection rule: Any configured protection remains authoritative; no
+ruleset is currently registered in this repository.
+Review-thread resolution profile: fast-agent-resolve with unresolved-thread
+blocking at pre-merge.
+Verification evidence: Issue #93 policy self-check, IDD documentation review,
+and the repository's `npm run validate` suite.
 Profile artifact applied: profiles/no-advisory/README.md
 ```

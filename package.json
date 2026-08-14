@@ -3,10 +3,11 @@
     "check:runtime-order": "node scripts/check-runtime-esm-loader-order.js",
     "check:syntax": "node --check regression-tests-esm.js && node --check tests/version-consistency.mjs && find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check",
     "check:version": "node tests/version-consistency.mjs",
+    "check:idd-policy": "node tests/idd-no-advisory-policy.mjs",
     "test:regression": "node --experimental-vm-modules regression-tests-esm.js",
     "test:browser": "node tests/browser-smoke.mjs",
     "test:performance": "node tests/performance-smoke.mjs",
-    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run test:regression && npm run test:browser && npm run test:performance"
+    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run check:idd-policy && npm run test:regression && npm run test:browser && npm run test:performance"
   },
   "devDependencies": {
     "playwright": "^1.61.1"
