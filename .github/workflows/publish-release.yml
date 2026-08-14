@@ -105,8 +105,17 @@ jobs:
             git push origin "$TAG"
           fi
 
-          gh release create "$TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --verify-tag \
-            --title "Angle Incremental $VERSION" \
-            --generate-notes
+          NOTES_FILE="docs/releases/$VERSION.md"
+          if [[ -f "$NOTES_FILE" ]]; then
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "Angle Incremental $VERSION" \
+              --notes-file "$NOTES_FILE"
+          else
+            gh release create "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "Angle Incremental $VERSION" \
+              --generate-notes
+          fi
