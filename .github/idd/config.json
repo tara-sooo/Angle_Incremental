@@ -1,0 +1,48 @@
+{
+  "$schema": "https://kurone-kito.github.io/idd-skill/schemas/policy.schema.json",
+  "iddVersion": "0.6.0",
+  "markerPrefix": "angle-incremental",
+  "mergePolicy": "human_merge",
+  "reviewPolicy": "copilot-advisory",
+  "threadResolutionPolicy": "fast-agent-resolve",
+  "claimTiming": {
+    "staleAge": "PT24H",
+    "heartbeatInterval": "PT12H"
+  },
+  "trustedMarkerActors": ["tara-sooo"],
+  "workshop": {
+    "exampleRepository": ""
+  },
+  "commands": {
+    "install-deps": "npm ci",
+    "fix-validate": "npm run check:runtime-order && npm run check:syntax",
+    "pre-push-validate": "npm run validate",
+    "post-fix-validate": "npm run validate"
+  },
+  "helperRuntime": {
+    "profile": "instructions-only"
+  },
+  "critiqueLoopProfile": "distributed defaults",
+  "maintainerApprovalActorPolicy": "owners-and-maintainers-only",
+  "ciWait": {
+    "runningTimeout": "PT30M",
+    "generationTimeout": "PT10M",
+    "rerunPolicy": "rerun-once"
+  },
+  "worktreeGuard": {
+    "enabled": true
+  },
+  "labels": {
+    "roadmapLabelName": "roadmap",
+    "blockedByHumanLabelName": "status:blocked-by-human",
+    "needsDecisionLabelName": "status:needs-decision"
+  },
+  "issueScope": "roadmap",
+  "orphanFirstPolicy": "none",
+  "advisoryWait": {
+    "convergenceScope": "all-prs"
+  },
+  "autopilotSuitability": {
+    "floor": 3
+  }
+}
