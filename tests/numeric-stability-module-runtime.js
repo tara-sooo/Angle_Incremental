@@ -349,6 +349,77 @@ async function runNumericStabilityModuleRuntimeTest() {
   }
 
   {
+    const runFirstInfinityScenario = async (offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      prepareVertexScenario(instance, {
+        scoreLog10: 307.99,
+        currentGainLog10: 306.5,
+        infiniteCapBroken: false,
+      });
+      state.infinityCount = 0;
+      state.achievementMask = 1 << 6;
+      state.vertices = 3;
+      if (offline) runtime.beginOfflineWorkBudget(1);
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() * 6_006 / state.vertices, true);
+      runtime.offlineProcessing = false;
+      return {
+        infinityCount: state.infinityCount,
+        scoreLog10: state.lastInfinityRuns[0]?.scoreLog10,
+        ipGain: state.lastInfinityRuns[0]?.ipGain,
+        work: runtime.offlineWorkStats,
+      };
+    };
+
+    const online = await runFirstInfinityScenario(false);
+    const offline = await runFirstInfinityScenario(true);
+    assert.equal(offline.infinityCount, online.infinityCount, "offline first Infinity should cross at the same point");
+    assertClose(offline.scoreLog10, online.scoreLog10, 1e-10, "offline first Infinity crossing score");
+    assert.equal(offline.ipGain, online.ipGain, "offline first Infinity IP gain should match online processing");
+    assert.equal(offline.work.precisionReduced, false, "offline first Infinity probes should remain exact");
+    assert.equal(offline.work.totalIterations, 2_002, "first Infinity probes must not consume additional offline work");
+  }
+
+  {
+    const runCombinedThresholdScenario = async (offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      prepareVertexScenario(instance, {
+        scoreLog10: 29.99,
+        currentGainLog10: 309,
+        infiniteCapBroken: true,
+      });
+      state.infinityCount = 0;
+      state.vertices = 3;
+      state.totalVertexProgress = 2;
+      state.pointProgress = 2 / 3;
+      state.lastVertexIndex = 2;
+      if (offline) runtime.beginOfflineWorkBudget(1);
+      runtime.offlineProcessing = offline;
+      debug.update(runtime.lapDuration() / 3, true);
+      runtime.offlineProcessing = false;
+      return {
+        infinityCount: state.infinityCount,
+        scoreLog10: state.lastInfinityRuns[0]?.scoreLog10,
+        ipGain: state.lastInfinityRuns[0]?.ipGain,
+        achievementMask: state.achievementMask,
+        work: runtime.offlineWorkStats,
+      };
+    };
+
+    const online = await runCombinedThresholdScenario(false);
+    const offline = await runCombinedThresholdScenario(true);
+    assert.equal(offline.infinityCount, online.infinityCount, "combined threshold processing should reach Infinity once");
+    assertClose(offline.scoreLog10, online.scoreLog10, 1e-10, "combined e30/e308 crossing score");
+    assert.equal(offline.ipGain, online.ipGain, "combined e30/e308 crossing IP gain");
+    assert.equal(offline.achievementMask, online.achievementMask, "e30 should unlock before first Infinity reset");
+    assert.equal(offline.work.precisionReduced, false, "combined threshold processing should remain exact");
+  }
+
+  {
     const exact = await simulateVertexSteps({
       targetVertexSteps: 6_006,
       batch: false,
@@ -590,6 +661,7 @@ async function runNumericStabilityModuleRuntimeTest() {
 
     for (const [threshold, unlockedIds, targetId] of [
       [30, [], 7],
+      [314, [7], 18],
       [628, [7, 18], 29],
       [2450, [7, 18, 29], 35],
     ]) {

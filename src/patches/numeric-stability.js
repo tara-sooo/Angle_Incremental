@@ -186,30 +186,43 @@ function coreStepForChronologicalHit(batches, hitIndex) {
   return step;
 }
 
-function coreScoreLogForFirstHits(batches, hitLimit, increaseLog10) {
+function coreScoreLogForFirstHits(batches, hitLimit, increaseLog10, plannedBatches = null) {
   const cutoffStep = coreStepForChronologicalHit(batches, hitLimit);
   if (cutoffStep === null) return -Infinity;
   const vertices = Math.max(3, runtime.effectiveVertexCount());
 
-  return batches.reduce((totalLog, batch) => {
+  return batches.reduce((totalLog, batch, index) => {
     const hits = coreHitsThroughStep(batch, cutoffStep, vertices);
     if (hits <= 0) return totalLog;
-    return runtime.combineLog10(totalLog, coreBatchScoreLog10(batch.firstCoreStep, hits, increaseLog10));
+    return runtime.combineLog10(
+      totalLog,
+      coreBatchScoreLog10(
+        batch.firstCoreStep,
+        hits,
+        increaseLog10,
+        plannedBatches?.[index]?.plan || null,
+      ),
+    );
   }, -Infinity);
 }
 
-function projectedScoreLogAfterCoreHits(batches, hitLimit, increaseLog10) {
-  const scoreLog = coreScoreLogForFirstHits(batches, hitLimit, increaseLog10);
+function projectedScoreLogAfterCoreHits(batches, hitLimit, increaseLog10, plannedBatches = null) {
+  const scoreLog = coreScoreLogForFirstHits(batches, hitLimit, increaseLog10, plannedBatches);
   return runtime.clampLog10(
     runtime.applyInfinitySoftcap(runtime.combineLog10(runtime.currentScoreLog10(), scoreLog)),
   );
 }
 
-function firstInfinityCrossingCoreHit(batches, increaseLog10) {
+function firstInfinityCrossingCoreHit(batches, increaseLog10, plannedBatches = null) {
   const maxHit = totalCoreHitsInBatches(batches);
   let low = 1;
   let high = 1;
-  while (high < maxHit && projectedScoreLogAfterCoreHits(batches, high, increaseLog10) < runtime.INFINITY_REQUIREMENT_LOG10) {
+  while (high < maxHit && projectedScoreLogAfterCoreHits(
+    batches,
+    high,
+    increaseLog10,
+    plannedBatches,
+  ) < runtime.INFINITY_REQUIREMENT_LOG10) {
     low = high + 1;
     high = Math.min(maxHit, high * 2);
   }
@@ -218,11 +231,26 @@ function firstInfinityCrossingCoreHit(batches, increaseLog10) {
   while (low <= high) {
     const mid = low + Math.floor((high - low) / 2);
     if (mid === low || mid === high) {
-      if (projectedScoreLogAfterCoreHits(batches, low, increaseLog10) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = low;
-      else if (projectedScoreLogAfterCoreHits(batches, high, increaseLog10) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = high;
+      if (projectedScoreLogAfterCoreHits(
+        batches,
+        low,
+        increaseLog10,
+        plannedBatches,
+      ) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = low;
+      else if (projectedScoreLogAfterCoreHits(
+        batches,
+        high,
+        increaseLog10,
+        plannedBatches,
+      ) >= runtime.INFINITY_REQUIREMENT_LOG10) crossingHit = high;
       break;
     }
-    if (projectedScoreLogAfterCoreHits(batches, mid, increaseLog10) >= runtime.INFINITY_REQUIREMENT_LOG10) {
+    if (projectedScoreLogAfterCoreHits(
+      batches,
+      mid,
+      increaseLog10,
+      plannedBatches,
+    ) >= runtime.INFINITY_REQUIREMENT_LOG10) {
       crossingHit = mid;
       high = mid - 1;
     } else {
@@ -247,15 +275,20 @@ function addFirstInfinityThresholdScore() {
   return runtime.addScore(runtime.valueFromLog10(requiredScoreLog), requiredScoreLog);
 }
 
-function processFirstInfinityCrossingBatch(batches, increaseLog10) {
+function processFirstInfinityCrossingBatch(batches, increaseLog10, plannedBatches = null) {
   if (firstInfinityCrossingExceedsSafeHitCount(batches)) {
     return addFirstInfinityThresholdScore();
   }
 
-  const crossing = firstInfinityCrossingCoreHit(batches, increaseLog10);
+  const crossing = firstInfinityCrossingCoreHit(batches, increaseLog10, plannedBatches);
   if (!crossing || crossing.step === null) return false;
 
-  const previousCoreScoreLog = coreScoreLogForFirstHits(batches, crossing.hit - 1, increaseLog10);
+  const previousCoreScoreLog = coreScoreLogForFirstHits(
+    batches,
+    crossing.hit - 1,
+    increaseLog10,
+    plannedBatches,
+  );
   if (previousCoreScoreLog > -Infinity) {
     const resetBeforeCrossing = runtime.addScore(runtime.valueFromLog10(previousCoreScoreLog), previousCoreScoreLog);
     if (resetBeforeCrossing) return true;
@@ -339,14 +372,14 @@ function processManyVerticesExactly(start, end) {
     const projectedScoreLog = runtime.clampLog10(
       runtime.applyInfinitySoftcap(runtime.combineLog10(runtime.currentScoreLog10(), scoreLog)),
     );
-    if (runtime.state.infinityCount === 0 && projectedScoreLog >= runtime.INFINITY_REQUIREMENT_LOG10) {
-      return processFirstInfinityCrossingBatch(batches, increaseLog10);
-    }
-
     if (plannedBatches !== batches
       && plannedBatches.every((batch) => batch.plan.mode === "exact")
       && scoreAchievementNeedsOrderedProcessing(projectedScoreLog)) {
       return processOfflineVerticesInOrder(start, end, plannedBatches);
+    }
+
+    if (runtime.state.infinityCount === 0 && projectedScoreLog >= runtime.INFINITY_REQUIREMENT_LOG10) {
+      return processFirstInfinityCrossingBatch(batches, increaseLog10, plannedBatches);
     }
 
     const scoreValue = runtime.valueFromLog10(scoreLog);
