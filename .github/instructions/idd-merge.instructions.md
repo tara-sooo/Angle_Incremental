@@ -369,7 +369,7 @@ Before any mutating action in F3, apply the
    format, cleanup-failure comment format, permission-blocked comment
    format, and fallback GraphQL commands.
 3. Delete the local worktree and local branch.
-4. Update the local `main` branch.
+4. Update the local `next` branch.
 5. If GitHub auto-delete is disabled: delete the remote branch too.
    (Worktrunk may be used for steps 3–5.)
 

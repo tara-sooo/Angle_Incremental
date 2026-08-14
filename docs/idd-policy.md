@@ -5,9 +5,11 @@
 ## 運用境界
 
 - 作業対象は明示的に指定されたIssueに限定します。自律的なIssue選択は行いません。
+- DiscoverはA0-T（明示的なIssue指定）だけを使用し、対象がない場合は停止して指定を求めます。設定の`issueScope: roadmap`はスキーマ互換の機械可読フォールバックであり、自律選択を許可しません。
 - workerは`issue/*`の隔離worktreeで作業し、`next`と`main`へのマージはmaintainerが行います。
 - `main`はリリース済みの安定版、`next`は次回リリースの統合ブランチです。
 - リリース、タグ、デプロイ、マージの判断は自動化しません。
+- 通常のIssue PRは`next`を対象にし、`next`から`main`へのリリースPRは既存の手動境界で管理します。
 - 初回導入は`direct-import`、以後は通常のIssue→branch/worktree→PR→CI→reviewフローを使います。
 
 ## IDDポリシー設定

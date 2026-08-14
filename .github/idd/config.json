@@ -37,7 +37,7 @@
     "blockedByHumanLabelName": "status:blocked-by-human",
     "needsDecisionLabelName": "status:needs-decision"
   },
-  "issueScope": "roadmap-first",
+  "issueScope": "roadmap",
   "orphanFirstPolicy": "none",
   "advisoryWait": {
     "convergenceScope": "all-prs"

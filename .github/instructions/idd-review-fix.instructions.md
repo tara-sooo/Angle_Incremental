@@ -67,11 +67,11 @@ Convergence guardrails:
   redirected by a maintainer.
 - If the critique pass reports zero issues, proceed to E11.
 
-## E11 — Resolve conflicts with main
+## E11 — Resolve conflicts with next
 
-Check for conflicts between the feature branch and `main`. If conflicts
-exist, merge `main` into the feature branch (`git fetch origin main &&
-git merge origin/main`), resolve them, and complete the merge. On a
+Check for conflicts between the feature branch and `next`. If conflicts
+exist, merge `next` into the feature branch (`git fetch origin next &&
+git merge origin/next`), resolve them, and complete the merge. On a
 signed-commit repo with non-interactive-hostile primary signing (GPG
 pinentry / hardware-touch), use the
 [signed-commit merge wrapper](../../docs/idd-helper-scripts.md#signed-commit-merge-wrapper-shared-git-procedure)
@@ -324,7 +324,7 @@ proceeding to F — do not skip triage.
 - **On failure / code-caused**: fix, run **fix-validate**, commit
   atomically, then return to E11
 - **On failure / infra-flaky or pre-existing** (failure also present on
-  `main`, unrelated to this branch): apply `ciWait.rerunPolicy` (default
+  `next`, unrelated to this branch): apply `ciWait.rerunPolicy` (default
   `rerun-once`) — rerun once and resume polling if it authorizes the
   current rerun; otherwise, or if the failure persists after that
   rerun, post a hold comment documenting it and stop. A maintainer must

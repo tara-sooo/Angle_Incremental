@@ -2208,8 +2208,8 @@ same as `AW4`/`AW5`.
 ## Signed-Commit Merge Wrapper (Shared Git Procedure)
 
 `idd-review-triage.instructions.md`'s E-phase sync path and
-`idd-review-fix.instructions.md`'s E11 both merge `main` into the feature
-branch with `git fetch origin main && git merge origin/main`. On a repo
+`idd-review-fix.instructions.md`'s E11 both merge `next` into the feature
+branch with `git fetch origin next && git merge origin/next`. On a repo
 whose primary commit signing is non-interactive-hostile (GPG pinentry /
 hardware-touch) and that configures a fallback signing wrapper for
 arbitrary git subcommands, run the **merge** step — including a
@@ -2217,7 +2217,7 @@ arbitrary git subcommands, run the **merge** step — including a
 plain command (`git fetch` creates no commit and needs no signing):
 
 ```sh
-git -c gpg.format=ssh -c user.signingkey=<abs-path> -c commit.gpgsign=true merge origin/main
+git -c gpg.format=ssh -c user.signingkey=<abs-path> -c commit.gpgsign=true merge origin/next
 # resolve conflicts if any, then:
 git -c gpg.format=ssh -c user.signingkey=<abs-path> -c commit.gpgsign=true merge --continue
 ```

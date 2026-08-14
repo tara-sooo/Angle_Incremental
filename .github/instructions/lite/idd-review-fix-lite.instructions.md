@@ -52,7 +52,7 @@ those are E4-E8 judgment calls, excluded from every lite profile.
 - E11 merge conflicts cannot be resolved cleanly, or the PR has
   unresolved review threads, unreplied comments, or a
   `CHANGES_REQUESTED` reviewer and no explicit operator confirmation
-  exists to merge `main` into the feature branch anyway.
+  exists to merge `next` into the feature branch anyway.
 - A CI failure is neither clearly code-caused nor recognized
   infra-flaky/pre-existing, **except** the sole-failing
   `idd-advisory-convergence` check with `pending: false` and outstanding
@@ -119,15 +119,15 @@ other GitHub side effect, confirm all of the following:
    Medium findings stay blockers until fixed or explicitly redirected
    by a maintainer.
 
-## E11 — Resolve conflicts with main
+## E11 — Resolve conflicts with next
 
-1. Check for conflicts between the feature branch and `main`.
+1. Check for conflicts between the feature branch and `next`.
 2. If none exist, continue to E12.
 3. If conflicts exist, and the PR has unresolved review threads,
    unreplied comments, or a reviewer's latest state is
    `CHANGES_REQUESTED`, get explicit operator confirmation before
    merging — the merge commit will appear in the PR history.
-4. Run `git fetch origin main && git merge origin/main`.
+4. Run `git fetch origin next && git merge origin/next`.
 5. On a signed-commit repo whose primary signing is non-interactive
    hostile (GPG pinentry or hardware-touch) but that provides a
    fallback signing wrapper for arbitrary git subcommands (pass
@@ -341,7 +341,7 @@ other GitHub side effect, confirm all of the following:
 5. On failure that is code-caused: fix it, run `fix-validate`, commit
    atomically, then return to E11.
 6. On failure that is infra-flaky or pre-existing (also failing on
-   `main`, unrelated to this branch): apply `ciWait.rerunPolicy`. If it
+   `next`, unrelated to this branch): apply `ciWait.rerunPolicy`. If it
    authorizes a rerun, rerun once and resume polling. If the failure
    persists after that rerun, or the policy is `hold`, post a hold
    comment documenting the pre-existing failure and stop for a

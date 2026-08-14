@@ -16,6 +16,18 @@ missing or disagrees.
 see A0), A3 (default; see decision tree).
 **Early stop condition**: A0-T, A4, or A4.5 (no claim made — see below).
 
+## Repository override: explicit issue targets only
+
+This repository requires an explicit A0-T target at session entry. The
+operator must provide exactly one open Issue number or same-repository Issue
+URL, such as `#91`. If no unambiguous target is present, stop and ask for
+one; do not run A0, A0-O, A1, A1.5, A2, A3, or candidate discovery. The
+configured `issue-scope: roadmap` is retained only as the schema-compatible
+machine-readable fallback and does not authorize autonomous Issue selection.
+
+This repository override takes precedence over the generic scope routing
+below. Never fall back from a failed A0-T check to another Issue.
+
 ## Authoring label guard
 
 The configured authoring label is `issueAuthoring.authoringLabelName`

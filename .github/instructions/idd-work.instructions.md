@@ -9,24 +9,24 @@ planning (B2), implementation (B3), and the self-review loop (C).
 
 Before creating, check for local conflicts in this order:
 
-1. Ensure the local `main` branch is up to date and has no local
-   commits. Run this from the primary worktree while on `main`:
+1. Ensure the local `next` branch is up to date and has no local
+   commits. Run this from the primary worktree while on `next`:
 
    ```sh
-   git fetch origin main
-   git log origin/main..main --oneline
+   git fetch origin next
+   git log origin/next..next --oneline
    ```
 
-   If the second command outputs any lines, local `main` has unpushed
-   commits — stop and report, do not force-reset `main`. Otherwise,
+   If the second command outputs any lines, local `next` has unpushed
+   commits — stop and report, do not force-reset `next`. Otherwise,
    fast-forward to origin:
 
    ```sh
-   git merge --ff-only origin/main
+   git merge --ff-only origin/next
    ```
 
-   After this `main` fast-forward, do **not** change the primary
-   worktree's HEAD off `main` for any reason during B1 — see
+   After this `next` fast-forward, do **not** change the primary
+   worktree's HEAD off `next` for any reason during B1 — see
    Anti-patterns below for the forbidden commands and the allowed
    HEAD-preserving exceptions (read-only inspection, and the
    HEAD-preserving branch/worktree commands used by Steps 2-3 below and
@@ -73,8 +73,8 @@ branch in the primary worktree:
   primary worktree — defeats the sibling-worktree invariant even though
   `git branch` alone does not move HEAD.
 
-The primary worktree's HEAD MUST remain on `main` throughout B1; if it
-ever leaves `main`, stop immediately and follow the B1 self-check
+The primary worktree's HEAD MUST remain on `next` throughout B1; if it
+ever leaves `next`, stop immediately and follow the B1 self-check
 repair path below.
 
 ### Worktree creation
@@ -99,7 +99,7 @@ cleanup before continuing.
   same `wt switch --create -b <base-branch> <branch-name>` if `git-wt` is
   unavailable
 
-`<base-branch>` is normally `main`. In a **non-interactive / automation**
+`<base-branch>` is normally `next`. In a **non-interactive / automation**
 context, append `-x <noop>` (e.g. `-x true`) — otherwise WorkTrunk tries
 to change the caller's directory and can hang; `-x` makes it create, run
 the pre-start hook, and exit cleanly.
@@ -109,7 +109,7 @@ If WorkTrunk is not available, choose the correct case:
 <!-- dprint-ignore-start -->
 | Case | Command |
 | --- | --- |
-| Fresh claim | `git worktree add <path> -b <branch-name> origin/main` |
+| Fresh claim | `git worktree add <path> -b <branch-name> origin/next` |
 | Takeover — local branch exists | `git worktree add <path> <branch-name>` |
 | Takeover — remote branch only | `git fetch origin && git worktree add <path> -b <branch-name> origin/<branch-name>` |
 | Takeover — neither local nor remote (rare) | treat as fresh claim; preserve the inherited branch name |
@@ -162,7 +162,7 @@ retry the install exactly once before failing loudly — see the
 Before continuing to B2, verify all of the following:
 
 - `git -C <primary-worktree-root> rev-parse --abbrev-ref HEAD` returns
-  `main`.
+  `next`.
 - `git worktree list` includes the new sibling worktree path.
 - The agent's current working directory is the new sibling worktree
   path, not the primary worktree.
@@ -185,7 +185,7 @@ mechanical file/close-based signal stronger than A4.5's title/
 declaration heuristic (a weak **title-only** match is **not** a hit
 here). Keep it cheap: one fetch plus a bounded merged-PR scan.
 
-1. `git fetch origin main`.
+1. `git fetch origin next`.
 2. **Closed-by-a-merged-PR signal**: re-fetch the issue; if it is now closed
    with a linked closing PR, the deliverable already shipped:
 
@@ -207,7 +207,7 @@ here). Keep it cheap: one fetch plus a bounded merged-PR scan.
 
 **On a hit → verify-then-close** (never silent re-implementation, and never an
 auto-close on a weak signal): confirm the issue's acceptance criteria already
-hold on current `main`, then close the issue with a comment referencing the
+hold on current `next`, then close the issue with a comment referencing the
 superseding PR. If the criteria only **partly** hold, keep the issue open,
 record the overlap, and plan only the genuinely-remaining work. On no hit,
 continue with the plan below.
@@ -268,7 +268,7 @@ function bodies look equivalent. See
 
 **Unexpected validation failures**: a `typecheck`/`lint` failure in a
 file this diff did not touch may signal dependency drift or a broken
-`main` baseline — verify with a fresh-vs-stale `node_modules` comparison
+`next` baseline — verify with a fresh-vs-stale `node_modules` comparison
 or a clean **install-deps** rerun before assuming the failure traces to
 this diff. See
 [rationale](../../docs/idd-design-rationale.md#b3--dependency-drift-vs-own-diff-a-typechecklint-diagnostic).

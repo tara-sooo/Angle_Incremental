@@ -3,9 +3,9 @@
 # forks. That is safe here only because all of the following hold, and any
 # future edit to this file must preserve them:
 #   - No unreviewed PR-head content is ever checked out: the sole
-#     `actions/checkout` step below carries no `ref:` override, so it
-#     resolves to the `pull_request_target` default -- the base branch's
-#     tip at event time. Because the job only proceeds when
+#     `actions/checkout` step below checks out the trusted base branch for
+#     pull-request events and the trusted `next` branch for manual runs.
+#     Because the job only proceeds when
 #     `merged == true`, that tip already includes this PR's own merge
 #     (a repository that merges via merge commits typically sees that
 #     merge commit itself) -- it is never the PR's own head SHA, and
@@ -38,9 +38,9 @@
 #     through `env:` and referenced as a quoted shell variable, never
 #     interpolated directly into a `run:` script.
 #   - The `cleanup` job only runs when
-#     `github.event.pull_request.merged == true`, or via an explicit,
-#     human-triggered `workflow_dispatch` -- never against an open or
-#     unmerged pull request.
+#     `github.event.pull_request.merged == true`, or after a manual
+#     dispatch verifies that its target PR has a non-null `merged_at` --
+#     never against an open or unmerged pull request.
 #   - `permissions:` stays least-privilege: `contents: read`,
 #     `issues: write`, `pull-requests: write` -- no `contents: write` and
 #     no elevated or secret-bearing scopes.
@@ -86,10 +86,31 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      - name: Verify manually selected PR is merged
+        id: manual-target
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.inputs.pr_number }}
+        run: |
+          set -eu
+          case "$PR_NUMBER" in
+            ''|*[!0-9]*)
+              echo "::error::workflow_dispatch pr_number must be numeric"
+              exit 1
+              ;;
+          esac
+          MERGED_AT=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.merged_at // empty')
+          if [ -z "$MERGED_AT" ]; then
+            echo "::error::PR #${PR_NUMBER} is not merged; refusing cleanup"
+            exit 1
+          fi
+          echo 'merged=true' >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
           persist-credentials: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'next' || github.event.pull_request.base.ref }}
       - name: Resolve helper-runtime profile
         id: profile
         run: |
@@ -174,7 +195,7 @@ jobs:
           esac
       - name: Run F4 cleanup (server-side fallback)
         id: cleanup
-        if: steps.profile.outputs.profile != 'instructions-only'
+        if: steps.profile.outputs.profile != 'instructions-only' && (github.event_name != 'workflow_dispatch' || steps.manual-target.outputs.merged == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
           # workflow_dispatch's `pr_number` input is `type: number` in the
@@ -265,7 +286,7 @@ jobs:
             echo "blocked=$BLOCKED"
           } >> "$GITHUB_OUTPUT"
       - name: Post cleanup evidence comment
-        if: steps.profile.outputs.profile != 'instructions-only'
+        if: steps.profile.outputs.profile != 'instructions-only' && (github.event_name != 'workflow_dispatch' || steps.manual-target.outputs.merged == 'true')
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.cleanup.outputs.pr_number }}
@@ -279,13 +300,15 @@ jobs:
           # only serialises this workflow's own runs; an agent F4 (or a
           # maintainer rerunning workflow_dispatch on the same PR) can
           # still have posted an evidence comment outside this run. Skip
-          # if a <!-- idd-cleanup-evidence: ... --> comment already on the
-          # PR was posted by a trusted author -- this workflow's own posts
+          # only if a successful (`clean` or `applied`) <!--
+          # idd-cleanup-evidence: ... --> comment already on the PR was
+          # posted by a trusted author -- this workflow's own posts
           # are authored by `github-actions[bot]` (the GITHUB_TOKEN actor),
           # and an agent's local F4 post is authored by a configured
           # `trustedMarkerActors` login. An untrusted commenter pre-posting
           # this marker prefix must never suppress the genuine evidence
-          # post or be treated as a completed cleanup record (this is the
+          # post or be treated as a completed cleanup record; failed or
+          # incomplete evidence remains retryable (this is the
           # same trust-scoping every other IDD operational marker already
           # applies).
           # This step runs under the default GitHub Actions bash flags
@@ -311,15 +334,19 @@ jobs:
           # substitution assignment does trip `-e` on failure.
           COMMENTS_TSV=$(gh api --paginate \
             "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
-            --jq '.[] | select(.body | startswith("<!-- idd-cleanup-evidence:")) | [.id, .user.login] | @tsv')
+            --jq '.[] | select(.body | startswith("<!-- idd-cleanup-evidence:")) | [.id, .user.login, (try (.body | capture("^<!-- idd-cleanup-evidence: (?<status>[^ ]+)") | .status) catch "")] | @tsv')
           EXISTING=""
-          while IFS=$'\t' read -r candidate_id candidate_login; do
+          while IFS=$'\t' read -r candidate_id candidate_login candidate_status; do
             [ -z "$candidate_id" ] && continue
             lower_login=$(printf '%s' "$candidate_login" | tr '[:upper:]' '[:lower:]')
-            if printf '%s\n' "$TRUSTED_LOGINS" | grep -Fxq "$lower_login"; then
-              EXISTING="$candidate_id"
-              break
-            fi
+            case "$candidate_status" in
+              clean|applied)
+                if printf '%s\n' "$TRUSTED_LOGINS" | grep -Fxq "$lower_login"; then
+                  EXISTING="$candidate_id"
+                  break
+                fi
+                ;;
+            esac
           done <<< "$COMMENTS_TSV"
           if [ -n "$EXISTING" ]; then
             echo "::notice::PR #${PR_NUMBER} already has a trusted-author idd-cleanup-evidence comment (id: ${EXISTING}); skipping workflow post."

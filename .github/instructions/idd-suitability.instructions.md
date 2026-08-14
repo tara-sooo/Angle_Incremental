@@ -110,7 +110,7 @@ collection failure follows the "Timeout on duplicate detection" Edge
 Case below.
 
 Same **detect-only** boundary as the rest of A4.5 (label + comment
-only). The acceptance-criteria-hold-on-`main` bullet is deferred to
+only). The acceptance-criteria-hold-on-`next` bullet is deferred to
 the gated-close follow-up.
 
 `suitability-triage.mjs` evaluates both signals as part of Check 4.

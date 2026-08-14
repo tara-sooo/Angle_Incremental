@@ -117,7 +117,7 @@ agent-id alone.
 | Multiple open PRs for the claim branch  | STOP — ambiguous                                                |
 | No PR, no remote, no local branch       | → B1 fresh worktree                                             |
 
-Primary worktree must stay on `main`. Never `git switch` the primary onto
+Primary worktree must stay on `next`. Never `git switch` the primary onto
 the issue branch.
 
 ## Step 3 — PR / CI / review route (helper-first)

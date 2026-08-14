@@ -52,7 +52,9 @@ idd_worktree_guard_check() {
     *'"branchPatterns":['*)
       raw=${guard_body#*'"branchPatterns":['}
       raw=${raw%%]*}
-      patterns=$(printf '%s' "$raw" | tr ',' ' ' | tr -d '"')
+      candidate=$(printf '%s' "$raw" | tr ',' ' ' | tr -d '"')
+      # An empty or malformed list must not disable the safe defaults.
+      [ -n "$candidate" ] && patterns="$candidate"
       ;;
   esac
 

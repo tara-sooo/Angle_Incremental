@@ -82,7 +82,7 @@ following:
    fail-closed: stop rather than proceed.
 6. If any check fails, stop.
 
-## D1 — Sync main before first push
+## D1 — Sync next before first push
 
 This section's rebase only applies **before the branch's first push**.
 
@@ -133,9 +133,9 @@ This section's rebase only applies **before the branch's first push**.
        per the condition above — this needs either the merge-based
        resync or a closer live-state read this file's mechanical scope
        does not cover.
-2. Run `git fetch origin main`.
-3. If `git merge-base HEAD origin/main` equals `origin/main`, the branch
-   already contains every commit on `main` — skip the rebase and go to
+2. Run `git fetch origin next`.
+3. If `git merge-base HEAD origin/next` equals `origin/next`, the branch
+   already contains every commit on `next` — skip the rebase and go to
    D2.
 4. **Before rebasing**: if primary commit signing is non-interactive-
    hostile (GPG pinentry, or a hardware-touch path) and the repository
@@ -151,10 +151,10 @@ This section's rebase only applies **before the branch's first push**.
    subcommand — a commit-only alias will not run `rebase`), run the
    rebase **through that wrapper from the start**: `git -c
    gpg.format=ssh -c user.signingkey=<abs-path> -c commit.gpgsign=true
-   rebase origin/main` (or the repo's wrapper alias), not the plain
-   `git rebase origin/main`. Otherwise (signing is not hostile, or is
+   rebase origin/next` (or the repo's wrapper alias), not the plain
+   `git rebase origin/next`. Otherwise (signing is not hostile, or is
    hostile with a wrapper already covering it transparently), run the
-   plain `git rebase origin/main`.
+   plain `git rebase origin/next`.
 6. If the rebase hits a content conflict, resolve it and continue the
    rebase. On the signed-commit repo case in step 5, continue with the
    **wrapper's own** `--continue` form, not plain `git rebase
@@ -167,7 +167,7 @@ This section's rebase only applies **before the branch's first push**.
    any resulting changes before continuing. Then verify both:
    - `git branch --show-current` is non-empty (HEAD is not detached).
    - The expected local commit appears in `git log --oneline
-     origin/main..HEAD` (not local `main`, which this file never
+     origin/next..HEAD` (not local `next`, which this file never
      fast-forwards and so can be stale).
 8. If HEAD is detached, re-attach once with `git checkout {branch-name}`,
    repeat this D1 rebase (through the same signing wrapper on a
@@ -176,7 +176,7 @@ This section's rebase only applies **before the branch's first push**.
    state.
 
 Once the branch is pushed, treat it as published review history: a
-later resync merges `main` into the branch through the E-phase review
+later resync merges `next` into the branch through the E-phase review
 loop instead of returning to this D1 rebase path.
 
 ## D2 — Verify claim, lint, push
