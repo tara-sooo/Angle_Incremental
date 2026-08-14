@@ -64,7 +64,7 @@ not reset the claim stale clock.
 
 For an externally owned blocker (sibling PR/issue, maintainer-owned
 check, base-branch health), phrase the resume condition as the checkable
-invariant (e.g. a named check passing on main), not the sibling alone —
+invariant (e.g. a named check passing on next), not the sibling alone —
 the proxy may resolve differently, or never.
 
 ## Roadmap markers

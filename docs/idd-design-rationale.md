@@ -256,7 +256,7 @@ no-op.
 kurone-kito/idd-skill#815 named the risk directly: parallel worktrees
 let a `git switch` move a checkout out from under another run, so a
 commit lands on the wrong branch — typically the primary worktree's
-`main`, or another issue's branch. The Claim revalidation gate in
+`next`, or another issue's branch. The Claim revalidation gate in
 `idd-overview-core.instructions.md` keeps the mechanical steps to a
 one-line pointer to stay inside its byte budget; this page owns the
 full procedure.
@@ -266,7 +266,7 @@ issue branch (in its own sibling worktree), then restoring the
 contaminated branch:
 
 - **Unpushed** contaminated branch (typically the primary worktree's
-  `main`): `git reset --hard` it back to its upstream.
+  `next`): `git reset --hard` it back to its upstream.
 - **Already pushed or shared**: do **not** `git reset --hard` then
   force-push to erase the misplaced commit — that is the forbidden
   force-push. Instead `git revert` the misplaced change, or let the
@@ -318,7 +318,7 @@ implementation guidance (kurone-kito/idd-skill#1238).
 
 A `typecheck`/`lint` failure in a file the current diff never touched
 can look like a bug in the diff itself, when it is really dependency
-drift or a broken `main` baseline — a real incident cost debugging time
+drift or a broken `next` baseline — a real incident cost debugging time
 this way before the guidance below existed
 (kurone-kito/idd-skill#1164, kurone-kito/idd-skill#1193).
 

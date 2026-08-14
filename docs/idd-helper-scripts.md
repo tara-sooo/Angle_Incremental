@@ -2046,7 +2046,8 @@ same as `AW4`/`AW5`.
   terminal)
 - `syncRecommendation` values: `none`, `merge-main`, `policy-required-update`,
   `force-push-exception`, `recheck`, `hold-unknown` (`recheck` pairs with
-  `computing`)
+  `computing`). `merge-main` is the helper's compatibility status literal;
+  this repository's phase instructions resolve that action against `next`.
 - `baseAdvancedSinceMergeBase` (boolean): `true` when the base ref has moved
   past this PR's merge-base, computed independently of `syncRecommendation` so
   it does not change any existing `syncRecommendation` value. `false` is
@@ -2165,7 +2166,7 @@ same as `AW4`/`AW5`.
 - Read-only boundary: the helper performs no minimization, no posting, and no
   issue creation. **Handoff**: the JSON is the input an operator hands to the
   issue-authoring skill, which re-verifies each candidate against current
-  `main` (reuse-first / not-already-fixed) and drafts follow-up issues
+  `next` (reuse-first / not-already-fixed) and drafts follow-up issues
   bucketed by readiness. The helper does deterministic detection; the
   judgment-heavy re-verification, drafting, and publish stay operator-gated.
 - **Operator runbook**: this helper is a **manual spot-check audit**, not a

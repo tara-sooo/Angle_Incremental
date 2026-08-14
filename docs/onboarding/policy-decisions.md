@@ -323,7 +323,7 @@ It should also confirm whether the repository's GitHub ruleset leaves
 disabled:
 
 - Recommended: disabled. Measured evidence shows enabling it can force
-  a `main`-sync merge on every merely-`BEHIND` PR and multiplies Copilot
+  a `next`-sync merge on every merely-`BEHIND` PR and multiplies Copilot
   advisory-review rounds without adding review value — a before/after
   commit sample measured the sync-merge share fall from ~27% to ~3.7%
   once this repository disabled it
@@ -332,8 +332,8 @@ disabled:
   ruleset — an unreadable ruleset read still fails closed to forcing
   the sync path regardless of the live setting.
 - Trade-off: disabling it means the final pre-merge CI run may not
-  reflect the very latest `main`, which IDD's own conflict-triggered
-  `main`-sync merge (E11) and F1/F2 freshness checks still catch when
+  reflect the very latest `next`, which IDD's own conflict-triggered
+  `next`-sync merge (E11) and F1/F2 freshness checks still catch when
   it matters for correctness.
 
 Record whether the repository keeps this setting disabled before

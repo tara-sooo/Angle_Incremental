@@ -130,7 +130,7 @@ run **pre-push-validate**, push, then wait for CI
 
 ## §W5 — PR exists (1 match), clean, unpushed
 
-Sync main (D1 rebase) + **pre-push-validate** + push (D2), then go to
+Sync next (D1 rebase) + **pre-push-validate** + push (D2), then go to
 Step 3.
 
 ## §W6 — PR exists (multiple matches)
@@ -147,7 +147,7 @@ claim ownership:
 
 ## §W7 — No PR, remote branch exists
 
-From the primary worktree (HEAD stays on `main`):
+From the primary worktree (HEAD stays on `next`):
 
 1. `git fetch origin {branch}` — fetch the remote tip.
 2. `git branch {branch} origin/{branch}` — create the local branch

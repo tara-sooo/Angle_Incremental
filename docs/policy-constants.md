@@ -449,7 +449,7 @@ conflicts most often: the **F-phase bundle instruction files** (the
 `idd-merge-handoff`, `idd-merge`) and the single-line entries in
 `audit/sync-manifest.json`. When a change touches one of these:
 
-- **Expect a merge-from-main conflict** and keep the addition small and
+- **Expect a merge-from-next conflict** and keep the addition small and
   localized so the conflict stays a trivial keep-both. Bump any affected
   bundle budget with the margin convention above.
 - **Discover de-prioritizes overlap** softly: A4 Step 2 prefers a candidate

@@ -4,13 +4,12 @@
 # future edit to this file must preserve them:
 #   - No unreviewed PR-head content is ever checked out: the sole
 #     `actions/checkout` step below checks out the trusted base branch for
-#     pull-request events and the trusted `next` branch for manual runs.
-#     Because the job only proceeds when
-#     `merged == true`, that tip already includes this PR's own merge
-#     (a repository that merges via merge commits typically sees that
-#     merge commit itself) -- it is never the PR's own head SHA, and
-#     never content that has not already passed through the merge
-#     decision.
+#     pull-request events and the selected merged PR's merge SHA (falling
+#     back to its base ref) for manual runs. Because the job only proceeds
+#     when `merged == true`, that SHA is the repository's recorded merge
+#     result, never the PR's own head SHA or content that has not already
+#     passed through the merge decision. Release and hotfix PRs therefore
+#     keep their legitimate `main` base, while normal PRs use `next`.
 #   - No PR-head code, workflow, or action is ever executed; nothing from
 #     the PR diff ever runs. Under `vendored-node` and `package-manager`,
 #     the cleanup-audit invocation names only a script or package this
@@ -44,9 +43,10 @@
 #   - `permissions:` stays least-privilege: `contents: read`,
 #     `issues: write`, `pull-requests: write` -- no `contents: write` and
 #     no elevated or secret-bearing scopes.
-# If a future change adds a `ref:` override on the checkout step, downloads
-# or executes PR-head content, widens `permissions:`, or removes the
-# merged-only guard, re-review this trust model before merging that change.
+# If a future change allows a user-selected/untrusted `ref:` override on the
+# checkout step, downloads or executes PR-head content, widens
+# `permissions:`, or removes the merged-only guard, re-review this trust
+# model before merging that change.
 #
 # Profile resolution: unlike this source repository's own dogfooded copy
 # (kurone-kito/idd-skill's own `.github/workflows/post-merge-cleanup.yml`),
@@ -100,17 +100,31 @@ jobs:
               exit 1
               ;;
           esac
-          MERGED_AT=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.merged_at // empty')
+          PR_JSON=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}")
+          MERGED_AT=$(printf '%s' "$PR_JSON" | jq -r '.merged_at // empty')
           if [ -z "$MERGED_AT" ]; then
             echo "::error::PR #${PR_NUMBER} is not merged; refusing cleanup"
             exit 1
           fi
-          echo 'merged=true' >> "$GITHUB_OUTPUT"
+          BASE_REF=$(printf '%s' "$PR_JSON" | jq -r '.base.ref // empty')
+          if [ -z "$BASE_REF" ]; then
+            echo "::error::PR #${PR_NUMBER} has no base ref; refusing cleanup"
+            exit 1
+          fi
+          MERGE_SHA=$(printf '%s' "$PR_JSON" | jq -r '.merge_commit_sha // empty')
+          CHECKOUT_REF="$BASE_REF"
+          if printf '%s' "$MERGE_SHA" | grep -Eq '^[0-9a-fA-F]{40}$'; then
+            CHECKOUT_REF="$MERGE_SHA"
+          fi
+          {
+            echo 'merged=true'
+            echo "checkout_ref=$CHECKOUT_REF"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
           persist-credentials: false
-          ref: ${{ github.event_name == 'workflow_dispatch' && 'next' || github.event.pull_request.base.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && steps.manual-target.outputs.checkout_ref || github.event.pull_request.base.ref }}
       - name: Resolve helper-runtime profile
         id: profile
         run: |
