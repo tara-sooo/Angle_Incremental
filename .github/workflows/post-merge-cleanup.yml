@@ -6,10 +6,11 @@
 #     `actions/checkout` step below checks out the trusted base branch for
 #     pull-request events and the selected merged PR's current base branch
 #     for manual runs. The PR metadata is used only to verify the target is
-#     merged and to select `next` or `main`; cleanup helpers and config are
-#     always loaded from that branch's current tip, never the historical PR
-#     merge tree. Release and hotfix PRs therefore keep their legitimate
-#     `main` base, while normal PRs use `next`.
+#     merged and to select `next`, `main`, or a valid `release/<version>`;
+#     cleanup helpers and config are always loaded from that branch's
+#     current tip, never the historical PR merge tree. Release and hotfix
+#     PRs therefore keep their legitimate `main` or release base, while
+#     normal PRs use `next`.
 #   - No PR-head code, workflow, or action is ever executed; nothing from
 #     the PR diff ever runs. Under `vendored-node` and `package-manager`,
 #     the cleanup-audit invocation names only a script or package this
@@ -113,6 +114,12 @@ jobs:
           fi
           case "$BASE_REF" in
             next | main) ;;
+            release/*)
+              if ! printf '%s' "$BASE_REF" | grep -Eq '^release/[0-9]+\.[0-9]+\.[0-9]+$'; then
+                echo "::error::PR #${PR_NUMBER} targets invalid release base ${BASE_REF}; refusing cleanup"
+                exit 1
+              fi
+              ;;
             *)
               echo "::error::PR #${PR_NUMBER} targets unsupported base ${BASE_REF}; refusing cleanup"
               exit 1
