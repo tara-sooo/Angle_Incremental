@@ -101,16 +101,16 @@ fresh round per arrival, but only when **all** hold:
 accumulated commit — whichever comes first.
 
 **Ends accumulation immediately** (push whatever has accumulated): a
-PATH A item from a **human or CODEOWNER** arrives (bot-sourced alone
-does not); any item requests a substantive code/logic change; any item
-falls outside the touched-file scope; or either bound is reached.
+new PATH A item arrives from the review snapshot; any item requests a
+substantive code/logic change; any item falls outside the touched-file
+scope; or either bound is reached.
 
 **Non-goals**: never delays an in-flight CI wait (E15's mid-wait
-fold-in rule is unchanged); never changes PATH A/B routing or triage
+fold-in rule is unchanged); never changes PATH A routing or triage
 timing (still happens at the next E1 pass — only push timing changes);
-and relaxes nothing else — E14 still re-reviews every push, the
-per-HEAD `review-watermark` still invalidates on push, each E6 reply
-stays individual, and the
+and relaxes nothing else — the applicable human re-review remains
+required after `CHANGES_REQUESTED`, the per-HEAD `review-watermark`
+still invalidates on push, each E6 reply stays individual, and the
 [claim revalidation gate](idd-overview-core.instructions.md#claim-revalidation-gate)
 still runs immediately before push.
 

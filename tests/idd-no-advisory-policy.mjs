@@ -26,6 +26,8 @@ const activeSurfaces = [
   '.github/instructions/lite/idd-pr-submit-lite.instructions.md',
   'docs/idd-advisory-wait-shell-fallback.md',
   'docs/idd-policy.md',
+  'docs/idd-workflow.md',
+  '.github/instructions/idd-merge-handoff.instructions.md',
   'profiles/no-advisory/README.md',
 ];
 const forbiddenRuntimePatterns = [
@@ -33,6 +35,7 @@ const forbiddenRuntimePatterns = [
   /\bCOPILOT_[A-Z_]+\b/,
   /\bLAST_COPILOT_[A-Z_]+\b/,
   /\bAW[1-6]\b/,
+  /advisory state/i,
   /advisoryWait\./i,
   /gh pr edit[^\n]*(?:copilot|advisory)/i,
   /requested_reviewers/i,
@@ -48,6 +51,9 @@ for (const path of activeSurfaces) {
 const reviewFix = read('.github/instructions/idd-review-fix.instructions.md');
 const reviewSnapshot = read('.github/instructions/idd-review-snapshot.instructions.md');
 const reviewTriage = read('.github/instructions/idd-review-triage.instructions.md');
+const prSubmit = read('.github/instructions/idd-pr-submit.instructions.md');
+const preMerge = read('.github/instructions/idd-pre-merge.instructions.md');
+const mergeHandoff = read('.github/instructions/idd-merge-handoff.instructions.md');
 const policy = read('docs/idd-policy.md');
 const workflow = read('docs/idd-workflow.md');
 
@@ -59,5 +65,23 @@ assert.match(policy, /next/);
 assert.match(policy, /main/);
 assert.match(workflow, /Codex CLI[\s\S]*bounded read-only native subagent/i);
 assert.match(workflow, /structured self-critique/i);
+
+const d4Success = prSubmit.indexOf('**On success**');
+const e1Route = prSubmit.indexOf('idd-review-snapshot.instructions.md', d4Success);
+assert.ok(d4Success >= 0 && e1Route > d4Success, 'D4 success must route to E1');
+
+const e1 = reviewSnapshot.indexOf('## E1');
+const e2 = reviewSnapshot.indexOf('## E2');
+const baseline = reviewSnapshot.indexOf('review-baseline', e2);
+assert.ok(e1 >= 0 && e2 > e1 && baseline > e2, 'E1 must include the E2 critique baseline route');
+
+const reviewCurrency = preMerge.indexOf('**Review currency**');
+assert.ok(reviewCurrency >= 0 && preMerge.indexOf('review-watermark', reviewCurrency) > reviewCurrency,
+  'F2 must require review-currency evidence');
+assert.match(preMerge, /When all F2 conditions are satisfied[\s\S]*idd-merge-handoff\.instructions\.md/);
+assert.match(mergeHandoff, /# IDD — Merge Policy Handoff Phase \(F2\.5\)/);
+assert.match(mergeHandoff, /Read this file after `idd-pre-merge\.instructions\.md` \(F2\) satisfies/);
+assert.match(mergeHandoff, /human_merge/);
+assert.doesNotMatch(mergeHandoff, /advisory state/i);
 
 console.log(`no-advisory policy OK (${activeSurfaces.length} runtime surfaces)`);

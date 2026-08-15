@@ -34,6 +34,10 @@ These values are adopted by Angle Incremental:
 | `.github/instructions/idd-merge.instructions.md`           | Remove final advisory rechecks while keeping CI, claim, freshness, branch protection, and unresolved-thread checks.                        |
 | `.github/instructions/idd-review-snapshot.instructions.md` | Keep human comments in scope and remove advisory-only PATH B requirements.                                                                 |
 | `.github/instructions/idd-review-triage.instructions.md`   | Keep human review comments in the review universe and remove advisory-only disposition requirements.                                       |
+| `.github/instructions/idd-merge-handoff.instructions.md`   | Carry review/critique evidence, rather than external-review state, into the `human_merge` handoff.                                       |
+| `docs/idd-workflow.md`                                    | Document this repository's no-advisory route and remove the stale external-review default.                                                |
+| `.github/workflows/regression.yml`                        | Run `check:idd-policy` as a load-bearing CI step.                                                                                          |
+| `tests/idd-no-advisory-policy.mjs`                        | Guard the no-advisory surfaces and D4 → E1 → E2 → F2 → F2.5 routing invariants.                                                          |
 | `docs/idd-review-policy-profiles.md`                       | Record the selected `no-advisory` profile and link to the local verification evidence.                                                     |
 | `docs/customization.md` or another local policy document   | Record why no IDD-managed advisory reviewer is used and which outside gates still protect merges.                                          |
 

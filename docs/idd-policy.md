@@ -42,9 +42,11 @@ never merge pull requests. Ordinary issue pull requests target `next`, while
 manual flow.
 
 The active no-advisory surfaces are the review-fix, pre-merge, merge,
-review-snapshot, review-triage, and inactive advisory-wait documents listed in
-`profiles/no-advisory/README.md`. The internal `idd-advisory-convergence` CI
-check is retained as a Codex critique/validation check; it is not an external
+review-snapshot, review-triage, merge-handoff, and workflow-guide documents
+listed in `profiles/no-advisory/README.md`. If a repository-local
+`idd-advisory-convergence` check is configured, it is treated only as an
+optional Codex critique/validation signal; this repository does not currently
+host or require a workflow with that name, and it is never an external
 reviewer request or wait gate.
 
 IDDの標準ラベルは`roadmap`、`status:blocked-by-human`、`status:needs-decision`です。これらは`.github/idd/config.json`とGitHub上のラベル名を一致させます。

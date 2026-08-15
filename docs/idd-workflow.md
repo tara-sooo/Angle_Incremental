@@ -8,15 +8,15 @@ tags: [workflow, phase-routing]
 # IDD workflow guide
 
 This document is the neutral entry point for the repository's
-Issue-Driven Development (IDD) workflow across GitHub Copilot, Codex
-CLI, OpenCode, Claude Code, and Antigravity CLI (formerly Gemini CLI).
+Issue-Driven Development (IDD) workflow across the supported CLI and
+editor surfaces.
 
 Use it when you need to answer three questions quickly:
 
 - Which repo entry file should I read first?
 - Which IDD instruction files load automatically for my agent?
-- When does the workflow rely on GitHub Copilot review state rather than
-  on my local CLI?
+- Which review and critique evidence does the current repository policy
+  require before merge?
 
 ## Start sequence
 
@@ -33,7 +33,7 @@ you are reading this guide first, start at step 1.
 
 | Agent / surface         | Read first                        | Automatically available IDD context                                                                                                                                     | Open manually                                                                      |
 | ----------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| GitHub Copilot surfaces | `.github/copilot-instructions.md` | `.github/instructions/idd-overview-core.instructions.md` for execution surfaces; package-scoped `.instructions.md` files in VS Code Copilot when editing matching paths | The routed phase file when the current step changes                                |
+| Editor instruction surfaces | Editor-specific entry instructions | The shared IDD overview and matching scoped instructions when the editor provides them | The routed phase file when the current step changes |
 | Codex CLI               | `AGENTS.md`                       | None from `.github/instructions/`                                                                                                                                       | `.github/instructions/idd-overview-core.instructions.md` and the routed phase file |
 | OpenCode                | `AGENTS.md`                       | `AGENTS.md` itself — OpenCode's native rules mechanism auto-loads it; none from `.github/instructions/`                                                                 | `.github/instructions/idd-overview-core.instructions.md` and the routed phase file |
 | Claude Code             | `CLAUDE.md`                       | None from `.github/instructions/` by default                                                                                                                            | `.github/instructions/idd-overview-core.instructions.md` and the routed phase file |
@@ -44,10 +44,9 @@ When the `issue-authoring` companion bundle is installed under
 there through its `.claude/skills/` compatibility.
 
 During onboarding, create or update `CLAUDE.md`, `AGENTS.md`, and
-`GEMINI.md` so each non-Copilot agent listed above has a stable first
-file to read. GitHub Copilot remains an update-if-present surface via
-`.github/copilot-instructions.md`. Skipping creation of a missing root
-entry file should be an explicit operator choice, not the default.
+`GEMINI.md` so each listed agent has a stable first file to read.
+Skipping creation of a missing root entry file should be an explicit
+operator choice, not the default.
 
 ## Model capability expectations
 
@@ -169,8 +168,8 @@ When a lightweight-tier model runs any part of this loop:
   (`docs/weak-model-lite-profile-design.md`) for the E9-E15
   upstream-triage boundary; the E4 narrow-rubric result is recorded
   there as future nuance, not as a scope change here. This note does not
-  change the upstream repository's Copilot advisory-review convergence
-  scope decision or the lite-profile exclusion of
+  change the upstream repository's advisory-review convergence scope
+  decision or the lite-profile exclusion of
   `idd-review-triage.instructions.md`.
 - Do not run the autonomous merge phases (F3 onward) on this tier. See
   the merge-policy recommendation for weak-model sessions in
@@ -361,7 +360,7 @@ session would.
 | `.github/instructions/idd-work.instructions.md`              | B1-B3 + C1-C6: create worktree, plan, implement, and self-review                                                                                                                                |
 | `.github/instructions/idd-pr-submit.instructions.md`         | D1-D4: rebase, validate, push, open PR, and wait for CI                                                                                                                                         |
 | `.github/instructions/idd-ci.instructions.md`                | D4/E15 helper: shared CI polling helper used by later phases                                                                                                                                    |
-| `.github/instructions/idd-advisory-wait.instructions.md`     | AW1-AW5 helper: shared Copilot advisory-wait protocol (E14, F2, F3)                                                                                                                             |
+| `.github/instructions/idd-advisory-wait.instructions.md`     | Optional advisory-wait helper; inactive under this repository's no-advisory profile                                                                                                            |
 | `.github/instructions/idd-review-snapshot.instructions.md`   | E1–E3: fetch activity snapshot, run critique, check if ReviewItems_snapshot is empty                                                                                                            |
 | `.github/instructions/idd-review-triage.instructions.md`     | E4–E8: classify items, score, record dispositions, and run E-phase branch-sync check before F-phase                                                                                             |
 | `.github/instructions/idd-review-fix.instructions.md`        | E9-E15: fix accepted review items and push follow-up commits (merge-from-next, not rebase)                                                                                                      |
@@ -398,8 +397,8 @@ ownership boundaries explicit:
 - **Live repository instructions**:
   `.github/instructions/*.instructions.md` are the canonical workflow
   rules that drive the execution loop.
-- **Agent entry files**: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and
-  `.github/copilot-instructions.md` tell each agent where to start.
+- **Agent entry files**: `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` tell
+  each agent where to start.
 - **Workflow docs**: files under `docs/` explain architecture, policy,
   and onboarding, but should not replace the operational instruction
   files.
@@ -449,7 +448,7 @@ CODEOWNERS are evaluated after work reaches the pull request, not during
 Discover or Claim. They become part of the PR review and merge gates in
 E and F phases: review snapshots must report required approval and
 CODEOWNER satisfaction, and F2/F3 must prove that unresolved review
-state, advisory state, CI, and branch freshness are all current for the
+state, critique/review evidence, CI, and branch freshness are all current for the
 same head.
 
 Autonomous operation therefore requires a satisfiable GitHub merge
@@ -626,8 +625,8 @@ Running this variant safely requires:
 Use the live status digest contract in
 [IDD comment minimization](idd-comment-minimization.md) when an active
 run needs one human-facing current-status comment. Digest text is never
-workflow evidence by itself: claim parsing, review currency, advisory
-waits, CI, merge readiness, and roadmap audits still read trusted
+workflow evidence by itself: claim parsing, review currency, critique
+evidence, CI, merge readiness, and roadmap audits still read trusted
 operational markers and GitHub state.
 
 During resume, repair a missing or stale digest only after the route and
@@ -639,8 +638,8 @@ arbitrarily.
 Phase files now define digest update points rather than leaving them to
 agent judgment. Issue digests are refreshed after claim verification,
 planning, meaningful C-loop decisions, hold, abort, and resume route
-selection. PR digests are refreshed for review-fix progress, advisory
-wait or CI holds, pre-merge blockers, merge failures, and post-merge
+selection. PR digests are refreshed for review-fix progress, critique
+or CI holds, pre-merge blockers, merge failures, and post-merge
 cleanup.
 
 Agents deliberately avoid editing a PR digest between a valid E1 review
@@ -692,20 +691,13 @@ heartbeat, release, or take over rather than holding the claim open.
 The docs audit keeps this guidance synchronized with the exported
 template so unattended runs can spot drift.
 
-## Copilot review instruction scope
+## Review instruction scope
 
-The heavy shared overview keeps `applyTo: "**"` so GitHub Copilot
-execution surfaces can receive the IDD entry context automatically.
-However, it also sets `excludeAgent: "code-review"` so Copilot code
-review does not ingest the full operational workflow as reviewer-side
-context.
-
-This is an intentional middle path between the evaluated alternatives:
-keeping review coupled to the full overview, narrowing `applyTo` and
-risking execution-agent discoverability, or splitting a separate
-reviewer-only instruction file. Copilot code review may still use the
-lightweight repository-wide `.github/copilot-instructions.md`; only the
-heavier `idd-overview-core.instructions.md` is excluded from review.
+The shared overview keeps `applyTo: "**"` for execution surfaces and
+keeps reviewer-side context separate. The repository's no-advisory
+policy does not request or wait for an external review service; review
+currency comes from the E-phase activity snapshot and the bounded Codex
+critique pass.
 
 ## F2 merge-readiness evidence checklist
 
@@ -724,15 +716,15 @@ Required evidence fields:
 4. Reviewer-state evidence: latest `CHANGES_REQUESTED` states for human,
    required, and CODEOWNER reviewers, plus required approval/CODEOWNER
    satisfaction.
-5. Advisory-wait evidence: AW outcome for the current HEAD, marker
-   coverage (`EARLIEST_SAME_HEAD_AT`), and merge-gate satisfaction.
+5. Review/critique evidence: the current-head watermark, critique
+   baseline, and merge-gate satisfaction.
 6. CI evidence: required-check generation and pass status for all
    required checks on the current HEAD.
 
 Mixed reviewer ecosystems are expected. The same checklist applies
-across human reviews and advisory bot surfaces (Copilot, CodeRabbit,
-Codex connectors, CI bots); "one bot says clean" is never sufficient by
-itself.
+across human reviews, ordinary PR discussion, review threads, and
+automated checks; "one automated signal says clean" is never sufficient
+by itself.
 
 **Authoritative source for the final-merge fields.** Bind every CI and
 activity value in this checklist to the **live `pre-merge-readiness` run on
@@ -748,34 +740,16 @@ for each helper's phase role.
 ## Review Policy Profiles
 
 The execution loop is cross-agent, while PR review policy is a
-repository choice. See
-[IDD review policy profiles](idd-review-policy-profiles.md) before
-customizing the default Copilot advisory behavior.
+repository choice. This repository uses `no-advisory`: it does not
+request or wait for an external reviewer. E1 snapshots human reviews,
+ordinary PR comments, and review threads; E2 runs the bounded Codex
+critique; E14 requests re-review only from a human reviewer whose latest
+state is `CHANGES_REQUESTED`; and F2 verifies review currency, unresolved
+conversation state, critique evidence, and CI together.
 
-## Default PR policy: Copilot advisory review
-
-The core IDD flow is cross-agent, but the distributed default PR policy
-still includes a GitHub Copilot advisory review step in later PR
-phases.
-
-- `idd-review-fix.instructions.md` can request a GitHub Copilot
-  re-review for the current PR head.
-- `idd-merge.instructions.md` can wait or hold based on that GitHub
-  review state.
-- This dependency is on GitHub's review integration, not on every local
-  agent using Copilot as its CLI.
-- Adopters who do not want that default PR policy should choose another
-  review policy profile, apply the matching
-  `profiles/<profile>/README.md` artifact, and follow the PR review
-  profile edit-surface checklist in
-  [IDD review policy profiles](idd-review-policy-profiles.md).
-- Expect non-default profile changes to cover review-fix, advisory-wait,
-  pre-merge, merge, review-snapshot, and review-triage surfaces; the
-  exact edits vary by profile.
-
-Non-Copilot agents can still drive the workflow end to end, but they
-should expect those later phases to interact with Copilot as a GitHub
-reviewer because that is part of this repository's current PR policy.
+Other adopters may choose a different profile by applying the matching
+`profiles/<profile>/README.md` artifact and its documented edit-surface
+checklist in [IDD review policy profiles](idd-review-policy-profiles.md).
 
 ## Maintainer-Authorized External-Check Waivers
 
@@ -860,7 +834,7 @@ agent; only the mechanism differs.
 
 | Agent           | How to run a critique pass                                                                                                                                                                                                 |
 | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Copilot         | Launch a subagent in Agent mode; use the calling phase's critique checklist as the prompt                                                                                                                                  |
+| Editor/agent surface | Use the surface's bounded subagent mechanism with the calling phase's critique checklist                                                                                                                                |
 | Claude Code     | `Agent(subagent_type="general-purpose")` with the calling phase's critique checklist                                                                                                                                       |
 | Codex CLI       | Use one bounded read-only native subagent review when supported and suitable; parent waits for and collects the result. Fallback: structured self-critique when delegation is unavailable, disabled, unsuitable, or fails. |
 | OpenCode        | Launch a subagent via OpenCode's Task tool (e.g. the built-in `general` subagent, or a `subtask: true` command) — an independent mechanism                                                                                 |
