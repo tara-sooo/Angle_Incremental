@@ -29,6 +29,9 @@
     "generationTimeout": "PT10M",
     "rerunPolicy": "rerun-once"
   },
+  "ciGate": {
+    "trustEmptyProtectionReads": true
+  },
   "worktreeGuard": {
     "enabled": true
   },
