@@ -6,12 +6,6 @@ on:
       - Regression Suite
     types:
       - completed
-  workflow_dispatch:
-    inputs:
-      version:
-        description: Release version without the v prefix. Leave empty to use version.json.
-        required: false
-        type: string
 
 permissions:
   contents: write
@@ -23,17 +17,16 @@ concurrency:
 jobs:
   publish:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'main')
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out release commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'main' }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
       - name: Verify commit is current main
@@ -56,18 +49,12 @@ jobs:
       - name: Resolve and validate version
         id: version
         shell: bash
-        env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
           set -euo pipefail
           FILE_VERSION="$(node -p "require('./version.json').appVersion")"
-          VERSION="${INPUT_VERSION:-$FILE_VERSION}"
+          VERSION="$FILE_VERSION"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Invalid release version: $VERSION"
-            exit 1
-          fi
-          if [[ "$VERSION" != "$FILE_VERSION" ]]; then
-            echo "::error::Requested version $VERSION does not match version.json ($FILE_VERSION)."
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"

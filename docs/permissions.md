@@ -44,13 +44,15 @@ claim, and head-binding gates. The transition PR #105 is explicitly
 human-controlled even though its base is `next`.
 
 `main` and every `release/**` base branch remain human-controlled. Their
-active `angle-incremental-human-release-boundary` ruleset must have no bypass
-actors and must require:
+active `angle-incremental-human-release-boundary` ruleset has no bypass actors
+and requires:
 
-- a pull request with exactly one approving review from another writer;
-- approval of the latest reviewable push;
-- dismissal of stale approvals and resolution of review threads; and
-- the repository's merge-commit method only.
+- a pull request with no required approval count (so a solo maintainer is not
+  deadlocked by self-approval);
+- the passing `regression` required status check;
+- resolution of review threads; and
+- the repository's merge-commit method only, with force-push and deletion
+  blocked.
 
 Unknown base branches fail closed to the human route. The repository-owned
 read-only checks are `node scripts/branch-merge-policy.mjs --base-branch
@@ -60,12 +62,16 @@ verification. They never call a merge endpoint and are evidence only.
 
 This is a GitHub-side control, not a claim that the current Codex login is a
 least-privilege worker credential. The PR #101 incident evidence showed that
-the available `tara-sooo` OAuth token is broad and administrator-capable.
-Until an operator replaces it with a repository-scoped worker credential that
-cannot administer rulesets, the current token remains broader than the ideal
-worker profile. `next` may use the normal F3 merge path only; `--admin` and
-other bypasses are forbidden. A maintainer supplies the approval and performs
-the final merge for `main`, `release/**`, unknown-base, and transition PRs.
+the available `tara-sooo` OAuth token is broad and administrator-capable. The
+repository therefore removes `workflow_dispatch` from `publish-release.yml`:
+Release can only follow a successful `Regression Suite` push run on `main`,
+and a worker cannot invoke the Release workflow directly through the manual
+dispatch endpoint. The same OAuth still cannot be distinguished by GitHub as
+"worker" versus "solo maintainer" for a main-branch merge; until a separate
+worker identity or Actions workflow-execution actor policy exists, that is an
+explicit interim limitation. `next` may use the normal F3 merge path only;
+`main`, `release/**`, unknown-base, and transition PRs remain IDD
+human-controlled, and `--admin`/other bypasses are forbidden.
 
 ## Merge Policy Profiles
 

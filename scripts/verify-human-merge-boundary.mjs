@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import { resolveBranchMergePolicy } from './branch-merge-policy.mjs';
+
+const releaseWorkflow = fs.readFileSync(new URL('../.github/workflows/publish-release.yml', import.meta.url), 'utf8');
+assert.doesNotMatch(releaseWorkflow, /^\s*workflow_dispatch:/m, 'release workflow must not expose workflow_dispatch');
+assert.match(releaseWorkflow, /github\.event\.workflow_run\.event == 'push'/);
+assert.match(releaseWorkflow, /github\.event\.workflow_run\.head_branch == 'main'/);
 
 const args = new Map();
 for (let index = 2; index < process.argv.length; index += 2) {
@@ -75,14 +81,21 @@ if (mergePolicy.route === 'autonomous') {
   const pullRequestRule = detail.rules.find(({ type }) => type === 'pull_request');
   assert.ok(pullRequestRule, 'pull_request rule is required');
   const parameters = pullRequestRule.parameters ?? {};
-  assert.equal(parameters.required_approving_review_count, 1);
+  assert.equal(parameters.required_approving_review_count, 0);
   assert.equal(parameters.dismiss_stale_reviews_on_push, true);
-  assert.equal(parameters.require_last_push_approval, true);
+  assert.equal(parameters.require_last_push_approval, false);
   assert.equal(parameters.required_review_thread_resolution, true);
   assert.deepEqual(parameters.allowed_merge_methods, ['merge']);
+  const statusRule = detail.rules.find(({ type }) => type === 'required_status_checks');
+  assert.ok(statusRule, 'regression status check is required');
+  const statusParameters = statusRule.parameters ?? {};
+  assert.ok(statusParameters.required_status_checks?.some(({ context }) => context === 'regression'));
+  assert.equal(statusParameters.strict_required_status_checks_policy, true);
   console.log(JSON.stringify({
     ...output,
     humanControlled: true,
+    soloMaintainerViable: true,
+    releaseWorkflowDispatchDisabled: true,
     rulesetId: detail.id,
     rulesetName: detail.name,
   }));

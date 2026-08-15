@@ -25,9 +25,9 @@
 - **CI wait**: 実行30分、生成待ち10分、`rerun-once`
 - **Required-check read trust**: `ciGate.trustEmptyProtectionReads: true`。これは空の保護設定を読む場合の互換ポリシーです。required ruleは必ず実CIと組み合わせて確認し、vacuous greenを許可しません。
 - **Branch-aware merge policy**: `.github/idd/config.json`の`branchMergePolicy`と`node scripts/branch-merge-policy.mjs`がbase branchを分類します。`next`以外はfail-closedでhuman route、transition PR #105もhuman routeです。
-- **Release human-merge ruleset**: `main`と`release/**`には`angle-incremental-human-release-boundary`を適用し、bypass actorなし、PR必須、独立承認1件、最新pushの承認、stale承認破棄、review thread解決、merge commitのみを要求します。`node scripts/verify-human-merge-boundary.mjs --repo tara-sooo/Angle_Incremental --pr 105`で対象PRのbaseとlive boundaryを読み取ります。
+- **Release human-merge ruleset**: `main`と`release/**`には`angle-incremental-human-release-boundary`を適用し、bypass actorなし、PR必須、`regression` required check、review thread解決、merge commitのみ、force push/delete禁止を要求します。required approvalは0件とし、solo maintainerが自分のPRでGitHubの自己承認deadlockに陥らない形にします。`node scripts/verify-human-merge-boundary.mjs --repo tara-sooo/Angle_Incremental --pr 105`で対象PRのbaseとlive boundaryを読み取ります。
 - **Required-check registration**: 未適用。`contexts`のpinning設定も行わない
-- **Worker credentials**: PR #101時点の`tara-sooo` OAuthはadmin-capableな広い権限であり、最小権限worker credentialとはみなしません。`next`自動統合はF2/F3のrepository-local safety gatesに限定し、`main`/`release/**`はGitHub rulesetとhuman handoffで保護します。`--admin` fallbackは`hold-and-report`で禁止します。
+- **Worker credentials**: PR #101時点の`tara-sooo` OAuthはadmin-capableな広い権限であり、最小権限worker credentialとはみなしません。同一OAuthではGitHub上でworkerとsolo maintainerをactorとして完全分離できないため、現行のinterim boundaryは、workerからのRelease `workflow_dispatch`をworkflow自体から削除し、`main`/`release/**`をPR・`regression` check・thread解決・merge commit・no-bypassで保護し、IDD routeをhumanに固定することです。将来はActions workflow-execution policyまたは別worker identityでactor分離を追加します。`--admin` fallbackは`hold-and-report`で禁止します。
 - **Merge credentials**: maintainerが別途管理
 - **Issue-author approval**: enabled-by-default、承認者はowners/maintainersのみ
 - **Helper runtime**: `instructions-only`。IDD npm依存関係は追加しない
