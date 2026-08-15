@@ -2,7 +2,14 @@
   "$schema": "https://kurone-kito.github.io/idd-skill/schemas/policy.schema.json",
   "iddVersion": "0.6.0",
   "markerPrefix": "angle-incremental",
-  "mergePolicy": "human_merge",
+  "mergePolicy": "fully_autonomous_merge",
+  "branchMergePolicy": {
+    "autonomousBranches": ["next"],
+    "humanExactBranches": ["main"],
+    "humanPatterns": ["release/**"],
+    "unknownBaseRoute": "human_merge",
+    "transitionPullRequests": [105]
+  },
   "reviewPolicy": "no-advisory",
   "threadResolutionPolicy": "fast-agent-resolve",
   "claimTiming": {
@@ -31,6 +38,9 @@
   },
   "ciGate": {
     "trustEmptyProtectionReads": true
+  },
+  "mergeGate": {
+    "soloCodeownerAdminFallback": "hold-and-report"
   },
   "worktreeGuard": {
     "enabled": true

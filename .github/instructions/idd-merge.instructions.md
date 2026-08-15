@@ -17,17 +17,16 @@ Before any mutating action in F3, apply the
    your current `{claim-id}`. If it is missing, released, or held by a
    different `{claim-id}` (even under the same agent ID), the claim was
    lost — report and stop.
-2. Defensive route check: re-read the repository's recorded merge
-   policy (missing → treat as `fully_autonomous_merge`, the distributed
-   default). Then apply:
-   - `fully_autonomous_merge`: continue.
-   - `separate_merge_agent`: continue only when repository documentation
-     explicitly records the **current session** as the designated
-     merge-capable actor and the documented resume condition is
-     satisfied; otherwise route to `idd-merge-handoff.instructions.md`
-     and stop.
-   - `human_merge` or unknown policy: route to
-     `idd-merge-handoff.instructions.md` and stop.
+2. Defensive branch-aware route check: run
+   `node scripts/verify-human-merge-boundary.mjs --repo OWNER/REPO --pr
+   {pr-number}` and use the live base branch. Continue only when it
+   reports `route: "autonomous"` for exact `next`; route `main`,
+   `release/**`, transition PRs, unknown bases, and any verifier failure
+   to `idd-merge-handoff.instructions.md` and stop. Then re-read the
+   recorded global merge policy (missing → `fully_autonomous_merge`, the
+   distributed default): `fully_autonomous_merge` may continue on this
+   explicit `next` route; `separate_merge_agent` still requires the
+   designated actor; `human_merge` or unknown policy stops.
 3. Immediately before executing the merge command, do one final live
    fetch using the **exact same activity-universe scope as E1 Step 1**
    (all review threads, review bodies, and regular PR comments,
@@ -144,36 +143,14 @@ Before any mutating action in F3, apply the
        not retry the plain command or add `--admin`; post a hold
        comment with the GitHub error text and stop for a maintainer
        decision (kurone-kito/idd-skill#1493).
-     - Anything else, including the key absent (distributed default
-       `"auto-admin-retry"`) → retry exactly once with `--admin`, bound
-       to the same validated head, only when every field in the
-       [Solo-CODEOWNER `--admin` fallback field
-       contract](../../docs/idd-helper-scripts.md#merge-execution-f3)
-       holds: the Gate checklist (step 4) was fully green; the merge
-       command's only reported failure is this exact GitHub error
-       against a configured pull-request-only (or wider) bypass actor;
-       and the report's `reviewerStates.codeownerSelfApproval` proves
-       the PR author is the sole eligible codeowner (`status: "clear"`
-       with a bypass-available `reason`, `prAuthorIsSoleEligibleCodeowner:
-       true`, `codeownerEligibilityUnreadable: false`) — re-checked a
-       second time immediately before the `--admin` call itself (real
-       time passes between the plain merge's failure and the retry, and
-       `--admin` bypasses the entire ruleset), with a fresh GitHub merge
-       state of `mergeable: "MERGEABLE"` and `mergeStateStatus` settled
-       to `"CLEAN"` or `"BEHIND"` also required. `idd-merge-execute.mjs
-       --apply` applies this automatically and records the outcome in
-       the verdict's `adminFallbackUsed` field.
-
-       ```sh
-       gh pr merge {pr-number} --merge --match-head-commit "${PR_HEAD_SHA_F3}" --admin
-       ```
-
-       On success, continue the normal post-merge digest update
-       exactly as after a successful plain merge (step 4). If any
-       condition above does not hold, or the `--admin` retry also
-       fails, post a hold comment with the GitHub error text(s) and
-       stop for a maintainer decision (kurone-kito/idd-skill#1493,
-       #1494) — the same hold-and-report outcome as the opt-in tier.
+   - This repository records `"hold-and-report"`; never retry with
+     `--admin`. Any plain merge failure is reported to the maintainer and
+     stops. Other repositories may retain the distributed default, but
+     that is not this repository's authorization.
+   - Any other value, including the distributed `"auto-admin-retry"`
+     default, is not authorized by this repository's branch-aware policy.
+     Never invoke `--admin`; post a hold with the GitHub error and stop for
+     a maintainer decision.
    - Base branch updated or conflict → return to
      `idd-pre-merge.instructions.md` F1
    - CI condition no longer met → return to

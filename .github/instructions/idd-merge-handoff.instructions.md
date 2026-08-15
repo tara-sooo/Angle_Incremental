@@ -11,7 +11,7 @@ designated `separate_merge_agent` actor path or the
 `fully_autonomous_merge` policy path (see Step 1); all other paths must
 stop and report.
 
-## F2.5 — Resolve merge policy route
+## F2.5 — Resolve branch-aware merge policy route
 
 1. Confirm claim ownership context:
    - If an **active claim** exists, it must still use your current
@@ -21,13 +21,26 @@ stop and report.
      `separate_merge_agent` actor path in step 5, or the
      `fully_autonomous_merge` policy path in step 6. Other paths must
      stop.
-2. Read the repository's recorded merge policy from repository
-   documentation that future IDD sessions read. If no policy is
-   recorded, treat it as `fully_autonomous_merge` (distributed default).
-3. If the recorded value is not one of `fully_autonomous_merge`,
+2. Before applying the global policy, resolve the current PR base branch
+   with the repository-owned check:
+
+   ```sh
+   node scripts/verify-human-merge-boundary.mjs --repo OWNER/REPO --pr {pr-number}
+   ```
+
+   The exact `next` base is the only autonomous route, and only after all
+   F2/F3 gates pass. `main`, `release/**`, transition PRs, and unknown
+   bases route to human handoff. A missing, weak, or unreadable result is
+   human/fail-closed; never infer authorization from a PR title or branch
+   name.
+3. Read the repository's recorded global merge policy from repository
+   documentation that future IDD sessions read. If no policy is recorded,
+   treat it as `fully_autonomous_merge` (distributed default).
+4. If the recorded value is not one of `fully_autonomous_merge`,
    `human_merge`, or `separate_merge_agent`, treat it as an unknown merge
    policy: stop, post a hold comment, and request maintainer decision.
-4. If the recorded policy is `human_merge`, stop before the final
+5. If the branch-aware result is human, or the recorded policy is
+   `human_merge`, stop before the final
    freshness fetch and before `gh pr merge`. After claim revalidation,
    post a concise handoff summary comment that includes:
    - PR number and branch
@@ -43,7 +56,7 @@ stop and report.
    ```
 
    For `human_merge`, hand off to the human maintainer.
-5. If the recorded policy is `separate_merge_agent`, apply this split:
+6. If the recorded policy is `separate_merge_agent`, apply this split:
    - If repository documentation explicitly records that the **current
      session** is the designated merge-capable actor and the documented
      resume condition is satisfied:
@@ -64,5 +77,6 @@ stop and report.
        then release the worker claim with `unclaimed-by` using the
        current `{claim-id}` and stop. If the claim was already lost, do
        not post release.
-6. When the policy is `fully_autonomous_merge`, continue directly to
+7. When the branch-aware result is autonomous and the policy is
+   `fully_autonomous_merge`, continue directly to
    `idd-merge.instructions.md`.
