@@ -16,6 +16,7 @@ assert.deepEqual(config.branchMergePolicy, {
 });
 assert.equal(config.helperRuntime.profile, 'instructions-only');
 assert.equal(config.ciGate?.trustEmptyProtectionReads, true);
+assert.equal(config.mergeGate?.soloCodeownerAdminFallback, 'hold-and-report');
 assert.equal(Object.hasOwn(config, 'advisoryWait'), false);
 
 const activeSurfaces = [
@@ -141,5 +142,6 @@ assert.deepEqual(directHumanMergeSurfaces, ['.github/instructions/idd-merge.inst
   'only post-F2.5 merge execution may contain the human_merge route');
 assert.match(mergeExecution, /Read only after `idd-merge-handoff\.instructions\.md` routes/);
 assert.match(mergeExecution, /route `main`[\s\S]*`human_merge` or unknown policy stops/);
+assert.match(mergeExecution, /never retry with\s+`--admin`/);
 
 console.log(`no-advisory policy OK (${activeSurfaces.length} runtime surfaces)`);

@@ -87,9 +87,9 @@ Before any mutating action in F3, apply the
    `ready`, it re-fetches the head SHA and re-validates the claim
    immediately before merging, fails closed (no merge) on head drift or
    lost claim, and runs the merge commit bound to the validated head
-   (never squash/rebase). On a plain-merge failure it also applies step
-   5's solo-CODEOWNER `--admin` fallback decision itself (recorded in
-   `adminFallbackUsed`) — the gate checklist and decision table below
+   (never squash/rebase). On a plain-merge failure, this repository's
+   recorded `hold-and-report` decision applies: no helper or worker path
+   may retry with `--admin`. The gate checklist and decision table below
    stay canonical: if the helper is unavailable, its output is invalid,
    or its evidence conflicts with live GitHub state, discard it and use
    the manual gate + merge steps in this section.
