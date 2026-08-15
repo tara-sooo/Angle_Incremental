@@ -32,7 +32,7 @@ These values are adopted by Angle Incremental:
 | `docs/idd-advisory-wait-shell-fallback.md`                 | Mark the doc unused by this profile, or remove local references to it, matching the `idd-advisory-wait.instructions.md` disposition above. |
 | `.github/instructions/idd-pre-merge.instructions.md`       | Gate on CI, branch protection, unresolved conversations, freshness, and claim evidence without requiring an advisory reviewer.             |
 | `.github/instructions/idd-merge.instructions.md`           | Remove final advisory rechecks while keeping CI, claim, freshness, branch protection, and unresolved-thread checks.                        |
-| `.github/instructions/idd-review-snapshot.instructions.md` | Keep human comments in scope and remove advisory-only PATH B requirements.                                                                 |
+| `.github/instructions/idd-review-snapshot.instructions.md` | Keep actionable human `COMMENTED` review bodies and ordinary comments in scope; remove advisory-only PATH B requirements.                 |
 | `.github/instructions/idd-review-triage.instructions.md`   | Keep human review comments in the review universe and remove advisory-only disposition requirements.                                       |
 | `.github/instructions/idd-merge-handoff.instructions.md`   | Carry review/critique evidence, rather than external-review state, into the `human_merge` handoff.                                       |
 | `docs/idd-workflow.md`                                    | Document this repository's no-advisory route and remove the stale external-review default.                                                |

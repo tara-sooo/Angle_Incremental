@@ -181,9 +181,16 @@ or the thread has an IDD-agent reply starting
 `**Awaiting maintainer decision**` (remains an active blocker
 regardless of maintainer response).
 
-**Review bodies** where the reviewer's latest state is
-`CHANGES_REQUESTED` — exclude reviews already replied to and
-re-review-requested in a previous E13/E14 pass.
+**Human review bodies**: include a review whose latest state is
+`CHANGES_REQUESTED`, and also include a non-empty `COMMENTED` review body
+when it contains a concrete finding, requested change, or explicit
+review verdict. In this repository a maintainer may be unable to submit
+`CHANGES_REQUESTED` on the PR author's own pull request, so actionable
+`COMMENTED` bodies are PATH A candidates rather than advisory noise.
+Exclude only empty or explicit acknowledgement-only bodies (for example
+`LGTM`, `Approved`, or `No changes requested`) and reviews already replied
+to and re-review-requested in a previous E13/E14 pass. When a `COMMENTED`
+body is ambiguous, keep it in ReviewItems_snapshot and let E4 triage it.
 
 **Regular comments** where the last speaker isn't any IDD agent and no
 reply from **you** exists after that comment's timestamp — exclude
