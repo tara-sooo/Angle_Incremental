@@ -36,6 +36,44 @@ to push a branch and update PR discussion, but it should not be able to
 change repository settings, read secrets, publish packages, or deploy to
 production.
 
+## Repository-specific branch-aware merge boundary
+
+Angle Incremental allows autonomous IDD integration only for the exact
+`next` base branch, after the full F2/F3 review, critique, CI, freshness,
+claim, and head-binding gates. The transition PR #105 is explicitly
+human-controlled even though its base is `next`.
+
+`main` and every `release/**` base branch remain human-controlled. Their
+active `angle-incremental-human-release-boundary` ruleset has no bypass actors
+and requires:
+
+- a pull request with no required approval count (so a solo maintainer is not
+  deadlocked by self-approval);
+- the passing `regression` required status check from the GitHub Actions
+  integration (`app_id: 15368`);
+- resolution of review threads; and
+- the repository's merge-commit method only, with force-push and deletion
+  blocked.
+
+Unknown base branches fail closed to the human route. The repository-owned
+read-only checks are `node scripts/branch-merge-policy.mjs --base-branch
+BRANCH` for pure routing and `node scripts/verify-human-merge-boundary.mjs
+--repo tara-sooo/Angle_Incremental --pr PR_NUMBER` for live PR/ruleset
+verification. They never call a merge endpoint and are evidence only.
+
+This is a GitHub-side control, not a claim that the current Codex login is a
+least-privilege worker credential. The PR #101 incident evidence showed that
+the available `tara-sooo` OAuth token is broad and administrator-capable. The
+repository therefore removes `workflow_dispatch` from `publish-release.yml`:
+Release can only follow a successful `Regression Suite` push run on `main`,
+and a worker cannot invoke the Release workflow directly through the manual
+dispatch endpoint. The same OAuth still cannot be distinguished by GitHub as
+"worker" versus "solo maintainer" for a main-branch merge; until a separate
+worker identity or Actions workflow-execution actor policy exists, that is an
+explicit interim limitation. `next` may use the normal F3 merge path only;
+`main`, `release/**`, unknown-base, and transition PRs remain IDD
+human-controlled, and `--admin`/other bypasses are forbidden.
+
 ## Merge Policy Profiles
 
 Choose and record one merge policy in repository documentation before

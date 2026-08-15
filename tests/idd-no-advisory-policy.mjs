@@ -1,13 +1,22 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { resolveBranchMergePolicy } from '../scripts/branch-merge-policy.mjs';
 
 const read = (path) => fs.readFileSync(path, 'utf8');
 const config = JSON.parse(read('.github/idd/config.json'));
 
 assert.equal(config.reviewPolicy, 'no-advisory');
-assert.equal(config.mergePolicy, 'human_merge');
+assert.equal(config.mergePolicy, 'fully_autonomous_merge');
+assert.deepEqual(config.branchMergePolicy, {
+  autonomousBranches: ['next'],
+  humanExactBranches: ['main'],
+  humanPatterns: ['release/**'],
+  unknownBaseRoute: 'human_merge',
+  transitionPullRequests: [105],
+});
 assert.equal(config.helperRuntime.profile, 'instructions-only');
 assert.equal(config.ciGate?.trustEmptyProtectionReads, true);
+assert.equal(config.mergeGate?.soloCodeownerAdminFallback, 'hold-and-report');
 assert.equal(Object.hasOwn(config, 'advisoryWait'), false);
 
 const activeSurfaces = [
@@ -58,6 +67,9 @@ const mergeHandoff = read('.github/instructions/idd-merge-handoff.instructions.m
 const mergeExecution = read('.github/instructions/idd-merge.instructions.md');
 const policy = read('docs/idd-policy.md');
 const workflow = read('docs/idd-workflow.md');
+const boundaryVerifier = read('scripts/verify-human-merge-boundary.mjs');
+const branchPolicy = read('scripts/branch-merge-policy.mjs');
+const releaseWorkflow = read('.github/workflows/publish-release.yml');
 
 assert.match(reviewFix, /## E10[\s\S]*critique pass/);
 assert.match(reviewSnapshot, /human|ordinary PR|review comments/i);
@@ -70,8 +82,31 @@ assert.match(policy, /human_merge/);
 assert.match(policy, /next/);
 assert.match(policy, /main/);
 assert.match(policy, /`ciGate\.trustEmptyProtectionReads: true`/);
-assert.match(policy, /protected:false/);
 assert.match(policy, /vacuous green/);
+assert.match(policy, /ruleset/);
+assert.match(policy, /bypass actor/i);
+assert.match(policy, /最小権限|least-privilege/i);
+assert.match(policy, /branch-aware|branch-aware/i);
+assert.match(boundaryVerifier, /angle-incremental-human-release-boundary/);
+assert.match(boundaryVerifier, /required_approving_review_count.*0/);
+assert.match(boundaryVerifier, /required_status_checks/);
+assert.match(boundaryVerifier, /integration_id.*15368/);
+assert.match(boundaryVerifier, /bypass_actors/);
+assert.doesNotMatch(boundaryVerifier, /pulls\/[^`]+\/merge/);
+assert.match(branchPolicy, /autonomousBranches/);
+assert.deepEqual(resolveBranchMergePolicy('next'), {
+  route: 'autonomous', reason: 'integration-branch', baseBranch: 'next', failClosed: false, releasePublication: false,
+});
+assert.equal(resolveBranchMergePolicy('next', 105).reason, 'transition-pr');
+assert.equal(resolveBranchMergePolicy('main').route, 'human');
+assert.equal(resolveBranchMergePolicy('release/0.12.0').route, 'human');
+assert.equal(resolveBranchMergePolicy('feature/demo').failClosed, true);
+assert.match(releaseWorkflow, /github\.event\.workflow_run\.event == 'push'/);
+assert.match(releaseWorkflow, /github\.event\.workflow_run\.head_branch == 'main'/);
+assert.doesNotMatch(releaseWorkflow, /^\s*workflow_dispatch:/m);
+assert.doesNotMatch(releaseWorkflow, /github\.event_name == 'workflow_dispatch'/);
+assert.match(releaseWorkflow, /github\.event\.workflow_run\.head_sha/);
+assert.doesNotMatch(releaseWorkflow, /head_branch == 'next'/);
 assert.match(workflow, /Codex CLI[\s\S]*bounded read-only native subagent/i);
 assert.match(workflow, /structured self-critique/i);
 
@@ -111,6 +146,7 @@ const directHumanMergeSurfaces = workerPhaseFiles.filter((path) => /human_merge/
 assert.deepEqual(directHumanMergeSurfaces, ['.github/instructions/idd-merge.instructions.md'],
   'only post-F2.5 merge execution may contain the human_merge route');
 assert.match(mergeExecution, /Read only after `idd-merge-handoff\.instructions\.md` routes/);
-assert.match(mergeExecution, /`human_merge`[\s\S]*route to\s+`idd-merge-handoff\.instructions\.md` and stop/);
+assert.match(mergeExecution, /route `main`[\s\S]*`human_merge` or unknown policy stops/);
+assert.match(mergeExecution, /never retry with\s+`--admin`/);
 
 console.log(`no-advisory policy OK (${activeSurfaces.length} runtime surfaces)`);
