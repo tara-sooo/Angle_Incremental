@@ -50,12 +50,6 @@ Before any mutating action in F3, apply the
    `{latest-ci-completed-at}` — this final fetch is the live side of
    each comparison, exactly as F2's own live snapshot was.
 
-   The structural ack-only carve-out from F2 applies here verbatim:
-   newer activity/count growth that helper evidence proves is
-   post-disposition advisory-bot acknowledgement only
-   (`ack-only-post-disposition`) does not force the return to E1; all
-   other triggers above are unaffected.
-
    From that same final fetch, compute `F3_UNRESOLVED_ACTIONABLE_COUNT`
    using the exact F2 unresolved-thread rule and exceptions
    (non-awaiting-reviewer unresolved threads only; awaiting-reviewer
@@ -73,49 +67,10 @@ Before any mutating action in F3, apply the
    fields (`passed`, `items[]`) are not merge-gate substitutes.
 
    Execute the merge immediately after this final fetch **and the claim
-   re-validation and advisory state revalidation below**, with no other
+   re-validation below**, with no other
    actions in between. Re-validate claim: re-read the issue and confirm
    the active claim still uses your current `{claim-id}` — if not, the
    claim was lost, report and stop.
-
-   **Advisory state revalidation (blocking)**: the AW1 check just below
-   is an instant state read, not itself a wait. If it escalates to a
-   genuine wait, return to the F2 advisory bot wait check (backgrounds
-   only if the topology-safety condition holds — confirmed to route
-   completion back to this turn — otherwise waits synchronously): no
-   single `gh` command blocks on Copilot review state, so run the AW
-   poll loop as a foreground wait, never via `run_in_background` absent
-   the confirmed condition — see
-   [idd-ci.instructions.md's Wake-up
-   discipline](idd-ci.instructions.md#wake-up-discipline).
-   Re-fetch the HEAD SHA:
-
-   ```sh
-   PR_HEAD_SHA_F3=$(gh pr view {pr-number} --json headRefOid --jq '.headRefOid')
-   ```
-
-   Use `PR_HEAD_SHA_F3` as `PR_HEAD_SHA`. Run **AW1**
-   (`idd-advisory-wait.instructions.md`):
-   - If **SATISFIED** (`LAST_COPILOT_COMMIT == PR_HEAD_SHA_F3`) →
-     proceed with the merge.
-   - If `COPILOT_PENDING` is `"false"` (review completed or cancelled) →
-     satisfied; proceed with the merge.
-   - Otherwise (`COPILOT_PENDING` is `"true"`, not yet reviewed): run
-     **AW2** and apply **AW3** — do not skip even if F2 already ran
-     them, since F3 is a self-contained blocking gate:
-     - **SATISFIED** → proceed with the merge.
-     - **HOLD** → post the hold comment from **AW4** and stop.
-     - **RECOVERY_NEEDED** → post the recovery marker from **AW3-R** and
-       return to the F2 advisory bot wait check; do not merge in the
-       same F3 pass that creates a recovery marker.
-     - **CAP_EXHAUSTED** → post the cap-exhausted hold comment from
-       **AW4** and stop.
-     - **REQUEST_NEEDED** → return to E14 to refresh/request Copilot
-       review and post a request marker; do not merge.
-     - **WAIT** → do NOT execute the merge; return to the **F2 advisory
-       bot wait check** in `idd-pre-merge.instructions.md` (go back to
-       the first condition in F2), which reuses the existing same-HEAD
-       marker — do not post a new one.
 
    If the optional helper output disagrees with the live fetch above,
    follow the live fetch and the written gate rules.
@@ -148,14 +103,6 @@ Before any mutating action in F3, apply the
      (`{f2-head-SHA}`);
    - review-currency route is `proceed`;
    - `F3_UNRESOLVED_ACTIONABLE_COUNT` is `0`;
-   - advisory `f3Outcome` is `SATISFIED` (the authoritative advisory
-     gate — do not add stricter sub-conditions; e.g. a pending-window
-     `SATISFIED` can keep `copilotPending` true and
-     `LAST_COPILOT_COMMIT` off the head);
-   - no unwaived `copilot-terminal-unavailable` in the helper's
-     `blockers[]` — separate from `f3Outcome`, not a stricter
-     sub-condition on it
-     ([Terminal routing](idd-advisory-wait.instructions.md#terminal-routing-1570));
    - all required CI checks pass for the current head;
    - claim ownership still uses your `{claim-id}`.
 
@@ -280,14 +227,12 @@ Before any mutating action in F3, apply the
      CodeRabbit summaries specifically — once all its review threads
      are resolved with fresh IDD dispositions).
    - Bot review parent bodies without associated review threads
-     (including Copilot error review bodies) are skipped by default
+     (including automated-review error bodies) are skipped by default
      unless a future policy narrows a safe cleanup class for them.
    - Trusted IDD operational marker comments may be minimized as
      `OUTDATED` only after merge, once the marker is no longer needed
-     for resume, advisory wait, or review-currency checks. Candidate
-     prefixes: `<!-- review-watermark:`, `<!-- review-baseline:`,
-     `advisory-wait:`, `advisory-wait-recovery:`, `<!-- advisory-wait:`,
-     `advisory-reroll:`.
+     for resume or review-currency checks. Candidate prefixes:
+     `<!-- review-watermark:` and `<!-- review-baseline:`.
    - Do not minimize comments with unresolved maintainer decisions,
      active holds, failed-CI context maintainers still need,
      non-operational human discussion, or content still in active F2/F3

@@ -36,7 +36,7 @@ fall through.
 sessions of the same agent type — pick or confirm one before the first
 command below that needs it (Claim execution step 4 at the latest).
 Appending a unique session token is recommended for auditability
-(e.g., `copilot-8122ca35`), not required. `{agent-id}` alone is never
+(e.g., `codex-8122ca35`), not required. `{agent-id}` alone is never
 ownership proof; `{claim-id}` is the authoritative token.
 
 ## Stop-and-ask

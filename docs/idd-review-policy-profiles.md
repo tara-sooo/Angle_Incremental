@@ -15,6 +15,14 @@ before they treat the imported workflow as final.
 This page names the supported policy shapes and the instruction files
 that need customization when a repository does not use the default.
 
+## Angle Incremental adoption
+
+This repository adopts `no-advisory`. The local policy record is
+`docs/idd-policy.md`, and the applied surface/evidence checklist is
+`profiles/no-advisory/README.md`. Its normal review loop is internal Codex
+critique plus deterministic validation, CI, human comments, and the existing
+`human_merge` boundary; no external review bot is requested or awaited.
+
 ## PR Review Profile Summary
 
 | Profile            | Use when                                                                                      | Review signal                                                                          | Merge gate                                                                                            |

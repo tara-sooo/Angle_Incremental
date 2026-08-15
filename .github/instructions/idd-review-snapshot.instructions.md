@@ -4,6 +4,9 @@ Read this file after CI passes on a newly pushed PR, or after returning
 from a fix cycle. It covers fetching review items (E1), running the
 critique pass (E2), and checking whether ReviewItems_snapshot is empty (E3).
 
+This repository uses the no-advisory profile: human review, ordinary PR
+comments, CI, and bounded Codex critique are the review inputs.
+
 Before posting any E-phase operational comment or GitHub reply, apply
 the shared claim revalidation gate. The active claim must still use your
 current `{claim-id}`.
@@ -61,13 +64,6 @@ Additionally, fetch the **current CI state** for `{head-SHA}`:
 `completedAt` of the most recently completed successful (or
 treated-as-passed) CI run as `{latest-ci-completed-at}`, or `none` if no
 CI pass exists yet for this HEAD.
-
-**Non-Copilot advisory safety net.** This E1 snapshot + the Step 2
-watermark are the load-bearing safety net for non-Copilot advisory
-bots, which get no settle/wait window from the advisory-wait protocol
-— see `idd-advisory-wait.instructions.md`'s Scope section. This is why
-Step 1 fetches the entire activity universe and Step 2 watermarks all
-of it.
 
 **Step 2 — Record the watermark.** Using the `{head-SHA}` stored at the
 start of Step 1, compute `{max-activity-updatedAt}` as the highest
@@ -129,18 +125,9 @@ no-code-fence note.
 Use server-reported timestamps, not the local wall clock.
 
 **CI-completion precondition.** Post the `review-watermark` only
-**after** every CI run counting toward the merge gate has completed —
-including any opt-in/label-triggered job enabled at the quiescent
-pre-merge point. Same precondition for an expected advisory-bot
-re-review: when the primary bot already reviewed an earlier head,
-check the AW1 fast-path signal in `idd-advisory-wait.instructions.md`
-(`LAST_COPILOT_COMMIT == PR_HEAD_SHA`) and post after that review
-lands, bounded by the advisory-wait windows when it never does.
-Operationally: enable the late job, await completion, **then** take
-the Step 1 snapshot and post the watermark — a merge-gate run
-completing _after_ the watermark forces a wasted E1↔F2 round-trip
-(F2's `ci-pass-drift`) with no new review activity.
-
+**after** every CI run counting toward the merge gate has completed.
+The watermark records the server-reported CI timestamp used by F2;
+a later completed run forces a fresh E1 snapshot.
 Note: some GitHub client tools (e.g., `gh issue comment`, `gh api -f
 body=`) silently reject HTML-comment-only bodies; this format's
 visible text avoids that, but the HTTP `POST` path is still
@@ -194,15 +181,21 @@ or the thread has an IDD-agent reply starting
 `**Awaiting maintainer decision**` (remains an active blocker
 regardless of maintainer response).
 
-**Review bodies** where the reviewer's latest state is
-`CHANGES_REQUESTED` — exclude reviews already replied to and
-re-review-requested in a previous E13/E14 pass.
+**Human review bodies**: include a review whose latest state is
+`CHANGES_REQUESTED`, and also include a non-empty `COMMENTED` review body
+when it contains a concrete finding, requested change, or explicit
+review verdict. In this repository a maintainer may be unable to submit
+`CHANGES_REQUESTED` on the PR author's own pull request, so actionable
+`COMMENTED` bodies are PATH A candidates rather than advisory noise.
+Exclude only empty or explicit acknowledgement-only bodies (for example
+`LGTM`, `Approved`, or `No changes requested`) and reviews already replied
+to and re-review-requested in a previous E13/E14 pass. When a `COMMENTED`
+body is ambiguous, keep it in ReviewItems_snapshot and let E4 triage it.
 
 **Regular comments** where the last speaker isn't any IDD agent and no
 reply from **you** exists after that comment's timestamp — exclude
-periodic notification bots (Renovate, etc.). Include Copilot/CI
-advisory bot comments; they follow PATH B in E4-E7 (non-review notices
-are dispositioned under the E6 rule).
+periodic notification bots (Renovate, etc.). Include ordinary comments
+that contain a finding; triage handles them as PATH A.
 
 **Resolved-thread index (for the E5 duplicate pre-check).** Also carry
 forward a light index of this PR's **resolved** threads

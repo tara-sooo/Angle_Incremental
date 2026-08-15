@@ -15,7 +15,10 @@
 ## IDDポリシー設定
 
 - **Merge policy**: `human_merge`
-- **PR review policy**: `copilot-advisory`
+- **PR review policy**: `no-advisory`
+- **External advisory reviewer**: none. IDD does not request or wait for
+  an external review bot; Codex critique passes remain
+  internal work/review checks with their existing bounded convergence guards.
 - **Review-thread resolution**: `fast-agent-resolve`
 - **Critique loop**: distributed defaults
 - **Claim timing**: stale age 24時間、heartbeat 12時間
@@ -28,6 +31,23 @@
 - **Helper runtime**: `instructions-only`。IDD npm依存関係は追加しない
 - **Issue-authoring companion**: not installed
 - **Worktree guard**: 有効。`core.hooksPath=.githooks`をローカルで設定する
+
+## No-advisory verification boundary
+
+The repository relies on CI, branch protection when configured, unresolved
+review conversations, review-currency snapshots, and human review rules
+outside IDD. `human_merge` remains the final integration boundary: workers
+never merge pull requests. Ordinary issue pull requests target `next`, while
+`main` remains the stable release boundary and release PRs keep their existing
+manual flow.
+
+The active no-advisory surfaces are the review-fix, pre-merge, merge,
+review-snapshot, review-triage, merge-handoff, and workflow-guide documents
+listed in `profiles/no-advisory/README.md`. If a repository-local
+`idd-advisory-convergence` check is configured, it is treated only as an
+optional Codex critique/validation signal; this repository does not currently
+host or require a workflow with that name, and it is never an external
+reviewer request or wait gate.
 
 IDDの標準ラベルは`roadmap`、`status:blocked-by-human`、`status:needs-decision`です。これらは`.github/idd/config.json`とGitHub上のラベル名を一致させます。
 

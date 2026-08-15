@@ -28,6 +28,8 @@ jobs:
         run: npm run check:syntax
       - name: Check version consistency
         run: npm run check:version
+      - name: Check IDD review policy
+        run: npm run check:idd-policy
       - name: Run ESM regression suite
         run: npm run test:regression
       - name: Install Chromium for browser smoke test

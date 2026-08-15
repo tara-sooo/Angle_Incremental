@@ -34,7 +34,7 @@ stop and report.
    - full F2 snapshot (`{f2-head-SHA}`, `{f2-max-activity-updatedAt}`,
      `{f2-total-item-count}`, `{f2-latest-ci-completed-at|none}`)
    - the F2 readiness evidence
-   - unresolved-thread count, advisory state, and CI state
+   - unresolved-thread count, review/critique evidence, and CI state
    - active `{claim-id}`
    - merge command candidate:
 

@@ -173,7 +173,9 @@ not soften.
 
 The distributed PR policy is `copilot-advisory`. These values apply to
 that profile and remain policy defaults until the relevant instruction
-files are edited.
+files are edited. Angle Incremental selects `no-advisory`; its local
+runtime policy is recorded in [IDD policy](idd-policy.md), and the
+advisory-wait instructions below are not an active route here.
 
 The current policy schema and helper runtime now support
 `.github/idd/config.json` `advisoryWait.requestCap`,
@@ -189,9 +191,9 @@ Omitted keys keep the distributed defaults below. The duration keys
 `advisoryWait.recoveryCycleCap` / `advisoryWait.terminalWindow` (#1572)
 define the terminal Copilot stall-recovery **state contract**, accounted
 independently of `requestCap` and `sameHeadRerollCap`: see
-[Advisory wait](../.github/instructions/idd-advisory-wait.instructions.md#terminal-copilot-stall-recovery-contract-state-policy-markers-clock)
-for the full contract (markers, clock anchoring, fail-closed rules, and
-the non-bypass invariant). No caller currently posts a
+[Advisory wait](../.github/instructions/idd-advisory-wait.instructions.md)
+for the generic profile contract (markers, clock anchoring, fail-closed
+rules, and the non-bypass invariant). No caller currently posts a
 `COPILOT_UNAVAILABLE` determination into a merge-gate decision yet.
 `advisoryWait.sameHeadRerollCap` bounds the AW6 same-HEAD advisory
 reroll carve-out (#1465 / #1511, see

@@ -92,7 +92,7 @@ This check never rebases, merges, or pushes.
    `false`, every entry in `blockers[]` — each a `gate` name plus a
    `detail` string. Do not interpret, re-route, or attempt to remedy
    individual blockers yourself (for example, waiting out a `ci` or
-   `advisory-wait` blocker, or returning to E1 for a `review-currency`
+   external-review blocker, or returning to E1 for a `review-currency`
    or `disposition-evidence` blocker) — that
    per-blocker routing is exactly the standard file's prose-heavy part
    this lite file excludes.

@@ -9,9 +9,8 @@ the shared claim revalidation gate. The active claim must still use your
 current `{claim-id}`.
 
 **Skip condition E8**: if the Accepted PATH A count after verification
-is zero, proceed to the **E-phase branch-sync check** below (its
-no-sync-required `clean`/`behind-no-conflict` exit applies the
-**Zero-Accepted-PATH-A advisory re-review gate**).
+is zero, proceed to the **E-phase branch-sync check** below. Otherwise
+continue through review-fix.
 
 ## E4 — Classify and score ReviewItems_snapshot
 
@@ -20,22 +19,9 @@ For each item in ReviewItems_snapshot, first classify it:
 - **PATH A — actionable feedback**: human reviewer threads and regular
   comments, `CHANGES_REQUESTED` review bodies, and critique-pass
   findings that require a code change or maintainer decision.
-- **PATH B — advisory feedback**: Copilot and CI advisory bot comments
-  included by E1 for traceability, even when they do not require a code
-  change.
 - If classification is ambiguous, default to PATH A.
 - Record each PATH A actor's permission standing (CODEOWNER, required
   reviewer, Triage/Write/Maintain/Admin, or none) — E5's cap reads it.
-
-**Advisory non-review notice.** Before scoring a PATH B item, decide
-whether it is a _completed_ advisory review of the current HEAD or an
-**advisory non-review notice** — an advisory bot comment reporting that
-it did **not** review the current HEAD: rate-limit / quota /
-credit-exhaustion warnings, queued / in-progress status, a bare request
-acknowledgement (e.g. CodeRabbit "Actions performed"), or an error /
-"temporarily unavailable" notice. A non-review notice carries no
-advisory result to score; handle it with the E6 non-review-notice rule
-instead of the normal PATH B disposition.
 
 Then apply path-specific scoring:
 
@@ -44,24 +30,15 @@ Then apply path-specific scoring:
   forced**, gated by "Verify before accept" and the actor-permission cap
   (E5); **Low** (minor, unrelated to PR intent) → **Reject
   recommended**; **Medium** → judge by context.
-- **PATH B**: no High/Medium/Low. Score only a _completed_ review of
-  current HEAD as `Accepted` (confirmed/useful) or `Rejected`
-  (noted, no action) — route a non-review notice to E6 instead.
 
 ## E5 — Record Accept / Reject decisions
 
-Record a path-specific disposition for every item:
+Record one evidence-backed disposition for every item:
 
 - **PATH A**: High-severity items reach Accepted only via "Verify
   before accept" below, or — when the actor-permission cap applies —
   an explicit maintainer confirmation reply; Medium/Low require an
   explicit Accept or Reject decision.
-- **PATH B** (a _completed_ review of the current HEAD): `Accepted`
-  means the advisory confirms the implementation or captures useful
-  context; `Rejected` means noted, no action required. An advisory
-  non-review notice (E4) is **not scored** here — record it, but always
-  as `Rejected` per the E6 non-review-notice rule.
-
 **Actor-permission cap (PATH A).** Before an Accept, check whether the
 actor is a CODEOWNER, required reviewer, or holds Triage/Write/Maintain/
 Admin access (`GET
@@ -72,11 +49,9 @@ reply, gets it there. Otherwise cap it at Rejected with the reasoned
 reply E6 already requires. CODEOWNER/required-reviewer AMD handling is
 unchanged.
 
-Accepted PATH B items do **not** enter review-fix. They are fully
-handled in E6-E7.
 
-**Verify before accept (PATH A and PATH B).** A PATH A or PATH B item
-often asserts a fact — about safety, correctness, the runtime, CI, or an
+**Verify before accept (PATH A).** Each item often asserts a fact — about
+safety, correctness, the runtime, CI, or an
 artifact. Before `Accept`ing it, confirm the claim against live evidence
 (a code read, reproduction, or an equivalent check), not the comment
 text alone — the actor-permission cap above is the only exception, via
@@ -86,9 +61,9 @@ maintainer confirmation for an unprivileged PATH A actor: confirmed →
 real run conclusion, file contents, or artifact) — a verified-false
 claim is a reasoned rejection, not an action item.
 
-**Resolved-thread duplicate pre-check (PATH B, before verification).**
-Before verification above, check whether a new PATH B item — a review
-thread or a regular comment (E6 supports both PATH B sources) — matches
+**Resolved-thread duplicate pre-check (review item, before verification).**
+Before verification above, check whether a new review item — a review
+thread or a regular comment (E6 supports both review item sources) — matches
 an entry in this PR's resolved-thread index
 (`idd-review-snapshot.instructions.md` E1 Step 3). Matching is scoped to
 **this PR's** resolved threads only: a regular comment has no resolved
@@ -111,7 +86,7 @@ state of its own, but can still match a prior resolved thread's claim.
 - **Shortcut.** If the prior disposition was a reasoned rejection with
   evidence and that evidence still holds: reply to the new item with a
   fresh, individually-authored disposition citing the prior thread's URL
-  and its evidence, then apply the existing E6 PATH B reply rules for
+  and its evidence, then apply the existing E6 review item reply rules for
   that item's source — resolve immediately after replying for a review
   thread; reply only for a regular comment. Every recurrence still gets
   its own reply, so the 1:1 disposition-count / no-combined-replies rule
@@ -245,8 +220,6 @@ For each Rejected PATH A item whose source is reviewer feedback:
 
 Use these prefixes so that disposition is always unambiguous:
 
-- PATH B acceptance marker (only for a _completed_ review of the current
-  HEAD): `**Accepted** — {what the advisory comment confirmed}`
 - Ordinary rejection: `**Rejected** — {reason}`
 - CODEOWNER / required reviewer exception:
   `**Awaiting maintainer decision** — {reasoning}`
@@ -254,7 +227,7 @@ Use these prefixes so that disposition is always unambiguous:
 Two requirements make the F2/F3 disposition-evidence gate recognize an
 `**Accepted**` / `**Rejected**` disposition — `isDispositionComment` reads
 "the body **starts with** that marker" and pairs dispositions to advisory
-comments **1:1 by count** (`**Awaiting maintainer decision**` is a
+review comments **1:1 by count** (`**Awaiting maintainer decision**` is a
 separate PATH A signal, not part of this pairing):
 
 - The marker must be the **first bytes of the comment body** — no
@@ -262,78 +235,9 @@ separate PATH A signal, not part of this pairing):
   marker fails this on its own — the fence delimiters, not the marker,
   are the first bytes), or the gate counts zero dispositions for that
   comment.
-- Post **one disposition reply per advisory item** — never combine
+- Post **one disposition reply per review item** — never combine
   several markers into one comment; the 1:1 pairing clears only one item
   per comment, leaving the rest flagged `missing-disposition-evidence`.
-
-PATH B — Advisory items (completed review of the current HEAD):
-
-- Reply immediately with a decision marker, even when no code change is
-  needed. Use `**Accepted**` / "no findings / no action required"
-  framing **only** when the advisory is a completed review of the
-  current HEAD:
-  - `**Accepted** — {what the advisory comment confirmed}`
-  - `**Rejected** — {why no action is required}`
-- **Review threads**: resolve immediately after posting the marker.
-- **Regular comments**: reply only.
-- Do not send PATH B items to review-fix. Their work is complete once
-  the marker is posted and any thread resolution is done.
-
-PATH B — Advisory non-review notice (rate-limit / quota / queued / bare
-ack / error, as defined in E4):
-
-- A non-review notice is never evidence of a completed review — never
-  disposition it as confirmation, "no findings", or "reviewed, no
-  action needed". It also doesn't prove no review exists: disposition
-  any separate _completed_ review of current HEAD under the
-  completed-review rules above.
-- **Helper-first (optional).** When helper runtime is enabled, the
-  `disposition-non-review-notices` helper (see
-  `docs/idd-helper-scripts.md`) detects these notices and emits (dry-run)
-  or posts (`--apply`) the canonical disposition below — marker-first, one
-  per notice, idempotently and fail-closed. The written rule here stays
-  authoritative; the manual `gh api` path is the fallback.
-- **Disposition it deterministically in the current pass — no
-  re-request, no wait.** The notice itself is always `**Rejected**`
-  (never `**Accepted**` — it carries no advisory result):
-  `**Rejected** — {bot} did not review HEAD {sha} ({reason}); this is
-  not a completed review (source: #issuecomment-{id})`. Use the bot's
-  GitHub login for `{bot}` (e.g. `coderabbitai[bot]`) so the
-  carry-forward rule below can attribute per-bot. A separate _completed_
-  review of current HEAD, if present, is its own snapshot item —
-  disposition that one as `**Accepted**` under the completed-review
-  rules, not this notice. **Re-validate first**: a completed review can
-  race in after the E1 snapshot but before this rejection posts. If it
-  has, disposition that review instead and take a fresh E1 snapshot, so
-  the rejection's later timestamp doesn't filter the completed review
-  out of the next pass.
-- **Carry the rejection forward across pushes.** Once a notice carries a
-  `**Rejected** — {bot} did not review HEAD …` reply, that disposition
-  persists across later HEAD changes and pushes while the same notice
-  persists and the bot still hasn't reviewed any HEAD — a bumped
-  `updatedAt` or a re-posted identical summary needs no fresh rejection;
-  the F2/F3 disposition-evidence gate carries the existing one forward.
-  Scoped per bot (by GitHub login): one bot's carried rejection never
-  clears another's undispositioned notice. Re-disposition only when the
-  bot replaces the notice with an actual completed review — disposition
-  that under the completed-review rules instead.
-- **Never auto-request a fresh review to "upgrade" a notice.** Requesting
-  review state is owned solely by the advisory-wait protocol
-  (`idd-advisory-wait.instructions.md`, AW3 `REQUEST_NEEDED` → E14); a
-  maintainer may manually re-trigger a non-Copilot bot. A later
-  completed review is dispositioned normally on the next E1 pass.
-  **Never post an `advisory-wait` marker for a non-Copilot bot** —
-  AW2/AW3 treat any trusted same-HEAD marker as Copilot evidence,
-  wrongly satisfying the Copilot gate and consuming its cap. (The
-  **Zero-Accepted-PATH-A advisory re-review gate** below is a sanctioned
-  exception — it never triggers on a notice alone.)
-- **Fail-closed honesty**: never cite a non-review notice as evidence
-  that the advisory reviewer reviewed the current HEAD — not in the
-  disposition reply, the `Authoritative by` line, or the PR live status
-  digest.
-- **Non-blocking boundary**: this rule does not make PATH B a merge
-  blocker. The blocking advisory gate remains the Copilot advisory-wait
-  protocol in `idd-advisory-wait.instructions.md`, which is unchanged.
 
 ## E7 — Verify recorded dispositions
 
@@ -352,7 +256,7 @@ execution fails, output is invalid, or it conflicts with observed
 review state.
 
 Before leaving triage, verify every ReviewItems_snapshot item has the
-evidence required by its path:
+evidence required by its classification:
 
 - Every PATH A item has a recorded classification and an Accept or
   Reject decision. Every Accepted item cites its "Verify before accept"
@@ -361,11 +265,8 @@ evidence required by its path:
 - Every Rejected PATH A item whose source is reviewer feedback has the
   required rejection or `**Awaiting maintainer decision**` reply posted,
   and any non-AMD thread resolution is complete.
-- Every PATH B item has a posted `**Accepted**` or `**Rejected**`
-  marker. Review threads are resolved immediately after the marker.
 - Only Accepted PATH A items remain candidates for
-  `idd-review-fix.instructions.md`. PATH B items are fully closed out in
-  triage.
+  `idd-review-fix.instructions.md`.
 
 If any check fails, do not continue. Return to E4-E6 as needed until the
 missing evidence is recorded.
@@ -407,9 +308,8 @@ Route based on `branchState` from the helper (or `mergeable` /
 `mergeStateStatus` from `gh pr view`):
 
 - **`clean`** or **`behind-no-conflict`** when branch protection does not
-  require an up-to-date head: **first** apply the
-  **Zero-Accepted-PATH-A advisory re-review gate** below if it applies
-  (no-op otherwise). **Then**, if E6 posted any disposition reply this
+  require an up-to-date head: proceed directly to the F-phase check. If E6
+  posted any disposition reply this
   pass, refresh the `review-watermark` for the same `{head-SHA}`
   (recompute `{max-activity-updatedAt}` / `{total-item-count}` /
   `{latest-ci-completed-at}`, following the E1 Step 2 rules) — otherwise
@@ -465,71 +365,3 @@ rerun settling, a new disposition reply, another `next` advance)
 stales it, failing `--apply` closed on `review-currency` regardless
 of CI color; re-post before retrying. A stale `idd-advisory-convergence`
 rollup: see [rerun mechanics](idd-ci.instructions.md#rerun-mechanics).
-
-## Zero-Accepted-PATH-A advisory re-review gate
-
-Applies only from the branch-sync check's no-sync-required `clean` /
-`behind-no-conflict` exit, and only when the last non-empty
-`ReviewItems_snapshot` pass this episode had zero Accepted PATH A items
-**and** at least one PATH B item got a _completed-review_ disposition
-(never a notice-only rejection — see the E6 non-review-notice rule).
-Otherwise a no-op: a true-virgin empty snapshot (no PATH B ever
-dispositioned this episode) never fires it; a later-pass empty snapshot
-after a sync loop-back still does, since the lookback still finds the
-prior non-empty pass. (Rationale for the gap this closes:
-[design rationale](../../docs/idd-design-rationale.md#zero-accepted-path-a-advisory-re-review-gate).)
-Run this gate **after** any branch-sync merge settles — requesting
-first would let a later merge invalidate the review just obtained.
-
-Run E14's **Primary advisory bot** procedure
-(`idd-review-fix.instructions.md` E14) at this now-stable HEAD — steps
-1-4 plus the active polling loop when it applies; skip Human reviewers
-and the secondary-bot step. Substitute "resume the branch-sync check's
-no-sync-required `clean` exit (watermark-refresh, then F1)" for each of
-E14's four "proceed to E15" exits (step 2's `SATISFIED`, step 4's AW3
-`SATISFIED` and `CAP_EXHAUSTED` default, and the polling loop's
-`SATISFIED` exit). Every other exit — every "return to E1" and every
-hold-and-stop exit — halts exactly as in a normal E9-E15 pass; never
-redirect a hold to branch-sync or F1.
-
-E14's own fresh AW1 check already makes this gate inert once the bot
-has reviewed current HEAD, so it never duplicates a request, and never
-fires when the bot's latest review already covers HEAD but still
-carries items — **AW6** (#1511) handles that residual from F2 instead.
-
-## Advisory courtesy-ack convergence
-
-A trusted advisory bot's post-disposition courtesy reply (e.g. "thanks
-for confirming") advances the PR's `updatedAt`, which a naive
-review-currency check would treat as new activity and loop the
-review/snapshot cycle forever.
-
-**Rule**: once every `ReviewItems_snapshot` item has an
-`**Accepted**`/`**Rejected**` disposition at the **current HEAD SHA**, a
-later **ack-only** comment from a trusted advisory bot does not reopen
-the loop — bind the merge to current HEAD and proceed. An **ack-only**
-comment opens no new thread, carries no `CHANGES_REQUESTED`, and raises
-no new finding; anything else re-opens the loop normally.
-
-_Example_: after you disposition a CodeRabbit thread `**Rejected**`,
-CodeRabbit replies "Thanks for confirming" on it — no new thread or
-finding, so the `updatedAt` advance is ignored; continue to F-phase on
-the current HEAD.
-
-**Helper evidence**: when the advisory-bot identity is configured, the
-activity-snapshot / `pre-merge-readiness` evidence emits the structural
-half of this classification (`reviewCurrency.live.ackOnly.items`,
-`reviewCurrency.comparisonReason: ack-only-post-disposition`); the
-agent still confirms the semantic residual (no new finding), and this
-never weakens the disposition-evidence or unreplied-comment backstops.
-
-**Disposition-evidence parity (advisory-only)**: the same ack can also
-re-trip the `dispositionEvidence` backstop on an already-resolved
-thread (`route: return-to-e1`). `pre-merge-readiness` flags each such
-thread `ackOnlyPostDisposition: true`; when
-`dispositionEvidence.soleCauseAckOnlyPostDisposition` is `true` (every
-blocking item is one such thread), autopilot may deterministically
-override `return-to-e1` and proceed (see `idd-pre-merge.instructions.md`
-F2). Any non-ack blocking cause keeps it `false`, so the backstop holds
-otherwise. (`inPlaceEditOnly`/`soleCauseInPlaceEditOnly`, #1313, is a
-stricter subset — not an override path of its own.)

@@ -200,33 +200,11 @@ ships). For a stuck or stale rollup entry, apply the rerun mechanic
 above (`gh run rerun <run-id>` on the _existing_ PR-linked run)
 instead of `workflow_dispatch`.
 
-A second cause: GitHub gates a bot-triggered run (e.g. Copilot's
-`pull_request_review`/`pull_request_review_comment` event) to
-`action_required`, and the bot event alone never refreshes the check.
-Recover by rerunning the _existing_ non-bot `pull_request`-triggered
-run for this HEAD (subject to `ciWait.rerunPolicy`) — never the gated
-bot run itself, which keeps the original actor's privileges and
-re-enters `action_required` (approve via `POST
-/repos/{owner}/{repo}/actions/runs/{run_id}/approve` if it must run).
-The check also self-heals on the next non-bot trigger — a push or a
-**review-thread** reply, not a regular PR comment (no `issue_comment`
-subscription).
-
-**If rerunning the passing non-bot instance alone does not clear the
-rollup (`#1745`)**: a HEAD can carry several `idd-advisory-convergence`
-check-run instances at once (the check fires on `pull_request` plus
-`pull_request_review`/`pull_request_review_comment`, and
-`cancel-in-progress` cancels most of them), and GitHub's own required-check
-rollup can stay pinned to a bot-triggered instance whose **conclusion** is
-`CANCELLED` — distinct from the `action_required` case above. Unlike
-`action_required`, a `CANCELLED`-conclusion bot-triggered instance is
-**not** gated: rerunning it completes normally and does not re-enter
-`action_required` (confirmed by direct experiment, `#1745`). If the
-non-bot rerun above does not clear the block, rerun every
-`CANCELLED`-conclusion bot-triggered sibling instance for the same HEAD
-next (`gh run rerun <run-id>` on each, one at a time, per the sequential
-rule in the helper-first plan below) — only an `action_required`-conclusion
-instance stays withheld from rerun.
+If a required `idd-advisory-convergence` run is stale or action-required,
+rerun the existing PR-linked run for the same HEAD according to the normal
+`ciWait.rerunPolicy`; never manufacture a separate workflow run or treat a
+missing rollup as green. A push or review-thread reply can also regenerate
+the PR-linked check when the workflow requires a fresh event.
 
 **Helper-first**: prints this diagnosis and ordered rerun plan, read-only
 by default; pass `--apply` to also execute it — the preferred one-shot
@@ -251,19 +229,13 @@ back to the manual sequence: run the diagnostic, then `gh run rerun
 <run-id>` on each plan entry one at a time, waiting for each to finish
 before the next.
 
-**Terminal-waiver recheck (`#1570`)**: once a maintainer waives a proven
-`COPILOT_UNAVAILABLE` state
-([Terminal routing](idd-advisory-wait.instructions.md#terminal-routing-1570)),
-rerun this SAME existing run via the mechanic above — never
-`workflow_dispatch`.
-
 ## Interpretation
 
 <!-- dprint-ignore-start -->
 | State (required checks only, normalized) | Action |
 | --- | --- |
 | All required checks are generated and pass-equivalent | → **on-success** (caller-defined) |
-| Any required check is non-pass `failure`, `action_required`, `startup_failure`, or `stale` | Inspect the log. Infra/flaky: apply `ciWait.rerunPolicy` (default `rerun-once`) — rerun the exact failed run once and resume polling, or hold and stop. Code-caused: fix, **fix-validate**, commit atomically, return to caller's pre-push step. `action_required`/`startup_failure`/`stale` rarely clear on a blind rerun — if it needs a maintainer action or fresh run, hold rather than loop reruns. Exception: `idd-advisory-convergence` stuck at `action_required` from a gated bot run recovers by rerunning the existing run per `ciWait.rerunPolicy` (see §Rerun mechanics). Exception 2: `idd-advisory-convergence` alone non-pass with `pending: false` and outstanding review reasons — D4/E15 exit to E1 (both carve out a just-posted maintainer waiver, which still needs the rerun — see D4); F2/F3 unaffected. |
+| Any required check is non-pass `failure`, `action_required`, `startup_failure`, or `stale` | Inspect the log. Infra/flaky: apply `ciWait.rerunPolicy` (default `rerun-once`) — rerun the exact failed run once and resume polling, or hold and stop. Code-caused: fix, **fix-validate**, commit atomically, return to caller's pre-push step. `action_required`/`startup_failure`/`stale` rarely clear on a blind rerun — if it needs a maintainer action or fresh run, hold rather than loop reruns. Exception: `idd-advisory-convergence` alone non-pass with `pending: false` and outstanding review reasons — D4/E15 exit to E1 for review triage; F2/F3 remain blocked until the check is green. |
 | Any required check is non-pass `cancelled` or `timed_out` | Code-caused: fix, **fix-validate**, commit atomically, return to caller's pre-push step. Infra-caused: apply `ciWait.rerunPolicy`; rerun/re-push only within budget, otherwise hold and stop. |
 | Any required check is running (`pending`/`requested`/`waiting`/`expected`/...) | Continue waiting. After `ciWait.runningTimeout` (from server `startedAt`; default 30 min) with no completion, apply `ciWait.rerunPolicy` — rerun once and resume, or hold and stop if the route recurs or policy is `hold`. |
 | Required checks are not generated after `ciWait.generationTimeout` | Treat as running (default 10 min). If the workflow run doesn't exist at all when that window elapses, hold and escalate to a maintainer, then stop. |
@@ -308,9 +280,8 @@ condition below accounts for this.
   tool-timeout kill of the watch call is not a CI verdict — re-issue
   the same blocking watch, keep accumulating elapsed time against the
   bound above, and do not fall back to `run_in_background` or another
-  detached/backgrounded mechanism just because of the kill. Neither
-  watches Copilot review state — see
-  `idd-advisory-wait.instructions.md`. A bare `sleep` may
+  detached/backgrounded mechanism just because of the kill. This waits
+  only on CI state; a bare `sleep` may
   be sandboxed or blocked in some runtimes (preventive; no observed
   incident yet); a `run_in_background` Bash task or other
   detached/backgrounded mechanism must not be used for this wait
@@ -324,8 +295,7 @@ condition below accounts for this.
   outside the full build/test suite, instead of re-running everything.
 
 This trims only wasteful dimensions (context re-read, CI minutes) —
-review rounds stay full. Same discipline applies to the advisory-wait
-and review-fix wait points.
+review rounds stay full. The same discipline applies to review-fix waits.
 
 **Known residual risk**: workers can still stall here — expected and
 budgeted. Recovery: one message citing live state (PR number, check

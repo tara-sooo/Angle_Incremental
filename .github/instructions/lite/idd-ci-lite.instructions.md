@@ -142,7 +142,7 @@ CI-polling shared helper file), never this one. Read
   reliably refresh the PR's required-check rollup for the current HEAD
   SHA. Rerun the existing PR-linked run for the current HEAD instead of
   dispatching a new one.
-- A gated bot-triggered run (for example, Copilot posting its review)
+- A gated event-triggered run (for example, an external integration event)
   can stick at `action_required`. Rerun the existing non-bot run that
   already executed for this HEAD, subject to `ciWait.rerunPolicy`;
   never rerun the gated bot run itself.
