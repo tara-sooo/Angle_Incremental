@@ -34,7 +34,7 @@
 | Infinity Point / IP | Infinity Upgrade購入とInfinity Angleの解放・通常強化購入に使うリソース。 |
 | Infinity Upgrade / IU | IPで購入する恒久強化。 |
 | Infinity Challenge / IC | 制約付きでInfinity到達を目指すチャレンジ。 |
-| Tower Challenge / TC | Towerの次階建設を制限するチャレンジ。TC1〜TC3を実装済み、TC4は未実装。 |
+| Tower Challenge / TC | Towerの次階建設を制限するチャレンジ。TC1〜TC3に加え、TC4のライフサイクルとレベル1制限を実装済み。 |
 | Infinity Angle / IA | e20 IPで解放する、Infinity内の独立した図形進行。 |
 | Infinity Score | IAの核到達で得るInfinity内スコア。^0.3後に通常の頂点獲得量へ乗算する。 |
 | Tower | IPで建設し、階数に応じてスコア累乗を強化するInfinity後の恒久要素。 |
