@@ -661,7 +661,7 @@ try {
   assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
   assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
   assert.equal(towerInitial.towerChallengeRows, 4, "TC1-TC4 rows should be visible");
-  assert.equal(towerInitial.towerChallengeReleaseStatus, "TC1〜TC3実装済み", "Tower Challenge status should reflect the implemented TC range");
+  assert.equal(towerInitial.towerChallengeReleaseStatus, "TC1〜TC4実装済み", "Tower Challenge status should reflect the implemented TC range");
   assert.equal(towerInitial.towerChallengeButton, "挑戦開始", "implemented TC rows should expose a start button");
   assert.equal(towerInitial.towerChallengeButtonDisabled, true, "locked TC rows should disable their start button");
   assert.match(towerInitial.towerChallengeRestriction, /通常強化/);
@@ -702,6 +702,32 @@ try {
   assert.equal(towerChallenge3Flow.disabled, false, "TC3 should be available at Floor 8");
   assert.match(towerChallenge3Flow.restriction, /\^0\.800/);
   assert.match(towerChallenge3Flow.restriction, /\^0\.500/);
+  const towerChallenge4Flow = await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    const original = {
+      towerFloor: state.towerFloor,
+      activeTowerChallenge: state.activeTowerChallenge,
+      completedTowerChallenges: state.completedTowerChallenges,
+    };
+    state.towerFloor = 12;
+    state.activeTowerChallenge = 4;
+    state.completedTowerChallenges = 0;
+    window.advanceTime(0);
+    const row = document.querySelector('#towerChallengeList [data-tower-challenge="4"]');
+    const result = {
+      status: row?.querySelector(".challenge-state")?.textContent?.trim() ?? "",
+      button: row?.querySelector("button")?.textContent?.trim() ?? "",
+      disabled: Boolean(row?.querySelector("button")?.disabled),
+      restriction: row?.querySelector(".challenge-restriction")?.textContent?.trim() ?? "",
+    };
+    Object.assign(state, original);
+    window.advanceTime(0);
+    return result;
+  });
+  assert.equal(towerChallenge4Flow.status, "挑戦中", "TC4 should show its active status");
+  assert.equal(towerChallenge4Flow.button, "挑戦中止", "an active TC4 should expose a stop button");
+  assert.equal(towerChallenge4Flow.disabled, false, "an active TC4 should be stoppable");
+  assert.match(towerChallenge4Flow.restriction, /レベル1/);
   const towerChallengeFlow = await page.evaluate(() => {
     const { state, toggleTowerChallenge, completeTowerChallengeIfReady } = window.__angleDebug;
     state.towerFloor = 3;

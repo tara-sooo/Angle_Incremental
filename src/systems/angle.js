@@ -491,6 +491,7 @@ function upgradeCostLog(kind) {
 
 function canBuyNormalUpgrade(kind) {
   if (runtime.state.activeTowerChallenge === 1) return false;
+  if (!runtime.towerChallenge4AllowsNormalUpgrade(kind)) return false;
   if (runtime.state.activeChallenge === 7 && currentScoreLog10() > 30) return false;
   if (kind === "vertex") {
     if (runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;
@@ -499,7 +500,7 @@ function canBuyNormalUpgrade(kind) {
 }
 
 function spendNormalUpgrade(kind) {
-  if (!canBuyNormalUpgrade(kind)) return false;
+  if (!runtime.towerChallenge4AllowsNormalUpgrade(kind) || !canBuyNormalUpgrade(kind)) return false;
   if (runtime.isChallengeCompleted(7)) return true;
   return spendLog(upgradeCostLog(kind));
 }

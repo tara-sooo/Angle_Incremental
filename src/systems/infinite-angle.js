@@ -161,6 +161,7 @@ function canBuyInfiniteAngleUpgrade(kind) {
   const maximumCostLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
   return runtime.state.infiniteAngleUnlocked
     && Boolean(INFINITE_ANGLE_UPGRADES[kind])
+    && runtime.towerChallenge4AllowsInfiniteAngleUpgrade(kind)
     && (kind !== "vertex" || infiniteAngleUpgradeLevel("vertex") < runtime.MAX_RENDERED_VERTICES - 3)
     && costLog10 <= maximumCostLog10
     && runtime.canSpendInfinityPoints(costLog10);

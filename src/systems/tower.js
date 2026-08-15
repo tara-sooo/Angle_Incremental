@@ -80,9 +80,12 @@ const TOWER_CHALLENGES = Object.freeze([
     unlockFloor: 12,
     targetLog10: Infinity,
     name: { ja: "TC4", en: "TC4" },
-    restriction: { ja: "内容は今後のリリースで公開", en: "Details planned for a future release." },
+    restriction: {
+      ja: "通常強化とIA強化はレベル1を超えて購入できない",
+      en: "Normal and Infinite Angle upgrades cannot be purchased above level 1.",
+    },
     reward: { ja: "報酬は今後のリリースで公開", en: "Reward planned for a future release." },
-    implemented: false,
+    implemented: true,
   },
 ]);
 
@@ -179,6 +182,33 @@ function towerChallengeImplemented(index) {
   return Boolean(towerChallengeDefinition(index)?.implemented);
 }
 
+function towerChallenge4AllowsNormalUpgrade(kind) {
+  if (runtime.state.activeTowerChallenge !== 4) return true;
+  if (kind === "speed") return runtime.state.speedLevel < 1;
+  if (kind === "gain") return runtime.state.gainLevel < 1;
+  if (kind === "vertex") {
+    const level = runtime.state.activeChallenge === 8
+      ? runtime.state.ic8VertexUpgradeLevel
+      : runtime.state.vertices - 3;
+    return Math.max(0, Math.floor(level)) < 1;
+  }
+  return false;
+}
+
+function towerChallenge4AllowsInfiniteAngleUpgrade(kind) {
+  if (runtime.state.activeTowerChallenge !== 4) return true;
+  if (kind === "speed") return runtime.state.infiniteAngleSpeedLevel < 1;
+  if (kind === "vertex") return runtime.state.infiniteAngleVertexLevel < 1;
+  if (kind === "gain") return runtime.state.infiniteAngleGainLevel < 1;
+  return false;
+}
+
+function resetTowerChallenge4Upgrades() {
+  runtime.state.infiniteAngleSpeedLevel = 0;
+  runtime.state.infiniteAngleVertexLevel = 0;
+  runtime.state.infiniteAngleGainLevel = 0;
+}
+
 function towerChallengeTargetLog10(index) {
   return towerChallengeDefinition(index)?.targetLog10 ?? Infinity;
 }
@@ -248,6 +278,7 @@ function toggleTowerChallenge(index) {
   runtime.state.activeTowerChallenge = normalizedIndex;
   runtime.state.activeTowerChallengeTime = 0;
   runtime.resetBelowInfinity();
+  if (normalizedIndex === 4) resetTowerChallenge4Upgrades();
   runtime.updateUi();
   runtime.saveGame("manual");
   return true;
@@ -329,6 +360,8 @@ expose("towerChallengeUnlocked", () => towerChallengeUnlocked);
 expose("towerChallengeCompleted", () => towerChallengeCompleted);
 expose("towerChallengeDefinition", () => towerChallengeDefinition);
 expose("towerChallengeImplemented", () => towerChallengeImplemented);
+expose("towerChallenge4AllowsNormalUpgrade", () => towerChallenge4AllowsNormalUpgrade);
+expose("towerChallenge4AllowsInfiniteAngleUpgrade", () => towerChallenge4AllowsInfiniteAngleUpgrade);
 expose("towerChallengeTargetLog10", () => towerChallengeTargetLog10);
 expose("towerChallengeText", () => towerChallengeText);
 expose("towerChallengeName", () => towerChallengeName);
