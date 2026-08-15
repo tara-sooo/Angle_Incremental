@@ -7,6 +7,7 @@ const config = JSON.parse(read('.github/idd/config.json'));
 assert.equal(config.reviewPolicy, 'no-advisory');
 assert.equal(config.mergePolicy, 'human_merge');
 assert.equal(config.helperRuntime.profile, 'instructions-only');
+assert.equal(config.ciGate?.trustEmptyProtectionReads, true);
 assert.equal(Object.hasOwn(config, 'advisoryWait'), false);
 
 const activeSurfaces = [
@@ -68,6 +69,9 @@ assert.match(reviewTriage, /PATH A[\s\S]*human|ordinary PR/i);
 assert.match(policy, /human_merge/);
 assert.match(policy, /next/);
 assert.match(policy, /main/);
+assert.match(policy, /`ciGate\.trustEmptyProtectionReads: true`/);
+assert.match(policy, /protected:false/);
+assert.match(policy, /vacuous green/);
 assert.match(workflow, /Codex CLI[\s\S]*bounded read-only native subagent/i);
 assert.match(workflow, /structured self-critique/i);
 

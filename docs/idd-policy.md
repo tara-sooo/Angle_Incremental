@@ -23,6 +23,7 @@
 - **Critique loop**: distributed defaults
 - **Claim timing**: stale age 24時間、heartbeat 12時間
 - **CI wait**: 実行30分、生成待ち10分、`rerun-once`
+- **Required-check read trust**: `ciGate.trustEmptyProtectionReads: true`。これは、maintainerがこの自動化コンテキストのtokenについて`admin`権限を確認したうえで、`next`の`protected:false`、branch-protectionの`404 Branch not protected`、rulesetsの空リストを検証したためです。この設定は空の保護設定の読み取りだけを信頼し、HEADに対する実CI実行の存在と成功を不要にせず、vacuous greenを許可しません。
 - **Up-to-date-head ruleset**: 無効（現在ruleset/branch protectionは未設定）
 - **Required-check registration**: 未適用。`contexts`のpinning設定も行わない
 - **Worker credentials**: merge権限なし
