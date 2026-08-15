@@ -4,7 +4,7 @@ Read after the E-phase branch-sync check confirms no sync is required,
 or when returning to merge-gate checks after a sync cycle. Covers F1
 (read-only branch-state check) and F2 (pre-merge checklist).
 
-This repository uses the `no-advisory` profile. The merge gate uses live
+This repository uses the no-advisory profile. The merge gate uses live
 review-currency, human-review, unresolved-conversation, claim, branch, and
 CI evidence; it does not require an external reviewer.
 
@@ -220,10 +220,14 @@ nonce was recorded for the active claim.
   lacks a subsequent IDD-agent comment — "subsequent" meaning any
   IDD-agent regular comment posted at a strictly later timestamp (→
   return to review triage). Mirrors E1's regular-comment filter for
-  ordinary PR discussion. Human and ordinary review threads/comments
-  remain in this same activity and disposition gate. When configured, the
-  internal `idd-advisory-convergence` CI check remains part of the CI gate;
-  it represents the bounded Codex critique result, not an external reviewer.
+  ordinary PR discussion. Human and ordinary review comments remain in this gate.
+- **Internal critique convergence and dispositions**: when configured, the
+  `idd-advisory-convergence` CI check remains part of the CI gate as the
+  bounded Codex critique result. Non-zero results or missing
+  `dispositionEvidence` route back to E1/E4. Require
+  `dispositionEvidence.route == "proceed"` and
+  `dispositionEvidence.blockingCount == 0`; this covers every unresolved
+  thread and ordinary PR comment, not just one actor class.
 
 When any F2 condition routes to a hold/stop or back to E1/E14, update
 the digest after recording the blocking evidence and before
