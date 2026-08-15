@@ -58,6 +58,7 @@ const mergeHandoff = read('.github/instructions/idd-merge-handoff.instructions.m
 const mergeExecution = read('.github/instructions/idd-merge.instructions.md');
 const policy = read('docs/idd-policy.md');
 const workflow = read('docs/idd-workflow.md');
+const boundaryVerifier = read('scripts/verify-human-merge-boundary.mjs');
 
 assert.match(reviewFix, /## E10[\s\S]*critique pass/);
 assert.match(reviewSnapshot, /human|ordinary PR|review comments/i);
@@ -70,8 +71,14 @@ assert.match(policy, /human_merge/);
 assert.match(policy, /next/);
 assert.match(policy, /main/);
 assert.match(policy, /`ciGate\.trustEmptyProtectionReads: true`/);
-assert.match(policy, /protected:false/);
 assert.match(policy, /vacuous green/);
+assert.match(policy, /ruleset/);
+assert.match(policy, /bypass actor/i);
+assert.match(policy, /最小権限|least-privilege/i);
+assert.match(boundaryVerifier, /rulesets/);
+assert.match(boundaryVerifier, /required_approving_review_count/);
+assert.match(boundaryVerifier, /bypass_actors/);
+assert.doesNotMatch(boundaryVerifier, /pulls\/[^`]+\/merge/);
 assert.match(workflow, /Codex CLI[\s\S]*bounded read-only native subagent/i);
 assert.match(workflow, /structured self-critique/i);
 

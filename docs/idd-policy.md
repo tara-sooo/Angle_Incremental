@@ -23,10 +23,10 @@
 - **Critique loop**: distributed defaults
 - **Claim timing**: stale age 24時間、heartbeat 12時間
 - **CI wait**: 実行30分、生成待ち10分、`rerun-once`
-- **Required-check read trust**: `ciGate.trustEmptyProtectionReads: true`。これは、maintainerがこの自動化コンテキストのtokenについて`admin`権限を確認したうえで、`next`の`protected:false`、branch-protectionの`404 Branch not protected`、rulesetsの空リストを検証したためです。この設定は空の保護設定の読み取りだけを信頼し、HEADに対する実CI実行の存在と成功を不要にせず、vacuous greenを許可しません。
-- **Up-to-date-head ruleset**: 無効（現在ruleset/branch protectionは未設定）
+- **Required-check read trust**: `ciGate.trustEmptyProtectionReads: true`。これは空の保護設定を読む場合の互換ポリシーであり、`next`には別途、Issue #104で導入したactive rulesetが適用されます。rulesetのrequired ruleは必ず実CIと組み合わせて確認し、vacuous greenを許可しません。
+- **Human-merge ruleset**: `next`には`angle-incremental-human-merge-next`を適用し、bypass actorなし、PR必須、独立承認1件、最新pushの承認、stale承認破棄、review thread解決、merge commitのみを要求します。`node scripts/verify-human-merge-boundary.mjs --repo tara-sooo/Angle_Incremental --branch next`でライブ設定をfail-closedに読み取ります。
 - **Required-check registration**: 未適用。`contexts`のpinning設定も行わない
-- **Worker credentials**: merge権限なし
+- **Worker credentials**: PR #101時点の`tara-sooo` OAuthはadmin-capableな広い権限であり、最小権限worker credentialとはみなしません。rulesetはサーバー側の補償制御です。maintainerがrepository-scopedでruleset変更・merge不能なcredentialへ交換するまで、無人worker運用は許可しません。
 - **Merge credentials**: maintainerが別途管理
 - **Issue-author approval**: enabled-by-default、承認者はowners/maintainersのみ
 - **Helper runtime**: `instructions-only`。IDD npm依存関係は追加しない

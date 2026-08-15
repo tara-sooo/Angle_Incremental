@@ -36,6 +36,31 @@ to push a branch and update PR discussion, but it should not be able to
 change repository settings, read secrets, publish packages, or deploy to
 production.
 
+## Repository-specific `human_merge` boundary
+
+Angle Incremental keeps `human_merge` as a server-enforced policy for the
+`next` integration branch. The active `angle-incremental-human-merge-next`
+ruleset must have no bypass actors and must require:
+
+- a pull request with exactly one approving review from another writer;
+- approval of the latest reviewable push;
+- dismissal of stale approvals and resolution of review threads; and
+- the repository's merge-commit method only.
+
+The repository-owned read-only check is
+`node scripts/verify-human-merge-boundary.mjs --repo tara-sooo/Angle_Incremental --branch next`.
+It reads the live ruleset and fails closed on missing, duplicated, or weaker
+configuration. It never calls a merge endpoint and is evidence only; it does
+not replace the human approval.
+
+This is a GitHub-side control, not a claim that the current Codex login is a
+least-privilege worker credential. The PR #101 incident evidence showed that
+the available `tara-sooo` OAuth token is broad and administrator-capable.
+Until an operator replaces it with a repository-scoped worker credential that
+cannot administer rulesets or merge, unattended worker use remains out of
+scope. A maintainer supplies the independent approval and performs the final
+merge; workers do not use `--admin` or any other bypass.
+
 ## Merge Policy Profiles
 
 Choose and record one merge policy in repository documentation before
