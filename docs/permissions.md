@@ -49,7 +49,8 @@ and requires:
 
 - a pull request with no required approval count (so a solo maintainer is not
   deadlocked by self-approval);
-- the passing `regression` required status check;
+- the passing `regression` required status check from the GitHub Actions
+  integration (`app_id: 15368`);
 - resolution of review threads; and
 - the repository's merge-commit method only, with force-push and deletion
   blocked.

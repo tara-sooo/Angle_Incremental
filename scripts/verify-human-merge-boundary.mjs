@@ -89,7 +89,9 @@ if (mergePolicy.route === 'autonomous') {
   const statusRule = detail.rules.find(({ type }) => type === 'required_status_checks');
   assert.ok(statusRule, 'regression status check is required');
   const statusParameters = statusRule.parameters ?? {};
-  assert.ok(statusParameters.required_status_checks?.some(({ context }) => context === 'regression'));
+  const regressionCheck = statusParameters.required_status_checks?.find(({ context }) => context === 'regression');
+  assert.ok(regressionCheck, 'regression status check is required');
+  assert.equal(regressionCheck.integration_id, 15368, 'regression must be produced by GitHub Actions');
   assert.equal(statusParameters.strict_required_status_checks_policy, true);
   console.log(JSON.stringify({
     ...output,

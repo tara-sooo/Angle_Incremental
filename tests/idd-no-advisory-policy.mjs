@@ -90,6 +90,7 @@ assert.match(policy, /branch-aware|branch-aware/i);
 assert.match(boundaryVerifier, /angle-incremental-human-release-boundary/);
 assert.match(boundaryVerifier, /required_approving_review_count.*0/);
 assert.match(boundaryVerifier, /required_status_checks/);
+assert.match(boundaryVerifier, /integration_id.*15368/);
 assert.match(boundaryVerifier, /bypass_actors/);
 assert.doesNotMatch(boundaryVerifier, /pulls\/[^`]+\/merge/);
 assert.match(branchPolicy, /autonomousBranches/);
