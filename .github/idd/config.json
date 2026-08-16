@@ -8,7 +8,7 @@
     "humanExactBranches": ["main"],
     "humanPatterns": ["release/**"],
     "unknownBaseRoute": "human_merge",
-    "transitionPullRequests": [105]
+    "transitionPullRequests": [105, 109]
   },
   "reviewPolicy": "no-advisory",
   "threadResolutionPolicy": "fast-agent-resolve",

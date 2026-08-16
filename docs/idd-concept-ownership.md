@@ -31,7 +31,7 @@ or extends a gate defined in `.github/instructions/`.
 | Merge-capable session | The actor authorized to execute F3. Under `fully_autonomous_merge` this is the same worker session; under `separate_merge_agent` it is a distinct designated session; under `human_merge` it is the human maintainer.                                                                               |
 | Human maintainer      | A repository owner or collaborator acting outside the automated loop — approving issues, resolving holds, authorizing forced handoff or an external-check waiver, or merging manually.                                                                                                              |
 | Advisory bot          | Copilot's PR review integration plus any bot configured in `advisoryBotLogins` (for example CodeRabbit or a Codex connector). Not a required-reviewer or `CHANGES_REQUESTED` gate, but its review threads still count toward F2's unresolved-threads backlog gate until dispositioned and resolved. |
-| GitHub platform       | Mechanical behavior GitHub itself performs once the right input exists — closing-keyword auto-close, CI run execution, mergeability computation.                                                                                                                                                    |
+| GitHub platform       | Mechanical behavior GitHub itself performs once the right input exists — default-branch closing-keyword auto-close, CI run execution, mergeability computation.                                                                                                                                      |
 
 ## Concept-ownership matrix
 
@@ -53,8 +53,8 @@ back as evidence for a gate.
 | Roadmap task list | Human maintainer (or issue-authoring skill) at roadmap authoring time | Worker session running the A1.5 roadmap-audit claim (adds follow-up links, keeps sequencing current) | A1.5 completion audit |
 | Branch | Worker session, B1 | Worker session (pushes at D2/E12; merge-from-`next` at E-phase sync/E11) | B1 self-check; cwd-vs-claim check in the claim revalidation gate |
 | Worktree | Worker session, B1 | Worker session (reuse/recreate on takeover) | B1 self-check; worktree-local claim lock |
-| PR title / body | Worker session, D3 | Worker session (D3.5 closing-keyword self-check edits, later E-phase updates) | D3.5 self-check; F2 disposition-evidence check |
-| Closing keyword | Worker session, in the PR body at D3 | Worker session, if D3.5 finds it missing or miswrapped | D3.5 self-check; GitHub platform at F3 merge (mechanical auto-close) |
+| PR title / body | Worker session, D3 | Worker session (D3.5 branch-aware association edits, later E-phase updates) | D3.5 association check; F2 disposition-evidence check |
+| Issue association | Worker session, in the PR body at D3 | Worker session, if D3.5 finds a missing/misrouted association | D3.5 branch-aware check; default GitHub auto-close or next reconciliation |
 | Review threads | Human reviewer or advisory bot, during CI/E-phase | Worker session (replies at E6/E13); reviewer (reopen) | E1 snapshot; E7 verification; F2 unresolved-threads gate |
 | `review-watermark` / `review-baseline` markers | Worker session, E1/E2 | Worker session (re-post to refresh; minimize a superseded one as `OUTDATED`) | F2/F3 review-currency check |
 | Disposition replies (`**Accepted**` / `**Rejected**` / `**Awaiting maintainer decision**`) | Worker session, E6/E13 | Worker session mirrors a human maintainer's later decision onto an AMD thread | E7 verifier; F2/F3 disposition-evidence gate |
@@ -78,7 +78,7 @@ matrix's general "who mutates" column above.
 <!-- dprint-ignore-start -->
 | Concept | Terminal state | Authorized actor / phase |
 | --- | --- | --- |
-| Issue | Closed | GitHub platform via the PR's closing keyword at F3 merge (execution-leaf issues); worker session running the A1.5 roadmap-audit claim (roadmap issues); worker session directly at B2.0 on a verified supersession hit (acceptance criteria already met by a merged sibling PR); human maintainer may also close manually |
+| Issue | Closed | GitHub platform via a verified default-branch closing set or worker F3/resume reconciliation after an exact-next merge (execution-leaf issues); worker session running the A1.5 roadmap-audit claim (roadmap issues); worker session directly at B2.0 on a verified supersession hit (acceptance criteria already met by a merged sibling PR); human maintainer may also close manually |
 | Claim | Released or superseded | Worker session (`unclaimed-by` on abort); a later worker session via stale takeover (A5, Resume-stall S5); human-gated forced handoff transfers it without a release step |
 | Roadmap task list / roadmap issue | Closed | Worker session running the A1.5 roadmap-audit claim, only once every child and descendant is closed or otherwise complete |
 | Branch and worktree | Deleted | Worker or merge-capable session, F4 — only after F3 merge succeeds |

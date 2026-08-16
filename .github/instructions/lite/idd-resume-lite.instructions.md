@@ -59,13 +59,19 @@ Use GitHub **server** timestamps only. Stale age default: **24 h**
 
 | Condition                                                      | Action                                                                 |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Issue closed or PR merged                                      | Step 1 cleanup only → STOP                                             |
+| Merged exact-next PR, next differs from default, issue CLOSED, completion evidence missing/invalid | Next-merge evidence repair; never reopen/re-close or re-merge |
+| Merged exact-next PR, next differs from default, issue OPEN      | Next-merge reconciliation; never re-merge or start D3.5              |
+| Issue closed or PR merged with issue CLOSED                   | Step 1 cleanup only → STOP                                             |
 | Valid human-gated forced-handoff matching live claim/branch/PR | Step 1 forced-handoff path (skip stall)                                |
 | Forced-handoff evidence present but mismatches live state      | STOP — report mismatch; do not claim/push                              |
 | Non-owned active claim, no valid forced-handoff                | Open `idd-resume-stall-lite.instructions.md`; return here if unblocked |
 | Otherwise                                                      | Step 1                                                                 |
 
 Quiet-window evidence never bypasses the 24 h stale threshold.
+
+For a merged exact-next PR with a CLOSED issue, fetch issue comments and
+run the completion-evidence evaluator before selecting generic cleanup;
+only missing or invalid evidence enters the repair route.
 
 ## Step 1 — Claim state (helper-first)
 
@@ -89,7 +95,9 @@ Written table (`instructions-only` profile only): first matching row.
 
 | Claim state                                                                                 | Action                                                        |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Closed / PR merged                                                                          | Remove local worktree/branch → STOP                           |
+| Merged exact-next PR with issue CLOSED and missing/invalid completion evidence             | Re-fetch/evaluate and repair only the completion evidence → STOP |
+| Merged exact-next PR with issue OPEN                                                       | Re-fetch/verify marker, merge SHA, claim; reconcile then STOP |
+| Closed / PR merged with issue CLOSED                                                        | Remove local worktree/branch → STOP                           |
 | Active claim = this session's verified `{claim-id}` and branch starts with `roadmap-audit/` | Re-run A1.5 only → STOP                                       |
 | Active claim = this session's verified `{claim-id}`                                         | → Step 2                                                      |
 | Forced-handoff names this session's verified `{claim-id}` as displaced                      | STOP — displaced; no push/comment/resolve/merge               |
@@ -102,6 +110,18 @@ Written table (`instructions-only` profile only): first matching row.
 All claim writes use A5 post-and-verify (`post-idd-marker` / claim helper
 settle delay). Same-agent non-stale claims are **not** inheritable by
 agent-id alone.
+
+## Next-merge reconciliation
+
+For a merged PR based on exact next while next differs from the live
+default branch, re-fetch base/default/body, empty closing references, the
+exact issue marker, merge SHA, issue comments, and claim. Run
+scripts/idd-issue-association.mjs in reconcile mode for an OPEN issue or
+completion mode for a CLOSED issue. For missing/invalid completion evidence,
+revalidate the claim and post only the evidence marker; never reopen,
+re-close, or re-merge. Re-fetch and verify before cleanup. Failed checks or
+mutations stop without undoing the merge; default/release/unknown bases use
+the existing human/fail-closed route.
 
 ## Step 2 — Worktree
 

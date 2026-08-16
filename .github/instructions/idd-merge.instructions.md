@@ -132,7 +132,51 @@ Before any mutating action in F3, apply the
    `Next action: F4 cleanup then F5 discover`, and `Authoritative by`
    pointing to the merge commit and matched head SHA — not a merge
    gate, and must not happen before the successful merge command.
-5. If merge fails:
+
+### Next integration issue completion
+
+Run this section only after a successful merge command and only when the
+live PR base is exactly `next` while the live repository default branch is
+not `next`. Default-base PRs use GitHub's verified closing set; `main`,
+`release/**`, transition, and unknown routes never use this worker path.
+
+1. Re-fetch the merged PR, repository default branch, and issue. Confirm
+   all of the following from the same live read:
+   - `baseRefName == next` and `next != defaultBranch`;
+   - `mergedAt` is non-null and `mergeCommit.oid` is a full merge SHA;
+   - the body contains a visible `Refs #N` and exactly one
+     `<!-- idd-claimed-issue: N -->` marker; unrelated neutral `Refs #M`
+     references are allowed;
+   - `closingIssuesReferences` is empty and the issue is still open.
+2. Run the read-only `scripts/idd-issue-association.mjs` evaluator in
+   `reconcile` mode with those values. It must report `ready: true`; any
+   missing, changed, or unknown value is a fail-closed reconciliation
+   stop. The merge is not undone.
+3. Revalidate the active claim immediately before the close mutation. Only
+   then run `gh issue close N --reason completed`. Never close an issue
+   before the merge evidence above exists.
+4. Re-fetch the issue to confirm it is closed, then revalidate the claim
+   before posting a completion comment containing the PR URL/number and
+   merge SHA. Use the direct JSON comment path so the machine-readable
+   evidence is preserved, for example:
+
+   ```sh
+   printf '%s' '{"body":"<!-- idd-next-issue-completion: N -->\\nCompleted by PR #<pr-number> (merge <merge-sha>)."}' |
+     gh api repos/OWNER/REPO/issues/N/comments --method POST --input -
+   ```
+
+   Re-fetch the issue comments and run the evaluator in `completion` mode.
+   It must report `ready: true`; otherwise record a reconciliation failure
+   without reopening or re-merging.
+
+5. If the close or evidence comment fails, record a reconciliation failure
+   in the digest/issue and stop for resume. Do not undo the merge and do
+   not claim completion from a stale digest. A later resume must re-fetch
+   the merged PR, marker, current claim, and issue state before retrying.
+   If the issue is already closed, resume through the evidence-repair route:
+   post only missing or invalid completion evidence, then verify it; do not
+   reopen or close it again.
+6. If merge fails:
    - `gh pr merge --merge` fails with "the base branch policy
      prohibits the merge" despite a passing Gate checklist and a
      configured pull-request-only bypass actor → that scoped bypass
