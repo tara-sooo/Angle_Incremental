@@ -577,6 +577,7 @@ function summarizeSearch(search) {
   const horizonTimeouts = search.routes.filter((route) => route.reason === "horizon reached").length;
   const best = successful[0] ?? null;
   const worst = successful.at(-1) ?? null;
+  const peakScoreLog10 = search.routes.reduce((peak, route) => Math.max(peak, route.peakScoreLog10), -Infinity);
   const median = successful.length === 0
     ? null
     : successful.length % 2 === 1
@@ -593,6 +594,14 @@ function summarizeSearch(search) {
     bestSeconds: best,
     medianSeconds: median,
     worstSeconds: worst,
+    peakScoreLog10: Number.isFinite(peakScoreLog10) ? peakScoreLog10 : null,
+    terminalAllocations: search.routes.map((route) => ({
+      status: route.status,
+      reason: route.reason,
+      finalLevels: route.finalLevels,
+      finalPriceSteps: route.finalPriceSteps,
+      peakScoreLog10: route.peakScoreLog10,
+    })),
     medianToBest: best && median ? median / best : null,
     worstToBest: best && worst ? worst / best : null,
     strategicDegenerate: successful.length > 0 && nearBest < 2,
