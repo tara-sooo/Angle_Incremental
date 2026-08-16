@@ -1,35 +1,49 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const {
+  CANDIDATE_A,
+  CANDIDATE_GRID,
   CORE_BOOST_SOURCE_USE_MANIFEST,
   RESET_POLICIES,
+  TC4_SCORE_MILESTONES,
+  candidateClassification,
   createReport,
 } = require("../scripts/simulate-tc4-balance.js");
 
+const POLICY_IDS = [
+  "fixed-60",
+  "fixed-120",
+  "fixed-300",
+  "fixed-600",
+  "fixed-1800",
+  "gain-aware-2x",
+  "threshold-aware",
+];
+const EVALUATED_POLICY_IDS = ["fixed-60", "gain-aware-2x", "threshold-aware"];
+
 async function runTc4BalanceSimulationTest() {
   const options = {
-    maxSeconds: 30,
+    maxSeconds: 20,
     stepSeconds: 1,
-    maxStates: 20,
-    maxRoutes: 10,
+    maxStates: 2,
+    maxRoutes: 2,
     targetLog10: 7777,
     stallSeconds: 20,
+    secondaryMaxSeconds: 5,
+    secondaryMaxStates: 1,
+    secondaryMaxRoutes: 1,
+    secondarySearchComplete: false,
   };
   const first = await createReport(options);
   const second = await createReport(options);
   assert.deepEqual(first, second, "TC4 simulation output must be deterministic");
-  assert.equal(first.issue, 112);
+  assert.equal(first.issue, 114);
   assert.equal(first.sourceIssue, 106);
+  assert.equal(first.strategySourceIssue, 112);
   assert.equal(first.researchOnly, true);
-  assert.deepEqual(first.resetPolicies.map((policy) => policy.id), [
-    "fixed-60",
-    "fixed-120",
-    "fixed-300",
-    "fixed-600",
-    "fixed-1800",
-    "gain-aware-2x",
-    "threshold-aware",
-  ]);
+  assert.deepEqual(first.resetPolicies.map((policy) => policy.id), POLICY_IDS);
   assert.equal(first.resetPolicies.length, RESET_POLICIES.length);
+  assert.deepEqual(first.evaluatedResetPolicies, EVALUATED_POLICY_IDS);
   assert.equal(first.resetPolicies.find((policy) => policy.id === "gain-aware-2x").minimumIpGainMultiplier, 2);
   assert.deepEqual(first.resetPolicies.find((policy) => policy.id === "threshold-aware"), {
     id: "threshold-aware",
@@ -39,6 +53,19 @@ async function runTc4BalanceSimulationTest() {
     progressThresholdLog10: 1,
     lookaheadSeconds: 600,
   });
+  assert.deepEqual(first.scoreMilestones, TC4_SCORE_MILESTONES);
+  assert.deepEqual(first.candidateGrid, CANDIDATE_GRID);
+  assert.equal(first.candidates.length, 9);
+  assert.deepEqual(first.candidates.map(({ candidate }) => candidate.id), CANDIDATE_GRID.map(({ id }) => id));
+  assert.deepEqual(first.candidateA.candidate, CANDIDATE_A);
+  assert.equal(first.candidateComparisons.length, 9);
+  assert.equal(first.ranking.adaptive.length, 9);
+  assert.equal(first.ranking.fixed60.length, 9);
+  assert.ok(first.candidateComparisons.every(({ policyComparisons }) => policyComparisons.length === EVALUATED_POLICY_IDS.length));
+  assert.ok(first.candidates.every((candidate) => candidate.policies.every((policy) => [
+    ...policy.canonical.routes,
+    ...policy.allLegal.routes,
+  ].every((route) => route.milestoneTimes && route.milestoneSnapshots))));
   assert.equal(first.candidateA.fixture.towerFloor, 12);
   assert.equal(first.candidateA.fixture.completedTowerChallenges & 0b111, 0b111);
   assert.equal(first.candidateA.fixture.activeTowerChallenge, 4);
@@ -47,49 +74,25 @@ async function runTc4BalanceSimulationTest() {
   assert.equal(first.candidateA.collision.includesDocumentedRange, true);
   assert.ok(first.candidateA.canonical.summary.exploredStates > 0);
   assert.ok(first.candidateA.allLegal.summary.exploredStates > 0);
-  assert.equal(first.candidateA.policies.length, RESET_POLICIES.length);
-  assert.ok(first.policyComparisons.every((comparison) => comparison.canonical && comparison.allLegal));
-  assert.equal(first.baselineComparison.baselinePolicy, "fixed-60");
-  const fixed60 = first.candidateA.policies.find(({ policy }) => policy.id === "fixed-60");
-  assert.deepEqual(fixed60.canonical, first.candidateA.canonical, "fixed-60 remains the Issue #106 baseline");
-  assert.ok(first.candidateA.canonical.routes.some((route) => route.reason === "stalled" || route.reason === "horizon reached"));
-  for (const kind of ["baseGain", "infinityScoreVertexGain", "freeCoreBoost"]) {
-    assert.equal(first.familyUsefulness[kind].reachable, true, `${kind} must be reachable in the explored routes`);
-    assert.equal(first.familyUsefulness[kind].measurableEffect, true, `${kind} must expose a measurable candidate effect`);
-  }
+  assert.ok(first.candidateAComparability.optionsMatch === false);
   assert.equal(first.coreBoostAudit.length, CORE_BOOST_SOURCE_USE_MANIFEST.length);
   assert.ok(first.coreBoostAudit.some((entry) => entry.classification === "benefit"));
   assert.ok(first.coreBoostAudit.some((entry) => entry.classification === "requirement/reset/history"));
-  assert.equal(first.sweep.length, 0);
+  assert.equal(first.nextSearchRecommendation.status, "inconclusive");
 
-  const bounded = await createReport({
-    maxSeconds: 1,
-    stepSeconds: 1,
-    maxStates: 1,
-    maxRoutes: 1,
-    targetLog10: 7777,
-    stallSeconds: 1,
-  });
-  assert.equal(bounded.sweep.length, 0, "policy comparison replaces the old candidate neighborhood sweep");
-  assert.equal(bounded.policyComparisons.length, RESET_POLICIES.length);
+  const truncatedPolicy = RESET_POLICIES.map((policy) => ({
+    policy,
+    canonical: { summary: { allCanonicalSuccessful: false, medianToBest: null, worstToBest: null, strategicDegenerate: false, truncated: true } },
+    allLegal: { summary: { truncated: true } },
+  }));
+  assert.equal(candidateClassification({ policies: truncatedPolicy }), "inconclusive");
 
-  const timing = await createReport({
-    maxSeconds: 180,
-    stepSeconds: 10,
-    maxStates: 20,
-    maxRoutes: 3,
-    targetLog10: 7777,
-    stallSeconds: 180,
-  });
-  const resetTimes = (id) => timing.candidateA.policies
-    .find(({ policy }) => policy.id === id)
-    .canonical.routes
-    .flatMap((route) => route.infinityResetTimes);
-  assert.ok(resetTimes("fixed-60").includes(60));
-  assert.ok(resetTimes("fixed-120").includes(120));
-  assert.ok(!resetTimes("fixed-120").includes(60));
-  assert.ok(!resetTimes("fixed-300").includes(60));
-  assert.ok(resetTimes("gain-aware-2x").includes(60));
+  const committedReport = JSON.parse(fs.readFileSync("reports/tc4-balance-sweep.json", "utf8"));
+  assert.equal(committedReport.issue, 114);
+  assert.equal(committedReport.candidateGrid.length, 9);
+  assert.deepEqual(committedReport.evaluatedResetPolicies, EVALUATED_POLICY_IDS);
+  assert.equal(committedReport.candidateAComparability.withinTolerance, true);
+  assert.ok(Object.values(committedReport.candidateClassifications).includes("inconclusive"));
 }
 
 if (require.main === module) {

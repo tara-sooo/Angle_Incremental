@@ -1,8 +1,17 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
 const path = require("node:path");
 const { loadRuntime } = require("../tests/runtime-harness-esm.js");
 
-const CANDIDATE_A = Object.freeze({ a: 0.20, b: 0.50, c: 1 });
+const TC4_CANDIDATE_A_VALUES = Object.freeze([0.15, 0.20, 0.25]);
+const TC4_CANDIDATE_B_VALUES = Object.freeze([0.35, 0.50, 0.65]);
+const CANDIDATE_A = Object.freeze({ id: "A0.20-B0.50-C1", a: 0.20, b: 0.50, c: 1 });
+const CANDIDATE_GRID = Object.freeze(TC4_CANDIDATE_A_VALUES.flatMap((a) => TC4_CANDIDATE_B_VALUES.map((b) => Object.freeze({
+  id: `A${a.toFixed(2)}-B${b.toFixed(2)}-C1`,
+  a,
+  b,
+  c: 1,
+}))));
 const TC4_KINDS = Object.freeze(["baseGain", "infinityScoreVertexGain", "freeCoreBoost"]);
 const TC4_KIND_LABELS = Object.freeze({
   baseGain: "A",
@@ -11,12 +20,15 @@ const TC4_KIND_LABELS = Object.freeze({
 });
 const NORMAL_KINDS = Object.freeze(["speed", "vertex", "gain"]);
 const TARGET_LOG10 = 7777;
+const TC4_SCORE_MILESTONES = Object.freeze([900, 1700, 2500, 2900, 3300, 4100, 4900, 5300, 5700, 6500, 7300, 7700, 7777]);
+const COMPARABILITY_TOLERANCE_LOG10 = 0.001;
 const DEFAULT_MAX_SECONDS = 24 * 60 * 60;
 const DEFAULT_STEP_SECONDS = 10;
 const DEFAULT_MAX_STATES = 2000;
 const DEFAULT_MAX_ROUTES = 300;
 const DEFAULT_STALL_SECONDS = 4 * 60 * 60;
 const CANDIDATE_PATH = path.join(__dirname, "..", "src", "main.js");
+const ISSUE_112_REPORT_PATH = path.join(__dirname, "..", "reports", "tc4-balance-candidate-a.json");
 const GENERATION_RESET_POLICY = Object.freeze({
   infinityMinimumSeconds: 60,
   generationMinimumSeconds: 60,
@@ -45,6 +57,7 @@ const RESET_POLICIES = Object.freeze([
     lookaheadSeconds: 600,
   }),
 ]);
+const EVALUATED_POLICY_IDS = Object.freeze(["fixed-60", "gain-aware-2x", "threshold-aware"]);
 
 // This is the explicit review ledger for every source use found by
 // `rg -n coreBoostCount src`. Free CB is only allowed to affect benefit rows.
@@ -345,6 +358,45 @@ function availablePurchases(runtime) {
   return TC4_KINDS.filter((kind) => runtime.towerChallenge4UpgradePriceLog10(kind) <= score + 1e-9);
 }
 
+function milestoneKey(milestone) {
+  return `e${milestone}`;
+}
+
+function milestoneSnapshot(runtime, node, elapsed, milestone) {
+  const levels = Object.fromEntries(TC4_KINDS.map((kind) => [kind, runtime.towerChallenge4UpgradeLevel(kind)]));
+  const freeCoreBoost = levels.freeCoreBoost;
+  const realCoreBoost = Math.max(0, Math.floor(runtime.state.coreBoostCount));
+  const infiniteScoreLog10 = runtime.currentInfiniteScoreLog10();
+  return {
+    milestone,
+    timeSeconds: elapsed,
+    scoreLog10: runtime.currentScoreLog10(),
+    purchaseCount: node.purchases.length,
+    lastPurchase: node.purchases.at(-1) ?? null,
+    levels,
+    priceSteps: Object.fromEntries(TC4_KINDS.map((kind) => [kind, runtime.towerChallenge4UpgradePriceStep(kind)])),
+    realCoreBoost,
+    freeCoreBoost,
+    effectiveCoreBoost: realCoreBoost + freeCoreBoost,
+    generationCount: runtime.state.generationCount,
+    infiniteScoreLog10: Number.isFinite(infiniteScoreLog10) ? infiniteScoreLog10 : null,
+    infiniteScorePower: runtime.infiniteAngleScorePower(),
+    vertexGainIncreaseLog10: runtime.vertexGainIncreaseLog10(),
+  };
+}
+
+function recordMilestones(runtime, node, elapsed, milestoneTimes, milestoneSnapshots) {
+  const scoreLog10 = runtime.currentScoreLog10();
+  if (!Number.isFinite(scoreLog10)) return;
+  TC4_SCORE_MILESTONES.forEach((milestone) => {
+    const key = milestoneKey(milestone);
+    if (milestoneTimes[key] === undefined && scoreLog10 >= milestone) {
+      milestoneTimes[key] = elapsed;
+      milestoneSnapshots[key] = milestoneSnapshot(runtime, node, elapsed, milestone);
+    }
+  });
+}
+
 function applyTc4Purchase(runtime, kind, elapsed, purchases) {
   const selectedPrice = runtime.towerChallenge4UpgradePriceLog10(kind);
   const prePurchasePrices = Object.fromEntries(TC4_KINDS.map((entry) => [entry, runtime.towerChallenge4UpgradePriceLog10(entry)]));
@@ -567,6 +619,7 @@ function routeKey(runtime, node) {
     roundedRouteValue(node.peakScoreLog10),
     Math.floor(node.peakScoreAt),
     Math.floor(node.lastProgressAt),
+    ...TC4_SCORE_MILESTONES.map((milestone) => Math.floor(node.milestoneTimes?.[milestoneKey(milestone)] ?? -1)),
   ].join("|");
 }
 
@@ -587,6 +640,8 @@ function routeMetrics(runtime, node, status, reason, validation) {
     finalLevels: levels,
     finalPriceSteps: Object.fromEntries(TC4_KINDS.map((kind) => [kind, runtime.towerChallenge4UpgradePriceStep(kind)])),
     thresholdTimes: node.purchases.map((purchase) => ({ kind: purchase.kind, timeSeconds: purchase.timeSeconds, priceLog10: purchase.priceLog10 })),
+    milestoneTimes: { ...node.milestoneTimes },
+    milestoneSnapshots: cloneValue(node.milestoneSnapshots),
     resetEvents: node.events,
     infinityResetCount: infinityEvents.length,
     infinityResetTimes: infinityEvents.map((event) => event.timeSeconds),
@@ -609,12 +664,24 @@ function advanceToDecision(runtime, node) {
   let elapsed = node.elapsed;
   const events = node.events.slice();
   const policyState = { ...node.policyState };
+  const milestoneTimes = { ...(node.milestoneTimes ?? {}) };
+  const milestoneSnapshots = cloneValue(node.milestoneSnapshots ?? {});
   let peakScoreAt = node.peakScoreAt;
+  recordMilestones(runtime, node, elapsed, milestoneTimes, milestoneSnapshots);
   while (elapsed < node.options.maxSeconds) {
     if (runtime.currentScoreLog10() >= node.options.targetLog10) {
       return {
         type: "success",
-        node: { ...node, elapsed, events, policyState, peakScoreAt, peakScoreLog10: node.peakScoreLog10 },
+        node: {
+          ...node,
+          elapsed,
+          events,
+          policyState,
+          peakScoreAt,
+          peakScoreLog10: node.peakScoreLog10,
+          milestoneTimes,
+          milestoneSnapshots,
+        },
         reason: "target reached",
       };
     }
@@ -630,6 +697,8 @@ function advanceToDecision(runtime, node) {
         peakScoreAt,
         peakScoreLog10: node.peakScoreLog10,
         peakInfiniteScoreLog10: node.peakInfiniteScoreLog10,
+        milestoneTimes,
+        milestoneSnapshots,
       };
     }
 
@@ -647,11 +716,21 @@ function advanceToDecision(runtime, node) {
       node.lastProgressAt = elapsed;
       peakScoreAt = elapsed;
     }
+    recordMilestones(runtime, node, elapsed, milestoneTimes, milestoneSnapshots);
     updateResetPolicyState(runtime, policyState, elapsed);
     if (runtime.currentScoreLog10() >= node.options.targetLog10) {
       return {
         type: "success",
-        node: { ...node, elapsed, events, policyState, peakScoreAt, peakScoreLog10 },
+        node: {
+          ...node,
+          elapsed,
+          events,
+          policyState,
+          peakScoreAt,
+          peakScoreLog10,
+          milestoneTimes,
+          milestoneSnapshots,
+        },
         reason: "target reached",
       };
     }
@@ -667,6 +746,8 @@ function advanceToDecision(runtime, node) {
         peakScoreAt,
         peakScoreLog10,
         peakInfiniteScoreLog10: node.peakInfiniteScoreLog10,
+        milestoneTimes,
+        milestoneSnapshots,
       };
     }
     runResetPolicy(runtime, events, elapsed, node.policy, policyState);
@@ -679,14 +760,23 @@ function advanceToDecision(runtime, node) {
     if (elapsed - node.lastProgressAt >= node.options.stallSeconds) {
       return {
         type: "timeout",
-        node: { ...node, elapsed, events, policyState, peakScoreAt },
+        node: { ...node, elapsed, events, policyState, peakScoreAt, milestoneTimes, milestoneSnapshots },
         reason: "stalled",
       };
     }
   }
   return {
     type: "timeout",
-    node: { ...node, elapsed, events, policyState, peakScoreAt, peakScoreLog10: node.peakScoreLog10 },
+    node: {
+      ...node,
+      elapsed,
+      events,
+      policyState,
+      peakScoreAt,
+      peakScoreLog10: node.peakScoreLog10,
+      milestoneTimes,
+      milestoneSnapshots,
+    },
     reason: "horizon reached",
   };
 }
@@ -703,6 +793,8 @@ function runSearch(runtime, rootSnapshot, candidate, options, validation, fronti
     lastProgressAt: 0,
     policy,
     policyState: createResetPolicyState(runtime),
+    milestoneTimes: {},
+    milestoneSnapshots: {},
     candidate,
     options,
     debug: options.debug,
@@ -746,6 +838,8 @@ function runSearch(runtime, rootSnapshot, candidate, options, validation, fronti
         peakScoreLog10: result.peakScoreLog10,
         peakInfiniteScoreLog10: result.peakInfiniteScoreLog10,
         lastProgressAt: result.elapsed,
+        milestoneTimes: { ...result.milestoneTimes },
+        milestoneSnapshots: cloneValue(result.milestoneSnapshots),
         policy,
         policyState: { ...result.policyState },
         candidate,
@@ -804,7 +898,10 @@ async function runCandidate(candidate, options) {
   const collision = validateProductionCollision(runtime);
   const rootSnapshot = captureState(runtime.state);
   const searchOptions = { ...options, debug: instance.debug };
-  const policies = RESET_POLICIES.map((policy) => {
+  const policies = (options.policyIds ?? RESET_POLICIES.map(({ id }) => id))
+    .map((policyId) => RESET_POLICIES.find(({ id }) => id === policyId))
+    .filter(Boolean)
+    .map((policy) => {
     restoreState(runtime.state, rootSnapshot);
     const canonical = runSearch(runtime, rootSnapshot, candidate, searchOptions, collision, true, policy);
     restoreState(runtime.state, rootSnapshot);
@@ -818,6 +915,15 @@ async function runCandidate(candidate, options) {
   const baseline = policies.find(({ policy }) => policy.id === "fixed-60");
   return {
     candidate,
+    searchComplete: options.searchComplete !== false,
+    searchOptions: {
+      maxSeconds: options.maxSeconds,
+      stepSeconds: options.stepSeconds,
+      maxStates: options.maxStates,
+      maxRoutes: options.maxRoutes,
+      stallSeconds: options.stallSeconds,
+      policyIds: options.policyIds ?? RESET_POLICIES.map(({ id }) => id),
+    },
     fixture,
     collision,
     canonical: baseline.canonical,
@@ -830,10 +936,40 @@ function policyRoutes(policyResult) {
   return [...policyResult.canonical.routes, ...policyResult.allLegal.routes];
 }
 
+function earliestMilestoneData(routes) {
+  const firstMilestoneTimes = Object.fromEntries(TC4_SCORE_MILESTONES.map((milestone) => {
+    const key = milestoneKey(milestone);
+    const times = routes
+      .map((route) => route.milestoneTimes?.[key])
+      .filter((time) => Number.isFinite(time));
+    return [key, times.length > 0 ? Math.min(...times) : null];
+  }));
+  const firstMilestoneSnapshots = Object.fromEntries(TC4_SCORE_MILESTONES.map((milestone) => {
+    const key = milestoneKey(milestone);
+    const route = routes
+      .filter((entry) => Number.isFinite(entry.milestoneTimes?.[key]))
+      .sort((left, right) => left.milestoneTimes[key] - right.milestoneTimes[key])[0];
+    return [key, route?.milestoneSnapshots?.[key] ?? null];
+  }));
+  let highestMilestoneIndex = -1;
+  TC4_SCORE_MILESTONES.forEach((milestone, index) => {
+    if (firstMilestoneTimes[milestoneKey(milestone)] !== null) highestMilestoneIndex = index;
+  });
+  return {
+    firstMilestoneTimes,
+    firstMilestoneSnapshots,
+    highestMilestone: highestMilestoneIndex >= 0 ? TC4_SCORE_MILESTONES[highestMilestoneIndex] : null,
+    highestMilestoneIndex,
+    timeToHighestMilestone: highestMilestoneIndex >= 0
+      ? firstMilestoneTimes[milestoneKey(TC4_SCORE_MILESTONES[highestMilestoneIndex])]
+      : null,
+  };
+}
+
 function policyComparison(policyResult) {
   const routes = policyRoutes(policyResult);
   const bestRoute = routes.reduce((best, route) => route.peakScoreLog10 > (best?.peakScoreLog10 ?? -Infinity) ? route : best, null);
-  const thresholds = [900, 1700, 2500];
+  const milestones = earliestMilestoneData(routes);
   return {
     policy: policyResult.policy,
     canonical: policyResult.canonical.summary,
@@ -841,9 +977,10 @@ function policyComparison(policyResult) {
     peakScoreLog10: bestRoute?.peakScoreLog10 ?? null,
     peakScoreAtSeconds: bestRoute?.peakScoreAtSeconds ?? null,
     infinityResetCount: routes.reduce((count, route) => Math.max(count, route.infinityResetCount), 0),
-    thresholdReached: Object.fromEntries(thresholds.map((threshold) => [
-      `e${threshold}`,
-      routes.some((route) => route.peakScoreLog10 >= threshold),
+    ...milestones,
+    thresholdReached: Object.fromEntries([900, 1700, 2500].map((threshold) => [
+      milestoneKey(threshold),
+      milestones.firstMilestoneTimes[milestoneKey(threshold)] !== null,
     ])),
     e900PurchaseKinds: [...new Set(routes.flatMap((route) => {
       const purchase = route.purchaseSequence.find((entry) => entry.priceLog10 >= 900);
@@ -861,12 +998,162 @@ function candidateClassification(result) {
       && !summary.strategicDegenerate;
   });
   if (viable) return "viable";
-  const complete = result.policies.every(({ canonical, allLegal }) => !canonical.summary.truncated && !allLegal.summary.truncated);
+  const complete = result.searchComplete !== false
+    && result.policies.every(({ canonical, allLegal }) => !canonical.summary.truncated && !allLegal.summary.truncated);
   return complete ? "failed" : "inconclusive";
 }
 
 function candidatePassesInitialTargets(result) {
   return candidateClassification(result) === "viable";
+}
+
+function policyComparisonSummary(comparison) {
+  return {
+    policy: comparison.policy,
+    canonical: comparison.canonical,
+    allLegal: comparison.allLegal,
+    peakScoreLog10: comparison.peakScoreLog10,
+    peakScoreAtSeconds: comparison.peakScoreAtSeconds,
+    infinityResetCount: comparison.infinityResetCount,
+    firstMilestoneTimes: comparison.firstMilestoneTimes,
+    highestMilestone: comparison.highestMilestone,
+    highestMilestoneIndex: comparison.highestMilestoneIndex,
+    timeToHighestMilestone: comparison.timeToHighestMilestone,
+    thresholdReached: comparison.thresholdReached,
+    e900PurchaseKinds: comparison.e900PurchaseKinds,
+  };
+}
+
+function comparePolicyProgress(left, right) {
+  const leftPeak = left?.peakScoreLog10 ?? -Infinity;
+  const rightPeak = right?.peakScoreLog10 ?? -Infinity;
+  if (left?.highestMilestoneIndex !== right?.highestMilestoneIndex) {
+    return (right?.highestMilestoneIndex ?? -1) - (left?.highestMilestoneIndex ?? -1);
+  }
+  if (leftPeak !== rightPeak) return rightPeak - leftPeak;
+  const leftTime = left?.timeToHighestMilestone ?? Infinity;
+  const rightTime = right?.timeToHighestMilestone ?? Infinity;
+  if (leftTime !== rightTime) return leftTime - rightTime;
+  return (left?.infinityResetCount ?? Infinity) - (right?.infinityResetCount ?? Infinity);
+}
+
+function summarizeCandidate(result) {
+  const policyComparisons = result.policies.map(policyComparison);
+  const fixed60 = policyComparisons.find(({ policy }) => policy.id === "fixed-60");
+  const adaptive = policyComparisons
+    .filter(({ policy }) => policy.id === "gain-aware-2x" || policy.id === "threshold-aware")
+    .sort(comparePolicyProgress)[0];
+  return {
+    candidate: result.candidate,
+    candidateId: result.candidate.id,
+    searchComplete: result.searchComplete,
+    searchOptions: result.searchOptions,
+    classification: candidateClassification(result),
+    bestAdaptivePolicy: adaptive?.policy.id ?? null,
+    bestAdaptive: adaptive ? policyComparisonSummary(adaptive) : null,
+    fixed60: fixed60 ? policyComparisonSummary(fixed60) : null,
+    policyComparisons: policyComparisons.map(policyComparisonSummary),
+    e900PurchaseKindsByPolicy: Object.fromEntries(policyComparisons.map((comparison) => [
+      comparison.policy.id,
+      comparison.e900PurchaseKinds,
+    ])),
+  };
+}
+
+function rankCandidates(candidateComparisons, mode) {
+  return candidateComparisons
+    .slice()
+    .sort((left, right) => {
+      const progress = comparePolicyProgress(left[mode]);
+      return progress !== 0 ? progress : left.candidateId.localeCompare(right.candidateId);
+    })
+    .map(({ candidateId }) => candidateId);
+}
+
+function candidateRanking(candidateComparisons) {
+  const adaptive = rankCandidates(candidateComparisons, "bestAdaptive");
+  const fixed60 = rankCandidates(candidateComparisons, "fixed60");
+  const adaptiveRank = Object.fromEntries(adaptive.map((candidateId, index) => [candidateId, index + 1]));
+  const fixed60Rank = Object.fromEntries(fixed60.map((candidateId, index) => [candidateId, index + 1]));
+  return {
+    rule: "highest milestone index, highest peak Score, earliest time to that milestone, then fewer Infinity resets; candidate ID breaks exact ties",
+    adaptive,
+    fixed60,
+    orderChanged: JSON.stringify(adaptive) !== JSON.stringify(fixed60),
+    ranks: Object.fromEntries(candidateComparisons.map(({ candidateId }) => [candidateId, {
+      adaptive: adaptiveRank[candidateId],
+      fixed60: fixed60Rank[candidateId],
+      changed: adaptiveRank[candidateId] !== fixed60Rank[candidateId],
+    }])),
+  };
+}
+
+function nextSearchRecommendation(candidateComparisons) {
+  const classifications = candidateComparisons.map(({ classification }) => classification);
+  if (classifications.includes("viable")) return { status: "not-needed", reason: "a candidate reached the target" };
+  if (classifications.includes("inconclusive")) {
+    return { status: "inconclusive", reason: "at least one candidate search was truncated" };
+  }
+  const best = candidateComparisons.slice().sort((left, right) => comparePolicyProgress(left.bestAdaptive, right.bestAdaptive))[0];
+  const maxA = Math.max(...TC4_CANDIDATE_A_VALUES);
+  const maxB = Math.max(...TC4_CANDIDATE_B_VALUES);
+  const atMaxA = best.candidate.a === maxA;
+  const atMaxB = best.candidate.b === maxB;
+  const direction = atMaxA && atMaxB
+    ? "revisit functional form or C semantics"
+    : atMaxA
+      ? "increase B"
+      : atMaxB
+        ? "increase A"
+        : "test a bounded combined increase of A and B";
+  return {
+    status: "bounded-recommendation",
+    direction,
+    basisCandidate: best.candidateId,
+    highestMilestone: best.bestAdaptive?.highestMilestone ?? null,
+    peakScoreLog10: best.bestAdaptive?.peakScoreLog10 ?? null,
+    gapToE2500: Math.max(0, 2500 - (best.bestAdaptive?.peakScoreLog10 ?? 0)),
+    nextRegion: "one bounded neighboring region only; maintainer decision required before another sweep",
+  };
+}
+
+function candidateAComparability(candidateA, options) {
+  let reference;
+  try {
+    reference = JSON.parse(fs.readFileSync(ISSUE_112_REPORT_PATH, "utf8"));
+  } catch (error) {
+    return { status: "inconclusive", reason: `reference report unavailable: ${error.message}` };
+  }
+  const optionsMatch = reference.horizonSeconds === options.maxSeconds
+    && reference.stepSeconds === options.stepSeconds
+    && reference.routeSearchLimits.maxStates === options.maxStates
+    && reference.routeSearchLimits.maxRoutes === options.maxRoutes
+    && reference.stallSeconds === options.stallSeconds;
+  const policies = ["gain-aware-2x", "threshold-aware"].map((policyId) => {
+    const actual = policyComparison(candidateA.policies.find(({ policy }) => policy.id === policyId));
+    const expected = reference.policyComparisons.find(({ policy }) => policy.id === policyId);
+    const peakDeltaLog10 = expected && actual.peakScoreLog10 !== null
+      ? actual.peakScoreLog10 - expected.peakScoreLog10
+      : null;
+    return {
+      policy: policyId,
+      expectedPeakScoreLog10: expected?.peakScoreLog10 ?? null,
+      actualPeakScoreLog10: actual.peakScoreLog10,
+      peakDeltaLog10,
+      expectedThresholdReached: Object.fromEntries(["e900", "e1700", "e2500"].map((key) => [key, expected?.thresholdReached?.[key] ?? null])),
+      actualThresholdReached: Object.fromEntries(["e900", "e1700", "e2500"].map((key) => [key, actual.firstMilestoneTimes[key] !== null])),
+      withinTolerance: optionsMatch && expected !== undefined && peakDeltaLog10 !== null
+        && Math.abs(peakDeltaLog10) <= COMPARABILITY_TOLERANCE_LOG10,
+    };
+  });
+  return {
+    sourceIssue: 112,
+    referenceReport: path.relative(path.join(__dirname, ".."), ISSUE_112_REPORT_PATH),
+    toleranceLog10: COMPARABILITY_TOLERANCE_LOG10,
+    optionsMatch,
+    policies,
+    withinTolerance: optionsMatch && policies.every(({ withinTolerance }) => withinTolerance),
+  };
 }
 
 function auditReport() {
@@ -908,36 +1195,71 @@ async function createReport(options = {}) {
     targetLog10: options.targetLog10 ?? TARGET_LOG10,
     stallSeconds: options.stallSeconds ?? DEFAULT_STALL_SECONDS,
   };
-  const primary = await runCandidate(CANDIDATE_A, normalized);
-  const policyComparisons = primary.policies.map(policyComparison);
-  const baseline = policyComparisons.find(({ policy }) => policy.id === "fixed-60");
-  const bestPolicy = policyComparisons.reduce((best, comparison) => best === null
-    || (comparison.peakScoreLog10 ?? -Infinity) > (best.peakScoreLog10 ?? -Infinity)
-    ? comparison
-    : best, null);
-  const classification = candidateClassification(primary);
+  const secondaryOptions = {
+    ...normalized,
+    maxSeconds: options.secondaryMaxSeconds ?? normalized.maxSeconds,
+    maxStates: options.secondaryMaxStates ?? normalized.maxStates,
+    maxRoutes: options.secondaryMaxRoutes ?? normalized.maxRoutes,
+    stallSeconds: options.secondaryStallSeconds ?? normalized.stallSeconds,
+    searchComplete: options.secondarySearchComplete ?? true,
+    policyIds: options.secondaryPolicyIds ?? EVALUATED_POLICY_IDS,
+  };
+  const candidates = [];
+  for (const candidate of CANDIDATE_GRID) {
+    candidates.push(await runCandidate(candidate, candidate.id === CANDIDATE_A.id
+      ? { ...normalized, policyIds: options.policyIds ?? EVALUATED_POLICY_IDS }
+      : secondaryOptions));
+  }
+  const primary = candidates.find(({ candidate }) => candidate.id === CANDIDATE_A.id);
+  assert.ok(primary, "Candidate A must be present in the documented 3x3 grid");
+  const candidateComparisons = candidates.map(summarizeCandidate);
+  const ranking = candidateRanking(candidateComparisons);
+  const rankedComparisons = candidateComparisons.map((comparison) => ({
+    ...comparison,
+    rank: ranking.ranks[comparison.candidateId],
+  }));
+  const primaryComparison = rankedComparisons.find(({ candidateId }) => candidateId === CANDIDATE_A.id);
+  const baseline = primaryComparison.fixed60;
+  const bestPolicy = primaryComparison.bestAdaptive;
+  const classification = primaryComparison.classification;
+  const classifications = Object.fromEntries(rankedComparisons.map(({ candidateId, classification: value }) => [candidateId, value]));
   const report = {
-    issue: 112,
-    title: "Expand TC4 Balance Candidate A reset-strategy search",
+    issue: 114,
+    title: "Re-evaluate TC4 balance sweep with improved reset strategies",
     researchOnly: true,
     sourceIssue: 106,
+    strategySourceIssue: 112,
     targetLog10: normalized.targetLog10,
     horizonSeconds: normalized.maxSeconds,
     stepSeconds: normalized.stepSeconds,
     routeSearchLimits: { maxStates: normalized.maxStates, maxRoutes: normalized.maxRoutes },
     stallSeconds: normalized.stallSeconds,
     resetPolicies: RESET_POLICIES,
+    evaluatedResetPolicies: EVALUATED_POLICY_IDS,
     generationResetPolicy: GENERATION_RESET_POLICY,
+    scoreMilestones: TC4_SCORE_MILESTONES,
+    candidateSearchPolicy: {
+      primaryCandidate: CANDIDATE_A.id,
+      primary: normalized,
+      secondary: secondaryOptions,
+    },
+    candidateGrid: CANDIDATE_GRID,
+    candidates,
     candidateA: primary,
+    candidateComparisons: rankedComparisons,
+    candidateClassifications: classifications,
     candidateClassification: classification,
     candidateAPassesInitialTargets: classification === "viable",
-    policyComparisons,
+    policyComparisons: primaryComparison.policyComparisons,
+    candidateAComparability: candidateAComparability(primary, normalized),
+    ranking,
+    nextSearchRecommendation: nextSearchRecommendation(rankedComparisons),
     baselineComparison: {
-      baselinePolicy: baseline.policy.id,
+      baselinePolicy: baseline?.policy.id ?? null,
       bestPolicy: bestPolicy?.policy.id ?? null,
-      baselinePeakScoreLog10: baseline.peakScoreLog10,
+      baselinePeakScoreLog10: baseline?.peakScoreLog10 ?? null,
       bestPeakScoreLog10: bestPolicy?.peakScoreLog10 ?? null,
-      peakDeltaLog10: bestPolicy && baseline.peakScoreLog10 !== null
+      peakDeltaLog10: bestPolicy && baseline?.peakScoreLog10 !== null
         ? bestPolicy.peakScoreLog10 - baseline.peakScoreLog10
         : null,
       e900PurchaseKinds: bestPolicy?.e900PurchaseKinds ?? [],
@@ -945,7 +1267,6 @@ async function createReport(options = {}) {
     },
     coreBoostAudit: auditReport(),
     familyUsefulness: familyUsefulness(primary.candidate, primary),
-    sweep: [],
   };
   return report;
 }
@@ -958,34 +1279,56 @@ function formatSeconds(seconds) {
 }
 
 function formatMarkdown(report) {
+  const formatPeak = (value) => value === null || value === undefined ? "not reached" : `e${value.toFixed(0)}`;
+  const formatMilestone = (value) => value === null || value === undefined ? "—" : `e${value}`;
   const lines = [
-    `# TC4 Balance Candidate A (Issue #${report.issue})`,
+    `# TC4 Balance Sweep (Issue #${report.issue})`,
     "",
     "> Research output only. No provisional effect is installed in production formulas.",
     "",
-    `- Source comparison: **Issue #${report.sourceIssue}** fixed-60 simulator`,
+    `- Candidate baseline: **Issue #${report.sourceIssue}** fixed-60 simulator`,
+    `- Adaptive strategy source: **Issue #${report.strategySourceIssue}**`,
     `- Target: **1e${report.targetLog10} Score**`,
     `- Horizon: **${formatSeconds(report.horizonSeconds)}**`,
     `- Runtime step: **${report.stepSeconds}s** (reported times have this resolution)`,
-    `- Search limits: **${report.routeSearchLimits.maxStates} states / ${report.routeSearchLimits.maxRoutes} routes**`,
+    `- Primary search limits (Candidate A): **${formatSeconds(report.candidateSearchPolicy.primary.maxSeconds)} / ${report.candidateSearchPolicy.primary.maxStates} states / ${report.candidateSearchPolicy.primary.maxRoutes} routes**`,
+    `- Secondary candidate limits: **${formatSeconds(report.candidateSearchPolicy.secondary.maxSeconds)} / ${report.candidateSearchPolicy.secondary.maxStates} states / ${report.candidateSearchPolicy.secondary.maxRoutes} routes**; incomplete searches remain **inconclusive**`,
+    `- Evaluated policies: **${report.evaluatedResetPolicies.join(", ")}** (other definitions retained for reproducibility)`,
+    `- Milestones: **${report.scoreMilestones.map((milestone) => `e${milestone}`).join(", ")}**`,
     "",
-    "## Reset-policy comparison",
+    "## Candidate ranking",
     "",
-    "| Policy | Canonical best | All-legal best | Peak Score | e900 | e1700 | e2500 | resets | truncated |",
-    "| --- | ---: | ---: | ---: | --- | --- | --- | ---: | --- |",
+    "| Adaptive rank | Candidate | Classification | Best policy | Highest milestone | Peak Score | Time to milestone | Fixed-60 peak | Rank changed |",
+    "| ---: | --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
   ];
-  report.policyComparisons.forEach((comparison) => {
-    const policy = comparison.policy;
-    const truncated = comparison.canonical.truncated || comparison.allLegal.truncated;
-    lines.push(`| ${policy.id} | ${formatSeconds(comparison.canonical.bestSeconds)} | ${formatSeconds(comparison.allLegal.bestSeconds)} | ${comparison.peakScoreLog10 === null ? "not reached" : `e${comparison.peakScoreLog10.toFixed(0)}`} | ${comparison.thresholdReached.e900 ? "yes" : "no"} | ${comparison.thresholdReached.e1700 ? "yes" : "no"} | ${comparison.thresholdReached.e2500 ? "yes" : "no"} | ${comparison.infinityResetCount} | ${truncated ? "yes" : "no"} |`);
+  report.ranking.adaptive.forEach((candidateId, index) => {
+    const comparison = report.candidateComparisons.find(({ candidateId: id }) => id === candidateId);
+    lines.push(`| ${index + 1} | ${candidateId} | ${comparison.classification} | ${comparison.bestAdaptivePolicy ?? "—"} | ${formatMilestone(comparison.bestAdaptive?.highestMilestone)} | ${formatPeak(comparison.bestAdaptive?.peakScoreLog10)} | ${formatSeconds(comparison.bestAdaptive?.timeToHighestMilestone)} | ${formatPeak(comparison.fixed60?.peakScoreLog10)} | ${comparison.rank.changed ? "yes" : "no"} |`);
   });
-  lines.push("", `Candidate A classification: **${report.candidateClassification}**`, `- Initial target gate: **${report.candidateAPassesInitialTargets ? "pass" : "not passed"}**`, `- Baseline policy: **${report.baselineComparison.baselinePolicy}**`, `- Best peak policy: **${report.baselineComparison.bestPolicy ?? "not reached"}**`, `- Peak delta vs fixed-60: **${report.baselineComparison.peakDeltaLog10?.toFixed(3) ?? "—"} log10**`, `- e900 purchase kinds at best peak: **${report.baselineComparison.e900PurchaseKinds.join(", ") || "none"}**`, "");
+  lines.push("", `Adaptive order differs from fixed-60: **${report.ranking.orderChanged ? "yes" : "no"}**`, `- Fixed-60 order: **${report.ranking.fixed60.join(" → ")}**`, `- Candidate A classification: **${report.candidateClassification}**`, `- Candidate A best adaptive policy: **${report.baselineComparison.bestPolicy ?? "not reached"}**`, `- Candidate A peak delta vs fixed-60: **${report.baselineComparison.peakDeltaLog10?.toFixed(3) ?? "—"} log10**`, `- Candidate A e900 purchase kinds at best adaptive peak: **${report.baselineComparison.e900PurchaseKinds.join(", ") || "none"}**`, "");
+
+  lines.push("## Candidate/policy results", "", "| Candidate | Policy | Canonical best | All-legal best | Highest milestone | Peak Score | e900/e1700/e2500 | resets | truncated |", "| --- | --- | ---: | ---: | ---: | ---: | --- | ---: | --- |");
+  report.candidateComparisons.forEach((candidate) => candidate.policyComparisons.forEach((comparison) => {
+    const truncated = comparison.canonical.truncated || comparison.allLegal.truncated;
+    lines.push(`| ${candidate.candidateId} | ${comparison.policy.id} | ${formatSeconds(comparison.canonical.bestSeconds)} | ${formatSeconds(comparison.allLegal.bestSeconds)} | ${formatMilestone(comparison.highestMilestone)} | ${formatPeak(comparison.peakScoreLog10)} | ${comparison.thresholdReached.e900 ? "yes" : "no"}/${comparison.thresholdReached.e1700 ? "yes" : "no"}/${comparison.thresholdReached.e2500 ? "yes" : "no"} | ${comparison.infinityResetCount} | ${truncated ? "yes" : "no"} |`);
+  }));
+
+  lines.push("", "## Required milestone first-reach times", "", `- Ordered milestones: **${report.scoreMilestones.map((milestone) => `e${milestone}`).join(", ")}**`);
+  report.candidateComparisons.forEach((candidate) => {
+    lines.push(`- **${candidate.candidateId} / ${candidate.bestAdaptivePolicy ?? "adaptive unavailable"}**: ${report.scoreMilestones.map((milestone) => `${milestoneKey(milestone)}=${formatSeconds(candidate.bestAdaptive?.firstMilestoneTimes?.[milestoneKey(milestone)])}`).join(", ")}`);
+  });
+
+  lines.push("", "## Candidate A comparability with Issue #112", "", `- Options match: **${report.candidateAComparability.optionsMatch ? "yes" : "no"}**`, `- Tolerance: **${report.candidateAComparability.toleranceLog10} log10**`, `- Within tolerance: **${report.candidateAComparability.withinTolerance ? "yes" : "no"}**`);
+  report.candidateAComparability.policies?.forEach((comparison) => lines.push(`- ${comparison.policy}: expected ${formatPeak(comparison.expectedPeakScoreLog10)}, observed ${formatPeak(comparison.actualPeakScoreLog10)}, delta ${comparison.peakDeltaLog10?.toFixed(3) ?? "—"}; milestone match ${comparison.withinTolerance ? "yes" : "no"}`));
+
+  lines.push("", "## Next bounded search recommendation", "", `- Status: **${report.nextSearchRecommendation.status}**`, `- Direction: **${report.nextSearchRecommendation.direction ?? report.nextSearchRecommendation.reason}**`, `- Basis: **${report.nextSearchRecommendation.basisCandidate ?? "—"}**`, `- Highest milestone: **${formatMilestone(report.nextSearchRecommendation.highestMilestone)}**`, `- Peak Score: **${formatPeak(report.nextSearchRecommendation.peakScoreLog10)}**`, `- Gap to e2500: **${report.nextSearchRecommendation.gapToE2500 ?? "—"} log10**`, `- Next region: **${report.nextSearchRecommendation.nextRegion ?? "—"}**`);
+
   lines.push("## Canonical collision validation", "", `- Production match: **${report.candidateA.collision.matchesProduction ? "yes" : "no"}**`, `- Documented e100…e7700 range present: **${report.candidateA.collision.includesDocumentedRange ? "yes" : "no"}**`, `- Sequence: ${report.candidateA.collision.sequence.map((entry) => `${entry.kind}@e${entry.priceLog10}`).join(" → ")}`, "");
   lines.push("", "## Family usefulness", "", "| Family | Reachable | Measurable effect |", "| --- | --- | --- |", ...Object.entries(report.familyUsefulness).map(([kind, value]) => `| ${kind} | ${value.reachable ? "yes" : "no"} | ${value.measurableEffect ? "yes" : "no"} |`));
   lines.push("## Core Boost audit", "", "| Source | Use | Classification |", "| --- | --- | --- |");
   report.coreBoostAudit.forEach((entry) => lines.push(`| \`${entry.path}\` | ${entry.use} | ${entry.classification} |`));
   lines.push("", "## Baseline", "", "```json", JSON.stringify(report.candidateA.fixture, null, 2), "```", "");
-  lines.push("## Caveats", "", "- The simulator uses production runtime updates in fixed steps; it is a deterministic balance comparison, not a replacement for frame-by-frame gameplay.", `- Stall cutoff: ${formatSeconds(report.stallSeconds)} without a new peak Score; stalled routes count as failures.`, "- Any route/search truncation or timeout is retained as a failure signal.", "- Gain-aware-2x and threshold-aware policies are bounded heuristics; they are comparison candidates, not production automation settings.");
+  lines.push("## Caveats", "", "- The simulator uses production runtime updates in fixed steps; it is a deterministic balance comparison, not a replacement for frame-by-frame gameplay.", `- Stall cutoff: ${formatSeconds(report.stallSeconds)} without a new peak Score; stalled routes count as failures.`, "- Any route/search truncation remains explicit and produces inconclusive candidate classification.", "- Gain-aware-2x and threshold-aware policies are bounded heuristics; they are comparison candidates, not production automation settings.", "- This report is evidence for maintainer review; it does not select production TC4 constants.");
   return `${lines.join("\n")}\n`;
 }
 
@@ -1004,12 +1347,17 @@ if (require.main === module) {
 
 module.exports = {
   CANDIDATE_A,
+  CANDIDATE_GRID,
   CORE_BOOST_SOURCE_USE_MANIFEST,
+  COMPARABILITY_TOLERANCE_LOG10,
   RESET_POLICIES,
+  TC4_SCORE_MILESTONES,
   TARGET_LOG10,
   canonicalCollisionSequence,
+  candidateClassification,
   candidatePassesInitialTargets,
   createReport,
   formatMarkdown,
   parseArgs,
+  runCandidate,
 };
