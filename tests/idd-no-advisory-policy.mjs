@@ -34,6 +34,7 @@ const activeSurfaces = [
   '.github/instructions/lite/idd-pre-merge-lite.instructions.md',
   '.github/instructions/lite/idd-ci-lite.instructions.md',
   '.github/instructions/lite/idd-pr-submit-lite.instructions.md',
+  '.github/instructions/lite/idd-resume-lite.instructions.md',
   'docs/idd-advisory-wait-shell-fallback.md',
   'docs/idd-policy.md',
   'docs/idd-workflow.md',
@@ -65,8 +66,12 @@ const prSubmit = read('.github/instructions/idd-pr-submit.instructions.md');
 const preMerge = read('.github/instructions/idd-pre-merge.instructions.md');
 const mergeHandoff = read('.github/instructions/idd-merge-handoff.instructions.md');
 const mergeExecution = read('.github/instructions/idd-merge.instructions.md');
+const resume = read('.github/instructions/idd-resume.instructions.md');
 const policy = read('docs/idd-policy.md');
 const workflow = read('docs/idd-workflow.md');
+const issueAssociation = read('scripts/idd-issue-association.mjs');
+const litePrSubmit = read('.github/instructions/lite/idd-pr-submit-lite.instructions.md');
+const liteResume = read('.github/instructions/lite/idd-resume-lite.instructions.md');
 const boundaryVerifier = read('scripts/verify-human-merge-boundary.mjs');
 const branchPolicy = read('scripts/branch-merge-policy.mjs');
 const releaseWorkflow = read('.github/workflows/publish-release.yml');
@@ -109,6 +114,19 @@ assert.match(releaseWorkflow, /github\.event\.workflow_run\.head_sha/);
 assert.doesNotMatch(releaseWorkflow, /head_branch == 'next'/);
 assert.match(workflow, /Codex CLI[\s\S]*bounded read-only native subagent/i);
 assert.match(workflow, /structured self-critique/i);
+assert.match(prSubmit, /Branch-aware issue association/);
+assert.match(prSubmit, /defaultBranch/);
+assert.match(prSubmit, /idd-claimed-issue/);
+assert.match(prSubmit, /D3\.5 — Verify branch-aware issue association/);
+assert.match(mergeExecution, /Next integration issue completion/);
+assert.match(mergeExecution, /gh issue close N --reason completed/);
+assert.match(resume, /Next-merge reconciliation/);
+assert.match(resume, /baseRefName == next/);
+assert.match(issueAssociation, /evaluateNextMergeReconciliation/);
+assert.match(issueAssociation, /normalizeLegacyNextBody/);
+assert.match(litePrSubmit, /branch-aware issue/);
+assert.match(litePrSubmit, /idd-claimed-issue/);
+assert.match(liteResume, /Next-merge reconciliation/);
 
 const d4Success = prSubmit.indexOf('**On success**');
 const e1Route = prSubmit.indexOf('idd-review-snapshot.instructions.md', d4Success);

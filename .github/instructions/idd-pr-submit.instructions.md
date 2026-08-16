@@ -125,29 +125,45 @@ include the following content, mapped onto the template's sections
 when one exists:
 
 - A concise summary of the branch's changes
-- A closing keyword on its own line linking the claimed issue (see
-  Closing keyword below)
+- A branch-aware issue association selected from the live PR base and
+  repository default branch (see Branch-aware issue association below)
 - Recommended follow-up issues (if any)
 - Relevant background/rationale, when it materially affects review (for
   example, reuse constraints, intentional trade-offs, or non-goals).
   Include only context grounded in the issue discussion, commits, diff,
   or explicit operator instructions; omit rather than speculate.
 
-### Closing keyword
+### Branch-aware issue association
 
-The closing keyword must appear in the PR **body** (not the title) as
-plain markdown text. Write a line such as Closes #N, Fixes #N, or
-Resolves #N (case-insensitive) where N is the claimed issue number.
-Render that example literally in the body — no backticks, no code
-fences, no block-quote prefix.
+Do not hard-code `main` or assume that every PR should close its issue.
+Fetch the PR base and repository default branch live:
 
-When referring to keyword forms _as forms_ (not as the literal body
-text), inline code is fine in surrounding prose; the no-wrapper
-constraint applies only to the actual PR body content that GitHub
-must parse.
+```sh
+gh pr view <pr-number> --json baseRefName,body,closingIssuesReferences
+gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
+```
 
-GitHub recognizes the following keyword forms: close, closes, closed,
-fix, fixes, fixed, resolve, resolves, resolved.
+Use the following association contract for the claimed issue `<N>`:
+
+- When `baseRefName` equals the live default branch, the body must contain
+  one plain-text closing keyword (`Closes #N`, `Fixes #N`, or `Resolves #N`)
+  and GitHub's `closingIssuesReferences` must be exactly `[N]`.
+- When `baseRefName` is exactly `next` and `next` differs from the live
+  default branch, the body must contain the neutral plain-text reference
+  `Refs #N` and exactly one machine marker on its own line:
+  `<!-- idd-claimed-issue: N -->`. GitHub's closing set must be empty and
+  the active claim must equal the current claim-id.
+- Any other base, including `release/**`, an issue/feature branch, or a
+  missing/unknown base, is not an autonomous association route. Stop and
+  follow the branch merge policy's human/fail-closed route.
+
+The read-only evaluator in `scripts/idd-issue-association.mjs` implements
+these checks and is the regression-testable source for the association
+decision. Its output never authorizes a merge or issue mutation.
+
+GitHub recognizes the following closing keyword forms: close, closes,
+closed, fix, fixes, fixed, resolve, resolves, resolved. They must be plain
+body text, not inline code, a fenced block, or a block quote.
 
 #### Anti-patterns
 
@@ -183,14 +199,13 @@ from any reference it must not close:
   Here `resolve` is followed by "it", not a `#N` token, so nothing
   adjacent to `#42` matches.
 
-Do not rely on careful phrasing alone as the only safeguard — the
-strengthened check in D3.5 below verifies `closingIssuesReferences`
-against the deliberate closing set exactly, catching a spurious extra
-close even if phrasing slips.
+Do not rely on careful phrasing alone as the only safeguard — D3.5 below
+checks both the stripped body and the live closing set, and the `next`
+route rejects any closing reference.
 
 #### Multiple closing issues
 
-When the PR closes more than one issue, repeat the keyword for each
+For default-base PRs, when the PR closes more than one issue, repeat the keyword for each
 reference. Both keywords must appear in plain body text for GitHub to
 auto-close both issues:
 
@@ -206,74 +221,38 @@ reviewers that are not auto-assigned by GitHub, request them explicitly:
 gh pr edit {pr-number} --add-reviewer {reviewer-login}
 ```
 
-### D3.5 — Verify closing keyword detection
+### D3.5 — Verify branch-aware issue association
 
-After PR creation and before D4, confirm GitHub recognized the
-closing keyword for the claimed issue. Resume routing should re-enter
-this sub-step when a session restarts after PR creation but before CI
-completion.
+After PR creation and before D4, re-fetch the PR base, body, closing set,
+and the repository default branch. Resume routing re-enters this sub-step
+when a session restarts after PR creation but before CI completion.
 
-1. Re-fetch the PR body:
+1. Run the live reads from D3 again. Do not infer the default branch from
+   repository history or from a hard-coded `main` value.
 
-   ```sh
-   gh pr view <pr-number> --json body --jq '.body'
-   ```
+2. Strip fenced blocks, inline code, and block-quote lines before checking
+   visible references. The exact D3 contract then applies:
+   - default-base PR: exactly one visible closing keyword for <N> and
+     `closingIssuesReferences == [N]`;
+   - non-default `next` PR: exactly one visible `Refs #N`, exactly one
+     exact marker `<!-- idd-claimed-issue: N -->`, an empty closing set,
+     and the active claim matching the current claim-id.
 
-2. Strip regions GitHub does not parse for closing keywords:
+3. Use the read-only `scripts/idd-issue-association.mjs` evaluator with the
+   live values when available. A `ready: false` result is a stop, not a
+   reason to guess or weaken the body.
 
-   - lines inside fenced code blocks (triple backtick or triple tilde)
-   - spans inside inline code (single backticks)
-   - lines beginning with `>` (block-quote prefix) after leading
-     whitespace
+4. For a legacy non-default `next` body containing a standalone
+   `Closes/Fixes/Resolves #N`, run the evaluator's one-time
+   `normalizeLegacyNextBody` transformation, update the PR body, then
+   repeat steps 1–3 once. Do not rewrite arbitrary references, multiple
+   markers, or malformed markers.
 
-3. Search the remaining plain-text body for a closing keyword
-   referencing the **claimed issue number** `<N>`, using a regex
-   equivalent to:
-
-   ```text
-   (?im)\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#<N>\b
-   ```
-
-4. **If no match in the stripped body**:
-
-   - Edit the PR body with
-     `gh pr edit <pr-number> --body <updated-body>` to add a
-     correctly placed plain-text closing keyword line (e.g.,
-     `Closes #<N>` as its own line, outside any code fence or
-     block quote).
-   - Repeat steps 1–3 once.
-   - If the second self-check still fails, post a hold note on the
-     issue citing the PR URL and stop. Do not proceed to D4.
-
-5. **If the keyword exists only inside a stripped region**: report
-   which wrapper form was detected (inline code, fenced block, or
-   block-quote prefix) and apply the same edit-and-recheck path
-   as step 4.
-
-6. **Confirm the closing set matches exactly**: GitHub's
-   `closingIssuesReferences` field on the PR
-   (`gh pr view <pr-number> --json closingIssuesReferences --jq
-   '.closingIssuesReferences[].number'`) lists every issue GitHub plans
-   to close when the PR merges. Compare it against the deliberate
-   closing set from D3 — normally just the claimed issue `<N>`, or the
-   full deliberate multi-issue set when "Multiple closing issues" above
-   applies. The two sets must be **exactly** equal; steps 1-5 above
-   only confirm the claimed issue `<N>` is present, so this step is the
-   only one that catches either direction of mismatch:
-
-   - **An extra entry** (a `closingIssuesReferences` issue outside the
-     deliberate set) is most often the negation-blind false-positive
-     documented above, where an unrelated `#M` reference ends up
-     adjacent to a recognized keyword elsewhere in the body. Edit the
-     PR body to separate the keyword from that `#M` reference.
-   - **A missing entry** (a deliberate multi-issue-close target absent
-     from `closingIssuesReferences`) means its keyword did not
-     register — apply the same edit-and-recheck path as step 4 for
-     that issue number.
-
-   Repeat this step once after either fix. If it still fails, post a
-   hold note on the issue citing the PR URL and stop. Do not proceed to
-   D4.
+5. For a missing marker, extra/missing closing reference, malformed body,
+   unsupported base, or any mismatch after one correction, post a hold
+   note citing the PR URL and stop. Do not proceed to D4. The evaluator
+   is fail-closed; do not add a closing keyword merely to make the old
+   check pass.
 
 ## D4 — Wait for CI
 

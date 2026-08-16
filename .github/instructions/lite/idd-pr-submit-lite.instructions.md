@@ -33,16 +33,16 @@ session already claimed and implemented. If the repository is
   merge-based resync (or a closer live-state read) is out of its scope.
   (A pushed branch with **no** open PR yet is not this case: push any
   unpushed local commits, then skip straight to D3. An open PR with
-  `syncRecommendation: none` is not this case either: run D3.5's check,
+  `syncRecommendation: none` is not this case either: run D3.5's association check,
   then skip straight to D4.)
 - D1's rebase hits a content conflict this session cannot resolve
   mechanically.
 - After D1, `git branch --show-current` is empty (detached HEAD) and one
   re-attach-and-re-rebase attempt still fails.
-- D3.5's closing-keyword self-check still fails after one corrective
+- D3.5's branch-aware association check still fails after one corrective
   edit.
-- `closingIssuesReferences` still does not exactly match the deliberate
-  closing set after one corrective edit.
+- the branch-aware closing/neutral-marker set still does not exactly match
+  the live base-branch contract after one corrective edit.
 - The required-check set for D4 cannot be determined (protection or
   ruleset reads are unreadable, or `ci-wait-state`'s
   `requiredChecks.status` reports `source-pinned`, or reports
@@ -118,7 +118,7 @@ This section's rebase only applies **before the branch's first push**.
      (branch protection requiring an up-to-date head) rather than treating
      every non-`CLEAN` state the same:
      - `syncRecommendation: "none"`: D1-D3 already happened in an
-       earlier session. Run D3.5's closing-keyword check first — it is
+       earlier session. Run D3.5's branch-aware association check first — it is
        idempotent even if an earlier session already verified it, and
        a session that crashed between D3 and D3.5 would otherwise
        never get the keyword verified — then continue to D4 (wait for
@@ -203,58 +203,32 @@ loop instead of returning to this D1 rebase path.
 2. Create the PR using GH CLI (`gh pr create`) or GH MCP, with a body
    satisfying the rules below — this step is not formatting guidance
    for an already-open PR; the PR must actually be created here.
-3. The PR body must include: a concise summary, a closing keyword line
-   for the claimed issue, recommended follow-up issues (if any), and
-   background/rationale only when it materially affects review. Ground
-   any background/rationale only in the issue discussion, commits,
-   diff, or explicit operator instructions — omit rather than
-   speculate.
-4. **Closing keyword**: write a plain-text line such as `Closes #N` for
-   the claimed issue number, on its own line. GitHub recognizes these
-   keyword forms (case-insensitive): `close`, `closes`, `closed`, `fix`,
-   `fixes`, `fixed`, `resolve`, `resolves`, `resolved`. Never wrap the
-   keyword in inline code, a fenced code block, or a block-quote `>`
-   prefix — GitHub does not detect the keyword in any of those forms,
-   and the linked issue will not auto-close on merge.
-5. **Negation-blind detection**: GitHub matches a keyword immediately
-   adjacent to a `#N` with no concept of negation. Never place a
-   recognized keyword directly next to a `#N` you do not intend to
-   close, even inside a sentence saying it should not close it — reorder
-   the sentence so no keyword sits next to that reference.
-6. **Multiple closes**: repeat the keyword for each issue — `Closes #1,
-   closes #2` closes both; `Closes #1, #2` closes only the first.
-7. If CODEOWNERS or expected reviewers are not auto-assigned, request
+3. The PR body must include a concise summary, the branch-aware issue
+   association required by the live PR base/default-branch contract,
+   recommended follow-up issues (if any), and background/rationale only
+   when grounded in the issue discussion, commits, diff, or instructions.
+4. Fetch baseRefName, body, closingIssuesReferences, and the live
+   defaultBranchRef. Default-base PRs use one plain closing keyword and
+   an exact closing set; non-default `next` PRs use `Refs #N`, one exact
+   `idd-claimed-issue: N` marker, and an empty closing set. Other bases
+   stop on the branch policy's human/fail-closed route.
+5. If CODEOWNERS or expected reviewers are not auto-assigned, request
    them explicitly: `gh pr edit {pr-number} --add-reviewer
    {reviewer-login}`.
 
-### D3.5 — Verify closing keyword detection
+### D3.5 — Verify branch-aware issue association
 
-1. Fetch the PR body: `gh pr view {pr-number} --json body --jq '.body'`.
-2. Strip fenced code blocks, inline-code spans, and block-quoted lines
-   from the body.
-3. Search the remaining plain text for the claimed issue number `<N>`
-   with this pattern, kept on one line (do not reflow it — a line break
-   inside the alternation would silently break the `resolve` branch):
-
-   ```text
-   (?im)\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\s+#<N>\b
-   ```
-
-   Matching case-insensitively (`Closes`, `CLOSES`, and `closes` all
-   count).
-4. If no match: edit the PR body to add a correctly placed plain-text
-   closing line, then repeat steps 1-3 once. If it still fails, stop and
-   post a hold note citing the PR URL.
-5. Confirm the closing set matches exactly: `gh pr view {pr-number}
-   --json closingIssuesReferences --jq
-   '.closingIssuesReferences[].number'` must list precisely the
-   deliberate closing set (normally just `<N>`).
-   - An extra entry usually means an unrelated `#M` sits next to a
-     keyword elsewhere in the body — separate them.
-   - A missing entry means that issue's keyword did not register — apply
-     the same edit-and-recheck path as step 4 for that number.
-   - Repeat once after either fix. If it still fails, stop and post a
-     hold note citing the PR URL.
+1. Fetch the PR base/body/closing set and the repository default branch
+   live; do not assume `main`.
+2. Strip fenced blocks, inline-code spans, and block-quoted lines.
+3. Use `scripts/idd-issue-association.mjs` with the live values:
+   default-base requires one plain closing keyword and closing set `[N]`;
+   non-default `next` requires `Refs #N`, one exact
+   `idd-claimed-issue: N` marker, and an empty closing set.
+4. For a standalone legacy closing line on a non-default `next` body,
+   apply `normalizeLegacyNextBody` once, update the body, and re-run the
+   evaluator. Other bases, malformed markers, claim mismatches, and
+   unverified closing sets stop on the human/fail-closed route.
 
 ## D4 — Wait for CI
 

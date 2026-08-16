@@ -34,7 +34,8 @@ Evaluate in order; take the first matching row.
 
 | Condition                                                                                 | Route                                                              |
 | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Issue closed or PR merged                                                                 | Step 1 (cleanup only)                                              |
+| PR merged into exact `next`, `next != defaultBranch`, issue still open                         | Step 1 next-merge reconciliation; do not re-merge or start D3.5 |
+| Issue closed, or PR merged with issue already closed                                      | Step 1 (cleanup only)                                              |
 | `forced-handoff: human-gated` + valid evidence matching active/inheritable state          | Step 1 forced-handoff path (skip stall check)                      |
 | `forced-handoff: human-gated` + evidence exists but mismatches live claim/branch/PR state | STOP — report mismatch; do not claim, push, or mutate review state |
 | Non-owned active claim + no valid forced-handoff evidence                                 | `idd-resume-stall.instructions.md`; then Step 1 if unblocked       |
@@ -91,7 +92,8 @@ Evaluate in order; take the first matching row.
 
 | Claim state                                                                                     | Route                                                                                                                         |
 | ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Issue closed or PR merged                                                                       | Clean up local worktree and branch; STOP                                                                                      |
+| PR merged into exact `next`, `next != defaultBranch`, issue OPEN                               | Run Next-merge reconciliation below; after completion, clean up and STOP                                                     |
+| Issue closed, or PR merged with issue CLOSED                                                    | Clean up local worktree and branch; STOP                                                                                      |
 | Active claim = this session's verified `{claim-id}` + branch field starts with `roadmap-audit/` | Re-run A1.5; skip worktree creation; STOP after roadmap-side effects. Coordination-only: does not lock child-issue execution. |
 | Active claim = this session's verified `{claim-id}`                                             | Continue with same `{claim-id}`; ignore stale FH evidence citing a different displaced `{claim-id}`; → Step 2                 |
 | FH evidence names this session's already-verified `{claim-id}`                                  | STOP — current session is displaced; do not push, comment, resolve, request reviewers, or merge                               |
@@ -117,6 +119,29 @@ After routing, repair a missing or stale digest from the parsed claim state,
 PR state, CI state, and review activity when safe under the claim
 revalidation gate. See §Digest in `docs/idd-resume-detail.md` for
 multi-digest and forced-handoff edge cases. Do not use digest text to route.
+
+## Next-merge reconciliation
+
+This route handles a merged exact-next PR while its issue is still open.
+It is not a merge retry and it never treats closingIssuesReferences as
+authoritative.
+
+1. Re-fetch the issue, PR, and repository default branch. Require
+   baseRefName == next, next != defaultBranch, mergedAt and a full
+   mergeCommit.oid, exactly one visible Refs #N, exactly one
+   idd-claimed-issue: N marker, an empty closing set, and the current
+   active claim.
+2. Run the read-only reconciliation mode of
+   scripts/idd-issue-association.mjs. Any ready: false, stale, or unknown
+   result is a fail-closed stop; do not close the issue.
+3. Revalidate the claim immediately before gh issue close N --reason
+   completed. Re-fetch the issue, then revalidate again before posting a
+   completion comment containing the PR URL and merge SHA.
+4. If close or evidence posting fails, update the digest with a
+   reconciliation blocker and stop. A later resume may retry after
+   re-fetching all evidence. Never undo a successful merge or reopen an
+   already closed issue. Default-base, release, transition, and unknown
+   bases use their existing human/cleanup routes instead.
 
 ## Step 2 — Locate or restore worktree
 

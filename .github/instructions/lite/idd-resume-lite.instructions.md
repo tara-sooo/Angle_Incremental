@@ -59,7 +59,8 @@ Use GitHub **server** timestamps only. Stale age default: **24 h**
 
 | Condition                                                      | Action                                                                 |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| Issue closed or PR merged                                      | Step 1 cleanup only → STOP                                             |
+| Merged exact-next PR, next differs from default, issue OPEN      | Next-merge reconciliation; never re-merge or start D3.5              |
+| Issue closed or PR merged with issue CLOSED                   | Step 1 cleanup only → STOP                                             |
 | Valid human-gated forced-handoff matching live claim/branch/PR | Step 1 forced-handoff path (skip stall)                                |
 | Forced-handoff evidence present but mismatches live state      | STOP — report mismatch; do not claim/push                              |
 | Non-owned active claim, no valid forced-handoff                | Open `idd-resume-stall-lite.instructions.md`; return here if unblocked |
@@ -89,7 +90,8 @@ Written table (`instructions-only` profile only): first matching row.
 
 | Claim state                                                                                 | Action                                                        |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Closed / PR merged                                                                          | Remove local worktree/branch → STOP                           |
+| Merged exact-next PR with issue OPEN                                                       | Re-fetch/verify marker, merge SHA, claim; reconcile then STOP |
+| Closed / PR merged with issue CLOSED                                                        | Remove local worktree/branch → STOP                           |
 | Active claim = this session's verified `{claim-id}` and branch starts with `roadmap-audit/` | Re-run A1.5 only → STOP                                       |
 | Active claim = this session's verified `{claim-id}`                                         | → Step 2                                                      |
 | Forced-handoff names this session's verified `{claim-id}` as displaced                      | STOP — displaced; no push/comment/resolve/merge               |
@@ -102,6 +104,17 @@ Written table (`instructions-only` profile only): first matching row.
 All claim writes use A5 post-and-verify (`post-idd-marker` / claim helper
 settle delay). Same-agent non-stale claims are **not** inheritable by
 agent-id alone.
+
+## Next-merge reconciliation
+
+For a merged PR based on exact next while next differs from the live
+default branch and the issue remains open, re-fetch base/default/body,
+empty closing references, the exact issue marker, merge SHA, and claim.
+Run scripts/idd-issue-association.mjs in reconcile mode. Revalidate the
+claim before closing the issue with reason completed, then re-fetch and
+revalidate before recording PR and merge-SHA evidence. Failed checks or
+mutations stop without undoing the merge; default/release/unknown bases
+use the existing human/fail-closed route.
 
 ## Step 2 — Worktree
 
