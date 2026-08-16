@@ -170,7 +170,7 @@ not `next`. Default-base PRs use GitHub's verified closing set; `main`,
    the merged PR, marker, current claim, and issue state before retrying.
    If the issue is already closed, record the existing completion evidence
    and do not reopen or close it again.
-5. If merge fails:
+6. If merge fails:
    - `gh pr merge --merge` fails with "the base branch policy
      prohibits the merge" despite a passing Gate checklist and a
      configured pull-request-only bypass actor → that scoped bypass
