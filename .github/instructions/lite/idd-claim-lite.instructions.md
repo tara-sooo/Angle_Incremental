@@ -212,7 +212,7 @@ of an inheritable claim — the already-verified active claim, the stale
 claim being taken over, the last voluntarily released claim, verified
 forced-handoff evidence (only when its branch and linked-PR fields
 match this live GitHub state), or a legacy migration source. Check
-both linked issues and PR-body closing keywords. A non-inheritable
+both linked issues and branch-aware PR-body associations. A non-inheritable
 matching PR → **STOP**.
 
 ### (e) Branch collision

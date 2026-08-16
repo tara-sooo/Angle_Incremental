@@ -503,6 +503,25 @@ stale-claim takeover, or ordinary clean continuation. This keeps crash
 and stall handling separate without requiring the stalled session to
 publish a final self-report.
 
+### Branch-aware issue association
+
+D3.5 derives the association contract from the live PR base and
+repository default branch. A default-base PR uses plain closing
+keywords for the deliberate closing set (defaulting to the claimed issue)
+and an exact GitHub closing set. A non-default `next` PR uses a visible
+neutral `Refs #N`, one exact `idd-claimed-issue: N` marker, an empty
+closing set, and the current claim; unrelated neutral `Refs #M` references
+are allowed. Release, transition, and unknown bases do not enter the
+autonomous route.
+
+After a successful exact-next merge, F3 re-fetches merge/base/marker/claim
+evidence before closing the still-open issue with reason `completed` and
+posting the merge-SHA evidence. Resume sends merged-next/open-issue state
+to the same reconciliation path. If close succeeds but evidence posting
+fails, a later resume repairs only the missing completion marker for the
+already-closed issue; it never re-closes or re-merges. Failed close/evidence
+is retained as a blocker without undoing the merge.
+
 ## Autopilot operating model
 
 The execution loop is **one issue = one short-lived session**: drive a
