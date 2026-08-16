@@ -8,6 +8,7 @@ const NEUTRAL_REFERENCE_RE = /\bRefs\s+#(\d+)\b/gi;
 const MARKER_LINE_RE = /^<!-- idd-claimed-issue: (\d+) -->$/gm;
 const MARKER_HINT_RE = /idd-claimed-issue:/gi;
 const LEGACY_LINE_RE = /^\s*(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)\s*$/i;
+const COMPLETION_MARKER_RE = /^<!-- idd-next-issue-completion: (\d+) -->$/gm;
 
 function issueNumber(value) {
   const number = Number(value);
@@ -80,6 +81,7 @@ export function evaluateIssueAssociation({
   issue,
   body = '',
   closingIssueNumbers,
+  deliberateClosingIssues,
   activeClaimId,
   claimId,
 }) {
@@ -97,7 +99,15 @@ export function evaluateIssueAssociation({
 
   const visibleClosing = extractClosingIssueNumbers(body);
   if (baseBranch === defaultBranch) {
-    const expected = [targetIssue];
+    const expected = deliberateClosingIssues === undefined
+      ? [targetIssue]
+      : normalizedNumbers(deliberateClosingIssues);
+    if (!expected || !expected.includes(targetIssue)) {
+      return result('default-close', false, 'invalid-deliberate-closing-set', {
+        expected,
+        issue: targetIssue,
+      });
+    }
     if (!sameSet(visibleClosing, expected)) {
       return result('default-close', false, 'closing-reference-mismatch', {
         expected,
@@ -136,7 +146,7 @@ export function evaluateIssueAssociation({
       markers,
     });
   }
-  if (!sameSet(neutralReferences, [targetIssue])) {
+  if (!neutralReferences.includes(targetIssue)) {
     return result('next-reconcile', false, 'neutral-reference-mismatch', {
       expected: [targetIssue],
       neutralReferences,
@@ -197,6 +207,16 @@ function validMergeSha(value) {
   return typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value);
 }
 
+function validCompletionComment(comment, issue, pullRequestNumber, mergeCommitSha) {
+  const source = typeof comment === 'string' ? comment : comment?.body;
+  if (typeof source !== 'string' || !issueNumber(pullRequestNumber)) return false;
+  const markers = [...stripIgnoredMarkdown(source).matchAll(COMPLETION_MARKER_RE)];
+  return markers.length === 1
+    && Number(markers[0][1]) === issue
+    && source.includes(`PR #${pullRequestNumber}`)
+    && source.includes(mergeCommitSha);
+}
+
 export function evaluateNextMergeReconciliation({
   baseBranch,
   defaultBranch,
@@ -236,15 +256,78 @@ export function evaluateNextMergeReconciliation({
   });
 }
 
+export function evaluateNextMergeCompletionEvidence({
+  baseBranch,
+  defaultBranch,
+  nextBranch = 'next',
+  issue,
+  issueState,
+  body = '',
+  closingIssueNumbers,
+  activeClaimId,
+  claimId,
+  merged,
+  mergedAt = null,
+  mergeCommitSha,
+  pullRequestNumber,
+  completionComments = [],
+}) {
+  if (issueState !== 'CLOSED') return result('next-reconcile', false, 'issue-not-closed');
+  if (merged !== true || typeof mergedAt !== 'string' || !mergedAt) {
+    return result('next-reconcile', false, 'merge-not-confirmed');
+  }
+  if (!validMergeSha(mergeCommitSha)) return result('next-reconcile', false, 'merge-sha-missing');
+
+  const association = evaluateIssueAssociation({
+    baseBranch,
+    defaultBranch,
+    nextBranch,
+    issue,
+    body,
+    closingIssueNumbers,
+    activeClaimId,
+    claimId,
+  });
+  if (!association.ready || association.route !== 'next-reconcile') {
+    return result('next-reconcile', false, `association-${association.reason}`, { association });
+  }
+
+  const targetIssue = issueNumber(issue);
+  const validCompletionCount = Array.isArray(completionComments)
+    ? completionComments.filter((comment) => validCompletionComment(
+      comment,
+      targetIssue,
+      pullRequestNumber,
+      mergeCommitSha,
+    )).length
+    : 0;
+  if (validCompletionCount !== 1) {
+    return result('next-reconcile', false, 'completion-evidence-missing', {
+      issue: targetIssue,
+      validCompletionCount,
+      repairable: true,
+      mergeCommitSha,
+    });
+  }
+  return result('next-reconcile', true, 'verified', {
+    issue: targetIssue,
+    mergeCommitSha,
+    repairable: false,
+  });
+}
+
 const isCli = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 if (isCli) {
   const inputIndex = process.argv.indexOf('--input');
   const modeIndex = process.argv.indexOf('--mode');
   assert.ok(inputIndex >= 0 && process.argv[inputIndex + 1],
-    'usage: node scripts/idd-issue-association.mjs --mode association|reconcile --input FILE');
+    'usage: node scripts/idd-issue-association.mjs --mode association|reconcile|completion --input FILE');
   const mode = modeIndex >= 0 ? process.argv[modeIndex + 1] : 'association';
   const input = JSON.parse(fs.readFileSync(process.argv[inputIndex + 1], 'utf8'));
-  const evaluate = mode === 'reconcile' ? evaluateNextMergeReconciliation : evaluateIssueAssociation;
-  assert.ok(mode === 'association' || mode === 'reconcile', 'mode must be association or reconcile');
+  const evaluate = mode === 'reconcile'
+    ? evaluateNextMergeReconciliation
+    : mode === 'completion' ? evaluateNextMergeCompletionEvidence : evaluateIssueAssociation;
+  assert.ok(mode === 'association' || mode === 'reconcile' || mode === 'completion',
+    'mode must be association, reconcile, or completion');
   console.log(JSON.stringify(evaluate(input)));
 }

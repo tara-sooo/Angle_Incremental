@@ -172,22 +172,26 @@ Restore the worktree from the local branch. Then route:
 - Unpushed commits exist → D1
 - No unpushed commits → B2
 
-## §W9 — Merged exact-next PR with an open issue
+## §W9 — Merged exact-next PR reconciliation
 
-After Step 0 identifies a merged PR whose base is `next`, whose
-repository default branch is different, and whose issue is still open,
-do not retry merge or D3.5. Re-fetch the PR, issue, and default branch
-and require the neutral `Refs #N` reference, one exact
-`idd-claimed-issue: N` marker, empty closing references, merge timestamp,
-full merge SHA, and the current claim.
+After Step 0 identifies a merged PR whose base is `next` and whose
+repository default branch is different, do not retry merge or D3.5.
+Re-fetch the PR, issue, default branch, and issue comments and require the
+neutral `Refs #N` reference, one exact `idd-claimed-issue: N` marker, empty
+closing references, merge timestamp, full merge SHA, and current claim.
 
-Run the read-only reconciliation evaluator, then revalidate the claim
-before closing the issue with reason `completed`. Re-fetch the issue and
-revalidate the claim again before posting a completion comment with the
-PR URL and merge SHA. A mismatch or failed close/comment is a
-reconciliation blocker; preserve the merge and stop for a later resume.
-Default-base, release, transition, and unknown-base PRs use the existing
-cleanup or human/fail-closed route.
+For an OPEN issue, run the reconciliation evaluator, then revalidate the
+claim before closing the issue with reason `completed`. Re-fetch the issue
+and revalidate again before posting a completion comment with the PR URL
+and merge SHA; verify it with the completion evaluator.
+
+For a CLOSED issue, run the completion-evidence evaluator. If the
+`idd-next-issue-completion` marker is missing or invalid, revalidate the
+claim and post only the missing evidence. Never reopen/re-close the issue
+or re-merge the PR. Re-fetch and verify the evidence before cleanup.
+A mismatch or failed close/evidence repair is a reconciliation blocker;
+preserve the merge and stop for a later resume. Default-base, release,
+transition, and unknown-base PRs use the existing cleanup or human route.
 
 ## §Digest — Digest Repair Guidance
 

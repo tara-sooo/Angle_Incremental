@@ -208,10 +208,12 @@ loop instead of returning to this D1 rebase path.
    recommended follow-up issues (if any), and background/rationale only
    when grounded in the issue discussion, commits, diff, or instructions.
 4. Fetch baseRefName, body, closingIssuesReferences, and the live
-   defaultBranchRef. Default-base PRs use one plain closing keyword and
-   an exact closing set; non-default `next` PRs use `Refs #N`, one exact
-   `idd-claimed-issue: N` marker, and an empty closing set. Other bases
-   stop on the branch policy's human/fail-closed route.
+   defaultBranchRef. Default-base PRs use one plain closing keyword for
+   every issue in the deliberate closing set (default `[N]`) and an exact
+   closing set; non-default `next` PRs use at least one `Refs #N`, one
+   exact `idd-claimed-issue: N` marker, an empty closing set, and may include
+   unrelated neutral `Refs #M` references. Other bases stop on the branch
+   policy's human/fail-closed route.
 5. If CODEOWNERS or expected reviewers are not auto-assigned, request
    them explicitly: `gh pr edit {pr-number} --add-reviewer
    {reviewer-login}`.
@@ -222,9 +224,12 @@ loop instead of returning to this D1 rebase path.
    live; do not assume `main`.
 2. Strip fenced blocks, inline-code spans, and block-quoted lines.
 3. Use `scripts/idd-issue-association.mjs` with the live values:
-   default-base requires one plain closing keyword and closing set `[N]`;
-   non-default `next` requires `Refs #N`, one exact
-   `idd-claimed-issue: N` marker, and an empty closing set.
+   default-base requires the deliberate closing set (default `[N]`) to
+   match both the plain closing keywords and GitHub's closing set;
+   non-default `next` requires a visible `Refs #N`, one exact
+   `idd-claimed-issue: N` marker, and an empty closing set. Unrelated
+   neutral `Refs #M` references are allowed. Pass the full deliberate
+   default-base set explicitly to the evaluator.
 4. For a standalone legacy closing line on a non-default `next` body,
    apply `normalizeLegacyNextBody` once, update the body, and re-run the
    evaluator. Other bases, malformed markers, claim mismatches, and

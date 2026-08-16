@@ -147,20 +147,26 @@ gh api graphql -f query='query($owner: String!, $repo: String!, $number: Int!) {
 Use the following association contract for the claimed issue `<N>`:
 
 - When `baseRefName` equals the live default branch, the body must contain
-  one plain-text closing keyword (`Closes #N`, `Fixes #N`, or `Resolves #N`)
-  and GitHub's `closingIssuesReferences` must be exactly `[N]`.
+  one plain-text closing keyword for every issue in the deliberate closing
+  set (`Closes #N`, `Fixes #N`, or `Resolves #N`) and GitHub's
+  `closingIssuesReferences` must exactly equal that set. When no additional
+  issue is deliberately closed, the set defaults to `[N]`.
 - When `baseRefName` is exactly `next` and `next` differs from the live
-  default branch, the body must contain the neutral plain-text reference
+  default branch, the body must contain a neutral plain-text reference
   `Refs #N` and exactly one machine marker on its own line:
   `<!-- idd-claimed-issue: N -->`. GitHub's closing set must be empty and
-  the active claim must equal the current claim-id.
+  the active claim must equal the current claim-id; unrelated neutral
+  `Refs #M` follow-up or background references are allowed.
 - Any other base, including `release/**`, an issue/feature branch, or a
   missing/unknown base, is not an autonomous association route. Stop and
   follow the branch merge policy's human/fail-closed route.
 
 The read-only evaluator in `scripts/idd-issue-association.mjs` implements
 these checks and is the regression-testable source for the association
-decision. Its output never authorizes a merge or issue mutation.
+decision. Pass `deliberateClosingIssues` as the full intended default-base
+set (or `[N]` when there are no additional closes); the `next` route has an
+empty GitHub closing set. Its output never authorizes a merge or issue
+mutation.
 
 GitHub recognizes the following closing keyword forms: close, closes,
 closed, fix, fixes, fixed, resolve, resolves, resolved. They must be plain
@@ -206,9 +212,9 @@ route rejects any closing reference.
 
 #### Multiple closing issues
 
-For default-base PRs, when the PR closes more than one issue, repeat the keyword for each
-reference. Both keywords must appear in plain body text for GitHub to
-auto-close both issues:
+For default-base PRs, record every deliberately closed issue in the
+closing set and repeat the keyword for each reference. Both keywords must
+appear in plain body text for GitHub to auto-close both issues:
 
 - Works — a body line written as Closes #1, closes #2 (GitHub parses
   each keyword + reference pair).
@@ -233,15 +239,18 @@ when a session restarts after PR creation but before CI completion.
 
 2. Strip fenced blocks, inline code, and block-quote lines before checking
    visible references. The exact D3 contract then applies:
-   - default-base PR: exactly one visible closing keyword for <N> and
-     `closingIssuesReferences == [N]`;
-   - non-default `next` PR: exactly one visible `Refs #N`, exactly one
+   - default-base PR: visible closing keywords and
+     `closingIssuesReferences` must exactly equal the deliberate closing
+     set (default `[N]`);
+   - non-default `next` PR: at least one visible `Refs #N`, exactly one
      exact marker `<!-- idd-claimed-issue: N -->`, an empty closing set,
-     and the active claim matching the current claim-id.
+     and the active claim matching the current claim-id. Other neutral
+     `Refs #M` references do not fail this check.
 
 3. Use the read-only `scripts/idd-issue-association.mjs` evaluator with the
    live values when available. A `ready: false` result is a stop, not a
-   reason to guess or weaken the body.
+   reason to guess or weaken the body. Pass the deliberate default-base
+   closing set explicitly.
 
 4. For a legacy non-default `next` body containing a standalone
    `Closes/Fixes/Resolves #N`, run the evaluator's one-time
@@ -249,7 +258,8 @@ when a session restarts after PR creation but before CI completion.
    repeat steps 1–3 once. Do not rewrite arbitrary references, multiple
    markers, or malformed markers.
 
-5. For a missing marker, extra/missing closing reference, malformed body,
+5. For a missing marker, a default-base extra/missing closing reference,
+   malformed body,
    unsupported base, or any mismatch after one correction, post a hold
    note citing the PR URL and stop. Do not proceed to D4. The evaluator
    is fail-closed; do not add a closing keyword merely to make the old

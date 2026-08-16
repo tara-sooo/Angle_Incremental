@@ -144,8 +144,9 @@ not `next`. Default-base PRs use GitHub's verified closing set; `main`,
    all of the following from the same live read:
    - `baseRefName == next` and `next != defaultBranch`;
    - `mergedAt` is non-null and `mergeCommit.oid` is a full merge SHA;
-   - the body contains exactly `Refs #N` and exactly one
-     `<!-- idd-claimed-issue: N -->` marker;
+   - the body contains a visible `Refs #N` and exactly one
+     `<!-- idd-claimed-issue: N -->` marker; unrelated neutral `Refs #M`
+     references are allowed;
    - `closingIssuesReferences` is empty and the issue is still open.
 2. Run the read-only `scripts/idd-issue-association.mjs` evaluator in
    `reconcile` mode with those values. It must report `ready: true`; any
@@ -164,12 +165,17 @@ not `next`. Default-base PRs use GitHub's verified closing set; `main`,
      gh api repos/OWNER/REPO/issues/N/comments --method POST --input -
    ```
 
+   Re-fetch the issue comments and run the evaluator in `completion` mode.
+   It must report `ready: true`; otherwise record a reconciliation failure
+   without reopening or re-merging.
+
 5. If the close or evidence comment fails, record a reconciliation failure
    in the digest/issue and stop for resume. Do not undo the merge and do
    not claim completion from a stale digest. A later resume must re-fetch
    the merged PR, marker, current claim, and issue state before retrying.
-   If the issue is already closed, record the existing completion evidence
-   and do not reopen or close it again.
+   If the issue is already closed, resume through the evidence-repair route:
+   post only missing or invalid completion evidence, then verify it; do not
+   reopen or close it again.
 6. If merge fails:
    - `gh pr merge --merge` fails with "the base branch policy
      prohibits the merge" despite a passing Gate checklist and a
