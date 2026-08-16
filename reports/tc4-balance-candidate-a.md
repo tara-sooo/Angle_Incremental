@@ -1,28 +1,31 @@
-# TC4 Balance Candidate A (Issue #106)
+# TC4 Balance Candidate A (Issue #112)
 
 > Research output only. No provisional effect is installed in production formulas.
 
+- Source comparison: **Issue #106** fixed-60 simulator
 - Target: **1e7777 Score**
 - Horizon: **24.00h**
 - Runtime step: **10s** (reported times have this resolution)
 - Search limits: **20 states / 10 routes**
 
-## Candidate ranking
+## Reset-policy comparison
 
-| Candidate | Canonical best | median/best | worst/best | successful | stalled | truncated |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| A 0.20 / B 0.50 / C 1 | not reached | — | — | 0 | 2 | no |
-| A 0.15 / B 0.35 / C 1 | not reached | — | — | 0 | 2 | no |
-| A 0.15 / B 0.50 / C 1 | not reached | — | — | 0 | 2 | no |
-| A 0.15 / B 0.65 / C 1 | not reached | — | — | 0 | 2 | no |
-| A 0.20 / B 0.35 / C 1 | not reached | — | — | 0 | 2 | no |
-| A 0.20 / B 0.50 / C 1 | not reached | — | — | 0 | 2 | no |
-| A 0.20 / B 0.65 / C 1 | not reached | — | — | 0 | 2 | no |
-| A 0.25 / B 0.35 / C 1 | not reached | — | — | 0 | 2 | no |
-| A 0.25 / B 0.50 / C 1 | not reached | — | — | 0 | 2 | no |
-| A 0.25 / B 0.65 / C 1 | not reached | — | — | 0 | 2 | no |
+| Policy | Canonical best | All-legal best | Peak Score | e900 | e1700 | e2500 | resets | truncated |
+| --- | ---: | ---: | ---: | --- | --- | --- | ---: | --- |
+| fixed-60 | not reached | not reached | e1337 | yes | no | no | 242 | no |
+| fixed-120 | not reached | not reached | e1392 | yes | no | no | 122 | no |
+| fixed-300 | not reached | not reached | e1528 | yes | no | no | 50 | no |
+| fixed-600 | not reached | not reached | e1552 | yes | no | no | 25 | no |
+| fixed-1800 | not reached | not reached | e1591 | yes | no | no | 9 | no |
+| gain-aware-2x | not reached | not reached | e1779 | yes | yes | no | 3 | no |
+| threshold-aware | not reached | not reached | e1779 | yes | yes | no | 1 | no |
 
-Candidate A initial targets: **fail; sweep evaluated**
+Candidate A classification: **failed**
+- Initial target gate: **not passed**
+- Baseline policy: **fixed-60**
+- Best peak policy: **threshold-aware**
+- Peak delta vs fixed-60: **442.500 log10**
+- e900 purchase kinds at best peak: **baseGain, freeCoreBoost**
 
 ## Canonical collision validation
 
@@ -84,7 +87,7 @@ Candidate A initial targets: **fail; sweep evaluated**
     "gain": 1
   },
   "startingInfinityPointsLog10": 24.999969598322195,
-  "automation": "manual-normal-level-1; Infinity reset after 60s when eligible; Core Boost when eligible; Generation after 60s only when both configured gains improve",
+  "automation": "manual-normal-level-1; compare fixed 60/120/300/600/1800s, gain-aware-2x, and threshold-aware Infinity resets; Core Boost and qualified Generation after each reset",
   "approximation": "10-second production-runtime steps; event timing is reported at step resolution"
 }
 ```
@@ -94,3 +97,4 @@ Candidate A initial targets: **fail; sweep evaluated**
 - The simulator uses production runtime updates in fixed steps; it is a deterministic balance comparison, not a replacement for frame-by-frame gameplay.
 - Stall cutoff: 4.00h without a new peak Score; stalled routes count as failures.
 - Any route/search truncation or timeout is retained as a failure signal.
+- Gain-aware-2x and threshold-aware policies are bounded heuristics; they are comparison candidates, not production automation settings.
