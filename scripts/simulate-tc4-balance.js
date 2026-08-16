@@ -254,7 +254,7 @@ async function configureBaseline(instance) {
       gain: state.infiniteAngleGainLevel,
     },
     startingInfinityPointsLog10: runtime.log10ExactInfinityPoints(runtime.currentExactInfinityPoints()),
-    automation: "manual-normal-level-1, automatic-generation/core-boost policy, no automatic Infinity reset",
+    automation: "manual-normal-level-1; Infinity reset after 60s when eligible; Core Boost when eligible; Generation after 60s only when both configured gains improve",
     approximation: "10-second production-runtime steps; event timing is reported at step resolution",
   };
 }
