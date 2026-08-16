@@ -12,7 +12,7 @@ assert.deepEqual(config.branchMergePolicy, {
   humanExactBranches: ['main'],
   humanPatterns: ['release/**'],
   unknownBaseRoute: 'human_merge',
-  transitionPullRequests: [105],
+  transitionPullRequests: [105, 109],
 });
 assert.equal(config.helperRuntime.profile, 'instructions-only');
 assert.equal(config.ciGate?.trustEmptyProtectionReads, true);
@@ -103,6 +103,7 @@ assert.deepEqual(resolveBranchMergePolicy('next'), {
   route: 'autonomous', reason: 'integration-branch', baseBranch: 'next', failClosed: false, releasePublication: false,
 });
 assert.equal(resolveBranchMergePolicy('next', 105).reason, 'transition-pr');
+assert.equal(resolveBranchMergePolicy('next', 109).reason, 'transition-pr');
 assert.equal(resolveBranchMergePolicy('main').route, 'human');
 assert.equal(resolveBranchMergePolicy('release/0.12.0').route, 'human');
 assert.equal(resolveBranchMergePolicy('feature/demo').failClosed, true);

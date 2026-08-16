@@ -139,8 +139,9 @@ Do not hard-code `main` or assume that every PR should close its issue.
 Fetch the PR base and repository default branch live:
 
 ```sh
-gh pr view <pr-number> --json baseRefName,body,closingIssuesReferences
+gh pr view <pr-number> --json baseRefName,body,headRefOid
 gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
+gh api graphql -f query='query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { closingIssuesReferences(first: 100) { nodes { number } } } } }' -f owner=OWNER -f repo=REPO -F number=<pr-number> --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].number'
 ```
 
 Use the following association contract for the claimed issue `<N>`:
