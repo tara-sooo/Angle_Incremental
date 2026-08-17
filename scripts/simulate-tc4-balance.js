@@ -636,6 +636,7 @@ function routeMetrics(runtime, node, status, reason, validation) {
     reason,
     policy: node.policy,
     elapsedSeconds: node.elapsed,
+    lastProgressAtSeconds: node.lastProgressAt,
     purchaseSequence: node.purchases,
     finalLevels: levels,
     finalPriceSteps: Object.fromEntries(TC4_KINDS.map((kind) => [kind, runtime.towerChallenge4UpgradePriceStep(kind)])),
@@ -879,6 +880,12 @@ function summarizeSearch(search) {
     terminalAllocations: search.routes.map((route) => ({
       status: route.status,
       reason: route.reason,
+      elapsedSeconds: route.elapsedSeconds,
+      lastProgressAtSeconds: route.lastProgressAtSeconds,
+      lastPurchase: route.purchaseSequence.at(-1) ?? null,
+      infinityResetCount: route.infinityResetCount,
+      infinityResetTimes: route.infinityResetTimes,
+      purchaseSequence: route.purchaseSequence,
       finalLevels: route.finalLevels,
       finalPriceSteps: route.finalPriceSteps,
       peakScoreLog10: route.peakScoreLog10,
@@ -1016,6 +1023,7 @@ function policyComparisonSummary(comparison) {
     peakScoreAtSeconds: comparison.peakScoreAtSeconds,
     infinityResetCount: comparison.infinityResetCount,
     firstMilestoneTimes: comparison.firstMilestoneTimes,
+    firstMilestoneSnapshots: comparison.firstMilestoneSnapshots,
     highestMilestone: comparison.highestMilestone,
     highestMilestoneIndex: comparison.highestMilestoneIndex,
     timeToHighestMilestone: comparison.timeToHighestMilestone,
@@ -1064,7 +1072,7 @@ function rankCandidates(candidateComparisons, mode) {
   return candidateComparisons
     .slice()
     .sort((left, right) => {
-      const progress = comparePolicyProgress(left[mode]);
+      const progress = comparePolicyProgress(left[mode], right[mode]);
       return progress !== 0 ? progress : left.candidateId.localeCompare(right.candidateId);
     })
     .map(({ candidateId }) => candidateId);
@@ -1356,8 +1364,13 @@ module.exports = {
   canonicalCollisionSequence,
   candidateClassification,
   candidatePassesInitialTargets,
+  candidateAComparability,
+  candidateRanking,
+  comparePolicyProgress,
   createReport,
   formatMarkdown,
+  nextSearchRecommendation,
   parseArgs,
   runCandidate,
+  summarizeCandidate,
 };
