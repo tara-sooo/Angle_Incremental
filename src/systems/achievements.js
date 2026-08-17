@@ -226,6 +226,18 @@ const ACHIEVEMENTS = [
     reward: { ja: "", en: "" },
     isUnlocked: () => runtime.towerChallengeCompleted(2),
   },
+  {
+    title: { ja: "無限万長者", en: "Infinity Millionaire" },
+    condition: { ja: "Infinity数が1.5e6を超える", en: "Have more than 1.5e6 Infinity." },
+    reward: { ja: "Infinity獲得量を×2", en: "Infinity gain x2." },
+    isUnlocked: () => runtime.state.infinityCount > 1.5e6,
+  },
+  {
+    title: { ja: "とうに越した先に", en: "Far Beyond" },
+    condition: { ja: "TC3をクリア", en: "Complete TC3." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.towerChallengeCompleted(3),
+  },
 ];
 
 let cachedAchievementSignature = null;
