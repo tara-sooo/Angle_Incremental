@@ -59,6 +59,13 @@ const RESET_POLICIES = Object.freeze([
 ]);
 const EVALUATED_POLICY_IDS = Object.freeze(["fixed-60", "gain-aware-2x", "threshold-aware"]);
 
+const TC4_A_FORM_IDS = Object.freeze([
+  "flat-additive",
+  "power-accumulation",
+  "logarithmic-accumulation",
+  "multiplicative",
+]);
+
 // This is the explicit review ledger for every source use found by
 // `rg -n coreBoostCount src`. Free CB is only allowed to affect benefit rows.
 const CORE_BOOST_SOURCE_USE_MANIFEST = Object.freeze([
@@ -146,6 +153,23 @@ function coreBoostGainExponentForCount(runtime, count) {
     + (runtime.isChallengeCompleted(5) ? 0.01 : 0);
 }
 
+function aExponentForCandidate(candidate, level, parts) {
+  const a = Number.isFinite(candidate?.a) ? candidate.a : 0;
+  const normalizedLevel = Math.max(0, Math.floor(Number.isFinite(level) ? level : 0));
+  const baseParts = Math.max(1, Number.isFinite(parts) ? parts : 1);
+  switch (candidate?.aForm ?? "flat-additive") {
+    case "power-accumulation":
+      return baseParts + a * normalizedLevel ** 1.25;
+    case "logarithmic-accumulation":
+      return baseParts + a * normalizedLevel * (1 + Math.log2(normalizedLevel + 1));
+    case "multiplicative":
+      return baseParts * (1 + a * normalizedLevel);
+    case "flat-additive":
+    default:
+      return baseParts + a * normalizedLevel;
+  }
+}
+
 function installCandidateEffects(runtime, candidate) {
   const original = {
     coreBoostGainIncreaseMultiplier: runtime.coreBoostGainIncreaseMultiplier,
@@ -177,7 +201,8 @@ function installCandidateEffects(runtime, candidate) {
     if (runtime.state.activeTowerChallenge !== 4 || candidate.a <= 0) return original.finalScoreGainFromBaseLog10(baseLog);
     const config = runtime.gainExpressionConfig();
     const parts = Math.max(1, config.parts);
-    const exponent = parts + candidate.a * Math.max(0, Math.floor(runtime.state.tc4BaseGainLevel));
+    const level = Math.max(0, Math.floor(runtime.state.tc4BaseGainLevel));
+    const exponent = aExponentForCandidate(candidate, level, parts);
     const expression = (baseLog - runtime.log10Value(config.divisor)) * exponent;
     const boostedLog = expression * runtime.coreBoostGainExponent() + runtime.generationScoreMultiplierEffectLog10();
     return boostedLog * runtime.finalScoreGainPower() - runtime.log10Value(runtime.finalScoreGainDivisor());
@@ -630,6 +655,8 @@ function routeMetrics(runtime, node, status, reason, validation) {
   const effective = realCoreBoost + free;
   const currentInfiniteScore = runtime.currentInfiniteScoreLog10();
   const candidatePower = runtime.infiniteAngleScorePower() + node.candidate.b * levels.infinityScoreVertexGain;
+  const gainExpressionParts = runtime.gainExpressionConfig().parts;
+  const baseGainExponent = aExponentForCandidate(node.candidate, levels.baseGain, gainExpressionParts);
   const infinityEvents = node.events.filter((event) => event.type === "infinity");
   return {
     status,
@@ -652,6 +679,10 @@ function routeMetrics(runtime, node, status, reason, validation) {
     representativeInfinityScoreLog10: Number.isFinite(currentInfiniteScore) ? currentInfiniteScore : null,
     representativeInfinityScorePower: candidatePower,
     representativeVertexGainIncreaseLog10: runtime.vertexGainIncreaseLog10(),
+    gainExpressionParts,
+    aForm: node.candidate.aForm ?? "flat-additive",
+    aExponentContribution: baseGainExponent - gainExpressionParts,
+    baseGainExponent,
     finalScoreLog10: runtime.currentScoreLog10(),
     peakScoreLog10: node.peakScoreLog10,
     peakScoreAtSeconds: node.peakScoreAt,
@@ -1404,9 +1435,11 @@ module.exports = {
   CANDIDATE_GRID,
   CORE_BOOST_SOURCE_USE_MANIFEST,
   COMPARABILITY_TOLERANCE_LOG10,
+  TC4_A_FORM_IDS,
   RESET_POLICIES,
   TC4_SCORE_MILESTONES,
   TARGET_LOG10,
+  aExponentForCandidate,
   canonicalCollisionSequence,
   candidateClassification,
   candidatePassesInitialTargets,
