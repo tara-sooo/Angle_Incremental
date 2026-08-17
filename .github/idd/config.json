@@ -31,6 +31,7 @@
   },
   "critiqueLoopProfile": "distributed defaults",
   "maintainerApprovalActorPolicy": "owners-and-maintainers-only",
+  "skipIssueAuthorApprovalGate": true,
   "ciWait": {
     "runningTimeout": "PT30M",
     "generationTimeout": "PT10M",
