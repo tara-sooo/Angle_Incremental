@@ -517,7 +517,7 @@ try {
     const { state, switchMainTab } = window.__angleDebug;
     switchMainTab("achievements");
     state.achievementMask = 0x7fffffff;
-    state.achievementMaskHigh = 0b111111;
+    state.achievementMaskHigh = 0b11111111;
     state.language = "ja";
     window.advanceTime(0);
     const rows = Array.from(document.querySelectorAll(".achievement-row"));
@@ -547,9 +547,9 @@ try {
     };
   });
   assert.equal(achievementUi.panelActive, true, "the Achievements panel should activate on desktop");
-  assert.equal(achievementUi.count, 37, "the desktop Achievements panel should render 37 rows");
-  assert.equal(achievementUi.japaneseSummary, "37/37 実績", "the desktop Japanese Achievements summary should show 37 achievements");
-  assert.equal(achievementUi.englishSummary, "37/37 Achievements", "the desktop English Achievements summary should show 37 achievements");
+  assert.equal(achievementUi.count, 39, "the desktop Achievements panel should render 39 rows");
+  assert.equal(achievementUi.japaneseSummary, "39/39 実績", "the desktop Japanese Achievements summary should show 39 achievements");
+  assert.equal(achievementUi.englishSummary, "39/39 Achievements", "the desktop English Achievements summary should show 39 achievements");
   assert.deepEqual(achievementUi.japanese, [
     { title: "不吉だという前提は置いておいて", condition: "所持IPがe44に到達", rewardHidden: true },
     { title: "バベルも土台から", condition: "Towerを建設", rewardHidden: true },
@@ -557,6 +557,8 @@ try {
     { title: "道しるべを残す", condition: "スコアがe2450を超える", rewardHidden: true },
     { title: "ちょっぴり豪邸", condition: "Towerの階層が3に到達", rewardHidden: true },
     { title: "物騒な名前", condition: "TC2をクリア", rewardHidden: true },
+    { title: "無限万長者", condition: "Infinity数が1.5e6を超える", rewardHidden: false },
+    { title: "とうに越した先に", condition: "TC3をクリア", rewardHidden: true },
   ], "the desktop Japanese achievement definitions should be exact");
   assert.deepEqual(achievementUi.english, [
     { title: "Assuming It Is Unlucky", condition: "Hold at least 1e44 IP." },
@@ -565,6 +567,8 @@ try {
     { title: "Leave a Signpost", condition: "Reach more than 1e2450 score." },
     { title: "A Slightly Luxurious Mansion", condition: "Reach Tower Floor 3." },
     { title: "A Violent-Sounding Name", condition: "Complete TC2." },
+    { title: "Infinity Millionaire", condition: "Have more than 1.5e6 Infinity." },
+    { title: "Far Beyond", condition: "Complete TC3." },
   ], "the desktop English achievement definitions should be exact");
   assert.ok(achievementUi.listWidth > 0, "the desktop achievement list should have a visible layout");
   const desktopUiChanges = await page.evaluate(() => {
@@ -1558,7 +1562,7 @@ try {
     const mobileAchievements = await mobilePage.evaluate(() => {
       const { state } = window.__angleDebug;
       state.achievementMask = 0x7fffffff;
-      state.achievementMaskHigh = 0b111111;
+      state.achievementMaskHigh = 0b11111111;
       state.language = "ja";
       window.advanceTime(0);
       const rows = document.querySelectorAll(".achievement-row");
@@ -1571,8 +1575,8 @@ try {
       };
     });
     assert.equal(mobileAchievements.panelActive, true, "the Achievements panel should activate on mobile");
-    assert.equal(mobileAchievements.count, 37, "the mobile Achievements panel should render 37 rows");
-    assert.equal(mobileAchievements.lastTitle, "物騒な名前", "the mobile Achievements panel should keep the final row visible");
+    assert.equal(mobileAchievements.count, 39, "the mobile Achievements panel should render 39 rows");
+    assert.equal(mobileAchievements.lastTitle, "とうに越した先に", "the mobile Achievements panel should keep the final row visible");
     assert.ok(mobileAchievements.listWidth > 0, "the mobile achievement list should have a visible layout");
 
     const mobileVertexGainDisplay = await mobilePage.evaluate(() => {
