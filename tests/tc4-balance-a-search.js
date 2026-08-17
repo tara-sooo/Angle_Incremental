@@ -51,6 +51,7 @@ async function runTc4ABalanceSearchTest() {
     "A1.00-B0.35-C1",
   ]);
   assert.equal(first.freshnessVerification.observations.every(({ currentHighestMilestone }) => currentHighestMilestone === 1700), true);
+  assert.match(require("../scripts/simulate-tc4-balance-a-search.js").formatMarkdown(first), /Freshness after #128 \/ PR #130/);
   assert.ok(first.sensitivity.marginal.every(({ deltaA }) => deltaA > 0), "marginal rows must be numeric A order");
   assert.equal(typeof first.anyReachedE2500, "boolean");
   assert.equal(typeof first.anyReachedE7777, "boolean");
