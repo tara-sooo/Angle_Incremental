@@ -1096,27 +1096,73 @@ function candidateRanking(candidateComparisons) {
   };
 }
 
-function nextSearchRecommendation(candidateComparisons) {
+function recommendationGroupScore(group) {
+  return [
+    group.bestHighestMilestoneDelta ?? -Infinity,
+    group.bestPeakDeltaLog10 ?? -Infinity,
+    group.bestTimeGainRatio ?? -Infinity,
+  ];
+}
+
+function compareRecommendationGroups(left, right) {
+  const leftScore = recommendationGroupScore(left);
+  const rightScore = recommendationGroupScore(right);
+  for (let index = 0; index < leftScore.length; index += 1) {
+    if (leftScore[index] !== rightScore[index]) return rightScore[index] - leftScore[index];
+  }
+  return left.axis.localeCompare(right.axis);
+}
+
+function materiallyImproves(group) {
+  return (group.bestHighestMilestoneDelta ?? -Infinity) >= 1
+    || (group.bestPeakDeltaLog10 ?? -Infinity) >= 1
+    || (group.bestTimeGainRatio ?? -Infinity) >= 0.1;
+}
+
+function clearlyBeats(left, right) {
+  if (!right) return true;
+  return (left.bestHighestMilestoneDelta ?? -Infinity) >= (right.bestHighestMilestoneDelta ?? -Infinity) + 1
+    || (left.bestPeakDeltaLog10 ?? -Infinity) >= (right.bestPeakDeltaLog10 ?? -Infinity) + 1
+    || (left.bestTimeGainRatio ?? -Infinity) >= (right.bestTimeGainRatio ?? -Infinity) + 0.1;
+}
+
+function nextSearchRecommendation(candidateComparisons, options = {}) {
   const classifications = candidateComparisons.map(({ classification }) => classification);
   if (classifications.includes("viable")) return { status: "not-needed", reason: "a candidate reached the target" };
-  if (classifications.includes("inconclusive")) {
+  if (classifications.includes("inconclusive") && options.allowInconclusive !== true) {
     return { status: "inconclusive", reason: "at least one candidate search was truncated" };
   }
   const best = candidateComparisons.slice().sort((left, right) => comparePolicyProgress(left.bestAdaptive, right.bestAdaptive))[0];
-  const maxA = Math.max(...TC4_CANDIDATE_A_VALUES);
-  const maxB = Math.max(...TC4_CANDIDATE_B_VALUES);
-  const atMaxA = best.candidate.a === maxA;
-  const atMaxB = best.candidate.b === maxB;
-  const direction = atMaxA && atMaxB
-    ? "revisit functional form or C semantics"
-    : atMaxA
-      ? "increase B"
-      : atMaxB
-        ? "increase A"
-        : "test a bounded combined increase of A and B";
+  const groups = (options.marginalEvidence?.groups ?? [])
+    .filter(materiallyImproves)
+    .sort(compareRecommendationGroups);
+  if (groups.length === 0) {
+    return {
+      status: "revisit-functional-form",
+      reason: "measured marginal evidence did not materially improve progression",
+      basisCandidate: best?.candidateId ?? null,
+    };
+  }
+  const winner = groups[0];
+  const runnerUp = groups[1] ?? null;
+  if (!clearlyBeats(winner, runnerUp)) {
+    return {
+      status: "insufficient-evidence",
+      reason: "the measured marginal leaders are too close to select a direction",
+      basisCandidate: best?.candidateId ?? null,
+      competingAxes: groups.slice(0, 2).map(({ axis }) => axis),
+    };
+  }
+  const directionByAxis = {
+    "A-only": "increase A",
+    "B-only": "increase B",
+    "A+B": "test a bounded combined increase of A and B",
+    "C-strength": "research C/free-CB semantics",
+  };
   return {
     status: "bounded-recommendation",
-    direction,
+    direction: directionByAxis[winner.axis] ?? "revisit functional form or C semantics",
+    evidenceAxis: winner.axis,
     basisCandidate: best.candidateId,
     highestMilestone: best.bestAdaptive?.highestMilestone ?? null,
     peakScoreLog10: best.bestAdaptive?.peakScoreLog10 ?? null,
