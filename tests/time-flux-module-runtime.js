@@ -767,6 +767,7 @@ async function runTimeFluxModuleRuntimeTest() {
   aggregationState.infinityCount = 1;
   aggregationState.bestInfinityCountPerSecond = 2;
   aggregationState.infinityCountRateRemainder = 0.5;
+  aggregationState.achievementMaskHigh = 1 << (38 - 32);
   aggregationState.automationEnabled = true;
   aggregationState.autoRunInfinity = true;
   aggregationState.autoInfinityPointThresholdLog10 = 0;
@@ -777,7 +778,7 @@ async function runTimeFluxModuleRuntimeTest() {
   try {
     const aggregateReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });
     assert.equal(aggregateReport.normalInfinityCountGain, 0, "the aggregate test should have no normal Infinity gain");
-    assert.equal(aggregateReport.aggregatedInfinityCountGain, 20, "aggregation should add only the target shortfall");
+    assert.equal(aggregateReport.aggregatedInfinityCountGain, 20, "aggregation should not double a recorded Achievement 38 count rate");
     assert.equal(aggregateReport.totalInfinityCountGain, 20, "the report should include normal and aggregate gains");
     assert.equal(aggregationState.infinityCount, 21, "aggregated Infinity should be added directly");
     assert.equal(aggregationState.infinityCountRateRemainder, 0.5, "fractional Infinity gain should carry forward");

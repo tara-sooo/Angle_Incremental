@@ -229,7 +229,7 @@ const ACHIEVEMENTS = [
   {
     title: { ja: "無限万長者", en: "Infinity Millionaire" },
     condition: { ja: "Infinity数が1.5e6を超える", en: "Have more than 1.5e6 Infinity." },
-    reward: { ja: "Infinity獲得量を×2", en: "Infinity gain x2." },
+    reward: { ja: "Infinity数獲得量を×2", en: "Infinity count gain x2." },
     isUnlocked: () => runtime.state.infinityCount > 1.5e6,
   },
   {

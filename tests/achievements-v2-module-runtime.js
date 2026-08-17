@@ -41,7 +41,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     state.achievementMaskHigh = 0;
     assert.equal(runtime.infinityPointGain(), 3, "base post-break IP gain should use the raw formula without achievement rewards");
     state.achievementMaskHigh = 1 << (38 - 32);
-    assert.equal(runtime.infinityPointGain(), 6, "achievement 38 should double Infinity gain");
+    assert.equal(runtime.infinityPointGain(), 3, "achievement 38 should not change Infinity Point gain");
     state.achievementMaskHigh = 0;
     state.achievementMask = 1 << (17 - 1);
     assert.equal(runtime.infinityPointGain(), 6, "achievement 17 should double IP gain");
@@ -49,7 +49,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     assert.equal(runtime.infinityPointGain(), 6, "achievement 21 should also double IP gain");
     state.achievementMask = (1 << (17 - 1)) | (1 << (21 - 1));
     state.achievementMaskHigh = 1 << (38 - 32);
-    assert.equal(runtime.infinityPointGain(), 24, "achievements 17, 21, and 38 should stack to octuple IP gain");
+    assert.equal(runtime.infinityPointGain(), 12, "achievements 17 and 21 should retain their combined IP multiplier without achievement 38");
     state.achievementMask = 1 << (31 - 1);
     state.achievementMaskHigh = 0;
     assert.equal(runtime.infinityPointGain(), 300, "achievement 31 should multiply IP gain by 100");
@@ -58,6 +58,18 @@ async function runAchievementV2ModuleRuntimeTest() {
     state.achievementMask = (1 << (17 - 1)) | (1 << (21 - 1));
     setLogResource(state, "score", 309);
     assert.equal(runtime.infinityPointGain(), 8, "achievement IP multipliers must preserve exact integer products before flooring");
+
+    state.achievementMask = 0;
+    state.achievementMaskHigh = 0;
+    state.completedChallenges = 0;
+    assert.equal(runtime.infinityCountGain(), 1, "without IC6 or achievement 38, an Infinity should grant one count");
+    state.achievementMaskHigh = 1 << (38 - 32);
+    assert.equal(runtime.infinityCountGain(), 2, "achievement 38 should double count gain without IC6");
+    state.achievementMaskHigh = 0;
+    state.completedChallenges = 1 << (6 - 1);
+    assert.equal(runtime.infinityCountGain(), 2, "IC6 should double count gain without achievement 38");
+    state.achievementMaskHigh = 1 << (38 - 32);
+    assert.equal(runtime.infinityCountGain(), 4, "IC6 and achievement 38 should stack to four count gain");
   }
 
   {
@@ -431,7 +443,7 @@ async function runAchievementV2ModuleRuntimeTest() {
       assert.equal(row.querySelector(".achievement-title").textContent, title, `achievement ${32 + offset} should use the Japanese title`);
       assert.equal(row.querySelector(".achievement-condition").textContent, condition, `achievement ${32 + offset} should use the Japanese condition`);
       const reward = row.querySelector(".achievement-reward");
-      assert.equal(reward.textContent, rewardHidden ? "" : "報酬: Infinity獲得量を×2", `achievement ${32 + offset} reward text should use the localized definition`);
+      assert.equal(reward.textContent, rewardHidden ? "" : "報酬: Infinity数獲得量を×2", `achievement ${32 + offset} reward text should use the localized definition`);
       assert.equal(reward.hidden, rewardHidden, `achievement ${32 + offset} reward visibility should use the definition`);
     });
 
