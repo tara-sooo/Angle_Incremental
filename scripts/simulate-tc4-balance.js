@@ -27,6 +27,7 @@ const DEFAULT_STEP_SECONDS = 10;
 const DEFAULT_MAX_STATES = 2000;
 const DEFAULT_MAX_ROUTES = 300;
 const DEFAULT_STALL_SECONDS = 4 * 60 * 60;
+const FRONTIER_SUMMARY_LIMIT = 25;
 const CANDIDATE_PATH = path.join(__dirname, "..", "src", "main.js");
 const ISSUE_112_REPORT_PATH = path.join(__dirname, "..", "reports", "tc4-balance-candidate-a.json");
 const GENERATION_RESET_POLICY = Object.freeze({
@@ -813,8 +814,8 @@ function advanceToDecision(runtime, node) {
   };
 }
 
-function runSearch(runtime, rootSnapshot, candidate, options, validation, frontierOnly, policy) {
-  const pending = [{
+function rootSearchNode(runtime, rootSnapshot, candidate, options, policy) {
+  return {
     snapshot: rootSnapshot,
     elapsed: 0,
     events: [],
@@ -830,15 +831,42 @@ function runSearch(runtime, rootSnapshot, candidate, options, validation, fronti
     candidate,
     options,
     debug: options.debug,
-  }];
-  const seen = new Set();
-  const routes = [];
-  let exploredStates = 0;
+  };
+}
+
+function compactFrontierNode(node) {
+  const snapshot = node.snapshot;
+  return {
+    elapsedSeconds: node.elapsed,
+    purchaseSequence: node.purchases.map(({ kind, priceLog10 }) => ({ kind, priceLog10 })),
+    levels: {
+      baseGain: snapshot.tc4BaseGainLevel,
+      infinityScoreVertexGain: snapshot.tc4InfinityScoreVertexGainLevel,
+      freeCoreBoost: snapshot.tc4FreeCoreBoostLevel,
+    },
+    priceSteps: {
+      baseGain: snapshot.tc4BaseGainPriceStep,
+      infinityScoreVertexGain: snapshot.tc4InfinityScoreVertexGainPriceStep,
+      freeCoreBoost: snapshot.tc4FreeCoreBoostPriceStep,
+    },
+    peakScoreLog10: Number.isFinite(node.peakScoreLog10) ? node.peakScoreLog10 : null,
+    peakScoreAtSeconds: node.peakScoreAt,
+    lastProgressAtSeconds: node.lastProgressAt,
+  };
+}
+
+function runSearch(runtime, rootSnapshot, candidate, options, validation, frontierOnly, policy, resume = null) {
+  const pending = resume?.pending?.slice() ?? [rootSearchNode(runtime, rootSnapshot, candidate, options, policy)];
+  const seen = new Set(resume?.seen ?? []);
+  const routes = resume?.routes?.slice() ?? [];
+  let exploredStates = resume?.exploredStates ?? 0;
   let truncated = false;
+  let truncationReason = null;
 
   while (pending.length > 0 && routes.length < options.maxRoutes) {
     if (exploredStates >= options.maxStates) {
       truncated = true;
+      truncationReason = "state-cap";
       break;
     }
     const node = pending.shift();
@@ -880,8 +908,22 @@ function runSearch(runtime, rootSnapshot, candidate, options, validation, fronti
       });
     }
   }
-  if (pending.length > 0) truncated = true;
-  return { exploredStates, routeCount: routes.length, truncated, routes };
+  if (pending.length > 0 && !truncationReason) {
+    truncated = true;
+    truncationReason = "route-cap";
+  }
+  return {
+    exploredStates,
+    routeCount: routes.length,
+    truncated,
+    truncationReason: truncationReason ?? "complete",
+    routes,
+    frontierCount: pending.length,
+    frontier: pending.slice(0, FRONTIER_SUMMARY_LIMIT).map(compactFrontierNode),
+    continuation: options.captureContinuation
+      ? { pending, seen: [...seen], routes, exploredStates }
+      : null,
+  };
 }
 
 function summarizeSearch(search) {
@@ -901,6 +943,9 @@ function summarizeSearch(search) {
     exploredStates: search.exploredStates,
     routeCount: search.routeCount,
     truncated: search.truncated,
+    truncationReason: search.truncationReason,
+    frontierCount: search.frontierCount ?? search.continuation?.pending.length ?? search.frontier?.length ?? 0,
+    frontier: search.frontier ?? [],
     successfulRoutes: successful.length,
     stalledRoutes,
     horizonTimeouts,
@@ -928,46 +973,101 @@ function summarizeSearch(search) {
   };
 }
 
-async function runCandidate(candidate, options) {
+function runSearchWithContinuation(runtime, rootSnapshot, candidate, options, validation, frontierOnly, policy) {
+  const seed = runSearch(runtime, rootSnapshot, candidate, options, validation, frontierOnly, policy);
+  const continuationMaxStates = options.continuationMaxStates;
+  if (seed.truncationReason !== "state-cap"
+    || !seed.continuation
+    || !Number.isInteger(continuationMaxStates)
+    || continuationMaxStates <= seed.exploredStates) {
+    return { seed, final: seed };
+  }
+  const final = runSearch(
+    runtime,
+    rootSnapshot,
+    candidate,
+    { ...options, maxStates: continuationMaxStates },
+    validation,
+    frontierOnly,
+    policy,
+    seed.continuation,
+  );
+  return { seed, final };
+}
+
+async function prepareCandidate(candidate, options) {
   const instance = await loadRuntime(CANDIDATE_PATH);
   const { runtime } = instance;
   const fixture = await configureBaseline(instance);
   installCandidateEffects(runtime, candidate);
   const collision = validateProductionCollision(runtime);
   const rootSnapshot = captureState(runtime.state);
-  const searchOptions = { ...options, debug: instance.debug };
-  const policies = (options.policyIds ?? RESET_POLICIES.map(({ id }) => id))
-    .map((policyId) => RESET_POLICIES.find(({ id }) => id === policyId))
-    .filter(Boolean)
-    .map((policy) => {
-    restoreState(runtime.state, rootSnapshot);
-    const canonical = runSearch(runtime, rootSnapshot, candidate, searchOptions, collision, true, policy);
-    restoreState(runtime.state, rootSnapshot);
-    const allLegal = runSearch(runtime, rootSnapshot, candidate, searchOptions, collision, false, policy);
-    return {
-      policy,
-      canonical: { summary: summarizeSearch(canonical), routes: canonical.routes },
-      allLegal: { summary: summarizeSearch(allLegal), routes: allLegal.routes },
-    };
-  });
+  const searchOptions = {
+    ...options,
+    captureContinuation: Number.isInteger(options.continuationMaxStates),
+    debug: instance.debug,
+  };
+  return { candidate, runtime, fixture, collision, rootSnapshot, searchOptions };
+}
+
+function runPolicySearch(context, policy) {
+  const { runtime, rootSnapshot, candidate, collision, searchOptions } = context;
+  restoreState(runtime.state, rootSnapshot);
+  const canonicalSearch = runSearchWithContinuation(runtime, rootSnapshot, candidate, searchOptions, collision, true, policy);
+  restoreState(runtime.state, rootSnapshot);
+  const allLegalSearch = runSearchWithContinuation(runtime, rootSnapshot, candidate, searchOptions, collision, false, policy);
+  return {
+    policy,
+    canonical: {
+      summary: summarizeSearch(canonicalSearch.final),
+      seedSummary: summarizeSearch(canonicalSearch.seed),
+      routes: canonicalSearch.final.routes,
+    },
+    allLegal: {
+      summary: summarizeSearch(allLegalSearch.final),
+      seedSummary: summarizeSearch(allLegalSearch.seed),
+      routes: allLegalSearch.final.routes,
+    },
+  };
+}
+
+function candidateRunResult(context, policies) {
+  const { candidate, fixture, collision, searchOptions } = context;
   const baseline = policies.find(({ policy }) => policy.id === "fixed-60");
   return {
     candidate,
-    searchComplete: options.searchComplete !== false,
+    searchComplete: searchOptions.searchComplete !== false,
     searchOptions: {
-      maxSeconds: options.maxSeconds,
-      stepSeconds: options.stepSeconds,
-      maxStates: options.maxStates,
-      maxRoutes: options.maxRoutes,
-      stallSeconds: options.stallSeconds,
-      policyIds: options.policyIds ?? RESET_POLICIES.map(({ id }) => id),
+      maxSeconds: searchOptions.maxSeconds,
+      stepSeconds: searchOptions.stepSeconds,
+      maxStates: searchOptions.maxStates,
+      maxRoutes: searchOptions.maxRoutes,
+      stallSeconds: searchOptions.stallSeconds,
+      continuationMaxStates: searchOptions.continuationMaxStates ?? null,
+      policyIds: searchOptions.policyIds ?? RESET_POLICIES.map(({ id }) => id),
     },
     fixture,
     collision,
-    canonical: baseline.canonical,
-    allLegal: baseline.allLegal,
+    canonical: baseline?.canonical ?? null,
+    allLegal: baseline?.allLegal ?? null,
     policies,
   };
+}
+
+async function runCandidatePolicy(candidate, policyId, options) {
+  const context = await prepareCandidate(candidate, options);
+  const policy = RESET_POLICIES.find(({ id }) => id === policyId);
+  if (!policy) throw new Error(`Unknown reset policy: ${policyId}`);
+  return candidateRunResult(context, [runPolicySearch(context, policy)]);
+}
+
+async function runCandidate(candidate, options) {
+  const context = await prepareCandidate(candidate, options);
+  const policies = (options.policyIds ?? RESET_POLICIES.map(({ id }) => id))
+    .map((policyId) => RESET_POLICIES.find(({ id }) => id === policyId))
+    .filter(Boolean)
+    .map((policy) => runPolicySearch(context, policy));
+  return candidateRunResult(context, policies);
 }
 
 function policyRoutes(policyResult) {
@@ -1451,5 +1551,6 @@ module.exports = {
   nextSearchRecommendation,
   parseArgs,
   runCandidate,
+  runCandidatePolicy,
   summarizeCandidate,
 };
