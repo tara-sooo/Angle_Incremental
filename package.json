@@ -9,7 +9,8 @@
     "test:performance": "node tests/performance-smoke.mjs",
     "test:tc4-balance": "node --experimental-vm-modules tests/tc4-balance-simulation.js",
     "test:tc4-balance-followup": "node --experimental-vm-modules tests/tc4-balance-followup.js",
-    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run check:idd-policy && npm run test:regression && npm run test:browser && npm run test:performance && npm run test:tc4-balance && npm run test:tc4-balance-followup"
+    "test:tc4-balance-sensitivity": "node --experimental-vm-modules tests/tc4-balance-sensitivity.js",
+    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run check:idd-policy && npm run test:regression && npm run test:browser && npm run test:performance && npm run test:tc4-balance && npm run test:tc4-balance-followup && npm run test:tc4-balance-sensitivity"
   },
   "devDependencies": {
     "playwright": "^1.61.1"
