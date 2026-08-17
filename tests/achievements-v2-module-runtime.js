@@ -49,7 +49,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     assert.equal(runtime.infinityPointGain(), 6, "achievement 21 should also double IP gain");
     state.achievementMask = (1 << (17 - 1)) | (1 << (21 - 1));
     state.achievementMaskHigh = 1 << (38 - 32);
-    assert.equal(runtime.infinityPointGain(), 12, "achievements 17 and 21 should retain their combined IP multiplier without achievement 38");
+    assert.equal(runtime.infinityPointGain(), 12, "achievements 17 and 21 should retain their combined IP multiplier even with achievement 38");
     state.achievementMask = 1 << (31 - 1);
     state.achievementMaskHigh = 0;
     assert.equal(runtime.infinityPointGain(), 300, "achievement 31 should multiply IP gain by 100");
