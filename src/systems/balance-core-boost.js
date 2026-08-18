@@ -13,7 +13,7 @@ function canonicalCoreBoostGainIncreaseBaseForCount(coreBoostCount) {
 
 function balanceCoreBoostGainIncreaseMultiplier() {
   return Math.pow(
-    canonicalCoreBoostGainIncreaseBaseForCount(runtime.state.coreBoostCount),
+    canonicalCoreBoostGainIncreaseBaseForCount(runtime.effectiveCoreBoostCount()),
     canonicalCoreBoostBonusPower(),
   );
 }
