@@ -12,7 +12,8 @@
     "test:tc4-balance-sensitivity": "node --experimental-vm-modules tests/tc4-balance-sensitivity.js",
     "test:tc4-balance-a-search": "node --experimental-vm-modules tests/tc4-balance-a-search.js",
     "test:tc4-a-form-search": "node --experimental-vm-modules tests/tc4-a-form-search.js",
-    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run check:idd-policy && npm run test:regression && npm run test:browser && npm run test:performance && npm run test:tc4-balance && npm run test:tc4-balance-followup && npm run test:tc4-balance-sensitivity && npm run test:tc4-balance-a-search && npm run test:tc4-a-form-search"
+    "test:tc4-a-form-frontier": "node --experimental-vm-modules tests/tc4-a-form-frontier.js",
+    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run check:idd-policy && npm run test:regression && npm run test:browser && npm run test:performance && npm run test:tc4-balance && npm run test:tc4-balance-followup && npm run test:tc4-balance-sensitivity && npm run test:tc4-balance-a-search && npm run test:tc4-a-form-search && npm run test:tc4-a-form-frontier"
   },
   "devDependencies": {
     "playwright": "^1.61.1"
