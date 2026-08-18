@@ -36,6 +36,8 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Run browser ESM smoke test
         run: npm run test:browser
+      - name: Test local performance gate classifier
+        run: npm run test:local-performance-gate
       - name: Run performance smoke test
         run: npm run test:performance
       - name: Upload test diagnostics
