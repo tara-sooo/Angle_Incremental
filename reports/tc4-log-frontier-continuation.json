@@ -60,7 +60,7 @@
         "id": "state-cap-160",
         "maxStates": 160,
         "maxRoutes": 10,
-        "expectedReason": "state-cap"
+        "expectedReason": "route-cap"
       },
       {
         "id": "route-cap-30",
@@ -74,7 +74,7 @@
         "id": "state-cap-160",
         "maxStates": 160,
         "maxRoutes": 10,
-        "expectedReason": "state-cap"
+        "expectedReason": "route-cap"
       },
       {
         "id": "route-cap-30",
@@ -97,7 +97,7 @@
       "stages": [
         {
           "id": "route-cap-30",
-          "limiter": "route-cap",
+          "limiter": "complete",
           "options": {
             "maxStates": 160,
             "maxRoutes": 30
@@ -47460,7 +47460,7 @@
       "stages": [
         {
           "id": "state-cap-160",
-          "limiter": "state-cap",
+          "limiter": "route-cap",
           "options": {
             "maxStates": 160,
             "maxRoutes": 10
@@ -102934,7 +102934,7 @@
       "stages": [
         {
           "id": "state-cap-160",
-          "limiter": "state-cap",
+          "limiter": "route-cap",
           "options": {
             "maxStates": 160,
             "maxRoutes": 10

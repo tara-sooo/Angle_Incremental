@@ -32,11 +32,11 @@ const STAGE_PLAN = Object.freeze({
     Object.freeze({ id: "route-cap-60", maxStates: 320, maxRoutes: 60, expectedReason: "route-cap" }),
   ]),
   "gain-aware-2x": Object.freeze([
-    Object.freeze({ id: "state-cap-160", maxStates: 160, maxRoutes: 10, expectedReason: "state-cap" }),
+    Object.freeze({ id: "state-cap-160", maxStates: 160, maxRoutes: 10, expectedReason: "route-cap" }),
     Object.freeze({ id: "route-cap-30", maxStates: 160, maxRoutes: 30, expectedReason: "route-cap" }),
   ]),
   "threshold-aware": Object.freeze([
-    Object.freeze({ id: "state-cap-160", maxStates: 160, maxRoutes: 10, expectedReason: "state-cap" }),
+    Object.freeze({ id: "state-cap-160", maxStates: 160, maxRoutes: 10, expectedReason: "route-cap" }),
     Object.freeze({ id: "route-cap-30", maxStates: 160, maxRoutes: 30, expectedReason: "route-cap" }),
   ]),
 });
@@ -250,7 +250,10 @@ function caseReport(caseState) {
     candidateId: caseState.candidateId,
     policyId: caseState.policyId,
     replay: caseState.replay,
-    stages: caseState.stages.map(({ state, nextResume, ...stage }) => stage),
+    stages: caseState.stages.map(({ state, nextResume, ...stage }) => ({
+      ...stage,
+      limiter: stage.summary?.truncationReason ?? stage.limiter,
+    })),
     finalStatus: caseState.status,
     finalLimiter: caseState.stages.at(-1)?.summary?.truncationReason ?? null,
     finalMilestones: routes.length ? milestoneEvidence(routes) : null,
@@ -440,6 +443,7 @@ module.exports = {
   DEFAULT_CHECKPOINT_PATH,
   POLICY_IDS,
   STAGE_PLAN,
+  canExtendCompletedCase,
   formatMarkdown,
   hydrateSearchState,
   readCheckpoint,

@@ -14,6 +14,7 @@ const {
 const {
   CANDIDATE_ID,
   STAGE_PLAN,
+  canExtendCompletedCase,
   readCheckpoint,
   serializeSearchState,
   sourceReportFingerprint,
@@ -33,6 +34,11 @@ async function main() {
   assert.equal(source.report.candidates.length, 3);
   assert.equal(STAGE_PLAN["gain-aware-2x"][1].id, "route-cap-30");
   assert.equal(STAGE_PLAN["threshold-aware"][1].id, "route-cap-30");
+  assert.equal(STAGE_PLAN["gain-aware-2x"][0].expectedReason, "route-cap");
+  assert.equal(STAGE_PLAN["threshold-aware"][0].expectedReason, "route-cap");
+  assert.equal(canExtendCompletedCase({
+    stages: [{ summary: { truncated: true, truncationReason: "route-cap" } }],
+  }, "gain-aware-2x"), true);
 
   const context = await prepareCandidate(candidate, {
     maxSeconds: 120,
