@@ -855,6 +855,53 @@ function compactFrontierNode(node) {
   };
 }
 
+function childNodeFromDecision(runtime, node, result, kind, policy, options) {
+  restoreState(runtime.state, result.snapshot);
+  const purchases = node.purchases.slice();
+  applyTc4Purchase(runtime, kind, result.elapsed, purchases);
+  return {
+    snapshot: captureState(runtime.state),
+    elapsed: result.elapsed,
+    events: result.events.slice(),
+    purchases,
+    peakScoreAt: result.peakScoreAt,
+    peakScoreLog10: result.peakScoreLog10,
+    peakInfiniteScoreLog10: result.peakInfiniteScoreLog10,
+    lastProgressAt: result.elapsed,
+    milestoneTimes: { ...result.milestoneTimes },
+    milestoneSnapshots: cloneValue(result.milestoneSnapshots),
+    policy,
+    policyState: { ...result.policyState },
+    candidate: node.candidate,
+    options,
+    debug: options.debug,
+  };
+}
+
+function replayCompactFrontierNode(context, compact, policy, options = context.searchOptions) {
+  const { runtime, rootSnapshot, candidate } = context;
+  const nodeOptions = { ...options, debug: context.searchOptions.debug };
+  let node = rootSearchNode(runtime, rootSnapshot, candidate, nodeOptions, policy);
+  for (const [index, expected] of compact.purchaseSequence.entries()) {
+    restoreState(runtime.state, node.snapshot);
+    const result = advanceToDecision(runtime, node);
+    if (result.type !== "decision") {
+      throw new Error(`Cannot replay ${policy.id} frontier purchase ${index}: ${result.type}`);
+    }
+    if (!result.available.includes(expected.kind)) {
+      throw new Error(`Cannot replay ${policy.id} frontier purchase ${index}: ${expected.kind} is not legal`);
+    }
+    const actualPrice = runtime.towerChallenge4UpgradePriceLog10(expected.kind);
+    if (Math.abs(actualPrice - expected.priceLog10) > 1e-9) {
+      throw new Error(`Cannot replay ${policy.id} frontier purchase ${index}: expected price ${expected.priceLog10}, got ${actualPrice}`);
+    }
+    node = childNodeFromDecision(runtime, node, result, expected.kind, policy, nodeOptions);
+  }
+  const actual = compactFrontierNode(node);
+  assert.deepEqual(actual, compact, `compact frontier replay mismatch for ${policy.id}`);
+  return node;
+}
+
 function runSearch(runtime, rootSnapshot, candidate, options, validation, frontierOnly, policy, resume = null) {
   const pending = resume?.pending?.slice() ?? [rootSearchNode(runtime, rootSnapshot, candidate, options, policy)];
   const seen = new Set(resume?.seen ?? []);
@@ -886,31 +933,21 @@ function runSearch(runtime, rootSnapshot, candidate, options, validation, fronti
       ? result.available.filter((kind) => runtime.towerChallenge4UpgradePriceLog10(kind) === cheapest)
       : result.available;
     for (const kind of choices) {
-      restoreState(runtime.state, result.snapshot);
-      const purchases = result.node?.purchases ? result.node.purchases.slice() : node.purchases.slice();
-      applyTc4Purchase(runtime, kind, result.elapsed, purchases);
-      pending.push({
-        snapshot: captureState(runtime.state),
-        elapsed: result.elapsed,
-        events: result.events.slice(),
-        purchases,
-        peakScoreAt: result.peakScoreAt,
-        peakScoreLog10: result.peakScoreLog10,
-        peakInfiniteScoreLog10: result.peakInfiniteScoreLog10,
-        lastProgressAt: result.elapsed,
-        milestoneTimes: { ...result.milestoneTimes },
-        milestoneSnapshots: cloneValue(result.milestoneSnapshots),
-        policy,
-        policyState: { ...result.policyState },
-        candidate,
-        options,
-        debug: options.debug,
-      });
+      pending.push(childNodeFromDecision(runtime, node, result, kind, policy, options));
+    }
+    if (typeof options.onProgress === "function"
+      && Number.isInteger(options.checkpointInterval)
+      && options.checkpointInterval > 0
+      && exploredStates % options.checkpointInterval === 0) {
+      options.onProgress({ pending, seen, routes, exploredStates });
     }
   }
   if (pending.length > 0 && !truncationReason) {
     truncated = true;
     truncationReason = "route-cap";
+  }
+  if (typeof options.onProgress === "function") {
+    options.onProgress({ pending, seen, routes, exploredStates });
   }
   return {
     exploredStates,
@@ -1552,5 +1589,9 @@ module.exports = {
   parseArgs,
   runCandidate,
   runCandidatePolicy,
+  prepareCandidate,
+  replayCompactFrontierNode,
+  runSearch,
+  summarizeSearch,
   summarizeCandidate,
 };
