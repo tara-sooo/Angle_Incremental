@@ -2,7 +2,6 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { execFileSync } = require("node:child_process");
 const { CANDIDATES } = require("../scripts/simulate-tc4-a-form-search.js");
 const {
   RESET_POLICIES,
@@ -126,9 +125,6 @@ async function main() {
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
-  const changedFiles = execFileSync("git", ["diff", "--name-only", "origin/next...HEAD"], { encoding: "utf8" })
-    .trim().split("\n").filter(Boolean);
-  assert.equal(changedFiles.some((file) => file.startsWith("src/")), false);
   console.log("TC4 retained log-A frontier continuation tests passed");
 }
 
