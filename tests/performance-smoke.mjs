@@ -128,6 +128,14 @@ function collectBudgetViolations(report) {
   return violations;
 }
 
+export function budgetViolationKey(violation) {
+  return violation
+    .replace(/ -?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?ms was not faster than exact -?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?ms$/i, "")
+    .replace(/ -?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?ms > -?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?ms$/i, "")
+    .replace(/ -?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)? > -?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i, "")
+    .trim();
+}
+
 function collectQualityViolations(report) {
   const violations = [];
   const expectedProfiles = {
@@ -717,11 +725,13 @@ try {
     offlineProcessing: results.find((result) => result.offlineProcessing)?.offlineProcessing || null,
     offlineStress: results.find((result) => result.offlineStress)?.offlineStress || null,
   };
-  const violations = [
-    ...collectBudgetViolations(report),
-    ...collectQualityViolations(report),
-  ];
+  const budgetViolations = collectBudgetViolations(report);
+  const qualityViolations = collectQualityViolations(report);
+  const violations = [...budgetViolations, ...qualityViolations];
   report.status = violations.length === 0 ? "passed" : "failed";
+  report.budgetViolations = budgetViolations;
+  report.budgetViolationKeys = budgetViolations.map(budgetViolationKey);
+  report.qualityViolations = qualityViolations;
   report.violations = violations;
   assert.ok(report.offlineProcessing, "the performance smoke should measure the real offline processing path");
   assert.equal(report.offlineProcessing.requestedTicks, 100000, "the real offline path should request 100000 ticks");

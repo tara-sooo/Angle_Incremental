@@ -59,4 +59,4 @@ IDDの標準ラベルは`roadmap`、`status:blocked-by-human`、`status:needs-de
 - fix-validate: `npm run check:runtime-order && npm run check:syntax`
 - pre-push/post-fix: `npm run validate`
 
-`npm run validate`はruntime順序、構文、version consistency、ESM回帰、browser smoke、performance smokeを実行します。
+`npm run validate`はruntime順序、構文、version consistency、ESM回帰、browser smoke、ローカル性能ゲート、TC4検証を実行します。ローカル性能ゲートは候補と再取得した`origin/next`を比較し、Hosted CIの`npm run test:performance`は既存の絶対予算をハードに検証します。
