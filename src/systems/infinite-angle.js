@@ -232,7 +232,8 @@ function infiniteAngleScorePower() {
 function infiniteAngleBoostLog10() {
   const scoreLog10 = runtime.currentInfiniteScoreLog10();
   if (scoreLog10 === -Infinity) return 0;
-  return runtime.clampLog10(Math.max(0, scoreLog10 * infiniteAngleScorePower()));
+  const baseBoostLog10 = Math.max(0, scoreLog10 * infiniteAngleScorePower());
+  return runtime.clampLog10(baseBoostLog10 + runtime.tc4InfinityScoreVertexGainBonusLog10(scoreLog10));
 }
 
 function infiniteAngleBoost() {

@@ -53,7 +53,7 @@ function coreBoostGainIncreaseBaseForCount(coreBoostCount) {
 }
 
 function coreBoostGainIncreaseMultiplier() {
-  return Math.pow(coreBoostGainIncreaseBaseForCount(runtime.state.coreBoostCount), coreBoostBonusPower());
+  return Math.pow(coreBoostGainIncreaseBaseForCount(runtime.effectiveCoreBoostCount()), coreBoostBonusPower());
 }
 
 function ic8VertexUpgradeCount() {
@@ -73,7 +73,7 @@ function coreBoostGainExponentForCount(coreBoostCount, options = {}) {
 }
 
 function coreBoostGainExponent() {
-  return coreBoostGainExponentForCount(runtime.state.coreBoostCount);
+  return coreBoostGainExponentForCount(runtime.effectiveCoreBoostCount());
 }
 
 function nextCoreBoostValues() {
@@ -82,8 +82,8 @@ function nextCoreBoostValues() {
   const nextCoreBoostCount = coreBoostReady ? currentCoreBoostCount + 1 : currentCoreBoostCount;
   const power = coreBoostBonusPower();
   return {
-    gainMultiplier: Math.pow(coreBoostGainIncreaseBaseForCount(nextCoreBoostCount), power),
-    gainExponent: coreBoostGainExponentForCount(nextCoreBoostCount, {
+    gainMultiplier: Math.pow(coreBoostGainIncreaseBaseForCount(runtime.effectiveCoreBoostCount(nextCoreBoostCount)), power),
+    gainExponent: coreBoostGainExponentForCount(runtime.effectiveCoreBoostCount(nextCoreBoostCount), {
       ic8ReplacementLevel: runtime.state.activeChallenge === 8 && coreBoostReady ? 0 : undefined,
     }),
   };

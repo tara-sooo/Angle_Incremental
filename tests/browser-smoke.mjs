@@ -657,6 +657,8 @@ try {
       towerChallenge3Name: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-name')?.textContent?.trim() ?? "",
       towerChallenge3Target: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-target')?.textContent?.trim() ?? "",
       towerChallenge3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
+      towerChallenge4Target: document.querySelector('#towerChallengeList [data-tower-challenge="4"] .challenge-target')?.textContent?.trim() ?? "",
+      towerChallenge4UpgradeCards: document.querySelectorAll('#towerChallengeList [data-tower-challenge="4"] .tc4-upgrade-card').length,
     };
   });
   assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
@@ -675,6 +677,8 @@ try {
   assert.match(towerInitial.towerChallenge3Target, /1\.00e5,000/);
   assert.match(towerInitial.towerChallenge3Restriction, /\^0\.001/);
   assert.match(towerInitial.towerChallenge3Restriction, /\^0\.100/);
+  assert.match(towerInitial.towerChallenge4Target, /1\.00e7,777/);
+  assert.equal(towerInitial.towerChallenge4UpgradeCards, 3, "TC4 should expose its three exclusive upgrade cards");
   assert.equal(towerInitial.towerState.scoreExponent, "^1.00");
   assert.equal(towerInitial.towerState.tc1Base, "^0.300");
   assert.equal(towerInitial.towerState.tc1Bonus, "+^0.000");

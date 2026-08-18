@@ -38,7 +38,7 @@ function lapSpeedSoftcapStart() {
   if (runtime.state.generationCount <= 0) return runtime.PRE_GENERATION_LAP_SPEED_SOFTCAP_START;
   const stagedStart = Math.min(
     runtime.LAP_SPEED_SOFTCAP_START,
-    60 + (runtime.state.generationCount - 1) * 40 + runtime.state.coreBoostCount * 65,
+    60 + (runtime.state.generationCount - 1) * 40 + runtime.effectiveCoreBoostCount() * 65,
   );
   const relief = Math.min(1.5, Math.max(0, runtime.currentGenerationScoreMultiplierLog10()) * 0.08);
   return stagedStart * (1 + relief);
@@ -48,7 +48,7 @@ function lapSpeedSoftcapPower() {
   if (runtime.state.generationCount <= 0) return runtime.PRE_GENERATION_LAP_SPEED_SOFTCAP_POWER;
   return Math.min(
     runtime.LAP_SPEED_SOFTCAP_POWER,
-    0.24 + (runtime.state.generationCount - 1) * 0.06 + runtime.state.coreBoostCount * 0.1,
+    0.24 + (runtime.state.generationCount - 1) * 0.06 + runtime.effectiveCoreBoostCount() * 0.1,
   );
 }
 
@@ -226,8 +226,9 @@ function finalScoreGain(baseGain = runtime.state.currentGain) {
 
 function angleExpressionFromBaseLog10(baseLog) {
   const config = runtime.gainExpressionConfig();
-  if (config.parts <= 1) return baseLog;
-  return (baseLog - runtime.log10Value(config.divisor)) * config.parts;
+  const effectiveParts = runtime.tc4EffectiveGainExpressionParts(config.parts);
+  if (effectiveParts <= 1) return baseLog;
+  return (baseLog - runtime.log10Value(config.divisor)) * effectiveParts;
 }
 
 function angleExpressionLog10(baseGain = runtime.state.currentGain) {
@@ -300,9 +301,10 @@ function earlyLayerCostScalingFactor() {
   else generationFactor = 0.08;
 
   let coreRelief;
-  if (runtime.state.coreBoostCount <= 0) coreRelief = 1;
-  else if (runtime.state.coreBoostCount === 1) coreRelief = 0.35;
-  else if (runtime.state.coreBoostCount === 2) coreRelief = 0.1;
+  const effectiveCoreBoosts = runtime.effectiveCoreBoostCount();
+  if (effectiveCoreBoosts <= 0) coreRelief = 1;
+  else if (effectiveCoreBoosts === 1) coreRelief = 0.35;
+  else if (effectiveCoreBoosts === 2) coreRelief = 0.1;
   else coreRelief = 0;
 
   return generationFactor * coreRelief;
@@ -320,7 +322,7 @@ function preGenerationCostScalingLog10(kind, level) {
 function stagedUpgradeCostScalingLog10(costLog) {
   const relief = Math.max(
     0.28,
-    1 - Math.max(0, runtime.state.generationCount - 1) * 0.06 - runtime.state.coreBoostCount * 0.16,
+    1 - Math.max(0, runtime.state.generationCount - 1) * 0.06 - runtime.effectiveCoreBoostCount() * 0.16,
   );
   return runtime.STAGED_UPGRADE_COST_SCALING.reduce((total, stage) => {
     const excess = Math.max(0, costLog - stage.startsAfterLog10);
