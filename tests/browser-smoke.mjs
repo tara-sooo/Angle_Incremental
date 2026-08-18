@@ -42,6 +42,7 @@ const EXPECTED_MODULE_PATHS = [
   "/src/systems/infinity.js",
   "/src/systems/infinite-angle.js",
   "/src/systems/balance.js",
+  "/src/systems/eternity.js",
   "/src/systems/balance-angle.js",
   "/src/systems/balance-generation.js",
   "/src/systems/balance-core-boost.js",

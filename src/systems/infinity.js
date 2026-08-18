@@ -340,6 +340,7 @@ function runInfinity(forced = false) {
   runtime.resetBelowInfinity();
   runtime.state.currentInfinityRunTime = 0;
   runtime.state.currentInfinityRealTime = 0;
+  runtime.maybeForceEternity?.({ save: false, update: false });
   runtime.updateUi();
   runtime.saveGame("manual");
 }
