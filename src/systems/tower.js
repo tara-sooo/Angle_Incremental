@@ -277,11 +277,16 @@ function resetTowerChallenge4ExclusiveUpgrades() {
   });
 }
 
+function normalizedTc4Integer(value) {
+  const number = Math.floor(Number(value));
+  return Number.isFinite(number) ? Math.max(0, number) : 0;
+}
+
 function normalizeTowerChallenge4State() {
   TC4_UPGRADE_KINDS.forEach((kind) => {
     const definition = TC4_UPGRADE_DEFINITIONS[kind];
-    runtime.state[definition.levelField] = Math.floor(runtime.sanitizeNumber(runtime.state[definition.levelField], 0));
-    runtime.state[definition.priceStepField] = Math.floor(runtime.sanitizeNumber(runtime.state[definition.priceStepField], 0));
+    runtime.state[definition.levelField] = normalizedTc4Integer(runtime.sanitizeNumber(runtime.state[definition.levelField], 0));
+    runtime.state[definition.priceStepField] = normalizedTc4Integer(runtime.sanitizeNumber(runtime.state[definition.priceStepField], 0));
   });
   if (runtime.state.activeTowerChallenge !== 4 || !towerChallengeUnlocked(4)) {
     resetTowerChallenge4ExclusiveUpgrades();
@@ -294,12 +299,12 @@ function towerChallenge4UpgradeDefinition(kind) {
 
 function towerChallenge4UpgradeLevel(kind) {
   const definition = towerChallenge4UpgradeDefinition(kind);
-  return definition ? runtime.state[definition.levelField] : 0;
+  return definition ? normalizedTc4Integer(runtime.state[definition.levelField]) : 0;
 }
 
 function towerChallenge4UpgradePriceStep(kind) {
   const definition = towerChallenge4UpgradeDefinition(kind);
-  return definition ? runtime.state[definition.priceStepField] : 0;
+  return definition ? normalizedTc4Integer(runtime.state[definition.priceStepField]) : 0;
 }
 
 function towerChallenge4UpgradePriceLog10(kind) {

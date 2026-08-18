@@ -1874,6 +1874,10 @@ canvas {
 }
 
 @media (max-width: 820px) {
+  .tc4-upgrade-list {
+    grid-template-columns: 1fr;
+  }
+
   .fps-counter {
     top: 12px;
     right: 14px;
