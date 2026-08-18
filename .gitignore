@@ -1,6 +1,7 @@
 output/
 browser-smoke-report.json
 reports/tc4-a-form-frontier.checkpoint.json
+reports/tc4-log-frontier-continuation.checkpoint.json
 node_modules/
 .DS_Store
 Thumbs.db
