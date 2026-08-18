@@ -32,6 +32,7 @@ const expectedOrder = [
   "src/systems/infinite-angle.js",
   "src/ui/events.js",
   "src/systems/balance.js",
+  "src/systems/eternity.js",
 ];
 
 assert.deepStrictEqual(

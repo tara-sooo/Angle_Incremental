@@ -24,6 +24,7 @@ import "./systems/infinity.js";
 import "./systems/infinite-angle.js";
 import "./ui/events.js";
 import "./systems/balance.js";
+import "./systems/eternity.js";
 
 let autoSaveElapsed = 0;
 let updateCheckElapsed = 0;
@@ -1924,6 +1925,9 @@ window.__angleDebug = {
   runGeneration: runtime.runGeneration,
   runCoreBoost: runtime.runCoreBoost,
   runInfinity: runtime.runInfinity,
+  canEternity: runtime.canEternity,
+  performEternity: runtime.performEternity,
+  maybeForceEternity: runtime.maybeForceEternity,
   buyInfinityUpgrade: runtime.buyInfinityUpgrade,
   buyAllUpgrades: runtime.buyAllUpgrades,
   generationRewardFor: runtime.generationRewardFor,

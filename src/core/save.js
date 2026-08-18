@@ -445,6 +445,7 @@ function restoreRecoveryEntry(entry, successMessage = "recoveryRestored") {
       recoveryEntryFromSave(currentSave, "pre-restore"),
     );
     applySaveData(entry.save.state, entry.save.version);
+    runtime.maybeForceEternity?.({ save: false, update: false });
     if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict: true })) throw new Error("restore save failed");
     finishSaveConflict();
     finishLoadRecovery();
@@ -594,6 +595,7 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   );
   runtime.state.coreBoostCount = Math.floor(runtime.sanitizeNumber(data.coreBoostCount, 0));
   runtime.state.infinityCount = Math.floor(runtime.sanitizeNumber(data.infinityCount, 0));
+  runtime.state.eternityCount = Math.max(0, Math.floor(runtime.sanitizeNumber(data.eternityCount, 0)));
   const infinityPoints = runtime.hydrateLogResource(data.infinityPoints, data.infinityPointsLog10, -Infinity, true);
   runtime.state.infinityPoints = infinityPoints.value;
   runtime.state.infinityPointsLog10 = infinityPoints.log;
@@ -1033,6 +1035,7 @@ async function loadGame(options = {}) {
     }
 
     lastKnownSaveFingerprint = loadedSaveFingerprint;
+    const eternityResetOnLoad = runtime.maybeForceEternity?.({ save: false, update: false }) || false;
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
     const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);
     const previousLoadFailure = readLoadFailure();
@@ -1086,6 +1089,12 @@ async function loadGame(options = {}) {
           if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict })) {
             throw new Error("offline progress save failed");
           }
+        }
+      }
+      if (eternityResetOnLoad && !offlineProcessed) {
+        loadTransactionActive = false;
+        if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict })) {
+          throw new Error("Eternity reset save failed");
         }
       }
     } catch (error) {
@@ -1212,6 +1221,7 @@ function resetSave() {
     generationCostFactor: 1,
     coreBoostCount: 0,
     infinityCount: 0,
+    eternityCount: 0,
     infinityPoints: 0,
     infinityPointsLog10: -Infinity,
     infinityPointsExact: "0",
