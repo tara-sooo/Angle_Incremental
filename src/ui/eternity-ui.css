@@ -2,6 +2,54 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.eternity-infinity-subtab {
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  color: var(--muted);
+  border: 2px solid var(--line);
+  background: linear-gradient(180deg, #19253e, #0f182a);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.eternity-infinity-subtab span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 26px;
+  color: var(--gold);
+  font-size: 0.78rem;
+  border: 1px solid var(--line-strong);
+  background: rgba(242, 184, 75, 0.08);
+}
+
+.eternity-infinity-subtab strong {
+  color: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.eternity-infinity-subtab.is-active {
+  color: white;
+  border-color: var(--line-strong);
+  filter: brightness(1.14);
+  background: linear-gradient(180deg, #4f6fb8, #253f82);
+  box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .eternity-infinity-subtab:hover {
+    color: white;
+    border-color: var(--line-strong);
+    filter: brightness(1.14);
+  }
+}
+
 .eternity-panel {
   display: grid;
   gap: 12px;
