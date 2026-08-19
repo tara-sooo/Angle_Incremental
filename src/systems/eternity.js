@@ -15,6 +15,7 @@ const COUNT_MILESTONE_REQUIREMENTS = Object.freeze({
 
 const FIRST_TIER_MILESTONE_MASK = Object.values(FIRST_TIER_MILESTONE_BITS)
   .reduce((mask, bit) => mask | bit, 0);
+const FIRST_TIER_MILESTONE_COUNT = Object.keys(FIRST_TIER_MILESTONE_BITS).length;
 
 function normalizedEternityCount() {
   return Math.max(0, Math.floor(runtime.state.eternityCount));
@@ -36,25 +37,36 @@ function eternityMilestoneActive(id) {
   return requiredCount !== undefined && normalizedEternityCount() >= requiredCount;
 }
 
-function availableEternityMilestoneChoices() {
-  return Object.keys(FIRST_TIER_MILESTONE_BITS).filter((id) => !eternityMilestoneActive(id));
+function ownedFirstTierMilestoneCount() {
+  const mask = normalizeEternityMilestoneMask(runtime.state.eternityMilestoneMask);
+  return Object.values(FIRST_TIER_MILESTONE_BITS)
+    .reduce((count, bit) => count + ((mask & bit) !== 0 ? 1 : 0), 0);
 }
 
-function selectEternityMilestone(id) {
-  const normalizedId = normalizeEternityMilestoneChoice(id);
-  if (!normalizedId || eternityMilestoneActive(normalizedId)) return false;
-  runtime.state.eternityMilestoneChoice = normalizedId;
-  return true;
+function firstTierMilestoneEntitlementCount() {
+  const earnedSlots = Math.min(normalizedEternityCount(), FIRST_TIER_MILESTONE_COUNT);
+  return Math.max(0, earnedSlots - ownedFirstTierMilestoneCount());
+}
+
+function availableEternityMilestoneChoices() {
+  if (firstTierMilestoneEntitlementCount() <= 0) return [];
+  return Object.keys(FIRST_TIER_MILESTONE_BITS).filter((id) => !eternityMilestoneActive(id));
 }
 
 function acquireEternityMilestone(id) {
   const normalizedId = normalizeEternityMilestoneChoice(id);
   const bit = FIRST_TIER_MILESTONE_BITS[normalizedId];
-  if (!bit || eternityMilestoneActive(normalizedId)) return false;
+  if (!bit || eternityMilestoneActive(normalizedId) || firstTierMilestoneEntitlementCount() <= 0) return false;
   runtime.state.eternityMilestoneMask = normalizeEternityMilestoneMask(
     runtime.state.eternityMilestoneMask,
   ) | bit;
+  runtime.state.eternityMilestoneChoice = "";
+  applyEternityMilestoneStartingLevels();
   return true;
+}
+
+function selectEternityMilestone(id) {
+  return acquireEternityMilestone(id);
 }
 
 function eternityMilestoneNormalUpgradeBonusLevel() {
@@ -106,7 +118,7 @@ function canEternity() {
 }
 
 function shouldForceEternity() {
-  return canEternity();
+  return false;
 }
 
 function resetEternityProgression() {
@@ -160,24 +172,20 @@ function resetEternityProgression() {
 }
 
 function performEternity(options = {}) {
-  if (!shouldForceEternity()) return false;
+  if (!canEternity()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-eternity", { force: true })) return false;
   resetEternityProgression();
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.state.eternityCount)) + 1;
-  runtime.checkAchievements(true);
-  const selectedMilestone = Object.hasOwn(options, "milestoneChoice")
-    ? options.milestoneChoice
-    : runtime.state.eternityMilestoneChoice;
-  acquireEternityMilestone(selectedMilestone);
   runtime.state.eternityMilestoneChoice = "";
+  runtime.checkAchievements(true);
   applyEternityMilestoneStartingLevels();
   if (options.update !== false) runtime.updateUi?.();
   if (options.save !== false) runtime.saveGame?.("manual");
   return true;
 }
 
-function maybeForceEternity(options = {}) {
-  return performEternity(options);
+function maybeForceEternity() {
+  return false;
 }
 
 expose("eternityRequirementExact", () => eternityRequirementExact);
@@ -185,7 +193,10 @@ expose("eternityIpThresholdMet", () => eternityIpThresholdMet);
 expose("normalizeEternityMilestoneMask", () => normalizeEternityMilestoneMask);
 expose("normalizeEternityMilestoneChoice", () => normalizeEternityMilestoneChoice);
 expose("eternityMilestoneActive", () => eternityMilestoneActive);
+expose("ownedFirstTierMilestoneCount", () => ownedFirstTierMilestoneCount);
+expose("firstTierMilestoneEntitlementCount", () => firstTierMilestoneEntitlementCount);
 expose("availableEternityMilestoneChoices", () => availableEternityMilestoneChoices);
+expose("acquireEternityMilestone", () => acquireEternityMilestone);
 expose("selectEternityMilestone", () => selectEternityMilestone);
 expose("eternityMilestoneNormalUpgradeBonusLevel", () => eternityMilestoneNormalUpgradeBonusLevel);
 expose("eternityMilestoneIc7RewardActive", () => eternityMilestoneIc7RewardActive);
