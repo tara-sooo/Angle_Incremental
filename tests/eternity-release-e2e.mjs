@@ -236,6 +236,7 @@ try {
     for (let index = 0; index < 12; index += 1) {
       floors.push(debug.buildTower());
     }
+    runtime.syncInfinityPointCachesFromExact(0n);
     return {
       floors,
       towerFloor: state.towerFloor,
