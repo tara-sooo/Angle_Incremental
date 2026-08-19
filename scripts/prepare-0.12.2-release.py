@@ -19,28 +19,29 @@ for filename in [
 ]:
     path = Path(filename)
     text = path.read_text()
-    path.write_text(text.replace("0.12.0", "0.12.2"))
+    text = text.replace("0.12.0", "0.12.2").replace("0.12.1", "0.12.2")
+    path.write_text(text)
 
 index_path = Path("index.html")
 index = index_path.read_text()
 for old, new, label in [
     (
-        "Tower Challenge 4と第4リセット層Eternityを追加しました。",
+        "Eternityを独立したメインタブへ移動し、UIレイアウトを修正しました。",
         "Eternityの初回フローとTC4 / Eternityタブ表示を修正しました。",
         "index update summary",
     ),
     (
-        "TC4では専用強化A/B/Cを使って1e7777 Scoreを目指し、クリアがEternity条件になります。",
+        "EternityをInfinity内のサブタブから独立したメインタブへ移動しました。",
         "TC4クリア + 1.80e308 IPでEternityが利用可能になり、条件達成だけでは自動実行されなくなりました。",
         "index update first bullet",
     ),
     (
-        "TC4クリア済みの周回で1.80e308 IPに到達するとEternityが発生し、Milestone 1-1〜5が進行します。",
+        "InfinityのサブタブをUpgrades / Infinite Angle / Towerの3つに戻し、レイアウト崩れを修正しました。",
         "Milestone 1-1〜1-3はEternity後に取得でき、未使用の取得権は保持されます。TC4タイトルとEternityタブのレスポンシブ表示も修正しました。",
         "index update second bullet",
     ),
     (
-        "セーブ形式10は変更ありません。既存セーブをそのまま利用でき、実績は41個になりました。",
+        "ゲーム進行・バランス・セーブ形式10に変更はありません。",
         "セーブ形式10は変更ありません。Milestone 1-1文言、Milestone 2〜5、TC4バランスは変更していません。",
         "index update compatibility note",
     ),
@@ -51,45 +52,45 @@ index_path.write_text(index)
 i18n_path = Path("src/data/i18n.js")
 i18n = i18n_path.read_text()
 for old, new, label in [
-    ('updateTitle: "0.12.0 アップデート"', 'updateTitle: "0.12.2 アップデート"', "Japanese update title"),
+    ('updateTitle: "0.12.1 アップデート"', 'updateTitle: "0.12.2 アップデート"', "Japanese update title"),
     (
-        'updateSummary: "Tower Challenge 4と第4リセット層Eternityを追加しました。"',
+        'updateSummary: "Tower Challenge 4 / Eternityの0.12.0 UIを修正し、Eternityを独立したメインタブへ移動しました。"',
         'updateSummary: "Eternityの初回フローとTC4 / Eternityタブ表示を修正しました。"',
         "Japanese update summary",
     ),
     (
-        'updateResetDock: "TC4では専用強化A/B/Cを使って1e7777 Scoreを目指し、クリアがEternity条件になります。"',
+        'updateResetDock: "EternityをInfinity内のサブタブから独立したメインタブへ移動しました。"',
         'updateResetDock: "TC4クリア + 1.80e308 IPでEternityが利用可能になり、条件達成だけでは自動実行されなくなりました。"',
         "Japanese update first bullet",
     ),
     (
-        'updateCanvas: "TC4クリア済みの周回で1.80e308 IPに到達するとEternityが発生し、Milestone 1-1〜5が進行します。"',
+        'updateCanvas: "InfinityのサブタブをUpgrades / Infinite Angle / Towerの3つに戻しました。Eternity条件の1.80e308 IPとMilestone 1-1〜5の仕様に変更はありません。"',
         'updateCanvas: "Milestone 1-1〜1-3はEternity後に取得でき、未使用の取得権は保持されます。TC4タイトルとEternityタブのレスポンシブ表示も修正しました。"',
         "Japanese update second bullet",
     ),
     (
-        'updateModalNote: "セーブ形式10は変更ありません。既存セーブをそのまま利用でき、実績は41個になりました。"',
+        'updateModalNote: "ゲーム進行・バランス・セーブ形式10に変更はありません。"',
         'updateModalNote: "セーブ形式10は変更ありません。Milestone 1-1文言、Milestone 2〜5、TC4バランスは変更していません。"',
         "Japanese update note",
     ),
-    ('updateTitle: "Version 0.12.0"', 'updateTitle: "Version 0.12.2"', "English update title"),
+    ('updateTitle: "Version 0.12.1"', 'updateTitle: "Version 0.12.2"', "English update title"),
     (
-        'updateSummary: "Added Tower Challenge 4 and the fourth reset layer, Eternity."',
+        'updateSummary: "Moved Eternity to its own main tab and repaired the Tower Challenge 4 / Eternity release UI layout."',
         'updateSummary: "Corrected the first Eternity flow and the TC4 / Eternity-tab presentation."',
         "English update summary",
     ),
     (
-        'updateResetDock: "TC4 uses three dedicated upgrades to reach 1e7777 Score, and clearing it becomes part of the Eternity requirement."',
+        'updateResetDock: "Eternity is now an independent top-level tab instead of an Infinity subtab."',
         'updateResetDock: "After clearing TC4 and reaching 1.80e308 IP, Eternity becomes available for manual activation instead of triggering automatically."',
         "English update first bullet",
     ),
     (
-        'updateCanvas: "After clearing TC4 in the current run, reaching 1.80e308 IP triggers Eternity and advances Milestones 1-1 through 5."',
+        'updateCanvas: "Infinity is back to its three subtabs: Upgrades, Infinite Angle, and Tower. The 1.80e308 IP Eternity requirement and Milestones 1-1 through 5 are unchanged."',
         'updateCanvas: "First-tier Milestones 1-1 through 1-3 are acquired after Eternity, unused acquisition rights persist, and the TC4 title / Eternity responsive tab layout are fixed."',
         "English update second bullet",
     ),
     (
-        'updateModalNote: "Save format 10 is unchanged, existing saves remain compatible, and there are now 41 achievements."',
+        'updateModalNote: "Gameplay progression, balance, and save format 10 are unchanged."',
         'updateModalNote: "Save format 10 is unchanged. Milestone 1-1 wording, Milestones 2-5, and TC4 balance are unchanged."',
         "English update note",
     ),
@@ -129,7 +130,7 @@ Path("docs/releases/0.12.2.md").write_text(
 - TC4のタイトル`TC4 既存品の代替`を復元しました（英語: `TC4 Substitute for Existing Products`）。
 - タブレット/モバイル幅でEternityメインタブだけ大きくなる0.12.1のレスポンシブ表示を修正しました。
 
-### 互換性 / 対象外
+### 互換性・対象外
 
 - `SAVE_VERSION`は10のままです。
 - Milestone 1-1の文言は変更していません。
@@ -138,9 +139,66 @@ Path("docs/releases/0.12.2.md").write_text(
 - TC4の係数・価格・数式・専用強化UIは変更していません。
 - Eternity Point / EP、Break Eternityは導入していません。
 
-関連: #166, #167, #168, #171, #170, #172, #173
+関連Issue / PR: #166, #167, #168, #171, #170, #172, #173
 """
 )
 
 Path(".github/workflows/prepare-0.12.2-release.yml").unlink(missing_ok=True)
+Path("scripts/prepare-0.12.2-release.py").unlink(missing_ok=True)
 Path(".prepare-0.12.2-trigger").unlink(missing_ok=True)
+
+Path(".github/workflows/regression.yml").write_text(
+    """name: Regression Suite
+
+on:
+  pull_request:
+    branches:
+      - main
+      - next
+      - \"release/**\"
+  push:
+    branches:
+      - main
+      - next
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify ESM entrypoint order
+        run: npm run check:runtime-order
+      - name: Check syntax
+        run: npm run check:syntax
+      - name: Check version consistency
+        run: npm run check:version
+      - name: Check IDD review policy
+        run: npm run check:idd-policy
+      - name: Run ESM regression suite
+        run: npm run test:regression
+      - name: Install Chromium for browser smoke test
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Run browser ESM smoke test
+        run: npm run test:browser
+      - name: Test local performance gate classifier
+        run: npm run test:local-performance-gate
+      - name: Run performance smoke test
+        run: npm run test:performance
+      - name: Upload test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-diagnostics
+          path: |
+            browser-smoke-report.json
+            output/performance-smoke.json
+            regression-failure.txt
+          if-no-files-found: warn
+"""
+)
