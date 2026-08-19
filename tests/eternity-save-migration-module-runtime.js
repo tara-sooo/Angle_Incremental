@@ -61,7 +61,8 @@ async function testCurrentRoundTripAndSanitization() {
   const source = await loadRuntime(candidatePath);
   const { runtime, debug } = source;
   setPersistentFixture(debug.state);
-  debug.state.completedTowerChallenges = 1 << 3;
+  debug.state.activeTowerChallenge = 4;
+  debug.state.completedTowerChallenges = 0;
   debug.state.tc4BaseGainLevel = 4;
   debug.state.tc4BaseGainPriceStep = 5;
 
@@ -69,9 +70,10 @@ async function testCurrentRoundTripAndSanitization() {
   serialized.savedAt = Date.now();
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(serialized)]]));
   assertPersistentFixture(loaded.debug.state, "current save round-trip");
-  assert.equal(loaded.debug.state.completedTowerChallenges, 1 << 3, "ordinary save/load should round-trip current-run TC state before Eternity");
-  assert.equal(loaded.debug.state.tc4BaseGainLevel, 4, "ordinary save/load should round-trip current-run TC4 state before Eternity");
-  assert.equal(loaded.debug.state.tc4BaseGainPriceStep, 5, "ordinary save/load should round-trip TC4 price state before Eternity");
+  assert.equal(loaded.debug.state.activeTowerChallenge, 4, "ordinary save/load should retain an active TC4 run");
+  assert.equal(loaded.debug.state.completedTowerChallenges, 0, "ordinary save/load must not invent TC completion during an active TC4 run");
+  assert.equal(loaded.debug.state.tc4BaseGainLevel, 4, "ordinary save/load should round-trip TC4 local state inside an active TC4 run");
+  assert.equal(loaded.debug.state.tc4BaseGainPriceStep, 5, "ordinary save/load should round-trip TC4 price state inside an active TC4 run");
 
   loaded.runtime.applySaveData({
     eternityMilestoneMask: 255,
