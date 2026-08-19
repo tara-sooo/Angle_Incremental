@@ -1,5 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
-import "../data/eternity-i18n.js?v=0.12.1";
+import "../data/eternity-i18n.js?v=0.12.2";
 
 const FIRST_TIER_IDS = Object.freeze(["1-1", "1-2", "1-3"]);
 const MILESTONES = Object.freeze([
@@ -21,7 +21,7 @@ function installEternityStyles() {
   const link = document.createElement("link");
   link.id = "eternityUiStyles";
   link.rel = "stylesheet";
-  link.href = new URL("./eternity-ui.css?v=0.12.1", import.meta.url).href;
+  link.href = new URL("./eternity-ui.css?v=0.12.2", import.meta.url).href;
   document.head.append(link);
 }
 
@@ -115,10 +115,14 @@ function installEternityUi() {
               <strong id="eternityRequirementState"></strong>
             </div>
           </section>
-          <p id="eternityForcedNote" class="eternity-forced-note" data-i18n="eternityForcedNotice"></p>
+          <div class="eternity-action-row">
+            <p id="eternityForcedNote" class="eternity-forced-note" data-i18n="eternityForcedNotice"></p>
+            <button id="eternityPerformButton" class="eternity-perform-button" type="button" data-eternity-action="perform"></button>
+          </div>
           <section class="eternity-choice-panel" aria-label="First-tier Eternity Milestone choice">
             <h2 data-i18n="eternityFirstTierChoice"></h2>
             <p class="eternity-choice-hint" data-i18n="eternityFirstTierHint"></p>
+            <p id="eternityChoiceEntitlement" class="eternity-choice-entitlement"></p>
             <p id="eternityChoiceAllOwned" class="eternity-choice-all-owned" data-i18n="eternityChoiceAllOwned" hidden></p>
           </section>
           <h2 class="eternity-milestones-heading" data-i18n="eternityMilestones"></h2>
@@ -144,6 +148,12 @@ function installEternityUi() {
   if (!eternityRoot.dataset.choiceBound) {
     eternityRoot.dataset.choiceBound = "true";
     eternityRoot.addEventListener("click", (event) => {
+      const performButton = event.target?.closest?.("[data-eternity-action=\"perform\"]");
+      if (performButton && !performButton.disabled) {
+        runtime.performEternity?.();
+        return;
+      }
+
       const button = event.target?.closest?.("[data-eternity-choice]");
       if (!button || button.disabled) return;
       const id = button.dataset.eternityChoice;
@@ -162,41 +172,42 @@ function setRequirementState(element, met) {
   element.classList.toggle("is-missing", !met);
 }
 
-function updateMilestoneCard(milestone, pendingChoice) {
+function updateMilestoneCard(milestone, availableChoices) {
   const card = eternityRoot?.querySelector(`[data-eternity-milestone="${milestone.id}"]`);
   if (!card) return;
   const active = runtime.eternityMilestoneActive?.(milestone.id) === true;
-  const selected = milestone.choice && !active && pendingChoice === milestone.id;
+  const available = milestone.choice && !active && availableChoices.has(milestone.id);
   const status = card.querySelector(".eternity-milestone-status");
   const requirement = card.querySelector(".eternity-milestone-requirement");
   const button = card.querySelector("[data-eternity-choice]");
 
   card.classList.toggle("is-owned", milestone.choice && active);
   card.classList.toggle("is-active", !milestone.choice && active);
-  card.classList.toggle("is-selected", selected);
+  card.classList.toggle("is-available", available);
   status?.classList.toggle("is-owned", milestone.choice && active);
   status?.classList.toggle("is-active", !milestone.choice && active);
-  status?.classList.toggle("is-selected", selected);
-  status?.classList.toggle("is-locked", !milestone.choice && !active);
+  status?.classList.toggle("is-available", available);
+  status?.classList.toggle("is-locked", milestone.choice ? !active && !available : !active);
 
   if (status) {
     status.textContent = milestone.choice
       ? runtime.t(active
         ? "eternityMilestoneOwned"
-        : selected
-          ? "eternityMilestoneSelected"
-          : "eternityMilestoneAvailable")
+        : available
+          ? "eternityMilestoneAvailable"
+          : "eternityMilestoneLocked")
       : runtime.t(active ? "eternityMilestoneActive" : "eternityMilestoneLocked");
   }
   if (requirement) {
     requirement.textContent = runtime.t("eternityCountRequirement").replace("{count}", String(milestone.count));
   }
   if (button) {
-    button.disabled = active;
-    button.classList.toggle("is-selected", selected);
+    button.disabled = active || !available;
     button.textContent = active
       ? runtime.t("eternityMilestoneOwned")
-      : runtime.t(selected ? "eternityChoiceSelected" : "eternityChoiceSelect");
+      : available
+        ? runtime.t("eternityChoiceSelect")
+        : runtime.t("eternityMilestoneLocked");
   }
 }
 
@@ -206,15 +217,16 @@ function updateEternityUi() {
   const tc4Met = runtime.towerChallenge4CompletedForEternity?.() === true;
   const ipMet = runtime.eternityIpThresholdMet?.() === true;
   const ready = runtime.canEternity?.() === true;
-  const pendingChoice = typeof runtime.state.eternityMilestoneChoice === "string"
-    ? runtime.state.eternityMilestoneChoice
-    : "";
+  const entitlementCount = Math.max(0, Math.floor(Number(runtime.firstTierMilestoneEntitlementCount?.()) || 0));
+  const availableChoices = new Set(runtime.availableEternityMilestoneChoices?.() || []);
 
   const headingCount = eternityRoot.querySelector("#eternityHeadingCount");
   const countValue = eternityRoot.querySelector("#eternityCountValue");
   const currentIp = eternityRoot.querySelector("#eternityCurrentIp");
   const requirementState = eternityRoot.querySelector("#eternityRequirementState");
   const forcedNote = eternityRoot.querySelector("#eternityForcedNote");
+  const performButton = eternityRoot.querySelector("#eternityPerformButton");
+  const entitlement = eternityRoot.querySelector("#eternityChoiceEntitlement");
   const allOwned = eternityRoot.querySelector("#eternityChoiceAllOwned");
 
   if (headingCount) headingCount.textContent = `Eternity ${runtime.formatUiNumber(count)}`;
@@ -228,8 +240,18 @@ function updateEternityUi() {
     requirementState.classList.toggle("is-missing", !ready);
   }
   forcedNote?.classList.toggle("is-ready", ready);
+  if (performButton) {
+    performButton.disabled = !ready;
+    performButton.textContent = runtime.t(ready ? "eternityPerform" : "eternityPerformUnavailable");
+  }
+  if (entitlement) {
+    entitlement.textContent = entitlementCount > 0
+      ? runtime.t("eternityFirstTierEntitlementAvailable").replace("{count}", String(entitlementCount))
+      : runtime.t("eternityFirstTierEntitlementNone");
+    entitlement.classList.toggle("is-available", entitlementCount > 0);
+  }
 
-  MILESTONES.forEach((milestone) => updateMilestoneCard(milestone, pendingChoice));
+  MILESTONES.forEach((milestone) => updateMilestoneCard(milestone, availableChoices));
   if (allOwned) {
     allOwned.hidden = !FIRST_TIER_IDS.every((id) => runtime.eternityMilestoneActive?.(id) === true);
   }

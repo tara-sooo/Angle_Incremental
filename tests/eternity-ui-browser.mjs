@@ -71,6 +71,10 @@ try {
     ip: document.getElementById("eternityIpRequirement")?.textContent,
     title11: document.querySelector('[data-eternity-milestone="1-1"] [data-i18n="eternityMilestone11Name"]')?.textContent,
     button11: document.querySelector('[data-eternity-choice="1-1"]')?.textContent,
+    disabled11: document.querySelector('[data-eternity-choice="1-1"]')?.disabled,
+    entitlement: document.getElementById("eternityChoiceEntitlement")?.textContent,
+    perform: document.getElementById("eternityPerformButton")?.textContent,
+    performDisabled: document.getElementById("eternityPerformButton")?.disabled,
     panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
   }));
   assert.equal(initial.tabActive, true, "Eternity should be selectable as a top-level main tab");
@@ -81,23 +85,46 @@ try {
   assert.equal(initial.tc4, "未達成", "TC4 requirement should show its current state");
   assert.equal(initial.ip, "未達成", "IP requirement should show its current state");
   assert.equal(initial.title11, "1-1 QoLの精神", "Japanese Milestone copy should render");
-  assert.equal(initial.button11, "次のEternityで選択", "unowned first-tier Milestones should expose a normal selection control");
+  assert.equal(initial.button11, "未解放", "first-tier Milestones should not be acquirable before the first Eternity");
+  assert.equal(initial.disabled11, true, "first-tier acquisition controls should be disabled before an entitlement exists");
+  assert.equal(initial.entitlement, "現在取得できるMilestoneはありません。", "the UI should explain the lack of a current acquisition right");
+  assert.equal(initial.perform, "Eternity条件未達成", "manual Eternity action should expose its unavailable state");
+  assert.equal(initial.performDisabled, true, "manual Eternity action should be disabled before the full requirement is met");
   assert.equal(initial.panelText.includes("Eternity Point"), false, "Eternity UI must not introduce an Eternity Point surface");
 
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.eternityCount = 1;
+    debug.runtime.updateUi();
+  });
+  const earned = await page.evaluate(() => ({
+    entitlement: document.getElementById("eternityChoiceEntitlement")?.textContent,
+    status: document.querySelector('[data-eternity-milestone="1-1"] .eternity-milestone-status')?.textContent,
+    button: document.querySelector('[data-eternity-choice="1-1"]')?.textContent,
+    disabled: document.querySelector('[data-eternity-choice="1-1"]')?.disabled,
+  }));
+  assert.equal(earned.entitlement, "現在取得可能: 1", "one successful Eternity should expose one first-tier acquisition");
+  assert.equal(earned.status, "取得可能", "unowned first-tier Milestones should show as available when entitlement exists");
+  assert.equal(earned.button, "取得", "first-tier control should acquire immediately rather than reserve for the next Eternity");
+  assert.equal(earned.disabled, false);
+
   await page.click('[data-eternity-choice="1-1"]');
-  const selected = await page.evaluate(() => ({
+  const acquired = await page.evaluate(() => ({
+    mask: window.__angleDebug.state.eternityMilestoneMask,
     choice: window.__angleDebug.state.eternityMilestoneChoice,
     status: document.querySelector('[data-eternity-milestone="1-1"] .eternity-milestone-status')?.textContent,
     button: document.querySelector('[data-eternity-choice="1-1"]')?.textContent,
+    entitlement: document.getElementById("eternityChoiceEntitlement")?.textContent,
   }));
-  assert.equal(selected.choice, "1-1", "the player-facing choice control should route through the authoritative pending-choice state");
-  assert.equal(selected.status, "次回取得予定", "the selected first-tier Milestone should be visibly pending");
-  assert.equal(selected.button, "選択中", "the selected choice button should show its state");
+  assert.equal(acquired.mask, 1, "the player-facing acquisition control should grant ownership immediately");
+  assert.equal(acquired.choice, "", "the legacy pending-choice state should not be used by the new UI");
+  assert.equal(acquired.status, "取得済み", "the acquired first-tier Milestone should be visibly owned");
+  assert.equal(acquired.button, "取得済み", "owned first-tier Milestones should no longer offer acquisition");
+  assert.equal(acquired.entitlement, "現在取得できるMilestoneはありません。", "the single earned entitlement should be consumed");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
     debug.state.eternityMilestoneMask = 1;
-    debug.state.eternityMilestoneChoice = "";
     debug.state.eternityCount = 5;
     debug.runtime.updateUi();
   });
@@ -106,11 +133,13 @@ try {
     disabled11: document.querySelector('[data-eternity-choice="1-1"]')?.disabled,
     active2: document.querySelector('[data-eternity-milestone="2"] .eternity-milestone-status')?.textContent,
     locked3: document.querySelector('[data-eternity-milestone="3"] .eternity-milestone-status')?.textContent,
+    entitlement: document.getElementById("eternityChoiceEntitlement")?.textContent,
   }));
   assert.equal(progressed.owned11, "取得済み", "owned first-tier Milestones should be represented as owned");
   assert.equal(progressed.disabled11, true, "owned first-tier Milestones should no longer be selectable");
   assert.equal(progressed.active2, "有効", "count-based Milestone 2 should show active at Eternity 5");
   assert.equal(progressed.locked3, "未解放", "later count-based Milestones should remain locked below their threshold");
+  assert.equal(progressed.entitlement, "現在取得可能: 2", "unused first-tier acquisition rights should accumulate and remain visible");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -121,20 +150,22 @@ try {
   const english = await page.evaluate(() => ({
     countLabel: document.querySelector('[data-i18n="eternityCountLabel"]')?.textContent,
     title11: document.querySelector('[data-i18n="eternityMilestone11Name"]')?.textContent,
-    forced: document.getElementById("eternityForcedNote")?.textContent,
+    manual: document.getElementById("eternityForcedNote")?.textContent,
   }));
   assert.equal(english.countLabel, "Eternity count", "Eternity UI should switch to English when the shared language state changes");
   assert.equal(english.title11, "1-1 Spirit of QoL", "Milestone names should have English copy");
-  assert.match(english.forced || "", /performed automatically/, "English copy should explain forced pre-Break Eternity");
+  assert.match(english.manual || "", /manually/, "English copy should explain that Eternity is player-triggered");
+  assert.doesNotMatch(english.manual || "", /performed automatically/, "English copy must not describe forced pre-Break Eternity");
 
   await page.setViewportSize({ width: 412, height: 915 });
   const mobile = await page.evaluate(() => ({
     visible: document.querySelector('[data-panel="eternity"]')?.classList.contains("is-active"),
     width: document.querySelector('[data-panel="eternity"]')?.getBoundingClientRect().width || 0,
     firstButtonWidth: document.querySelector('[data-eternity-choice="1-2"]')?.getBoundingClientRect().width || 0,
+    performWidth: document.getElementById("eternityPerformButton")?.getBoundingClientRect().width || 0,
   }));
   assert.equal(mobile.visible, true, "Eternity top-level panel should remain usable at a mobile viewport");
-  assert.ok(mobile.width > 0 && mobile.firstButtonWidth > 0, "Eternity controls should keep a visible mobile layout");
+  assert.ok(mobile.width > 0 && mobile.firstButtonWidth > 0 && mobile.performWidth > 0, "Eternity controls should keep a visible mobile layout");
 
   console.log("Eternity UI browser test passed");
 } finally {
