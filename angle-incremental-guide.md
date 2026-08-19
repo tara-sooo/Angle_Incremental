@@ -139,7 +139,7 @@ EternityはInfinityより上の第4リセットです。現在の周回でTC4を
 
 EternityではInfinity以下の進行、IA、Tower、TC進行が大きくリセットされます。一方で、実績、Eternity回数とMilestone、設定や統計、保存されているTime Flux状態は残ります。
 
-最初の3回のEternityではMilestone 1-1〜1-3から、1回につき未取得のものを1つ選べます。その後はEternity回数5・8・12・20でMilestone 2〜5が順に有効になります。Eternityタブで現在の回数、条件、Milestone状態を確認できます。
+Milestone 1-1〜1-3は、各Eternityで未取得のものを最大1つ選べます。最初の3回で1つずつ選べば3つすべてを揃えられますが、選ばなかった回があっても後のEternityで取得できます。Eternity回数5・8・12・20ではMilestone 2〜5が順に有効になります。Eternityタブで現在の回数、条件、Milestone状態を確認できます。
 
 ### オフライン進行
 
@@ -166,10 +166,10 @@ Settingsタブの「オフライン進行」で、離席中の進行を有効／
 
 | 解放 | 自動化 |
 | --- | --- |
-| IU 1-2 | 通常強化の自動購入 |
+| IU 1-2 または Eternity Milestone 1-1 | 通常強化の自動購入 |
 | IU 4-1 | IC自動完了 |
 | 実績19 | GenerationとCore Boostの自動実行 |
-| IU 8-1 | Infinity自動実行 |
+| IU 8-1 または Eternity Milestone 5 | Infinity自動実行 |
 
 自動化は便利ですが、しきい値が合わないと早すぎるリセットになることがあります。進み方が変だと感じたら、Automationタブのしきい値を見直してください。
 
