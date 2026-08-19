@@ -1,6 +1,6 @@
 # Angle Incremental 開発仕様書
 
-対象リリース: **0.11.1**
+対象リリース: **0.12.0**
 
 この文書は、現行公開版のゲーム仕様と実装基準をまとめる。プレイヤー向けの遊び方は [angle-incremental-guide.md](angle-incremental-guide.md) を参照する。
 
@@ -17,7 +17,8 @@
 3. Core Boost で Generation 以下をリセットし、より強い恒久補正を得る。
 4. Infinity で下位進行をリセットし、Infinity Point と Infinity Upgrade を解放する。
 5. Infinity Challenge、Infinity Angle、Tower、Break Infinite Cap でInfinity後半を進める。
-6. オフライン進行で、離席中の進行を管理する。
+6. Tower Challenge 4をクリアし、所持IPが1.80e308に到達すると第4リセット層Eternityへ進む。
+7. オフライン進行で、離席中の進行を管理する。
 
 ## 2. 用語
 
@@ -34,11 +35,13 @@
 | Infinity Point / IP | Infinity Upgrade購入とInfinity Angleの解放・通常強化購入に使うリソース。 |
 | Infinity Upgrade / IU | IPで購入する恒久強化。 |
 | Infinity Challenge / IC | 制約付きでInfinity到達を目指すチャレンジ。 |
-| Tower Challenge / TC | Towerの次階建設を制限するチャレンジ。TC1〜TC3に加え、TC4のライフサイクルとレベル1制限を実装済み。 |
+| Tower Challenge / TC | Towerの次階建設を制限するチャレンジ。TC1〜TC4を実装済みで、TC4クリアは現在のEternity周回の条件になる。 |
 | Infinity Angle / IA | e20 IPで解放する、Infinity内の独立した図形進行。 |
 | Infinity Score | IAの核到達で得るInfinity内スコア。^0.3後に通常の頂点獲得量へ乗算する。 |
 | Tower | IPで建設し、階数に応じてスコア累乗を強化するInfinity後の恒久要素。 |
 | Break Infinite Cap | Infinity後の強いスコアソフトキャップを恒久的に解除する要素。 |
+| Eternity | TC4をクリアした現在の周回で1.80e308 IPに到達すると発生する第4リセット層。Eternity回数とMilestone進行は保持する。 |
+| Eternity Milestone | Eternity回数または各Eternityでのfirst-tier選択によって有効になる恒久進行。 |
 | オフライン進行 | 保存時刻との差分を、復帰時に複数の粗いティックとして処理する仕組み。 |
 | Time Flux / TF | 現在は休止中の旧機能。過去のセーブとの互換性のため保存項目だけを保持し、現行ゲームでは効果を持たない。 |
 
@@ -64,6 +67,7 @@
 | Core Boost | 0 |
 | Infinity | 0 |
 | IP | 0 |
+| Eternity | 0 |
 | Infinity Angle | 未解放 |
 | Infinity Score | 0 |
 
@@ -472,7 +476,7 @@ CB要求量log10 = log10(1.00e20) * (CB要求量実効指数 ^ Core Boost回数)
 
 ## 13. 実績
 
-実績は37個あり、すべてのリセットを超えて保持される。
+実績は41個あり、すべてのリセットを超えて保持される。
 
 ```text
 実績倍率 = 1.01 ^ 達成済み実績数
@@ -519,8 +523,32 @@ CB要求量log10 = log10(1.00e20) * (CB要求量実効指数 ^ Core Boost回数)
 | 35 | スコアがe2450を超える | なし |
 | 36 | Towerの階層が3に到達 | なし |
 | 37 | TC2をクリア | なし |
+| 38 | Infinity数が1.5e6を超える | Infinity数獲得量 `x2` |
+| 39 | TC3をクリア | なし |
+| 40 | TC4をクリア | なし |
+| 41 | 初回Eternityを実行 | なし |
 
-## 14. 自動化と統計
+## 14. Eternity
+
+Eternityは第4リセット層である。Break Eternity以前は、現在のEternity周回でTC4をクリアし、所持IPが`1.80e308`以上になると強制的に実行される。Break Eternityの本体機構は0.12.0では未実装だが、将来もTC4クリアがEternity条件であるという互換ガードは維持する。Eternity PointやEP通貨は存在しない。
+
+Eternity成功時は`eternityCount`を1だけ増やし、Score、通常強化、Generation、Core Boost、Infinity回数、IP、IU、IC、IA、Tower、TC1〜TC4、TC4専用強化、Break Infinite Cap、現在周回のタイマー類をリセットする。実績、Eternity回数・Milestone所有、総プレイ時間・実プレイ時間、履歴・最速記録、各種設定・自動化設定、休眠中を含む全Time Flux保存状態は保持する。派生キャッシュと自動化の利用可否はリセット後の状態から再計算する。
+
+### 14.1 Eternity Milestone
+
+first-tierの1-1〜1-3はEternity回数1から候補になり、1回のEternity成功につき未取得のものを最大1つだけ選択・取得できる。通貨は消費しないため、最初の3回のEternityで3つすべてを取得できる。
+
+| Milestone | 条件 | 効果 |
+| --- | --- | --- |
+| 1-1 QoLの精神 | Eternity 1、first-tier選択 | Infinity以前の通常強化自動購入を最初から利用可能にする。 |
+| 1-2 高みの見物 | Eternity 1、first-tier選択 | 通常強化の実効レベルへ`Eternity回数 × 10`を加える。TC3報酬がある場合はTC3倍率適用後に加算する。 |
+| 1-3 2つの盾 | Eternity 1、first-tier選択 | Eternity後、IAのSpeed・Vertex・Gain強化をそれぞれ最低レベル5から開始する。 |
+| 2 真の倹約家 | Eternity 5 | IC7の通常強化無消費効果を有効にする。IC7クリア状態そのものは立てない。 |
+| 3 完璧な世代間継承 | Eternity 8 | GenerationとCore Boost実行時の下位リセットを抑止し、実行・正の効果は維持する。 |
+| 4 効率的なウラン235の探し方 | Eternity 12 | Core Boost要求量のlog10を`×0.9`する。 |
+| 5 自動植林 | Eternity 20 | Infinity自動化を解放する。 |
+
+## 15. 自動化と統計
 
 ### オフライン進行
 
@@ -556,9 +584,9 @@ Time Fluxのゲーム内効果とUIは一時的に削除している。オンラ
 
 チャレンジ記録ではIC1〜8とTC1〜4の最速クリアゲーム時間を表示する。クリアタイムはチャレンジ開始から測定し、オフライン進行で進んだゲーム時間も含める。各チャレンジの最速記録は、より短いクリアタイムでのみ更新する。未クリア・未実装のチャレンジは記録なしと表示する。
 
-## 15. UI、ニュース、設定
+## 16. UI、ニュース、設定
 
-メインタブは The Angle、Infinity、Challenges、Automation、Statistics、Achievements、Help、Settings の順で構成する。Infinityタブ内には Upgrades、Infinite Angle、Tower の順でサブタブがある。Challengesタブ内には Infinity Challenge と Tower Challenge の順でサブタブがある。
+メインタブは The Angle、Infinity、Challenges、Automation、Statistics、Achievements、Help、Settings の順で構成する。Infinityタブ内には Upgrades、Infinite Angle、Tower、Eternity の順でサブタブがある。Challengesタブ内には Infinity Challenge と Tower Challenge の順でサブタブがある。
 
 上部バーは設定で次の表示を選べる。
 
@@ -574,11 +602,11 @@ Time Fluxのゲーム内効果とUIは一時的に削除している。オンラ
 
 設定では、言語、数値表記、時間単位、オフライン進行の有効／無効、オフラインティック数、軽量表示、浮遊テキスト、FPS表示、上部バー表示を保存する。オフラインティック数は1,000〜1,000,000の範囲で指定する。
 
-## 16. セーブと更新
+## 17. セーブと更新
 
 セーブはローカルストレージへ自動保存し、手動保存とリセットも提供する。セーブコードは `ANGLE_SAVE_V2:` で始まり、AES-GCMを使って書き出し・読み込みする。
 
-主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower階数、Break Infinite Cap、Infinite Score、実績、自動化、ゲーム時間統計、実プレイ時間統計、Infinity回数/秒の最高値、集約の小数繰越、表示設定、`offlineProgressEnabled`、オフラインティック数が含まれる。旧版との互換性のため、Time Flux量、現在速度、任意倍率、Time Flux強化レベル、旧クイックバー表示設定も保存項目として残すが、現行版では休眠値として扱う。ローカルセーブには互換用の `savedAt` と、サーバー時刻基準の離席処理に使う任意項目 `serverSavedAt` を保存する。既存セーブに `offlineProgressEnabled` がない場合は有効として読み込み、その他の新しい項目がない場合も安全な初期値を使用する。SAVE_VERSIONは10のまま維持する。
+主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower/TC状態、Break Infinite Cap、Infinite Score、実績、`eternityCount`、`eternityMilestoneMask`、`eternityMilestoneChoice`、自動化、ゲーム時間統計、実プレイ時間統計、Infinity回数/秒の最高値、集約の小数繰越、表示設定、`offlineProgressEnabled`、オフラインティック数が含まれる。旧版との互換性のため、Time Flux量、現在速度、任意倍率、Time Flux強化レベル、旧クイックバー表示設定も保存項目として残すが、現行版では休眠値として扱う。ローカルセーブには互換用の `savedAt` と、サーバー時刻基準の離席処理に使う任意項目 `serverSavedAt` を保存する。既存セーブに `offlineProgressEnabled` がない場合は有効として読み込み、その他の新しい項目がない場合も安全な初期値を使用する。SAVE_VERSIONは10のまま維持する。
 
 IPは大きい整数を正確に扱うため `infinityPointsExact` を正本にし、表示用に通常数値とlog10値を同期する。
 
@@ -586,7 +614,7 @@ IPは大きい整数を正確に扱うため `infinityPointsExact` を正本に�
 
 複数タブでセーブのフィンガープリントが競合した場合は、現在タブの状態を `save-conflict` チェックポイントへ退避してから処理を停止し、共有ストレージの最新セーブを読み込む。退避に失敗した場合は現在のメモリ状態を破棄せず、セーブコード出力などの復旧操作を表示する。より新しい形式の共有セーブを古いクライアントが検出した場合は、その共有セーブを削除しない。
 
-## 17. バージョン管理
+## 18. バージョン管理
 
 公開バージョンは Semantic Versioning 形式を使う。
 
@@ -597,11 +625,11 @@ major.minor.patch
 - `APP_VERSION`: 公開アプリのバージョン。`version.json` の `appVersion` と一致させる。
 - `SAVE_VERSION`: セーブデータの移行が必要な場合に上げる保存形式バージョン。
 
-0.11.1では、`APP_VERSION = 0.11.1`、`SAVE_VERSION = 10` とする。0.11.0のTC3とTower進行を維持し、オフライン進行を最大1,000,000ティックの非同期チャンクで処理する。Auto InfinityのUI更新を抑制し、Normal AngleとInfinite Angleのcore-hit処理には負荷上限と近似処理を適用する。既存セーブの形式、Time Flux関連の休眠フィールド、オフライン進行のサーバー時刻優先とローカル時刻フォールバックは維持する。
+0.12.0では、`APP_VERSION = 0.12.0`、`SAVE_VERSION = 10` とする。TC4、Eternity、Eternity Milestone 1-1〜5、実績38〜41、Eternity UIと日英表示を追加する。既存セーブは新しいEternity関連フィールドを安全な初期値で補完し、Time Flux関連の休眠フィールドを含む既存の保存形式を維持する。
 
 ブラウザのキャッシュ対策として、CSS/JSのURLにはアプリバージョンのクエリを付ける。起動中クライアントは `version.json` を定期確認し、新しい `appVersion` を検出したら保存してリロードを促す。
 
-## 18. 主要データ構造
+## 19. 主要データ構造
 
 主要な保存フィールドは `src/core/state.js` の `SAVE_FIELDS` を正本とする。代表的な項目は次の通り。
 
@@ -660,11 +688,13 @@ automation settings
 display settings
 ```
 
-## 19. 今後の拡張候補
+## 20. 今後の拡張候補
 
 - IUの新しい段と分岐
 - 新しいInfinity Challenge
-- Tower Challengeの具体的な制約・報酬
+- Break Eternityとそれ以降のEternity進行
+- Eternity Milestone 6以降
+- 実績42以降
 - 後半の複数Point
 - 実績の個別追加報酬
 - 後半バランス調整
