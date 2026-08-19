@@ -156,19 +156,22 @@ function iu11_2EffectiveInfinityCount() {
 
 function effectiveSpeedLevel() {
   return runtime.state.speedLevel * runtime.towerNormalUpgradeMultiplier()
-    + sponsoredNormalUpgradeBonusLevel();
+    + sponsoredNormalUpgradeBonusLevel()
+    + (runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0);
 }
 
 function effectiveGainLevel() {
   return runtime.state.gainLevel * runtime.towerNormalUpgradeMultiplier()
-    + sponsoredNormalUpgradeBonusLevel();
+    + sponsoredNormalUpgradeBonusLevel()
+    + (runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0);
 }
 
 function effectiveVertexCount() {
   if (runtime.state.activeChallenge === 8) return 3;
   const purchasedVertices = Math.max(0, runtime.state.vertices - 3);
   const count = 3 + Math.floor(purchasedVertices * runtime.towerNormalUpgradeMultiplier())
-    + sponsoredNormalUpgradeBonusLevel();
+    + sponsoredNormalUpgradeBonusLevel()
+    + (runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0);
   if (runtime.state.activeChallenge === 2) return Math.min(200, count);
   return count;
 }
@@ -503,7 +506,7 @@ function canBuyNormalUpgrade(kind) {
 
 function spendNormalUpgrade(kind) {
   if (!runtime.towerChallenge4AllowsNormalUpgrade(kind) || !canBuyNormalUpgrade(kind)) return false;
-  if (runtime.isChallengeCompleted(7)) return true;
+  if (runtime.isChallengeCompleted(7) || runtime.eternityMilestoneIc7RewardActive?.()) return true;
   return spendLog(upgradeCostLog(kind));
 }
 

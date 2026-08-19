@@ -63,7 +63,10 @@ function coreBoostRequirementWithoutEarlyCap() {
   if (Number.isFinite(multiplier)) {
     const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
     const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
-    if (Number.isFinite(challengeAdjustedLog10)) return challengeAdjustedLog10;
+    if (Number.isFinite(challengeAdjustedLog10)) {
+      return runtime.eternityMilestoneCoreBoostRequirementLog10?.(challengeAdjustedLog10)
+        ?? challengeAdjustedLog10;
+    }
   }
   return MAX_GAME_LOG10;
 }

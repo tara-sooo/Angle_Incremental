@@ -80,22 +80,24 @@ function balanceRunGeneration() {
     nextCostFactor,
     runtime.state.activeTowerChallenge === 2 ? 0.90 : 0,
   );
-  runtime.state.score = 0;
-  runtime.state.scoreLog10 = -Infinity;
-  runtime.state.generationScore = 0;
-  runtime.state.generationScoreLog10 = -Infinity;
-  runtime.state.vertices = 3;
-  runtime.state.ic8VertexUpgradeLevel = 0;
-  runtime.state.speedLevel = 0;
-  runtime.state.gainLevel = 0;
-  runtime.state.currentGain = 1;
-  runtime.state.currentGainLog10 = 0;
-  runtime.state.pointProgress = 0;
-  runtime.state.totalVertexProgress = 0;
-  runtime.state.lastVertexIndex = 0;
-  runtime.state.floatingTexts = [];
-  runtime.state.currentGenerationRunTime = 0;
-  balanceApplyResetStartScore();
+  if (!runtime.eternityMilestonePreservesGenerationReset?.()) {
+    runtime.state.score = 0;
+    runtime.state.scoreLog10 = -Infinity;
+    runtime.state.generationScore = 0;
+    runtime.state.generationScoreLog10 = -Infinity;
+    runtime.state.vertices = 3;
+    runtime.state.ic8VertexUpgradeLevel = 0;
+    runtime.state.currentGain = 1;
+    runtime.state.currentGainLog10 = 0;
+    runtime.state.pointProgress = 0;
+    runtime.state.totalVertexProgress = 0;
+    runtime.state.lastVertexIndex = 0;
+    runtime.state.floatingTexts = [];
+    runtime.state.currentGenerationRunTime = 0;
+    runtime.state.speedLevel = 0;
+    runtime.state.gainLevel = 0;
+  }
+  if (!runtime.eternityMilestonePreservesGenerationReset?.()) balanceApplyResetStartScore();
   runtime.checkAchievements(true);
   runtime.updateUi();
   runtime.saveGame("manual");
