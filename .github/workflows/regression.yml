@@ -50,3 +50,47 @@ jobs:
             output/performance-smoke.json
             regression-failure.txt
           if-no-files-found: warn
+
+  prepare-0-12-2-release:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'chore/run-0.12.2-preparer-ci'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out trusted helper from main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: helper
+      - name: Check out release branch
+        uses: actions/checkout@v4
+        with:
+          ref: release-0.12.2
+          path: release
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare and validate 0.12.2
+        working-directory: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python ../helper/scripts/prepare-0.12.2-release.py
+          npm ci
+          npm run check:version
+          npm run check:syntax
+          git diff --check
+      - name: Commit prepared 0.12.2 release
+        working-directory: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Prepare 0.12.2 release"
+          git push origin HEAD:release-0.12.2
