@@ -1,0 +1,177 @@
+name: Prepare 0.12.1 Hotfix
+
+on:
+  push:
+    branches:
+      - hotfix/0.12.1
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hotfix/0.12.1
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare patch-release metadata and copy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
+
+          versioned_runtime_files = [
+              "src/core/constants.js",
+              "version.json",
+              "index.html",
+              "src/ui/events.js",
+              "src/ui/render-eternity.js",
+          ]
+          for filename in versioned_runtime_files:
+              path = Path(filename)
+              text = path.read_text()
+              if "0.12.0" not in text:
+                  raise SystemExit(f"{filename}: missing 0.12.0 source version")
+              path.write_text(text.replace("0.12.0", "0.12.1"))
+
+          index_path = Path("index.html")
+          index = index_path.read_text()
+          index = replace_once(
+              index,
+              "Tower Challenge 4と第4リセット層Eternityを追加しました。",
+              "Eternityを独立したメインタブへ移動し、UIレイアウトを修正しました。",
+              "index update summary",
+          )
+          index = replace_once(
+              index,
+              "TC4では専用強化A/B/Cを使って1e7777 Scoreを目指し、クリアがEternity条件になります。",
+              "EternityをInfinity内のサブタブから独立したメインタブへ移動しました。",
+              "index update first bullet",
+          )
+          index = replace_once(
+              index,
+              "TC4クリア済みの周回で1.80e308 IPに到達するとEternityが発生し、Milestone 1-1〜5が進行します。",
+              "InfinityのサブタブをUpgrades / Infinite Angle / Towerの3つに戻し、レイアウト崩れを修正しました。",
+              "index update second bullet",
+          )
+          index = replace_once(
+              index,
+              "セーブ形式10は変更ありません。既存セーブをそのまま利用でき、実績は41個になりました。",
+              "ゲーム進行・バランス・セーブ形式10に変更はありません。",
+              "index update compatibility note",
+          )
+          index_path.write_text(index)
+
+          i18n_path = Path("src/data/i18n.js")
+          i18n = i18n_path.read_text()
+          i18n = replace_once(i18n, 'updateTitle: "0.12.0 アップデート"', 'updateTitle: "0.12.1 アップデート"', "Japanese update title")
+          i18n = replace_once(
+              i18n,
+              'updateSummary: "Tower Challenge 4と第4リセット層Eternityを追加しました。"',
+              'updateSummary: "Eternityを独立したメインタブへ移動し、UIレイアウトを修正しました。"',
+              "Japanese update summary",
+          )
+          i18n = replace_once(
+              i18n,
+              'updateResetDock: "TC4では専用強化A/B/Cを使って1e7777 Scoreを目指し、クリアがEternity条件になります。"',
+              'updateResetDock: "EternityをInfinity内のサブタブから独立したメインタブへ移動しました。"',
+              "Japanese update first bullet",
+          )
+          i18n = replace_once(
+              i18n,
+              'updateCanvas: "TC4クリア済みの周回で1.80e308 IPに到達するとEternityが発生し、Milestone 1-1〜5が進行します。"',
+              'updateCanvas: "InfinityのサブタブをUpgrades / Infinite Angle / Towerの3つに戻し、レイアウト崩れを修正しました。"',
+              "Japanese update second bullet",
+          )
+          i18n = replace_once(
+              i18n,
+              'updateModalNote: "セーブ形式10は変更ありません。既存セーブをそのまま利用でき、実績は41個になりました。"',
+              'updateModalNote: "ゲーム進行・バランス・セーブ形式10に変更はありません。"',
+              "Japanese update note",
+          )
+          i18n = replace_once(i18n, 'updateTitle: "Version 0.12.0"', 'updateTitle: "Version 0.12.1"', "English update title")
+          i18n = replace_once(
+              i18n,
+              'updateSummary: "Added Tower Challenge 4 and the fourth reset layer, Eternity."',
+              'updateSummary: "Moved Eternity to its own main tab and repaired the release UI layout."',
+              "English update summary",
+          )
+          i18n = replace_once(
+              i18n,
+              'updateResetDock: "TC4 uses three dedicated upgrades to reach 1e7777 Score, and clearing it becomes part of the Eternity requirement."',
+              'updateResetDock: "Eternity is now an independent top-level tab instead of an Infinity subtab."',
+              "English update first bullet",
+          )
+          i18n = replace_once(
+              i18n,
+              'updateCanvas: "After clearing TC4 in the current run, reaching 1.80e308 IP triggers Eternity and advances Milestones 1-1 through 5."',
+              'updateCanvas: "Infinity is back to its three subtabs: Upgrades, Infinite Angle, and Tower."',
+              "English update second bullet",
+          )
+          i18n = replace_once(
+              i18n,
+              'updateModalNote: "Save format 10 is unchanged, existing saves remain compatible, and there are now 41 achievements."',
+              'updateModalNote: "Gameplay progression, balance, and save format 10 are unchanged."',
+              "English update note",
+          )
+          i18n_path.write_text(i18n)
+
+          browser_path = Path("tests/browser-smoke.mjs")
+          browser = browser_path.read_text()
+          browser = replace_once(
+              browser,
+              '  assert.match(updateModal.summary, /Tower Challenge 4/);\n  assert.match(updateModal.summary, /Eternity/);\n  assert.match(updateModal.canvas, /1\\.80e308 IP/);\n  assert.match(updateModal.canvas, /Milestone 1-1〜5/);',
+              '  assert.match(updateModal.summary, /Eternity/);\n  assert.match(updateModal.summary, /独立/);\n  assert.match(updateModal.canvas, /Infinity/);\n  assert.match(updateModal.canvas, /3つ/);',
+              "browser update-modal assertions",
+          )
+          browser_path.write_text(browser)
+
+          release_notes = """## Angle Incremental 0.12.1
+
+### 修正
+
+- EternityをInfinity内のサブタブから分離し、独立したトップレベルのメインタブへ移動しました。
+- Infinityのサブタブ構成を `Upgrades / Infinite Angle / Tower` の3つへ戻しました。
+- 0.12.0でEternityをInfinity内へ追加した際に発生していたUIレイアウト崩れを修正しました。
+- デスクトップ・モバイルのブラウザテストとEternityリリースE2Eを更新し、Eternityが独立タブであることとInfinity側にEternityサブタブが存在しないことを回帰検証します。
+
+### 互換性
+
+`SAVE_VERSION` は10のままです。TC4、Eternity条件、Milestone、実績、Time Flux保持を含むゲーム進行・バランス・セーブ仕様に変更はありません。
+
+### 0.12.0からの変更範囲
+
+このリリースはUI/navigationのみのパッチです。Eternity Point / EP、Break Eternity、追加Milestoneなどの新しいゲーム要素は導入しません。
+
+関連: #163, #164
+"""
+          Path("docs/releases/0.12.1.md").write_text(release_notes)
+          PY
+
+          npm ci
+          npm run check:version
+          npm run check:syntax
+          git diff --check
+
+      - name: Commit prepared hotfix and remove helper workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/prepare-0.12.1-hotfix.yml
+          git add -A
+          git commit -m "Prepare 0.12.1 UI hotfix release"
+          git push origin HEAD:hotfix/0.12.1
