@@ -1,0 +1,304 @@
+# IDD — PR Submit Phase (D)
+
+Read this file after the self-review loop passes. It covers
+pre-publication next sync, claim verification, tests, pushing, PR
+creation, and waiting for CI.
+
+Before the D1 sync and D2 push, apply the
+[shared claim revalidation gate](idd-overview-core.instructions.md#claim-revalidation-gate).
+
+## D1 — Sync next before first push
+
+If the branch has not been pushed yet, sync it onto `next` before the
+first push — the routine pre-publication history cleanup step. First run
+`git fetch origin next`, then check whether the branch is **already
+current** with `origin/next`: if `git merge-base HEAD origin/next` equals
+`origin/next` (behind-count 0), the branch already contains every commit
+on `next`, so the rebase would be a pure no-op. **Skip the rebase entirely
+and proceed to D2** — D1's pre-publication synchronization goal is already
+met. In a sibling-worktree setup a no-op `git rebase origin/next` can still
+detach HEAD at the upstream tip without replaying the local commit, and
+re-running that no-op rebase re-detaches every time, so the bounded
+recovery below cannot converge for the no-op case; skipping it is the clean
+exit.
+
+Otherwise the branch **is** behind `origin/next`: rebase it onto `next`
+(`git rebase origin/next`), then apply the post-rebase verification and
+bounded recovery below.
+
+After the first D-phase push, do not reuse D1 as the normal
+synchronization path. Later branch updates should return through the
+E-phase review loop and, by default, merge `next` into the published PR
+branch so the synchronization diff is reviewable.
+
+This D-phase file records the publication boundary only: post-push
+synchronization itself runs through `idd-review-triage.instructions.md`'s
+E-phase branch-sync check (`Esync`), which uses the
+`branch-conflict-state` helper when helper runtime is enabled (a
+`gh pr view` fallback otherwise), and `idd-resume.instructions.md`
+already routes a content-conflicting branch there on restart.
+
+If D1 itself reveals content conflicts before the first push, resolve
+them and continue the rebase. After completing the rebase, if any files
+were manually edited during conflict resolution, run **fix-validate**
+and commit any resulting changes before proceeding.
+
+On a signed-commit repo whose primary signing is non-interactive-hostile
+(GPG pinentry or a hardware-touch path) but that provides a fallback
+signing wrapper for arbitrary git subcommands (pass
+`-c gpg.format=ssh -c user.signingkey=<abs-path> -c commit.gpgsign=true`
+to `git` before the subcommand — `git -c … rebase`, not `git rebase -c …`
+— or use a repo alias that wraps any subcommand; a commit-only alias like
+`git commit-ssh` will not run `rebase`),
+**run the initial `git rebase origin/next` above through that wrapper —
+not the plain command — and continue it with the wrapper's own
+`--continue` form**; the wrapper must own the whole operation. Plain
+`git rebase --continue` re-signs the replayed commit through the
+configured primary signing, which stalls non-interactively right after
+the conflict is already resolved. This is the normal-path complement to
+the recovery-path re-signing in Post-rebase verification below.
+
+### Post-rebase verification
+
+In a sibling-worktree setup, a rebase can leave HEAD **detached at the
+upstream tip without replaying the local commit**: the branch ref is
+preserved, but HEAD is moved off it. After the rebase completes and before
+D2, verify both:
+
+1. `git branch --show-current` is **non-empty** — HEAD is on the claimed
+   branch, not detached.
+2. The expected local commit is present in `next..HEAD` (for example,
+   `git log --oneline next..HEAD` lists it).
+
+If HEAD is detached (current branch empty), **auto-recover once**: re-attach
+to the claimed branch with `git checkout {branch-name}` (the local commit is
+preserved on the branch ref), re-run the D1 rebase, then re-verify both
+checks. The re-rebase re-signs through the configured commit-signing path —
+do not hardcode an ad-hoc key. On the signed-commit repos in the rebase
+note above, run the re-rebase through that same fallback wrapper (the
+repo's blessed fallback, not an ad-hoc pin), since the plain re-rebase
+would stall on the non-interactive primary signing. If
+recovery still fails (HEAD still detached or the
+expected commit absent), post a hold note documenting the branch state and
+stop; do not push.
+
+This is the same divergence the shared
+[claim revalidation gate](idd-overview-core.instructions.md#claim-revalidation-gate)
+catches at the next mutation (current branch ≠ claimed branch); detecting it
+here turns a confusing later failure into an immediate, recoverable signal.
+
+## D2 — Verify claim, lint, test, push
+
+1. Re-read the issue to confirm the claim is still yours: the **active
+   claim** must still use your current `{claim-id}`. If the active claim
+   is missing, released, or held by a different `{claim-id}` (even under
+   the same agent ID), the claim was lost — report this and stop.
+2. Run **pre-push-validate**.
+
+   (E2E tests are verified by CI; do not run them locally.)
+3. Push the branch to the remote. On the first publication push, use a
+   normal push. If you are recovering an already-published branch under
+   an explicit force-push exception, use `--force-with-lease` only when
+   repository policy permits it and the exceptional route already
+   required a rebase; otherwise stop and return to the merge-based sync
+   path.
+
+Once the branch is pushed, treat it as published review history. A PR
+that is merely `BEHIND` does not force a branch update by itself unless
+branch protection or explicit repository policy requires an up-to-date
+head before merge.
+
+## D3 — Create PR
+
+Before drafting the PR body, check whether the repository defines
+`.github/pull_request_template.md`. If it exists, shape the PR body to
+follow that template's section structure from the start, rather than
+drafting free-form text and reconciling it against the template
+afterward — repository review tooling (for example, CodeRabbit's
+default description check) can compare the PR description against
+that template when present, and a mismatched body can trigger an
+avoidable advisory finding. If no template file exists, use the
+structure below directly.
+
+Use GH CLI or GH MCP to create the pull request. The PR body must
+include the following content, mapped onto the template's sections
+when one exists:
+
+- A concise summary of the branch's changes
+- A branch-aware issue association selected from the live PR base and
+  repository default branch (see Branch-aware issue association below)
+- Recommended follow-up issues (if any)
+- Relevant background/rationale, when it materially affects review (for
+  example, reuse constraints, intentional trade-offs, or non-goals).
+  Include only context grounded in the issue discussion, commits, diff,
+  or explicit operator instructions; omit rather than speculate.
+
+### Branch-aware issue association
+
+Do not hard-code `main` or assume that every PR should close its issue.
+Fetch the PR base and repository default branch live:
+
+```sh
+gh pr view <pr-number> --json baseRefName,body,headRefOid
+gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'
+gh api graphql -f query='query($owner: String!, $repo: String!, $number: Int!) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { closingIssuesReferences(first: 100) { nodes { number } } } } }' -f owner=OWNER -f repo=REPO -F number=<pr-number> --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].number'
+```
+
+Use the following association contract for the claimed issue `<N>`:
+
+- When `baseRefName` equals the live default branch, the body must contain
+  one plain-text closing keyword for every issue in the deliberate closing
+  set (`Closes #N`, `Fixes #N`, or `Resolves #N`) and GitHub's
+  `closingIssuesReferences` must exactly equal that set. When no additional
+  issue is deliberately closed, the set defaults to `[N]`.
+- When `baseRefName` is exactly `next` and `next` differs from the live
+  default branch, the body must contain a neutral plain-text reference
+  `Refs #N` and exactly one machine marker on its own line:
+  `<!-- idd-claimed-issue: N -->`. GitHub's closing set must be empty and
+  the active claim must equal the current claim-id; unrelated neutral
+  `Refs #M` follow-up or background references are allowed.
+- Any other base, including `release/**`, an issue/feature branch, or a
+  missing/unknown base, is not an autonomous association route. Stop and
+  follow the branch merge policy's human/fail-closed route.
+
+The read-only evaluator in `scripts/idd-issue-association.mjs` implements
+these checks and is the regression-testable source for the association
+decision. Pass `deliberateClosingIssues` as the full intended default-base
+set (or `[N]` when there are no additional closes); the `next` route has an
+empty GitHub closing set. Its output never authorizes a merge or issue
+mutation.
+
+GitHub recognizes the following closing keyword forms: close, closes,
+closed, fix, fixes, fixed, resolve, resolves, resolved. They must be plain
+body text, not inline code, a fenced block, or a block quote.
+
+#### Anti-patterns
+
+GitHub's closing-keyword detection does NOT activate when the keyword
+is wrapped in any of these markdown forms — even if the underlying
+text is correct:
+
+- inline code (backtick-wrapped, e.g. `` `Closes #1` ``) — not
+  detected
+- fenced code block (triple backtick or triple tilde) — not detected
+- block quote prefix (`>` at line start) — not detected
+
+When detection fails, GitHub will not auto-close the linked issue on
+merge and the issue↔PR linking surfaces (sidebar, timeline) will not
+populate.
+
+**Mirror false-positive — negation-blind detection**: the same literal
+matching runs in the other direction too. GitHub's detector matches a
+recognized keyword form immediately adjacent to a `#N` reference and
+has no concept of negation — wrapping the keyword in surrounding
+"not" / "deliberately" / "isn't" wording does not stop detection when
+the keyword itself still sits next to the `#N` it must not close. Keep
+every recognized keyword form (`close`, `closes`, `closed`, `fix`,
+`fixes`, `fixed`, `resolve`, `resolves`, `resolved`) structurally apart
+from any reference it must not close:
+
+- Risky — a keyword sits directly before the reference, even inside a
+  negation clause: "this PR does not close #42" (`close` is
+  immediately adjacent to `#42`; GitHub cannot see the "not").
+- Safe — reorder so no recognized keyword is adjacent to the
+  reference: "Refs #42 (deliberately not a closing keyword — see the
+  discussion there for why this PR does not resolve it directly)".
+  Here `resolve` is followed by "it", not a `#N` token, so nothing
+  adjacent to `#42` matches.
+
+Do not rely on careful phrasing alone as the only safeguard — D3.5 below
+checks both the stripped body and the live closing set, and the `next`
+route rejects any closing reference.
+
+#### Multiple closing issues
+
+For default-base PRs, record every deliberately closed issue in the
+closing set and repeat the keyword for each reference. Both keywords must
+appear in plain body text for GitHub to auto-close both issues:
+
+- Works — a body line written as Closes #1, closes #2 (GitHub parses
+  each keyword + reference pair).
+- Does **not** work — a body line written as Closes #1, #2 (no
+  keyword precedes the second reference, so #2 is not auto-closed).
+
+After creating the PR, if the repository has CODEOWNER rules or expected
+reviewers that are not auto-assigned by GitHub, request them explicitly:
+
+```sh
+gh pr edit {pr-number} --add-reviewer {reviewer-login}
+```
+
+### D3.5 — Verify branch-aware issue association
+
+After PR creation and before D4, re-fetch the PR base, body, closing set,
+and the repository default branch. Resume routing re-enters this sub-step
+when a session restarts after PR creation but before CI completion.
+
+1. Run the live reads from D3 again. Do not infer the default branch from
+   repository history or from a hard-coded `main` value.
+
+2. Strip fenced blocks, inline code, and block-quote lines before checking
+   visible references. The exact D3 contract then applies:
+   - default-base PR: visible closing keywords and
+     `closingIssuesReferences` must exactly equal the deliberate closing
+     set (default `[N]`);
+   - non-default `next` PR: at least one visible `Refs #N`, exactly one
+     exact marker `<!-- idd-claimed-issue: N -->`, an empty closing set,
+     and the active claim matching the current claim-id. Other neutral
+     `Refs #M` references do not fail this check.
+
+3. Use the read-only `scripts/idd-issue-association.mjs` evaluator with the
+   live values when available. A `ready: false` result is a stop, not a
+   reason to guess or weaken the body. Pass the deliberate default-base
+   closing set explicitly.
+
+4. For a legacy non-default `next` body containing a standalone
+   `Closes/Fixes/Resolves #N`, run the evaluator's one-time
+   `normalizeLegacyNextBody` transformation, update the PR body, then
+   repeat steps 1–3 once. Do not rewrite arbitrary references, multiple
+   markers, or malformed markers.
+
+5. For a missing marker, a default-base extra/missing closing reference,
+   malformed body,
+   unsupported base, or any mismatch after one correction, post a hold
+   note citing the PR URL and stop. Do not proceed to D4. The evaluator
+   is fail-closed; do not add a closing keyword merely to make the old
+   check pass.
+
+## D4 — Wait for CI
+
+Schedule a wake, or background this wait only if the
+topology-safety condition holds (confirmed to route completion back to
+this turn); otherwise wait synchronously — block with:
+
+- `gh run watch <run-id> --exit-status` (single workflow run; not
+  usable on a fine-grained PAT)
+- `gh pr checks <pr-number> --watch --required` (PR required-check
+  rollup)
+
+See [idd-ci.instructions.md's Wake-up
+discipline](idd-ci.instructions.md#wake-up-discipline) for the
+caveats on both. Do not `run_in_background` this wait absent the
+confirmed condition above. Delegate polling mechanics to
+`idd-ci.instructions.md`.
+
+- **On success** → proceed to `idd-review-snapshot.instructions.md`
+- **`idd-advisory-convergence` is the sole non-pass required check, and
+  its own verdict — a JSON object printed in that check's run log, whose
+  `pending` field is distinct from any GitHub check-run status —
+  reports `pending: false` with outstanding review reasons** (thread
+  disposition, actionable item count on the latest review, or
+  both; see `idd-ci.instructions.md` §Interpretation for this shared
+  trigger condition) → this is not a CI-wait state: the
+  check turns green only after E-phase disposition, which is downstream
+  of D4, so continued polling cannot resolve it, and a
+  `ciWait.rerunPolicy` rerun only reproduces the same red **unless a
+  maintainer has since posted a valid external-check waiver for this
+  HEAD** — that case still needs the rerun, to make the check reflect
+  the waiver (a pre-existing F2/F3 concern this branch leaves unchanged;
+  see `idd-pre-merge.instructions.md`'s External-check waivers). Absent
+  a waiver, exit CI-wait and proceed directly to
+  `idd-review-snapshot.instructions.md` (E1) instead, matching the phase
+  routing table's "PR open, CI running, reviews exist" row. This does
+  not relax the merge gate — the check stays required, and F2
+  re-verifies it independently before merge.

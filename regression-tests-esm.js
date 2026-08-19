@@ -12,9 +12,12 @@ async function main() {
   await require("./tests/new-infinity-upgrades-module-runtime.js").runNewInfinityUpgradesModuleRuntimeTest();
   await require("./tests/infinite-angle-module-runtime.js").runInfiniteAngleModuleRuntimeTest();
   await require("./tests/tower-module-runtime.js").runTowerModuleRuntimeTest();
+  await require("./tests/eternity-module-runtime.js").runEternityModuleRuntimeTest();
+  await require("./tests/eternity-save-migration-module-runtime.js").runEternitySaveMigrationModuleRuntimeTest();
   await require("./tests/save-recovery-module-runtime.js").runSaveRecoveryModuleRuntimeTest();
   await require("./tests/time-flux-module-runtime.js").runTimeFluxModuleRuntimeTest();
   await require("./tests/version-consistency-module-runtime.js").runVersionConsistencyModuleRuntimeTest();
+  await require("./tests/idd-issue-association-module-runtime.js").runIddIssueAssociationModuleRuntimeTest();
 }
 
 main().catch((error) => {

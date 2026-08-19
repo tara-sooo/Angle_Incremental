@@ -713,11 +713,11 @@ async function runSaveRecoveryModuleRuntimeTest() {
     state.infinityPoints = 1234567;
     state.infinityPointsLog10 = Math.log10(state.infinityPoints);
     state.achievementMask = 0x7fffffff;
-    state.achievementMaskHigh = 0b111111;
+    state.achievementMaskHigh = 0b1111111111;
     assert.equal(debug.createCheckpoint("format-test", { force: true }), true);
     runtime.updateUi();
     const compactSummary = runtime.elements.saveCheckpointList.children[0].children[0].children[2].textContent;
-    assert.match(compactSummary, /実績: 37\/37/, "recovery summaries should count achievements from both masks");
+    assert.match(compactSummary, /実績: 41\/41/, "recovery summaries should count achievements from both masks");
     state.numberFormat = "scientific";
     runtime.updateUi();
     const scientificSummary = runtime.elements.saveCheckpointList.children[0].children[0].children[2].textContent;

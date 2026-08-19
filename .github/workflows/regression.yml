@@ -10,7 +10,6 @@ on:
     branches:
       - main
       - next
-      - "release/**"
 
 jobs:
   regression:
@@ -20,25 +19,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install dependencies
+        run: npm ci
       - name: Verify ESM entrypoint order
-        run: node scripts/check-runtime-esm-loader-order.js
+        run: npm run check:runtime-order
       - name: Check syntax
-        run: |
-          node --check regression-tests-esm.js
-          node --check tests/version-consistency.mjs
-          find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check
+        run: npm run check:syntax
       - name: Check version consistency
         run: npm run check:version
+      - name: Check IDD review policy
+        run: npm run check:idd-policy
       - name: Run ESM regression suite
-        run: node --experimental-vm-modules regression-tests-esm.js
+        run: npm run test:regression
       - name: Install Chromium for browser smoke test
-        run: |
-          npm install --no-save --ignore-scripts playwright
-          npx playwright install --with-deps chromium
+        timeout-minutes: 5
+        run: npx playwright install chromium
       - name: Run browser ESM smoke test
-        run: node tests/browser-smoke.mjs
+        run: npm run test:browser
+      - name: Test local performance gate classifier
+        run: npm run test:local-performance-gate
       - name: Run performance smoke test
-        run: node tests/performance-smoke.mjs
+        run: npm run test:performance
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4

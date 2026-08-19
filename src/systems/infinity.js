@@ -269,7 +269,7 @@ function recordInfinityRun(
 }
 
 function infinityCountGain() {
-  return isChallengeCompleted(6) ? 2 : 1;
+  return (isChallengeCompleted(6) ? 2 : 1) * (runtime.isAchievementUnlocked(38) ? 2 : 1);
 }
 
 function addAggregatedInfinityCount(amount) {
@@ -340,6 +340,7 @@ function runInfinity(forced = false) {
   runtime.resetBelowInfinity();
   runtime.state.currentInfinityRunTime = 0;
   runtime.state.currentInfinityRealTime = 0;
+  runtime.maybeForceEternity?.({ save: false, update: false });
   runtime.updateUi();
   runtime.saveGame("manual");
 }

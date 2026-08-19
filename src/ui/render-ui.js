@@ -378,18 +378,22 @@ function setSaveStatus(text) {
 
 function gainExpressionConfig() {
   const parts = gainExpressionParts();
-  if (parts <= 1) return { parts, divisor: 1, rewardRemovesDivisor: false };
-  if (runtime.state.activeChallenge === 1) return { parts, divisor: parts * 10, rewardRemovesDivisor: false };
-  if (runtime.isChallengeCompleted(1)) return { parts, divisor: 1, rewardRemovesDivisor: true };
-  return { parts, divisor: parts, rewardRemovesDivisor: false };
+  const effectiveParts = runtime.tc4EffectiveGainExpressionParts(parts);
+  if (parts <= 1) return { parts, effectiveParts, divisor: 1, rewardRemovesDivisor: false };
+  if (runtime.state.activeChallenge === 1) return { parts, effectiveParts, divisor: parts * 10, rewardRemovesDivisor: false };
+  if (runtime.isChallengeCompleted(1)) return { parts, effectiveParts, divisor: 1, rewardRemovesDivisor: true };
+  return { parts, effectiveParts, divisor: parts, rewardRemovesDivisor: false };
 }
 
 function formatGainExpression(valueLog10) {
   const config = gainExpressionConfig();
-  if (config.parts <= 1) return runtime.formatUiLogNumber(valueLog10);
+  if (config.effectiveParts <= 1) return runtime.formatUiLogNumber(valueLog10);
   const base = runtime.formatUiLogNumber(valueLog10);
-  if (config.divisor <= 1) return `(${base})^${config.parts}`;
-  return `(${base} / ${config.divisor})^${config.parts}`;
+  const exponent = Number.isInteger(config.effectiveParts)
+    ? String(config.effectiveParts)
+    : config.effectiveParts.toFixed(2);
+  if (config.divisor <= 1) return `(${base})^${exponent}`;
+  return `(${base} / ${config.divisor})^${exponent}`;
 }
 
 function formatEffectiveLevel(rawLevel, effectiveLevel) {

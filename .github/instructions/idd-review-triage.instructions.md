@@ -1,0 +1,367 @@
+# IDD — Review Triage Phase (E4–E8)
+
+Read this file after `idd-review-snapshot.instructions.md` (E3) finds
+ReviewItems_snapshot non-empty. Covers classifying, scoring, recording
+dispositions, and counting accepted items.
+
+Before posting any E-phase operational comment or GitHub reply, apply
+the shared claim revalidation gate. The active claim must still use your
+current `{claim-id}`.
+
+**Skip condition E8**: if the Accepted PATH A count after verification
+is zero, proceed to the **E-phase branch-sync check** below. Otherwise
+continue through review-fix.
+
+## E4 — Classify and score ReviewItems_snapshot
+
+For each item in ReviewItems_snapshot, first classify it:
+
+- **PATH A — actionable feedback**: human reviewer threads and regular
+  comments, `CHANGES_REQUESTED` review bodies, and critique-pass
+  findings that require a code change or maintainer decision.
+- If classification is ambiguous, default to PATH A.
+- Record each PATH A actor's permission standing (CODEOWNER, required
+  reviewer, Triage/Write/Maintain/Admin, or none) — E5's cap reads it.
+
+Then apply path-specific scoring:
+
+- **PATH A**: assess severity/relevance to PR intent. **High** (safety,
+  correctness, requirement violations, CI stability) → **Accept
+  forced**, gated by "Verify before accept" and the actor-permission cap
+  (E5); **Low** (minor, unrelated to PR intent) → **Reject
+  recommended**; **Medium** → judge by context.
+
+## E5 — Record Accept / Reject decisions
+
+Record one evidence-backed disposition for every item:
+
+- **PATH A**: High-severity items reach Accepted only via "Verify
+  before accept" below, or — when the actor-permission cap applies —
+  an explicit maintainer confirmation reply; Medium/Low require an
+  explicit Accept or Reject decision.
+**Actor-permission cap (PATH A).** Before an Accept, check whether the
+actor is a CODEOWNER, required reviewer, or holds Triage/Write/Maintain/
+Admin access (`GET
+/repos/{owner}/{repo}/collaborators/{username}/permission`). Absent all
+three, assertion alone never reaches Accept forced — only "Verify before
+accept" confirming the claim, or an explicit maintainer confirmation
+reply, gets it there. Otherwise cap it at Rejected with the reasoned
+reply E6 already requires. CODEOWNER/required-reviewer AMD handling is
+unchanged.
+
+
+**Verify before accept (PATH A).** Each item often asserts a fact — about
+safety, correctness, the runtime, CI, or an
+artifact. Before `Accept`ing it, confirm the claim against live evidence
+(a code read, reproduction, or an equivalent check), not the comment
+text alone — the actor-permission cap above is the only exception, via
+maintainer confirmation for an unprivileged PATH A actor: confirmed →
+`Accept` and act; **false on the live evidence** → disposition it
+`Rejected` and cite the contradicting evidence (the code as read, the
+real run conclusion, file contents, or artifact) — a verified-false
+claim is a reasoned rejection, not an action item.
+
+**Resolved-thread duplicate pre-check (review item, before verification).**
+Before verification above, check whether a new review item — a review
+thread or a regular comment (E6 supports both review item sources) — matches
+an entry in this PR's resolved-thread index
+(`idd-review-snapshot.instructions.md` E1 Step 3). Matching is scoped to
+**this PR's** resolved threads only: a regular comment has no resolved
+state of its own, but can still match a prior resolved thread's claim.
+
+- Match the new item against the index by file area and substantive
+  claim, requiring the identical claim rather than merely a related
+  topic in the same file. (For example, a prior "raw SQL concatenation"
+  rejection on `db/query.mts` does not match a new "missing index"
+  comment on the same file: same file area, different claim.)
+- On a match, open the linked prior thread — the index disposition alone
+  is not proof. Re-confirm the new item raises that **same underlying
+  claim**, not just a related one, then confirm the prior thread
+  actually recorded a **reasoned rejection with citable evidence** (not
+  a bare `**Rejected**`, and not the E6 non-review-notice rejection,
+  which asserts no result was reviewed rather than rejecting a claim),
+  then quickly recheck that the cited evidence still holds at the
+  current HEAD — the diff moves between rounds, so a prior file/line
+  citation can be stale.
+- **Shortcut.** If the prior disposition was a reasoned rejection with
+  evidence and that evidence still holds: reply to the new item with a
+  fresh, individually-authored disposition citing the prior thread's URL
+  and its evidence, then apply the existing E6 review item reply rules for
+  that item's source — resolve immediately after replying for a review
+  thread; reply only for a regular comment. Every recurrence still gets
+  its own reply, so the 1:1 disposition-count / no-combined-replies rule
+  (E6) is unchanged — only the reply's content is shortcut.
+- **Fall through** unchanged to "Verify before accept" above
+  when there is no match, re-confirmation shows the new item is not
+  actually the same underlying claim, the matched disposition is not a
+  reasoned rejection with evidence, the cited evidence no longer holds
+  at current HEAD, or the new occurrence carries genuinely new
+  information the prior thread did not address.
+
+**Worked example.** A bot re-raises "this workflow step needs
+`contents: write`" two rounds after an identical claim on the same file
+was rejected with evidence (the step only uploads an artifact). Confirm
+the claim and evidence still hold at current HEAD, reply `**Rejected**
+— same claim as {prior thread URL}: verified false there; unchanged at
+current HEAD.`, then resolve the thread.
+
+**Reasoned-rejection convergence.** The iterate-to-zero loop may converge
+by reasoned rejection of peripheral or verified-false items — not every
+comment needs a code change. Record the reason in the disposition reply;
+"a bot raised it" alone never forces a change.
+
+**Worked example.** A bot flags a "credential leak" on a config-only file
+that in fact holds only public placeholders. Reply `**Rejected** —
+verified: the flagged file contains only public placeholders; no
+credential is present.`
+
+## E6 — Post disposition replies
+
+Apply the reply rules below after E5 records a disposition.
+
+PATH A — Accepted items:
+
+- Do not reply in triage solely to acknowledge the acceptance. Accepted
+  reviewer feedback is replied to after the fix work in
+  `idd-review-fix.instructions.md`.
+
+PATH A — Rejected reviewer feedback:
+
+For each Rejected PATH A item whose source is reviewer feedback:
+
+- Reply using the format: `**Rejected** — {reason}`
+- **Exception**: if the source is a CODEOWNER or required reviewer, do
+  not reject unilaterally. Reply using the format:
+  `**Awaiting maintainer decision** — {your reasoning}` and wait for the
+  maintainer's response.
+- After posting your reply, **immediately resolve the thread** — except
+  for `**Awaiting maintainer decision**`. When helper runtime is enabled,
+  the profile-selected resolve-review-thread command (`--pr <number>
+  --comment-id <id> --apply`, with `--body`/`--claim-issue`/`--claim-id`;
+  see `docs/idd-helper-scripts.md`) posts the reply and resolves in one
+  call, replying before resolving so a failed reply never leaves a
+  silently-resolved thread; the manual REST + GraphQL
+  `resolveReviewThread` sequence is the fallback. Resolving means "agent
+  acted", not "reviewer agreed" — a disagreeing reviewer can reopen the
+  thread, which re-surfaces it in a future E1 pass.
+- **Exception to immediate resolution**: for a review-thread AMD, leave
+  it unresolved (do **NOT** resolve) so F2's "Unresolved threads = 0"
+  gate blocks merge until the maintainer responds, and post a separate
+  hold comment explaining what you're waiting for. A regular-comment AMD
+  (CODEOWNER/required-reviewer feedback with no thread) cannot use that
+  gate structurally — instead post the hold comment stating you will
+  **not** merge until the decision appears, and stop. Either way, wait
+  for the response in a future E1 pass: agreement closes the AMD (reply
+  to confirm, remove the hold); an override moves it to Accepted.
+- **When an `Awaiting maintainer decision` thread re-appears in ReviewItems_snapshot**:
+  scan the activity universe for a **qualifying response** — a reply on
+  this thread, or a separate comment/review that clearly references
+  this item — from a **qualifying person** (any CODEOWNER, required
+  reviewer, or a collaborator with Write/Maintain/Admin access per
+  `GET /repos/{owner}/{repo}/collaborators/{username}/permission`),
+  excluding the acting agent and the PR author, posted **after** your
+  AMD comment. A general comment/review from a qualifying person that
+  does not reference this item does not count.
+
+  If a qualifying response exists, apply the transitions below.
+  Otherwise, ensure a hold comment exists (post one if not), then
+  stop — do not re-reply or resolve; resume when the response appears
+  in a future E1 pass.
+- **When the maintainer eventually responds** (their response surfaces
+  in a future E1 pass as an unresolved thread or new reply):
+  - If the maintainer **agrees with your rejection**: reply summarizing
+    the agreed decision (e.g.,
+    `**Rejection confirmed by maintainer** — {summary}`) and resolve the
+    thread.
+  - If the maintainer **disagrees**: move the item from Rejected to
+    Accepted and proceed through the fix flow. Resolve the thread after
+    fixing.
+  - If the maintainer's response arrived in a separate PR comment or
+    review rather than in the original thread: mirror the decision onto
+    the original thread and resolve the thread. Also **reply to the
+    maintainer's separate comment** (e.g., "Decision mirrored to the
+    review thread — {link}") so that F2's unreplied-comments gate does
+    not block merge on that comment.
+- For a `CHANGES_REQUESTED` review body you are rejecting: post a PR
+  comment explaining your reasoning and ask the reviewer to reconsider.
+  - If the reviewer does not respond and the state does not change: post
+    a hold comment (keep the claim) and stop. Check elapsed time on the
+    next heartbeat or resume:
+    - After `reviewEscalation.changesRequestedFirstEscalation` (default
+      `PT24H`) with no response: escalate to a maintainer via issue or
+      PR comment.
+    - After `reviewEscalation.changesRequestedSecondEscalation` (default
+      `PT48H`) with no escalation response: consider adding the
+      configured needs-decision label
+      (`labels.needsDecisionLabelName`, default `status:needs-decision`)
+      and releasing the claim; remove the label and re-claim once
+      resolved.
+  - Clearing F2's `CHANGES_REQUESTED` gate always requires the review
+    **state** itself to change — a reviewer state change (re-submit as
+    `COMMENTED`/`APPROVED`) or an admin dismissal via
+    `PUT /repos/{owner}/{repo}/pulls/{pull_number}/reviews/{review_id}/dismissals`.
+    A comment merely agreeing with your rejection is **never sufficient**
+    on its own, whether posted by the original reviewer or by a
+    different maintainer/admin — ask them to change state or dismiss
+    explicitly.
+  - If the reviewer responds and disagrees: move the item to Accepted
+    and proceed through the fix flow.
+  - If the reviewer responds (either way): restart from E1.
+- If you decide "Reject now but should do eventually": open a new issue.
+  The new issue's body must include a `Refs #NNN` line on its own
+  line (not narrative prose) back to the originating issue — use
+  `Refs` specifically and reference the issue, never the PR: a
+  referenced PR is recorded as an unresolved reference by
+  `discover-roadmap-graph`, and only the `Refs` relationship is
+  cycle-exempt for a closed leaf, so a different keyword (e.g.
+  `Closes`) or a PR target leaves the reference unresolved until
+  the issue body is corrected. Mention the originating PR in prose
+  if useful. Mirrors the A1.5 rule in `idd-roadmap-audit.instructions.md`.
+
+Use these prefixes so that disposition is always unambiguous:
+
+- Ordinary rejection: `**Rejected** — {reason}`
+- CODEOWNER / required reviewer exception:
+  `**Awaiting maintainer decision** — {reasoning}`
+
+Two requirements make the F2/F3 disposition-evidence gate recognize an
+`**Accepted**` / `**Rejected**` disposition — `isDispositionComment` reads
+"the body **starts with** that marker" and pairs dispositions to advisory
+review comments **1:1 by count** (`**Awaiting maintainer decision**` is a
+separate PATH A signal, not part of this pairing):
+
+- The marker must be the **first bytes of the comment body** — no
+  heading, block quote, code fence, or preamble before it (a code-fenced
+  marker fails this on its own — the fence delimiters, not the marker,
+  are the first bytes), or the gate counts zero dispositions for that
+  comment.
+- Post **one disposition reply per review item** — never combine
+  several markers into one comment; the 1:1 pairing clears only one item
+  per comment, leaving the rest flagged `missing-disposition-evidence`.
+
+## E7 — Verify recorded dispositions
+
+When helper runtime is enabled, prefer the read-only verifier command:
+
+```sh
+idd-review-disposition-verify --items '<json>'
+```
+
+In the source repository, `node scripts/review-disposition-verify.mjs`
+is equivalent. E7 consumes helper fields `passed`, `items[].passed`,
+`items[].checks`, and `items[].issues`. This helper never posts replies
+or resolves threads: all E6 mutations remain manual and authoritative.
+Discard helper output and apply the written checks below directly if
+execution fails, output is invalid, or it conflicts with observed
+review state.
+
+Before leaving triage, verify every ReviewItems_snapshot item has the
+evidence required by its classification:
+
+- Every PATH A item has a recorded classification and an Accept or
+  Reject decision. Every Accepted item cites its "Verify before accept"
+  evidence, or the maintainer confirmation reply when actor-permission
+  capped.
+- Every Rejected PATH A item whose source is reviewer feedback has the
+  required rejection or `**Awaiting maintainer decision**` reply posted,
+  and any non-AMD thread resolution is complete.
+- Only Accepted PATH A items remain candidates for
+  `idd-review-fix.instructions.md`.
+
+If any check fails, do not continue. Return to E4-E6 as needed until the
+missing evidence is recorded.
+
+After E7 succeeds, update the PR live status digest only when it will
+not invalidate a merge-bound E1 snapshot — when triage posts a hold and
+stops, when Accepted PATH A items remain and the next route is E9, or
+when a fresh E1 snapshot follows before F2. Set `Phase` to `E triage`,
+summarize remaining Accepted PATH A work or `none` in `Open blockers`,
+`Next action` to E9 or F2 as appropriate, and cite the disposition
+replies plus the trusted review-watermark in `Authoritative by`. If
+ReviewItems_snapshot is empty and the next step is F2, defer the digest
+update unless you intentionally return to E1 afterward.
+
+## E8 — Accepted PATH A count check
+
+If the Accepted PATH A count is zero → proceed to the
+**E-phase branch-sync check** below.
+
+Otherwise continue to `idd-review-fix.instructions.md`.
+
+## E-phase branch-sync check
+
+After the review loop confirms no PATH A items remain (from E3 or E8),
+check the current branch state before routing to F-phase. This gate uses
+merge-from-`next` (never rebase) when synchronization is required,
+preserving review history on the already-published PR branch.
+
+When helper runtime is enabled, call:
+`idd-branch-conflict-state --pr {pr-number}`
+
+Otherwise read branch state directly:
+
+```sh
+gh pr view {pr-number} --json mergeable,mergeStateStatus
+```
+
+Route based on `branchState` from the helper (or `mergeable` /
+`mergeStateStatus` from `gh pr view`):
+
+- **`clean`** or **`behind-no-conflict`** when branch protection does not
+  require an up-to-date head: proceed directly to the F-phase check. If E6
+  posted any disposition reply this
+  pass, refresh the `review-watermark` for the same `{head-SHA}`
+  (recompute `{max-activity-updatedAt}` / `{total-item-count}` /
+  `{latest-ci-completed-at}`, following the E1 Step 2 rules) — otherwise
+  F2's review-currency check treats your own dispositions as new
+  activity and bounces back to E1 needlessly. Skip the refresh on the
+  sync path (E1 re-snapshots after merging `next`) or on a hold. `clean`
+  here means conflict-freeness only — see the `baseAdvancedSinceMergeBase`
+  note under F1 in `idd-pre-merge.instructions.md`. **Then** proceed to
+  `idd-pre-merge.instructions.md` (F1).
+- **`behind-no-conflict`** when branch protection or recorded repository
+  policy requires an up-to-date head, or undetermined (fail closed, per
+  F1): → **sync path** below.
+- **`content-conflict`** (`mergeable` is `CONFLICTING`): → **sync path**
+  below.
+- **`computing`** (`syncRecommendation` is `recheck`): `mergeable` is
+  `UNKNOWN` / null because GitHub computes mergeability asynchronously and
+  has not settled — a **transient** state. Do **not** hold. Re-poll after a
+  short wait, up to a small fixed attempt budget (distributed default: 3
+  attempts, a few seconds apart), then route by the first settled result.
+  Only a state that is **still** `computing` / `unknown` after the budget
+  falls through to the hold below.
+- **`dirty`** (`mergeStateStatus` is `DIRTY`) or **`unknown`**: hold; post
+  a PR comment documenting the state and stop. Do not proceed to F-phase
+  without confirmed branch-state evidence.
+
+**Sync path** (merge-from-`next`):
+
+1. **Active review gate**: unresolved review threads, unreplied
+   comments, or a reviewer's `CHANGES_REQUESTED` state require explicit
+   operator confirmation before this merge, since the merge commit will
+   appear in PR history.
+2. Merge `next` into the feature branch:
+   `git fetch origin next && git merge origin/next`. Use the
+   [signed-commit merge wrapper](../../docs/idd-helper-scripts.md#signed-commit-merge-wrapper-shared-git-procedure)
+   when primary signing is non-interactive-hostile.
+3. If conflicts arise, resolve them and complete the merge with that
+   same procedure — mirrors the D1 rebase note.
+4. Run **post-fix-validate**.
+5. Push the feature branch normally (no force push required for merge
+   commits).
+6. Return to `idd-review-snapshot.instructions.md` (E1).
+
+## Merge-next livelock under fast-moving `next`
+
+Under heavy concurrent-session load, `next` can advance faster than one
+sync cycle finishes, livelocking naive retries before ever reaching F3
+(background:
+[design rationale](../../docs/idd-design-rationale.md#merge-next-livelock-under-fast-moving-next)).
+
+**Rule**: post the watermark as the **last** action before F3's
+`idd-merge-execute.mjs --apply`, every pass — anything after (a CI
+rerun settling, a new disposition reply, another `next` advance)
+stales it, failing `--apply` closed on `review-currency` regardless
+of CI color; re-post before retrying. A stale `idd-advisory-convergence`
+rollup: see [rerun mechanics](idd-ci.instructions.md#rerun-mechanics).

@@ -445,6 +445,7 @@ function restoreRecoveryEntry(entry, successMessage = "recoveryRestored") {
       recoveryEntryFromSave(currentSave, "pre-restore"),
     );
     applySaveData(entry.save.state, entry.save.version);
+    runtime.maybeForceEternity?.({ save: false, update: false });
     if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict: true })) throw new Error("restore save failed");
     finishSaveConflict();
     finishLoadRecovery();
@@ -594,6 +595,9 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   );
   runtime.state.coreBoostCount = Math.floor(runtime.sanitizeNumber(data.coreBoostCount, 0));
   runtime.state.infinityCount = Math.floor(runtime.sanitizeNumber(data.infinityCount, 0));
+  runtime.state.eternityCount = Math.max(0, Math.floor(runtime.sanitizeNumber(data.eternityCount, 0)));
+  runtime.state.eternityMilestoneMask = runtime.normalizeEternityMilestoneMask?.(data.eternityMilestoneMask) ?? 0;
+  runtime.state.eternityMilestoneChoice = runtime.normalizeEternityMilestoneChoice?.(data.eternityMilestoneChoice) || "";
   const infinityPoints = runtime.hydrateLogResource(data.infinityPoints, data.infinityPointsLog10, -Infinity, true);
   runtime.state.infinityPoints = infinityPoints.value;
   runtime.state.infinityPointsLog10 = infinityPoints.log;
@@ -665,6 +669,12 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.completedTowerChallenges = Math.floor(runtime.sanitizeNumber(data.completedTowerChallenges, 0))
     & ((1 << runtime.TOWER_CHALLENGE_COUNT) - 1);
   runtime.state.activeTowerChallengeTime = Math.max(0, runtime.sanitizeNumber(data.activeTowerChallengeTime, 0));
+  runtime.state.tc4BaseGainLevel = Math.floor(runtime.sanitizeNumber(data.tc4BaseGainLevel, 0));
+  runtime.state.tc4BaseGainPriceStep = Math.floor(runtime.sanitizeNumber(data.tc4BaseGainPriceStep, 0));
+  runtime.state.tc4InfinityScoreVertexGainLevel = Math.floor(runtime.sanitizeNumber(data.tc4InfinityScoreVertexGainLevel, 0));
+  runtime.state.tc4InfinityScoreVertexGainPriceStep = Math.floor(runtime.sanitizeNumber(data.tc4InfinityScoreVertexGainPriceStep, 0));
+  runtime.state.tc4FreeCoreBoostLevel = Math.floor(runtime.sanitizeNumber(data.tc4FreeCoreBoostLevel, 0));
+  runtime.state.tc4FreeCoreBoostPriceStep = Math.floor(runtime.sanitizeNumber(data.tc4FreeCoreBoostPriceStep, 0));
   runtime.state.fastestInfinityChallengeTimes = sanitizeChallengeTimes(
     data.fastestInfinityChallengeTimes,
     runtime.INFINITY_CHALLENGE_COUNT,
@@ -690,6 +700,7 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.state.activeTowerChallenge = 0;
     runtime.state.activeTowerChallengeTime = 0;
   }
+  runtime.normalizeTowerChallenge4State?.();
   runtime.state.infiniteCapBroken = Boolean(data.infiniteCapBroken);
   const loadedAchievementMask = Math.floor(runtime.sanitizeNumber(data.achievementMask, 0));
   if (saveVersion < 4) {
@@ -860,6 +871,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
 
 function serializeSaveData() {
   runtime.normalizeInfinityPointState();
+  runtime.normalizeTowerChallenge4State?.();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
   runtime.state.achievementMaskHigh = ((Number(runtime.state.achievementMaskHigh) || 0) >>> 0);
   const data = {};
@@ -1025,6 +1037,7 @@ async function loadGame(options = {}) {
     }
 
     lastKnownSaveFingerprint = loadedSaveFingerprint;
+    const eternityResetOnLoad = runtime.maybeForceEternity?.({ save: false, update: false }) || false;
     const savedAt = runtime.sanitizeNumber(parsed.savedAt, 0);
     const serverSavedAt = runtime.sanitizeNumber(parsed.serverSavedAt, 0);
     const previousLoadFailure = readLoadFailure();
@@ -1078,6 +1091,12 @@ async function loadGame(options = {}) {
           if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict })) {
             throw new Error("offline progress save failed");
           }
+        }
+      }
+      if (eternityResetOnLoad && !offlineProcessed) {
+        loadTransactionActive = false;
+        if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true, allowDuringSaveConflict })) {
+          throw new Error("Eternity reset save failed");
         }
       }
     } catch (error) {
@@ -1204,6 +1223,9 @@ function resetSave() {
     generationCostFactor: 1,
     coreBoostCount: 0,
     infinityCount: 0,
+    eternityCount: 0,
+    eternityMilestoneMask: 0,
+    eternityMilestoneChoice: "",
     infinityPoints: 0,
     infinityPointsLog10: -Infinity,
     infinityPointsExact: "0",
@@ -1229,6 +1251,12 @@ function resetSave() {
     activeTowerChallenge: 0,
     completedTowerChallenges: 0,
     activeTowerChallengeTime: 0,
+    tc4BaseGainLevel: 0,
+    tc4BaseGainPriceStep: 0,
+    tc4InfinityScoreVertexGainLevel: 0,
+    tc4InfinityScoreVertexGainPriceStep: 0,
+    tc4FreeCoreBoostLevel: 0,
+    tc4FreeCoreBoostPriceStep: 0,
     fastestInfinityChallengeTimes: Array(8).fill(0),
     fastestTowerChallengeTimes: Array(4).fill(0),
     infiniteCapBroken: false,

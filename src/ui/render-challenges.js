@@ -87,8 +87,44 @@ function createTowerChallengeRows() {
 
     info.append(name, status, target, restriction, reward);
     row.append(info, button);
+    if (index === 4) {
+      const upgradeList = document.createElement("div");
+      upgradeList.className = "tc4-upgrade-list";
+      [
+        ["baseGain", "towerChallenge4UpgradeBaseGain", "towerChallenge4UpgradeBaseGainEffect"],
+        ["infinityScoreVertexGain", "towerChallenge4UpgradeInfinityScoreVertexGain", "towerChallenge4UpgradeInfinityScoreVertexGainEffect"],
+        ["freeCoreBoost", "towerChallenge4UpgradeFreeCoreBoost", "towerChallenge4UpgradeFreeCoreBoostEffect"],
+      ].forEach(([kind, labelKey, effectKey]) => {
+        const card = document.createElement("div");
+        card.className = "tc4-upgrade-card";
+        card.dataset.tc4Upgrade = kind;
+        const label = document.createElement("strong");
+        label.className = "tc4-upgrade-label";
+        const effect = document.createElement("small");
+        effect.className = "tc4-upgrade-effect";
+        const buy = document.createElement("button");
+        buy.className = "tc4-upgrade-button";
+        buy.type = "button";
+        buy.addEventListener("click", () => runtime.buyTowerChallenge4Upgrade(kind));
+        card.append(label, effect, buy);
+        card.dataset.labelKey = labelKey;
+        card.dataset.effectKey = effectKey;
+        upgradeList.append(card);
+      });
+      row.append(upgradeList);
+    }
     runtime.elements.towerChallengeList.append(row);
   }
+}
+
+function towerChallenge4UpgradeEffectText(kind, effectKey, level) {
+  if (kind === "baseGain") {
+    return `${runtime.t(effectKey)}: +${runtime.tc4BaseGainPartsBonus().toFixed(2)} parts`;
+  }
+  if (kind === "infinityScoreVertexGain") {
+    return `${runtime.t(effectKey)}: +${(runtime.TC4_INFINITY_SCORE_VERTEX_GAIN_COEFFICIENT * level).toFixed(2)} × Infinity Score log10`;
+  }
+  return `${runtime.t(effectKey)}: +${runtime.effectiveCoreBoostCount() - runtime.state.coreBoostCount} effective CB`;
 }
 
 function updateTowerChallengeRows() {
@@ -99,6 +135,11 @@ function updateTowerChallengeRows() {
     runtime.state.infinityCount,
     runtime.state.language,
     runtime.state.numberFormat,
+    runtime.currentScoreLog10(),
+    ...Object.keys(runtime.TC4_UPGRADE_DEFINITIONS).map((kind) => [
+      runtime.towerChallenge4UpgradeLevel(kind),
+      runtime.towerChallenge4UpgradePriceStep(kind),
+    ]).flat(),
   ].join("|");
   if (signature === lastTowerChallengeSignature) return;
   lastTowerChallengeSignature = signature;
@@ -134,6 +175,21 @@ function updateTowerChallengeRows() {
         ? runtime.t("towerChallengeReplay")
         : runtime.t("towerChallengeStart");
     button.disabled = !implemented || !unlocked || (runtime.state.activeTowerChallenge > 0 && !active);
+
+    if (index === 4) {
+      row.querySelectorAll(".tc4-upgrade-card").forEach((card) => {
+        const kind = card.dataset.tc4Upgrade;
+        const level = runtime.towerChallenge4UpgradeLevel(kind);
+        const effectKey = card.dataset.effectKey;
+        card.querySelector(".tc4-upgrade-label").textContent = runtime.t(card.dataset.labelKey);
+        card.querySelector(".tc4-upgrade-effect").textContent = `${towerChallenge4UpgradeEffectText(kind, effectKey, level)} · ${runtime.t("level")} ${level} · ${runtime.t("towerChallenge4UpgradePrice")}: ${runtime.formatPowerOfTen(runtime.towerChallenge4UpgradePriceLog10(kind))}`;
+        const buy = card.querySelector(".tc4-upgrade-button");
+        buy.textContent = runtime.canBuyTowerChallenge4Upgrade(kind)
+          ? runtime.t("towerChallenge4UpgradeBuy")
+          : runtime.t("towerChallenge4UpgradeUnavailable");
+        buy.disabled = !active || !runtime.canBuyTowerChallenge4Upgrade(kind);
+      });
+    }
   });
 }
 

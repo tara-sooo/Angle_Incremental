@@ -226,6 +226,30 @@ const ACHIEVEMENTS = [
     reward: { ja: "", en: "" },
     isUnlocked: () => runtime.towerChallengeCompleted(2),
   },
+  {
+    title: { ja: "無限万長者", en: "Infinity Millionaire" },
+    condition: { ja: "Infinity数が1.5e6を超える", en: "Have more than 1.5e6 Infinity." },
+    reward: { ja: "Infinity数獲得量を×2", en: "Infinity count gain x2." },
+    isUnlocked: () => runtime.state.infinityCount > 1.5e6,
+  },
+  {
+    title: { ja: "とうに越した先に", en: "Far Beyond" },
+    condition: { ja: "TC3をクリア", en: "Complete TC3." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.towerChallengeCompleted(3),
+  },
+  {
+    title: { ja: "挑戦権、そして時空の片道切符", en: "The Right to Challenge, and a One-Way Ticket Through Spacetime" },
+    condition: { ja: "TC4をクリア", en: "Complete TC4." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.towerChallengeCompleted(4),
+  },
+  {
+    title: { ja: "Time is generative", en: "Time is generative" },
+    condition: { ja: "初回Eternityを実行", en: "Perform Eternity for the first time." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.state.eternityCount > 0,
+  },
 ];
 
 let cachedAchievementSignature = null;

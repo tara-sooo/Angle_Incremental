@@ -1,0 +1,101 @@
+{
+  "_artifactPolicy": "Compact tracked research summary for release history. Full route/search output is reproducible from the corresponding simulator script and Markdown report.",
+  "issue": 119,
+  "title": "Probe TC4 balance sensitivity beyond the resolved 3x3 region",
+  "researchOnly": true,
+  "sourceIssues": [
+    95,
+    98,
+    117
+  ],
+  "relationshipToIssue98": "Issue #98 remains status:needs-decision; this report selects no production constants or semantics.",
+  "targetLog10": 7777,
+  "evaluatedResetPolicies": [
+    "fixed-60",
+    "gain-aware-2x",
+    "threshold-aware"
+  ],
+  "probeDesign": [
+    {
+      "id": "A0.25-B0.35-C1",
+      "a": 0.25,
+      "b": 0.35,
+      "c": 1,
+      "axis": "baseline",
+      "reason": "strongest #117 candidate"
+    },
+    {
+      "id": "A0.30-B0.35-C1",
+      "a": 0.3,
+      "b": 0.35,
+      "c": 1,
+      "axis": "A-only",
+      "reason": "small A increase"
+    },
+    {
+      "id": "A0.40-B0.35-C1",
+      "a": 0.4,
+      "b": 0.35,
+      "c": 1,
+      "axis": "A-only",
+      "reason": "larger A increase"
+    },
+    {
+      "id": "A0.25-B0.80-C1",
+      "a": 0.25,
+      "b": 0.8,
+      "c": 1,
+      "axis": "B-only",
+      "reason": "small B increase beyond the resolved region"
+    },
+    {
+      "id": "A0.25-B1.00-C1",
+      "a": 0.25,
+      "b": 1,
+      "c": 1,
+      "axis": "B-only",
+      "reason": "larger B increase beyond the resolved region"
+    },
+    {
+      "id": "A0.30-B0.80-C1",
+      "a": 0.3,
+      "b": 0.8,
+      "c": 1,
+      "axis": "A+B",
+      "reason": "moderate combined increase"
+    },
+    {
+      "id": "A0.40-B1.00-C1",
+      "a": 0.4,
+      "b": 1,
+      "c": 1,
+      "axis": "A+B",
+      "reason": "larger combined increase"
+    },
+    {
+      "id": "A0.25-B0.35-C2",
+      "a": 0.25,
+      "b": 0.35,
+      "c": 2,
+      "axis": "C-strength",
+      "reason": "research-only free-CB strength probe"
+    }
+  ],
+  "recommendation": {
+    "status": "bounded-recommendation",
+    "direction": "increase A",
+    "evidenceAxis": "A-only",
+    "basisCandidate": "A0.40-B0.35-C1",
+    "highestMilestone": 1700,
+    "peakScoreLog10": 1916.5081076008387,
+    "gapToE2500": 583.4918923991613,
+    "nextRegion": "one bounded neighboring region only; maintainer decision required before another sweep"
+  },
+  "uncertainty": [
+    "Stage 1 truncation is retained explicitly and is not treated as a failed balance verdict.",
+    "The probes identify measured sensitivity only; they do not establish monotonicity or production C semantics."
+  ],
+  "noProductionChanges": true,
+  "anyReachedE2500": false,
+  "anyReachedE7777": false
+}

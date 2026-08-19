@@ -1,0 +1,88 @@
+{
+  "_artifactPolicy": "Compact tracked research summary for release history. Full route/search output is reproducible from the corresponding simulator script and Markdown report.",
+  "issue": 114,
+  "title": "Re-evaluate TC4 balance sweep with improved reset strategies",
+  "researchOnly": true,
+  "sourceIssue": 106,
+  "strategySourceIssue": 112,
+  "targetLog10": 7777,
+  "evaluatedResetPolicies": [
+    "fixed-60",
+    "gain-aware-2x",
+    "threshold-aware"
+  ],
+  "candidateGrid": [
+    {
+      "id": "A0.15-B0.35-C1",
+      "a": 0.15,
+      "b": 0.35,
+      "c": 1
+    },
+    {
+      "id": "A0.15-B0.50-C1",
+      "a": 0.15,
+      "b": 0.5,
+      "c": 1
+    },
+    {
+      "id": "A0.15-B0.65-C1",
+      "a": 0.15,
+      "b": 0.65,
+      "c": 1
+    },
+    {
+      "id": "A0.20-B0.35-C1",
+      "a": 0.2,
+      "b": 0.35,
+      "c": 1
+    },
+    {
+      "id": "A0.20-B0.50-C1",
+      "a": 0.2,
+      "b": 0.5,
+      "c": 1
+    },
+    {
+      "id": "A0.20-B0.65-C1",
+      "a": 0.2,
+      "b": 0.65,
+      "c": 1
+    },
+    {
+      "id": "A0.25-B0.35-C1",
+      "a": 0.25,
+      "b": 0.35,
+      "c": 1
+    },
+    {
+      "id": "A0.25-B0.50-C1",
+      "a": 0.25,
+      "b": 0.5,
+      "c": 1
+    },
+    {
+      "id": "A0.25-B0.65-C1",
+      "a": 0.25,
+      "b": 0.65,
+      "c": 1
+    }
+  ],
+  "candidateAComparability": {
+    "sourceIssue": 112,
+    "referenceReport": "reports/tc4-balance-candidate-a.json",
+    "toleranceLog10": 0.001,
+    "optionsMatch": true,
+    "withinTolerance": true
+  },
+  "candidateClassifications": {
+    "A0.15-B0.35-C1": "inconclusive",
+    "A0.15-B0.50-C1": "inconclusive",
+    "A0.15-B0.65-C1": "inconclusive",
+    "A0.20-B0.35-C1": "inconclusive",
+    "A0.20-B0.50-C1": "failed",
+    "A0.20-B0.65-C1": "inconclusive",
+    "A0.25-B0.35-C1": "inconclusive",
+    "A0.25-B0.50-C1": "inconclusive",
+    "A0.25-B0.65-C1": "inconclusive"
+  }
+}

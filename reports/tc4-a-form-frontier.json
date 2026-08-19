@@ -1,0 +1,3385 @@
+{
+  "_artifactPolicy": "Compact replay fixture retained because Issue #139 reconstructs the log-A continuation from this frontier. Non-replay route/search detail remains summarized in reports/tc4-a-form-frontier.md.",
+  "issue": 136,
+  "title": "Verify the TC4 log-A route frontier and distinguish magnitude from functional-form improvement",
+  "researchOnly": true,
+  "noProductionChanges": true,
+  "sourceIssue": 134,
+  "sourceCommit": "9a38e3a0a9db7c5de9944b1630f9098f1dea7847",
+  "targetLog10": 7777,
+  "options": {
+    "maxSeconds": 86400,
+    "stepSeconds": 10,
+    "stallSeconds": 14400,
+    "maxRoutes": 10,
+    "seedMaxStates": 20,
+    "continuationMaxStates": 80,
+    "policyIds": [
+      "fixed-60",
+      "gain-aware-2x",
+      "threshold-aware"
+    ]
+  },
+  "candidateDefinitions": [
+    {
+      "id": "flat-A1.00-B0.35-C1",
+      "sourceCandidateId": "flat-A1.00-B0.35-C1",
+      "aForm": "flat-additive",
+      "formula": "E = parts + A * level",
+      "parameters": {
+        "A": 1,
+        "B": 0.35,
+        "C": 1
+      },
+      "axis": "flat-control"
+    },
+    {
+      "id": "log-A1.00-B0.35-C1",
+      "sourceCandidateId": "log-A1.00-B0.35-C1",
+      "aForm": "logarithmic-accumulation",
+      "formula": "E = parts + A * level * (1 + log2(level + 1))",
+      "parameters": {
+        "A": 1,
+        "logBase": 2,
+        "B": 0.35,
+        "C": 1
+      },
+      "axis": "logarithmic-accumulation"
+    },
+    {
+      "id": "flat-A2.00",
+      "sourceCandidateId": "flat-A2.00-diagnostic",
+      "aForm": "flat-additive",
+      "formula": "E = parts + 2.00 * level",
+      "parameters": {
+        "A": 2,
+        "B": 0.35,
+        "C": 1
+      },
+      "axis": "magnitude-only-diagnostic"
+    }
+  ],
+  "candidates": [
+    {
+      "candidateId": "flat-A1.00-B0.35-C1"
+    },
+    {
+      "candidateId": "log-A1.00-B0.35-C1",
+      "frontierSearch": [
+        {
+          "policy": "fixed-60",
+          "allLegal": {
+            "continuation": {
+              "frontierCount": 6,
+              "frontier": [
+                {
+                  "elapsedSeconds": 130,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5913.05895275914,
+                  "peakScoreAtSeconds": 130,
+                  "lastProgressAtSeconds": 130
+                },
+                {
+                  "elapsedSeconds": 90,
+                  "purchaseSequence": [
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5800.25220931191,
+                  "peakScoreAtSeconds": 90,
+                  "lastProgressAtSeconds": 90
+                },
+                {
+                  "elapsedSeconds": 90,
+                  "purchaseSequence": [
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5800.25220931191,
+                  "peakScoreAtSeconds": 90,
+                  "lastProgressAtSeconds": 90
+                },
+                {
+                  "elapsedSeconds": 90,
+                  "purchaseSequence": [
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5800.25220931191,
+                  "peakScoreAtSeconds": 90,
+                  "lastProgressAtSeconds": 90
+                },
+                {
+                  "elapsedSeconds": 140,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 6500
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 9,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 9,
+                    "infinityScoreVertexGain": 6,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6836.60973080155,
+                  "peakScoreAtSeconds": 140,
+                  "lastProgressAtSeconds": 140
+                },
+                {
+                  "elapsedSeconds": 140,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 6500
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 9,
+                    "infinityScoreVertexGain": 6,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6836.60973080155,
+                  "peakScoreAtSeconds": 140,
+                  "lastProgressAtSeconds": 140
+                }
+              ]
+            }
+          }
+        },
+        {
+          "policy": "gain-aware-2x",
+          "allLegal": {
+            "continuation": {
+              "frontierCount": 42,
+              "frontier": [
+                {
+                  "elapsedSeconds": 130,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5913.05895275914,
+                  "peakScoreAtSeconds": 130,
+                  "lastProgressAtSeconds": 130
+                },
+                {
+                  "elapsedSeconds": 130,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5913.05895275914,
+                  "peakScoreAtSeconds": 130,
+                  "lastProgressAtSeconds": 130
+                },
+                {
+                  "elapsedSeconds": 240,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6112.836753111517,
+                  "peakScoreAtSeconds": 240,
+                  "lastProgressAtSeconds": 240
+                },
+                {
+                  "elapsedSeconds": 240,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 6112.836753111517,
+                  "peakScoreAtSeconds": 240,
+                  "lastProgressAtSeconds": 240
+                },
+                {
+                  "elapsedSeconds": 240,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6112.836753111517,
+                  "peakScoreAtSeconds": 240,
+                  "lastProgressAtSeconds": 240
+                },
+                {
+                  "elapsedSeconds": 200,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5881.559964169604,
+                  "peakScoreAtSeconds": 200,
+                  "lastProgressAtSeconds": 200
+                },
+                {
+                  "elapsedSeconds": 200,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5881.559964169604,
+                  "peakScoreAtSeconds": 200,
+                  "lastProgressAtSeconds": 200
+                },
+                {
+                  "elapsedSeconds": 200,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5881.559964169604,
+                  "peakScoreAtSeconds": 200,
+                  "lastProgressAtSeconds": 200
+                },
+                {
+                  "elapsedSeconds": 400,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6055.3418352725375,
+                  "peakScoreAtSeconds": 400,
+                  "lastProgressAtSeconds": 400
+                },
+                {
+                  "elapsedSeconds": 400,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 6055.3418352725375,
+                  "peakScoreAtSeconds": 400,
+                  "lastProgressAtSeconds": 400
+                },
+                {
+                  "elapsedSeconds": 400,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6055.3418352725375,
+                  "peakScoreAtSeconds": 400,
+                  "lastProgressAtSeconds": 400
+                },
+                {
+                  "elapsedSeconds": 53790,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.56028327362,
+                  "peakScoreAtSeconds": 53790,
+                  "lastProgressAtSeconds": 53790
+                },
+                {
+                  "elapsedSeconds": 53790,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5963.56028327362,
+                  "peakScoreAtSeconds": 53790,
+                  "lastProgressAtSeconds": 53790
+                },
+                {
+                  "elapsedSeconds": 53790,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.56028327362,
+                  "peakScoreAtSeconds": 53790,
+                  "lastProgressAtSeconds": 53790
+                },
+                {
+                  "elapsedSeconds": 19010,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.527767911775,
+                  "peakScoreAtSeconds": 19010,
+                  "lastProgressAtSeconds": 19010
+                },
+                {
+                  "elapsedSeconds": 19010,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5963.527767911775,
+                  "peakScoreAtSeconds": 19010,
+                  "lastProgressAtSeconds": 19010
+                },
+                {
+                  "elapsedSeconds": 19010,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 3
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.527767911775,
+                  "peakScoreAtSeconds": 19010,
+                  "lastProgressAtSeconds": 19010
+                },
+                {
+                  "elapsedSeconds": 1010,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6043.337957991834,
+                  "peakScoreAtSeconds": 1010,
+                  "lastProgressAtSeconds": 1010
+                },
+                {
+                  "elapsedSeconds": 1010,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 6043.337957991834,
+                  "peakScoreAtSeconds": 1010,
+                  "lastProgressAtSeconds": 1010
+                },
+                {
+                  "elapsedSeconds": 1010,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6043.337957991834,
+                  "peakScoreAtSeconds": 1010,
+                  "lastProgressAtSeconds": 1010
+                },
+                {
+                  "elapsedSeconds": 54400,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.56028327362,
+                  "peakScoreAtSeconds": 54400,
+                  "lastProgressAtSeconds": 54400
+                },
+                {
+                  "elapsedSeconds": 54400,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5963.56028327362,
+                  "peakScoreAtSeconds": 54400,
+                  "lastProgressAtSeconds": 54400
+                },
+                {
+                  "elapsedSeconds": 54400,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.56028327362,
+                  "peakScoreAtSeconds": 54400,
+                  "lastProgressAtSeconds": 54400
+                },
+                {
+                  "elapsedSeconds": 690,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6055.3418352725375,
+                  "peakScoreAtSeconds": 690,
+                  "lastProgressAtSeconds": 690
+                },
+                {
+                  "elapsedSeconds": 690,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 6055.3418352725375,
+                  "peakScoreAtSeconds": 690,
+                  "lastProgressAtSeconds": 690
+                }
+              ]
+            }
+          }
+        },
+        {
+          "policy": "threshold-aware",
+          "allLegal": {
+            "continuation": {
+              "frontierCount": 42,
+              "frontier": [
+                {
+                  "elapsedSeconds": 100,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5809.833366176272,
+                  "peakScoreAtSeconds": 100,
+                  "lastProgressAtSeconds": 100
+                },
+                {
+                  "elapsedSeconds": 100,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5809.833366176272,
+                  "peakScoreAtSeconds": 100,
+                  "lastProgressAtSeconds": 100
+                },
+                {
+                  "elapsedSeconds": 220,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6133.004531665632,
+                  "peakScoreAtSeconds": 220,
+                  "lastProgressAtSeconds": 220
+                },
+                {
+                  "elapsedSeconds": 220,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 6133.004531665632,
+                  "peakScoreAtSeconds": 220,
+                  "lastProgressAtSeconds": 220
+                },
+                {
+                  "elapsedSeconds": 220,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6133.004531665632,
+                  "peakScoreAtSeconds": 220,
+                  "lastProgressAtSeconds": 220
+                },
+                {
+                  "elapsedSeconds": 170,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5893.925001636926,
+                  "peakScoreAtSeconds": 170,
+                  "lastProgressAtSeconds": 170
+                },
+                {
+                  "elapsedSeconds": 170,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5893.925001636926,
+                  "peakScoreAtSeconds": 170,
+                  "lastProgressAtSeconds": 170
+                },
+                {
+                  "elapsedSeconds": 170,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5893.925001636926,
+                  "peakScoreAtSeconds": 170,
+                  "lastProgressAtSeconds": 170
+                },
+                {
+                  "elapsedSeconds": 220,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6067.644665098925,
+                  "peakScoreAtSeconds": 220,
+                  "lastProgressAtSeconds": 220
+                },
+                {
+                  "elapsedSeconds": 220,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 6067.644665098925,
+                  "peakScoreAtSeconds": 220,
+                  "lastProgressAtSeconds": 220
+                },
+                {
+                  "elapsedSeconds": 220,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6067.644665098925,
+                  "peakScoreAtSeconds": 220,
+                  "lastProgressAtSeconds": 220
+                },
+                {
+                  "elapsedSeconds": 52110,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.113384701038,
+                  "peakScoreAtSeconds": 52110,
+                  "lastProgressAtSeconds": 52110
+                },
+                {
+                  "elapsedSeconds": 52110,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5963.113384701038,
+                  "peakScoreAtSeconds": 52110,
+                  "lastProgressAtSeconds": 52110
+                },
+                {
+                  "elapsedSeconds": 52110,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.113384701038,
+                  "peakScoreAtSeconds": 52110,
+                  "lastProgressAtSeconds": 52110
+                },
+                {
+                  "elapsedSeconds": 17990,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.067428849236,
+                  "peakScoreAtSeconds": 17990,
+                  "lastProgressAtSeconds": 17990
+                },
+                {
+                  "elapsedSeconds": 17990,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5963.067428849236,
+                  "peakScoreAtSeconds": 17990,
+                  "lastProgressAtSeconds": 17990
+                },
+                {
+                  "elapsedSeconds": 17990,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 3
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5963.067428849236,
+                  "peakScoreAtSeconds": 17990,
+                  "lastProgressAtSeconds": 17990
+                },
+                {
+                  "elapsedSeconds": 610,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6043.469187618549,
+                  "peakScoreAtSeconds": 610,
+                  "lastProgressAtSeconds": 610
+                },
+                {
+                  "elapsedSeconds": 610,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 0
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 6043.469187618549,
+                  "peakScoreAtSeconds": 610,
+                  "lastProgressAtSeconds": 610
+                },
+                {
+                  "elapsedSeconds": 610,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6043.469187618549,
+                  "peakScoreAtSeconds": 610,
+                  "lastProgressAtSeconds": 610
+                },
+                {
+                  "elapsedSeconds": 50530,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5962.412648572119,
+                  "peakScoreAtSeconds": 50530,
+                  "lastProgressAtSeconds": 50530
+                },
+                {
+                  "elapsedSeconds": 50530,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 5962.412648572119,
+                  "peakScoreAtSeconds": 50530,
+                  "lastProgressAtSeconds": 50530
+                },
+                {
+                  "elapsedSeconds": 50530,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 5,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 2
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 5962.412648572119,
+                  "peakScoreAtSeconds": 50530,
+                  "lastProgressAtSeconds": 50530
+                },
+                {
+                  "elapsedSeconds": 290,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 5700
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 2,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 8,
+                    "infinityScoreVertexGain": 4,
+                    "freeCoreBoost": 4
+                  },
+                  "peakScoreLog10": 6068.78924054848,
+                  "peakScoreAtSeconds": 290,
+                  "lastProgressAtSeconds": 290
+                },
+                {
+                  "elapsedSeconds": 290,
+                  "purchaseSequence": [
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 100
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 500
+                    },
+                    {
+                      "kind": "freeCoreBoost",
+                      "priceLog10": 900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 1700
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 2500
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 2900
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 3300
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4100
+                    },
+                    {
+                      "kind": "baseGain",
+                      "priceLog10": 4900
+                    },
+                    {
+                      "kind": "infinityScoreVertexGain",
+                      "priceLog10": 5300
+                    }
+                  ],
+                  "levels": {
+                    "baseGain": 6,
+                    "infinityScoreVertexGain": 3,
+                    "freeCoreBoost": 1
+                  },
+                  "priceSteps": {
+                    "baseGain": 7,
+                    "infinityScoreVertexGain": 5,
+                    "freeCoreBoost": 3
+                  },
+                  "peakScoreLog10": 6068.78924054848,
+                  "peakScoreAtSeconds": 290,
+                  "lastProgressAtSeconds": 290
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "candidateId": "flat-A2.00-diagnostic"
+    }
+  ]
+}

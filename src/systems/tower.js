@@ -28,6 +28,31 @@ const TOWER_CHALLENGE_3_SCORE_GAIN_POWER_TARGET = 0.8;
 const TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_START = 0.1;
 const TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_TARGET = 0.5;
 const TOWER_NORMAL_UPGRADE_MULTIPLIER_STEP = 1.05;
+const TC4_UPGRADE_DEFINITIONS = Object.freeze({
+  baseGain: Object.freeze({
+    baseLog10: 100,
+    stepLog10: 800,
+    levelField: "tc4BaseGainLevel",
+    priceStepField: "tc4BaseGainPriceStep",
+  }),
+  infinityScoreVertexGain: Object.freeze({
+    baseLog10: 500,
+    stepLog10: 1200,
+    levelField: "tc4InfinityScoreVertexGainLevel",
+    priceStepField: "tc4InfinityScoreVertexGainPriceStep",
+  }),
+  freeCoreBoost: Object.freeze({
+    baseLog10: 900,
+    stepLog10: 1600,
+    levelField: "tc4FreeCoreBoostLevel",
+    priceStepField: "tc4FreeCoreBoostPriceStep",
+  }),
+});
+const TC4_UPGRADE_KINDS = Object.freeze(Object.keys(TC4_UPGRADE_DEFINITIONS));
+const TC4_BASE_GAIN_COEFFICIENT = 0.85;
+const TC4_INFINITY_SCORE_VERTEX_GAIN_COEFFICIENT = 0.35;
+const TC4_FREE_CORE_BOOST_PER_LEVEL = 1;
+const TC4_COMPLETION_TARGET_LOG10 = 7777;
 
 const TOWER_CHALLENGES = Object.freeze([
   {
@@ -78,11 +103,17 @@ const TOWER_CHALLENGES = Object.freeze([
   {
     index: 4,
     unlockFloor: 12,
-    targetLog10: Infinity,
+    targetLog10: TC4_COMPLETION_TARGET_LOG10,
     name: { ja: "TC4", en: "TC4" },
-    restriction: { ja: "内容は今後のリリースで公開", en: "Details planned for a future release." },
-    reward: { ja: "報酬は今後のリリースで公開", en: "Reward planned for a future release." },
-    implemented: false,
+    restriction: {
+      ja: "通常強化とIA強化はレベル1を超えて購入できず、TC4専用強化で1e7777 Scoreを目指す",
+      en: "Normal and Infinite Angle upgrades stop at level 1; use the TC4 upgrades to reach 1e7777 Score.",
+    },
+    reward: {
+      ja: "クリアすると現在のEternity周回でTC4条件を満たす",
+      en: "Clearing TC4 satisfies the current Eternity run's TC4 requirement.",
+    },
+    implemented: true,
   },
 ]);
 
@@ -179,6 +210,141 @@ function towerChallengeImplemented(index) {
   return Boolean(towerChallengeDefinition(index)?.implemented);
 }
 
+function towerChallenge4AllowsNormalUpgrade(kind) {
+  if (runtime.state.activeTowerChallenge !== 4) return true;
+  if (kind === "speed") return runtime.state.speedLevel < 1;
+  if (kind === "gain") return runtime.state.gainLevel < 1;
+  if (kind === "vertex") {
+    const level = runtime.state.activeChallenge === 8
+      ? runtime.state.ic8VertexUpgradeLevel
+      : runtime.state.vertices - 3;
+    return Math.max(0, Math.floor(level)) < 1;
+  }
+  return false;
+}
+
+function towerChallenge4AllowsInfiniteAngleUpgrade(kind) {
+  if (runtime.state.activeTowerChallenge !== 4) return true;
+  if (kind === "speed") return runtime.state.infiniteAngleSpeedLevel < 1;
+  if (kind === "vertex") return runtime.state.infiniteAngleVertexLevel < 1;
+  if (kind === "gain") return runtime.state.infiniteAngleGainLevel < 1;
+  return false;
+}
+
+function tc4BaseGainPartsBonus() {
+  if (runtime.state.activeTowerChallenge !== 4) return 0;
+  const level = towerChallenge4UpgradeLevel("baseGain");
+  const bonus = TC4_BASE_GAIN_COEFFICIENT * level * (1 + Math.log2(level + 1));
+  return Number.isFinite(bonus) ? Math.max(0, bonus) : Number.MAX_VALUE;
+}
+
+function tc4EffectiveGainExpressionParts(parts) {
+  const rawParts = Number.isFinite(Number(parts)) ? Math.max(0, Number(parts)) : 0;
+  return Math.min(Number.MAX_VALUE, rawParts + tc4BaseGainPartsBonus());
+}
+
+function tc4InfinityScoreVertexGainBonusLog10(scoreLog10) {
+  if (runtime.state.activeTowerChallenge !== 4) return 0;
+  const normalizedScoreLog10 = Number(scoreLog10);
+  if (!Number.isFinite(normalizedScoreLog10) || normalizedScoreLog10 <= 0) return 0;
+  const level = towerChallenge4UpgradeLevel("infinityScoreVertexGain");
+  return runtime.clampLog10(normalizedScoreLog10 * TC4_INFINITY_SCORE_VERTEX_GAIN_COEFFICIENT * level);
+}
+
+function effectiveCoreBoostCount(realCount = runtime.state.coreBoostCount) {
+  const normalizedRealCount = Number.isFinite(Number(realCount))
+    ? Math.max(0, Math.floor(Number(realCount)))
+    : 0;
+  if (runtime.state.activeTowerChallenge !== 4) return normalizedRealCount;
+  return normalizedRealCount + TC4_FREE_CORE_BOOST_PER_LEVEL * towerChallenge4UpgradeLevel("freeCoreBoost");
+}
+
+function towerChallenge4CompletedForEternity() {
+  return towerChallengeCompleted(4);
+}
+
+function resetTowerChallenge4Upgrades() {
+  runtime.state.infiniteAngleSpeedLevel = 0;
+  runtime.state.infiniteAngleVertexLevel = 0;
+  runtime.state.infiniteAngleGainLevel = 0;
+}
+
+function resetTowerChallenge4ExclusiveUpgrades() {
+  TC4_UPGRADE_KINDS.forEach((kind) => {
+    const definition = TC4_UPGRADE_DEFINITIONS[kind];
+    runtime.state[definition.levelField] = 0;
+    runtime.state[definition.priceStepField] = 0;
+  });
+}
+
+function normalizedTc4Integer(value) {
+  const number = Math.floor(Number(value));
+  return Number.isFinite(number) ? Math.max(0, number) : 0;
+}
+
+function normalizeTowerChallenge4State() {
+  TC4_UPGRADE_KINDS.forEach((kind) => {
+    const definition = TC4_UPGRADE_DEFINITIONS[kind];
+    runtime.state[definition.levelField] = normalizedTc4Integer(runtime.sanitizeNumber(runtime.state[definition.levelField], 0));
+    runtime.state[definition.priceStepField] = normalizedTc4Integer(runtime.sanitizeNumber(runtime.state[definition.priceStepField], 0));
+  });
+  if (runtime.state.activeTowerChallenge !== 4 || !towerChallengeUnlocked(4)) {
+    resetTowerChallenge4ExclusiveUpgrades();
+  }
+}
+
+function towerChallenge4UpgradeDefinition(kind) {
+  return TC4_UPGRADE_DEFINITIONS[kind] || null;
+}
+
+function towerChallenge4UpgradeLevel(kind) {
+  const definition = towerChallenge4UpgradeDefinition(kind);
+  return definition ? normalizedTc4Integer(runtime.state[definition.levelField]) : 0;
+}
+
+function towerChallenge4UpgradePriceStep(kind) {
+  const definition = towerChallenge4UpgradeDefinition(kind);
+  return definition ? normalizedTc4Integer(runtime.state[definition.priceStepField]) : 0;
+}
+
+function towerChallenge4UpgradePriceLog10(kind) {
+  const definition = towerChallenge4UpgradeDefinition(kind);
+  if (!definition) return Infinity;
+  return definition.baseLog10 + definition.stepLog10 * towerChallenge4UpgradePriceStep(kind);
+}
+
+function canBuyTowerChallenge4Upgrade(kind) {
+  return runtime.state.activeTowerChallenge === 4
+    && towerChallengeUnlocked(4)
+    && Boolean(towerChallenge4UpgradeDefinition(kind))
+    && runtime.canSpendLog(towerChallenge4UpgradePriceLog10(kind));
+}
+
+function purchaseTowerChallenge4Upgrade(kind) {
+  if (!canBuyTowerChallenge4Upgrade(kind)) return false;
+  const selectedPrice = towerChallenge4UpgradePriceLog10(kind);
+  const prePurchasePrices = Object.fromEntries(
+    TC4_UPGRADE_KINDS.map((upgradeKind) => [upgradeKind, towerChallenge4UpgradePriceLog10(upgradeKind)]),
+  );
+  if (!runtime.spendLog(selectedPrice)) return false;
+  TC4_UPGRADE_KINDS.forEach((upgradeKind) => {
+    const definition = TC4_UPGRADE_DEFINITIONS[upgradeKind];
+    if (upgradeKind === kind || prePurchasePrices[upgradeKind] === selectedPrice) {
+      runtime.state[definition.priceStepField] += 1;
+    }
+    if (upgradeKind === kind) runtime.state[definition.levelField] += 1;
+  });
+  return true;
+}
+
+function buyTowerChallenge4Upgrade(kind, options = {}) {
+  if (typeof Event !== "undefined" && options instanceof Event) options = {};
+  if (!purchaseTowerChallenge4Upgrade(kind)) return false;
+  if (options.refresh !== false) runtime.updateUi();
+  if (options.save !== false) runtime.saveGame("manual");
+  return true;
+}
+
 function towerChallengeTargetLog10(index) {
   return towerChallengeDefinition(index)?.targetLog10 ?? Infinity;
 }
@@ -238,6 +404,7 @@ function toggleTowerChallenge(index) {
   if (runtime.state.activeTowerChallenge === normalizedIndex) {
     runtime.state.activeTowerChallenge = 0;
     runtime.state.activeTowerChallengeTime = 0;
+    if (normalizedIndex === 4) resetTowerChallenge4ExclusiveUpgrades();
     runtime.resetBelowInfinity();
     runtime.updateUi();
     runtime.saveGame("manual");
@@ -248,6 +415,10 @@ function toggleTowerChallenge(index) {
   runtime.state.activeTowerChallenge = normalizedIndex;
   runtime.state.activeTowerChallengeTime = 0;
   runtime.resetBelowInfinity();
+  if (normalizedIndex === 4) {
+    resetTowerChallenge4Upgrades();
+    resetTowerChallenge4ExclusiveUpgrades();
+  }
   runtime.updateUi();
   runtime.saveGame("manual");
   return true;
@@ -270,7 +441,11 @@ function completeTowerChallengeIfReady() {
     return true;
   }
   if (runtime.canInfinity()) {
+    const completedIndex = index;
     runtime.runInfinity(false);
+    if (completedIndex === 4 && runtime.state.activeTowerChallenge !== completedIndex) {
+      resetTowerChallenge4ExclusiveUpgrades();
+    }
     return runtime.state.activeTowerChallenge !== index;
   }
   return false;
@@ -315,6 +490,11 @@ expose("TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_START", () => TOWER_CHALLENGE_3_I
 expose("TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_TARGET", () => TOWER_CHALLENGE_3_INFINITY_SCORE_POWER_TARGET);
 expose("TOWER_NORMAL_UPGRADE_MULTIPLIER_STEP", () => TOWER_NORMAL_UPGRADE_MULTIPLIER_STEP);
 expose("TOWER_CHALLENGES", () => TOWER_CHALLENGES);
+expose("TC4_UPGRADE_DEFINITIONS", () => TC4_UPGRADE_DEFINITIONS);
+expose("TC4_BASE_GAIN_COEFFICIENT", () => TC4_BASE_GAIN_COEFFICIENT);
+expose("TC4_INFINITY_SCORE_VERTEX_GAIN_COEFFICIENT", () => TC4_INFINITY_SCORE_VERTEX_GAIN_COEFFICIENT);
+expose("TC4_FREE_CORE_BOOST_PER_LEVEL", () => TC4_FREE_CORE_BOOST_PER_LEVEL);
+expose("TC4_COMPLETION_TARGET_LOG10", () => TC4_COMPLETION_TARGET_LOG10);
 expose("towerFloor", () => towerFloor);
 expose("towerFloorCostLog10", () => towerFloorCostLog10);
 expose("towerNextFloor", () => towerNextFloor);
@@ -329,6 +509,22 @@ expose("towerChallengeUnlocked", () => towerChallengeUnlocked);
 expose("towerChallengeCompleted", () => towerChallengeCompleted);
 expose("towerChallengeDefinition", () => towerChallengeDefinition);
 expose("towerChallengeImplemented", () => towerChallengeImplemented);
+expose("towerChallenge4AllowsNormalUpgrade", () => towerChallenge4AllowsNormalUpgrade);
+expose("towerChallenge4AllowsInfiniteAngleUpgrade", () => towerChallenge4AllowsInfiniteAngleUpgrade);
+expose("tc4BaseGainPartsBonus", () => tc4BaseGainPartsBonus);
+expose("tc4EffectiveGainExpressionParts", () => tc4EffectiveGainExpressionParts);
+expose("tc4InfinityScoreVertexGainBonusLog10", () => tc4InfinityScoreVertexGainBonusLog10);
+expose("effectiveCoreBoostCount", () => effectiveCoreBoostCount);
+expose("towerChallenge4CompletedForEternity", () => towerChallenge4CompletedForEternity);
+expose("resetTowerChallenge4ExclusiveUpgrades", () => resetTowerChallenge4ExclusiveUpgrades);
+expose("normalizeTowerChallenge4State", () => normalizeTowerChallenge4State);
+expose("towerChallenge4UpgradeDefinition", () => towerChallenge4UpgradeDefinition);
+expose("towerChallenge4UpgradeLevel", () => towerChallenge4UpgradeLevel);
+expose("towerChallenge4UpgradePriceStep", () => towerChallenge4UpgradePriceStep);
+expose("towerChallenge4UpgradePriceLog10", () => towerChallenge4UpgradePriceLog10);
+expose("canBuyTowerChallenge4Upgrade", () => canBuyTowerChallenge4Upgrade);
+expose("purchaseTowerChallenge4Upgrade", () => purchaseTowerChallenge4Upgrade);
+expose("buyTowerChallenge4Upgrade", () => buyTowerChallenge4Upgrade);
 expose("towerChallengeTargetLog10", () => towerChallengeTargetLog10);
 expose("towerChallengeText", () => towerChallengeText);
 expose("towerChallengeName", () => towerChallengeName);

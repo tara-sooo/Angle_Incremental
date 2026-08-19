@@ -1,0 +1,98 @@
+{
+  "_artifactPolicy": "Compact tracked research summary for release history. Full route/search output is reproducible from the corresponding simulator script and Markdown report.",
+  "issue": 139,
+  "title": "Extend the retained TC4 log-A frontier through e7777 reachability",
+  "researchOnly": true,
+  "fixedParameters": {
+    "A": 1,
+    "B": 0.35,
+    "C": 1
+  },
+  "mode": "reconstructed-frontier",
+  "sourceReport": {
+    "path": "reports/tc4-a-form-frontier.json",
+    "sha256": "a4760fc46568bcea59b92d952bf74759f40a5ad3775ee8e7ff0430a6d727ba93",
+    "sourceCommit": "9a38e3a0a9db7c5de9944b1630f9098f1dea7847"
+  },
+  "candidate": {
+    "id": "log-A1.00-B0.35-C1",
+    "sourceCandidateId": "log-A1.00-B0.35-C1",
+    "aForm": "logarithmic-accumulation",
+    "formula": "E = parts + A * level * (1 + log2(level + 1))",
+    "parameters": {
+      "A": 1,
+      "logBase": 2,
+      "B": 0.35,
+      "C": 1
+    },
+    "axis": "logarithmic-accumulation"
+  },
+  "stagePlan": {
+    "fixed-60": [
+      {
+        "id": "route-cap-30",
+        "maxStates": 160,
+        "maxRoutes": 30,
+        "expectedReason": "route-cap"
+      },
+      {
+        "id": "route-cap-60",
+        "maxStates": 320,
+        "maxRoutes": 60,
+        "expectedReason": "route-cap"
+      }
+    ],
+    "gain-aware-2x": [
+      {
+        "id": "state-cap-160",
+        "maxStates": 160,
+        "maxRoutes": 10,
+        "expectedReason": "route-cap"
+      },
+      {
+        "id": "route-cap-30",
+        "maxStates": 160,
+        "maxRoutes": 30,
+        "expectedReason": "route-cap"
+      }
+    ],
+    "threshold-aware": [
+      {
+        "id": "state-cap-160",
+        "maxStates": 160,
+        "maxRoutes": 10,
+        "expectedReason": "route-cap"
+      },
+      {
+        "id": "route-cap-30",
+        "maxStates": 160,
+        "maxRoutes": 30,
+        "expectedReason": "route-cap"
+      }
+    ]
+  },
+  "progressionAssessment": {
+    "e7777Reached": true,
+    "searchCapacityStillOpen": true,
+    "interpretation": "e7777 is reached by reconstructed legal routes, but adaptive cases terminate at route-cap; this does not establish a complete retained-frontier conclusion."
+  },
+  "outcome": {
+    "status": "still search-inconclusive",
+    "reason": "the reconstructed retained frontier still reached an explicit bounded search limiter",
+    "basis": "historical full pending/seen/routes checkpoint was unavailable; continuation evidence is bounded from the validated reconstruction boundary"
+  },
+  "noProductionChanges": true,
+  "options": {
+    "maxSeconds": 86400,
+    "stepSeconds": 10,
+    "stallSeconds": 14400,
+    "maxRoutes": 10,
+    "seedMaxStates": 20,
+    "continuationMaxStates": 80,
+    "policyIds": [
+      "fixed-60",
+      "gain-aware-2x",
+      "threshold-aware"
+    ]
+  }
+}

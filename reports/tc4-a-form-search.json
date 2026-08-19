@@ -1,0 +1,86 @@
+{
+  "_artifactPolicy": "Compact tracked research summary for release history. Full route/search output is reproducible from the corresponding simulator script and Markdown report.",
+  "issue": 134,
+  "title": "Study a TC4 A-effect functional form that can break the e1700 progression wall",
+  "researchOnly": true,
+  "relationshipToIssue125": "Issue #125 remains status:needs-decision; this report is research input only.",
+  "targetLog10": 7777,
+  "evaluatedResetPolicies": [
+    "fixed-60",
+    "gain-aware-2x",
+    "threshold-aware"
+  ],
+  "candidateDesign": [
+    {
+      "id": "flat-A1.00-B0.35-C1",
+      "aForm": "flat-additive",
+      "formula": "E = parts + A * level",
+      "parameters": {
+        "A": 1,
+        "B": 0.35,
+        "C": 1
+      },
+      "axis": "flat-control"
+    },
+    {
+      "id": "power-A1.00-B0.35-C1",
+      "aForm": "power-accumulation",
+      "formula": "E = parts + A * level^1.25",
+      "parameters": {
+        "A": 1,
+        "power": 1.25,
+        "B": 0.35,
+        "C": 1
+      },
+      "axis": "power-accumulation"
+    },
+    {
+      "id": "log-A1.00-B0.35-C1",
+      "aForm": "logarithmic-accumulation",
+      "formula": "E = parts + A * level * (1 + log2(level + 1))",
+      "parameters": {
+        "A": 1,
+        "logBase": 2,
+        "B": 0.35,
+        "C": 1
+      },
+      "axis": "logarithmic-accumulation"
+    },
+    {
+      "id": "multiplicative-A1.00-B0.35-C1",
+      "aForm": "multiplicative",
+      "formula": "E = parts * (1 + A * level)",
+      "parameters": {
+        "A": 1,
+        "B": 0.35,
+        "C": 1
+      },
+      "axis": "multiplicative"
+    }
+  ],
+  "diagnosticControl": {
+    "id": "flat-A2.00-diagnostic",
+    "formula": "E = parts + A * level (single A=2.00 magnitude diagnostic)",
+    "parameters": {
+      "A": 2,
+      "B": 0.35,
+      "C": 1,
+      "diagnosticOnly": true
+    }
+  },
+  "recommendation": {
+    "status": "search-inconclusive",
+    "basisCandidate": "log-A1.00-B0.35-C1",
+    "reason": "at least one promoted search remains truncated",
+    "nextStep": "review truncation before selecting another bounded verification"
+  },
+  "uncertainty": [
+    "The forms are a bounded hypothesis set, not an exhaustive search of exponent functions or parameters.",
+    "Search truncation, route limits, fixed-step simulation, and reset-policy heuristics remain explicit uncertainty.",
+    "A successful research form still requires a separate maintainer production decision in #125."
+  ],
+  "noProductionChanges": true,
+  "sourceCommit": "3b3fe21586987e34ef093c3452d9bb7335a6997e",
+  "anyReachedE2500": true,
+  "anyReachedE7777": false
+}

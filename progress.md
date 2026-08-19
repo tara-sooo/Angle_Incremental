@@ -135,3 +135,4 @@ Original prompt: では、中核ループを完成させてください
 - Future balance pass: tune Core Boost gain multiplier/exponent formulas only if Generation-only tuning is still too fast.
 - Future balance pass: playtest the tuned Infinity Point gain, softcap strength, IC penalties/rewards, and Infinite Angle upgrade curve.
 - Future design pass: replace provisional IC6-IC8 if the game owner provides official designs.
+- Prepared the 0.12.0 release candidate metadata and documentation, including TC4/Eternity release notes, version metadata, guide/spec synchronization, and save-format-10 compatibility.

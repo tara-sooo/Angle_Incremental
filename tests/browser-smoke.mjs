@@ -42,6 +42,7 @@ const EXPECTED_MODULE_PATHS = [
   "/src/systems/infinity.js",
   "/src/systems/infinite-angle.js",
   "/src/systems/balance.js",
+  "/src/systems/eternity.js",
   "/src/systems/balance-angle.js",
   "/src/systems/balance-generation.js",
   "/src/systems/balance-core-boost.js",
@@ -159,10 +160,10 @@ try {
   });
   assert.equal(updateModal.visible, true, "the current-version update modal should appear for a fresh browser profile");
   assert.equal(updateModal.title, `${EXPECTED_ASSET_VERSION} アップデート`, "the update modal should show the current Japanese version");
-  assert.match(updateModal.summary, /オフライン進行/);
-  assert.match(updateModal.summary, /Infinite Angle/);
-  assert.match(updateModal.canvas, /Auto Infinity/);
-  assert.match(updateModal.canvas, /応答性/);
+  assert.match(updateModal.summary, /Tower Challenge 4/);
+  assert.match(updateModal.summary, /Eternity/);
+  assert.match(updateModal.canvas, /1\.80e308 IP/);
+  assert.match(updateModal.canvas, /Milestone 1-1〜5/);
   const desktopButtonInteraction = await page.evaluate(() => {
     const selectors = ["[data-tab=angle]", "#speedUpgrade"];
     return selectors.map((selector) => {
@@ -517,7 +518,7 @@ try {
     const { state, switchMainTab } = window.__angleDebug;
     switchMainTab("achievements");
     state.achievementMask = 0x7fffffff;
-    state.achievementMaskHigh = 0b111111;
+    state.achievementMaskHigh = 0b1111111111;
     state.language = "ja";
     window.advanceTime(0);
     const rows = Array.from(document.querySelectorAll(".achievement-row"));
@@ -547,9 +548,9 @@ try {
     };
   });
   assert.equal(achievementUi.panelActive, true, "the Achievements panel should activate on desktop");
-  assert.equal(achievementUi.count, 37, "the desktop Achievements panel should render 37 rows");
-  assert.equal(achievementUi.japaneseSummary, "37/37 実績", "the desktop Japanese Achievements summary should show 37 achievements");
-  assert.equal(achievementUi.englishSummary, "37/37 Achievements", "the desktop English Achievements summary should show 37 achievements");
+  assert.equal(achievementUi.count, 41, "the desktop Achievements panel should render 41 rows");
+  assert.equal(achievementUi.japaneseSummary, "41/41 実績", "the desktop Japanese Achievements summary should show 41 achievements");
+  assert.equal(achievementUi.englishSummary, "41/41 Achievements", "the desktop English Achievements summary should show 41 achievements");
   assert.deepEqual(achievementUi.japanese, [
     { title: "不吉だという前提は置いておいて", condition: "所持IPがe44に到達", rewardHidden: true },
     { title: "バベルも土台から", condition: "Towerを建設", rewardHidden: true },
@@ -557,6 +558,10 @@ try {
     { title: "道しるべを残す", condition: "スコアがe2450を超える", rewardHidden: true },
     { title: "ちょっぴり豪邸", condition: "Towerの階層が3に到達", rewardHidden: true },
     { title: "物騒な名前", condition: "TC2をクリア", rewardHidden: true },
+    { title: "無限万長者", condition: "Infinity数が1.5e6を超える", rewardHidden: false },
+    { title: "とうに越した先に", condition: "TC3をクリア", rewardHidden: true },
+    { title: "挑戦権、そして時空の片道切符", condition: "TC4をクリア", rewardHidden: true },
+    { title: "Time is generative", condition: "初回Eternityを実行", rewardHidden: true },
   ], "the desktop Japanese achievement definitions should be exact");
   assert.deepEqual(achievementUi.english, [
     { title: "Assuming It Is Unlucky", condition: "Hold at least 1e44 IP." },
@@ -565,6 +570,10 @@ try {
     { title: "Leave a Signpost", condition: "Reach more than 1e2450 score." },
     { title: "A Slightly Luxurious Mansion", condition: "Reach Tower Floor 3." },
     { title: "A Violent-Sounding Name", condition: "Complete TC2." },
+    { title: "Infinity Millionaire", condition: "Have more than 1.5e6 Infinity." },
+    { title: "Far Beyond", condition: "Complete TC3." },
+    { title: "The Right to Challenge, and a One-Way Ticket Through Spacetime", condition: "Complete TC4." },
+    { title: "Time is generative", condition: "Perform Eternity for the first time." },
   ], "the desktop English achievement definitions should be exact");
   assert.ok(achievementUi.listWidth > 0, "the desktop achievement list should have a visible layout");
   const desktopUiChanges = await page.evaluate(() => {
@@ -653,6 +662,8 @@ try {
       towerChallenge3Name: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-name')?.textContent?.trim() ?? "",
       towerChallenge3Target: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-target')?.textContent?.trim() ?? "",
       towerChallenge3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
+      towerChallenge4Target: document.querySelector('#towerChallengeList [data-tower-challenge="4"] .challenge-target')?.textContent?.trim() ?? "",
+      towerChallenge4UpgradeCards: document.querySelectorAll('#towerChallengeList [data-tower-challenge="4"] .tc4-upgrade-card').length,
     };
   });
   assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
@@ -661,7 +672,7 @@ try {
   assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
   assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
   assert.equal(towerInitial.towerChallengeRows, 4, "TC1-TC4 rows should be visible");
-  assert.equal(towerInitial.towerChallengeReleaseStatus, "TC1〜TC3実装済み", "Tower Challenge status should reflect the implemented TC range");
+  assert.equal(towerInitial.towerChallengeReleaseStatus, "TC1〜TC4実装済み", "Tower Challenge status should reflect the implemented TC range");
   assert.equal(towerInitial.towerChallengeButton, "挑戦開始", "implemented TC rows should expose a start button");
   assert.equal(towerInitial.towerChallengeButtonDisabled, true, "locked TC rows should disable their start button");
   assert.match(towerInitial.towerChallengeRestriction, /通常強化/);
@@ -671,6 +682,8 @@ try {
   assert.match(towerInitial.towerChallenge3Target, /1\.00e5,000/);
   assert.match(towerInitial.towerChallenge3Restriction, /\^0\.001/);
   assert.match(towerInitial.towerChallenge3Restriction, /\^0\.100/);
+  assert.match(towerInitial.towerChallenge4Target, /1\.00e7,777/);
+  assert.equal(towerInitial.towerChallenge4UpgradeCards, 3, "TC4 should expose its three exclusive upgrade cards");
   assert.equal(towerInitial.towerState.scoreExponent, "^1.00");
   assert.equal(towerInitial.towerState.tc1Base, "^0.300");
   assert.equal(towerInitial.towerState.tc1Bonus, "+^0.000");
@@ -702,6 +715,32 @@ try {
   assert.equal(towerChallenge3Flow.disabled, false, "TC3 should be available at Floor 8");
   assert.match(towerChallenge3Flow.restriction, /\^0\.800/);
   assert.match(towerChallenge3Flow.restriction, /\^0\.500/);
+  const towerChallenge4Flow = await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    const original = {
+      towerFloor: state.towerFloor,
+      activeTowerChallenge: state.activeTowerChallenge,
+      completedTowerChallenges: state.completedTowerChallenges,
+    };
+    state.towerFloor = 12;
+    state.activeTowerChallenge = 4;
+    state.completedTowerChallenges = 0;
+    window.advanceTime(0);
+    const row = document.querySelector('#towerChallengeList [data-tower-challenge="4"]');
+    const result = {
+      status: row?.querySelector(".challenge-state")?.textContent?.trim() ?? "",
+      button: row?.querySelector("button")?.textContent?.trim() ?? "",
+      disabled: Boolean(row?.querySelector("button")?.disabled),
+      restriction: row?.querySelector(".challenge-restriction")?.textContent?.trim() ?? "",
+    };
+    Object.assign(state, original);
+    window.advanceTime(0);
+    return result;
+  });
+  assert.equal(towerChallenge4Flow.status, "挑戦中", "TC4 should show its active status");
+  assert.equal(towerChallenge4Flow.button, "挑戦中止", "an active TC4 should expose a stop button");
+  assert.equal(towerChallenge4Flow.disabled, false, "an active TC4 should be stoppable");
+  assert.match(towerChallenge4Flow.restriction, /レベル1/);
   const towerChallengeFlow = await page.evaluate(() => {
     const { state, toggleTowerChallenge, completeTowerChallengeIfReady } = window.__angleDebug;
     state.towerFloor = 3;
@@ -1532,7 +1571,7 @@ try {
     const mobileAchievements = await mobilePage.evaluate(() => {
       const { state } = window.__angleDebug;
       state.achievementMask = 0x7fffffff;
-      state.achievementMaskHigh = 0b111111;
+      state.achievementMaskHigh = 0b1111111111;
       state.language = "ja";
       window.advanceTime(0);
       const rows = document.querySelectorAll(".achievement-row");
@@ -1545,8 +1584,8 @@ try {
       };
     });
     assert.equal(mobileAchievements.panelActive, true, "the Achievements panel should activate on mobile");
-    assert.equal(mobileAchievements.count, 37, "the mobile Achievements panel should render 37 rows");
-    assert.equal(mobileAchievements.lastTitle, "物騒な名前", "the mobile Achievements panel should keep the final row visible");
+    assert.equal(mobileAchievements.count, 41, "the mobile Achievements panel should render 41 rows");
+    assert.equal(mobileAchievements.lastTitle, "Time is generative", "the mobile Achievements panel should keep the final row visible");
     assert.ok(mobileAchievements.listWidth > 0, "the mobile achievement list should have a visible layout");
 
     const mobileVertexGainDisplay = await mobilePage.evaluate(() => {

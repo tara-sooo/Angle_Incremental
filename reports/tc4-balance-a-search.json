@@ -1,0 +1,141 @@
+{
+  "_artifactPolicy": "Compact tracked research summary for release history. Full route/search output is reproducible from the corresponding simulator script and Markdown report.",
+  "issue": 127,
+  "title": "Search the A-focused TC4 balance region beyond A=0.40",
+  "researchOnly": true,
+  "sourceIssues": [
+    119,
+    125
+  ],
+  "relationshipToIssue125": "Issue #125 remains status:needs-decision; this report makes no production decision.",
+  "targetLog10": 7777,
+  "evaluatedResetPolicies": [
+    "fixed-60",
+    "gain-aware-2x",
+    "threshold-aware"
+  ],
+  "probeDesign": [
+    {
+      "id": "A0.40-B0.35-C1",
+      "a": 0.4,
+      "b": 0.35,
+      "c": 1,
+      "axis": "baseline",
+      "reason": "strongest #119 A-only result"
+    },
+    {
+      "id": "A0.50-B0.35-C1",
+      "a": 0.5,
+      "b": 0.35,
+      "c": 1,
+      "axis": "A-only",
+      "reason": "bounded higher-A probe"
+    },
+    {
+      "id": "A0.60-B0.35-C1",
+      "a": 0.6,
+      "b": 0.35,
+      "c": 1,
+      "axis": "A-only",
+      "reason": "bounded higher-A probe"
+    },
+    {
+      "id": "A0.80-B0.35-C1",
+      "a": 0.8,
+      "b": 0.35,
+      "c": 1,
+      "axis": "A-only",
+      "reason": "bounded higher-A probe"
+    },
+    {
+      "id": "A1.00-B0.35-C1",
+      "a": 1,
+      "b": 0.35,
+      "c": 1,
+      "axis": "A-only",
+      "reason": "bounded higher-A probe"
+    }
+  ],
+  "recommendation": {
+    "status": "a-only-scaling-insufficient",
+    "reason": "the highest bounded A probe remains below e2500",
+    "basisCandidate": "A1.00-B0.35-C1",
+    "observedA": [
+      {
+        "fromA": 0.5,
+        "toA": 0.6,
+        "deltaA": 0.09999999999999998,
+        "deltaPeakLog10": 67.60941395340888,
+        "deltaMilestone": 0,
+        "commonMilestoneTimeGainRatio": 0.8865671641791045,
+        "candidates": [
+          "A0.50-B0.35-C1",
+          "A0.60-B0.35-C1"
+        ]
+      },
+      {
+        "fromA": 0.6,
+        "toA": 0.8,
+        "deltaA": 0.20000000000000007,
+        "deltaPeakLog10": 202.4351491760176,
+        "deltaMilestone": 0,
+        "commonMilestoneTimeGainRatio": 0.9582089552238806,
+        "candidates": [
+          "A0.60-B0.35-C1",
+          "A0.80-B0.35-C1"
+        ]
+      },
+      {
+        "fromA": 0.8,
+        "toA": 1,
+        "deltaA": 0.19999999999999996,
+        "deltaPeakLog10": 171.13077058369709,
+        "deltaMilestone": 0,
+        "commonMilestoneTimeGainRatio": 0.9582089552238806,
+        "candidates": [
+          "A0.80-B0.35-C1",
+          "A1.00-B0.35-C1"
+        ]
+      }
+    ],
+    "nextStep": "study the A functional form before increasing the flat coefficient further"
+  },
+  "uncertainty": [
+    "The A response is observed only at the tested values from 0.40 through 1.00; it does not establish monotonicity or justify extrapolation.",
+    "Search truncation, route limits, and simulator policy differences remain explicit uncertainty rather than production evidence."
+  ],
+  "noProductionChanges": true,
+  "freshnessVerification": {
+    "mergedChange": "#128 / PR #130 achievements 38-39; #131 / PR #132 reward correction",
+    "previousCommit": "f2c0c7f",
+    "verifiedCommit": "3f21ad887236be5f3e98d911f3ed748b6975881c",
+    "budget": "stage-3 equivalent: 24h / 20 states / 10 routes / 4h stall",
+    "observations": [
+      {
+        "candidateId": "A0.40-B0.35-C1",
+        "previousPeakScoreLog10": 1916.5081076008387,
+        "currentPeakScoreLog10": 1916.6978221197528,
+        "peakDeltaLog10": 0.18971451891411562,
+        "previousHighestMilestone": 1700,
+        "currentHighestMilestone": 1700,
+        "previousE1700Seconds": 3350,
+        "currentE1700Seconds": 3340,
+        "currentE2500Seconds": null
+      },
+      {
+        "candidateId": "A1.00-B0.35-C1",
+        "previousPeakScoreLog10": 2396.5433334486474,
+        "currentPeakScoreLog10": 2396.779890313369,
+        "peakDeltaLog10": 0.23655686472147863,
+        "previousHighestMilestone": 1700,
+        "currentHighestMilestone": 1700,
+        "previousE1700Seconds": 140,
+        "currentE1700Seconds": 140,
+        "currentE2500Seconds": null
+      }
+    ],
+    "conclusion": "The #128 refresh shifts peaks slightly and the #131 reward correction adds no further shift; the A direction, selected neighborhood, e1700 ceiling, and e2500/e7777 conclusion are preserved, with no #125 production decision change."
+  },
+  "anyReachedE2500": false,
+  "anyReachedE7777": false
+}

@@ -1268,6 +1268,33 @@ canvas {
   text-align: center;
 }
 
+.tc4-upgrade-list {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.tc4-upgrade-card {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid rgba(91, 113, 153, 0.55);
+  border-radius: 8px;
+  background: rgba(9, 16, 29, 0.72);
+}
+
+.tc4-upgrade-card small {
+  min-height: 2.4em;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.tc4-upgrade-button {
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
 .break-button {
   background: linear-gradient(180deg, #272f43, #101726);
 }
@@ -1847,6 +1874,10 @@ canvas {
 }
 
 @media (max-width: 820px) {
+  .tc4-upgrade-list {
+    grid-template-columns: 1fr;
+  }
+
   .fps-counter {
     top: 12px;
     right: 14px;

@@ -28,7 +28,8 @@ function coreBoostRequirementLog10() {
   if (!Number.isFinite(multiplier)) return runtime.MAX_TRACKED_LOG10;
   const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
   const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
-  return Math.min(challengeAdjustedLog10, runtime.MAX_TRACKED_LOG10);
+  const cappedLog10 = Math.min(challengeAdjustedLog10, runtime.MAX_TRACKED_LOG10);
+  return runtime.eternityMilestoneCoreBoostRequirementLog10?.(cappedLog10) ?? cappedLog10;
 }
 
 function coreBoostRequirement() {
@@ -53,7 +54,7 @@ function coreBoostGainIncreaseBaseForCount(coreBoostCount) {
 }
 
 function coreBoostGainIncreaseMultiplier() {
-  return Math.pow(coreBoostGainIncreaseBaseForCount(runtime.state.coreBoostCount), coreBoostBonusPower());
+  return Math.pow(coreBoostGainIncreaseBaseForCount(runtime.effectiveCoreBoostCount()), coreBoostBonusPower());
 }
 
 function ic8VertexUpgradeCount() {
@@ -73,7 +74,7 @@ function coreBoostGainExponentForCount(coreBoostCount, options = {}) {
 }
 
 function coreBoostGainExponent() {
-  return coreBoostGainExponentForCount(runtime.state.coreBoostCount);
+  return coreBoostGainExponentForCount(runtime.effectiveCoreBoostCount());
 }
 
 function nextCoreBoostValues() {
@@ -82,8 +83,8 @@ function nextCoreBoostValues() {
   const nextCoreBoostCount = coreBoostReady ? currentCoreBoostCount + 1 : currentCoreBoostCount;
   const power = coreBoostBonusPower();
   return {
-    gainMultiplier: Math.pow(coreBoostGainIncreaseBaseForCount(nextCoreBoostCount), power),
-    gainExponent: coreBoostGainExponentForCount(nextCoreBoostCount, {
+    gainMultiplier: Math.pow(coreBoostGainIncreaseBaseForCount(runtime.effectiveCoreBoostCount(nextCoreBoostCount)), power),
+    gainExponent: coreBoostGainExponentForCount(runtime.effectiveCoreBoostCount(nextCoreBoostCount), {
       ic8ReplacementLevel: runtime.state.activeChallenge === 8 && coreBoostReady ? 0 : undefined,
     }),
   };
@@ -125,7 +126,7 @@ function runCoreBoost() {
   runtime.state.currentInfinityRunHadCoreBoost = true;
   runtime.state.coreBoostCount += 1;
   runtime.checkAchievements(true);
-  resetBelowCoreBoost();
+  if (!runtime.eternityMilestonePreservesCoreBoostReset?.()) resetBelowCoreBoost();
   runtime.updateUi();
   runtime.saveGame("manual");
 }

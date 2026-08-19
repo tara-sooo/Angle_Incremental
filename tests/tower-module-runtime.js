@@ -8,6 +8,11 @@ function setInfinityPoints(runtime, amount) {
   runtime.syncInfinityPointCachesFromExact(BigInt(amount));
 }
 
+function setEffectiveScoreLog(runtime, debug, scoreLog10) {
+  debug.state.scoreLog10 = scoreLog10 / runtime.towerScoreExponent();
+  debug.state.score = Number.MAX_VALUE;
+}
+
 async function runTowerModuleRuntimeTest() {
   {
     const instance = await loadRuntime(candidatePath);
@@ -18,6 +23,26 @@ async function runTowerModuleRuntimeTest() {
     });
     assert.equal(runtime.towerFloorCostLog10(14), 345 * 1.15, "Floor 14 should apply the post-Floor-13 power");
     assert.equal(runtime.towerFloorCostLog10(15), 345 * 1.15 ** 2, "post-Floor-13 costs should compound by 1.15");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    debug.state.towerFloor = 12;
+    debug.state.activeTowerChallenge = 4;
+    debug.state.infinityCount = 1;
+    debug.state.completedTowerChallenges = 0;
+    setEffectiveScoreLog(runtime, debug, 7776);
+    assert.equal(runtime.towerChallengeCanComplete(), false, "TC4 should remain incomplete below e7777");
+    setEffectiveScoreLog(runtime, debug, 7778);
+    assert.equal(runtime.towerChallengeCanComplete(), true, "TC4 should remain complete above e7777");
+    setEffectiveScoreLog(runtime, debug, 7777);
+    assert.equal(runtime.towerChallengeCanComplete(), true, "TC4 should be complete at e7777");
+    assert.equal(runtime.towerChallenge4CompletedForEternity(), false, "TC4 completion should not be permanent before the reset");
+    assert.equal(runtime.completeTowerChallengeIfReady(), true, "TC4 should complete through the normal Infinity path");
+    assert.equal(debug.state.activeTowerChallenge, 0, "TC4 completion should leave the challenge");
+    assert.equal(debug.state.completedTowerChallenges & 8, 8, "TC4 completion should set the current-run completion bit");
+    assert.equal(runtime.towerChallenge4CompletedForEternity(), true, "#120 should receive current-run TC4 eligibility");
   }
 
   {
@@ -194,7 +219,31 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(runtime.towerChallengeTargetLog10(1), 1000, "TC1 should target e1000 Score");
     assert.equal(runtime.towerChallengeTargetLog10(2), 3000, "TC2 should target e3000 Score");
     assert.equal(runtime.towerChallengeTargetLog10(3), 5000, "TC3 should target e5000 Score");
+    assert.equal(runtime.towerChallengeTargetLog10(4), 7777, "TC4 should use the authoritative e7777 completion target");
     assert.equal(runtime.towerChallengeImplemented(3), true, "TC3 should be implemented");
+    assert.equal(runtime.towerChallengeImplemented(4), true, "TC4 lifecycle should be implemented");
+    debug.state.towerFloor = 12;
+    debug.state.activeTowerChallenge = 4;
+    debug.state.vertices = 16;
+    debug.state.tc4BaseGainLevel = 1;
+    assert.equal(runtime.tc4BaseGainPartsBonus(), 1.7, "TC4 A level 1 should add the logarithmic 1.7 parts bonus");
+    assert.equal(runtime.tc4EffectiveGainExpressionParts(4), 5.7, "TC4 A should add to the existing gain-expression parts");
+    assert.equal(runtime.gainExpressionConfig().divisor, 4, "TC4 A should preserve the existing divisor rule");
+    debug.state.infiniteScoreLog10 = 100;
+    debug.state.tc4InfinityScoreVertexGainLevel = 2;
+    assert.equal(runtime.infiniteAngleBoostLog10(), 100, "TC4 B should add 0.35 per level in log space");
+    debug.state.coreBoostCount = 2;
+    debug.state.tc4FreeCoreBoostLevel = 3;
+    assert.equal(runtime.effectiveCoreBoostCount(), 5, "TC4 C should add free CB only to benefit-side calculations");
+    assert.equal(runtime.coreBoostGainExponent(), 1.1, "TC4 C should affect the Core Boost gain exponent");
+    assert.equal(runtime.coreBoostRequirementLog10(), 80, "TC4 C must not affect Core Boost requirements");
+    debug.state.activeTowerChallenge = 0;
+    assert.equal(runtime.tc4BaseGainPartsBonus(), 0, "TC4 A must not leak outside the active challenge");
+    assert.equal(runtime.tc4InfinityScoreVertexGainBonusLog10(100), 0, "TC4 B must not leak outside the active challenge");
+    assert.equal(runtime.effectiveCoreBoostCount(), 2, "TC4 C must not leak outside the active challenge");
+    debug.state.tc4BaseGainLevel = 0;
+    debug.state.tc4InfinityScoreVertexGainLevel = 0;
+    debug.state.tc4FreeCoreBoostLevel = 0;
     debug.state.infinityCount = 0;
     assert.equal(runtime.towerChallenge3ScoreGainPower(), 0.001, "TC3 should start Score gain at ^0.001");
     assert.equal(runtime.towerChallenge3InfinityScorePower(), 0.1, "TC3 should start Infinity Score gain at ^0.1");
@@ -271,6 +320,119 @@ async function runTowerModuleRuntimeTest() {
   {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
+    debug.state.towerFloor = 12;
+    debug.state.infiniteAngleUnlocked = true;
+    debug.state.infiniteAngleSpeedLevel = 4;
+    debug.state.infiniteAngleVertexLevel = 3;
+    debug.state.infiniteAngleGainLevel = 2;
+    setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
+    assert.equal(runtime.towerChallengeUnlocked(4), true, "TC4 should unlock at Floor 12");
+    assert.equal(runtime.toggleTowerChallenge(4), true, "TC4 should start at Floor 12");
+    assert.equal(debug.state.activeTowerChallenge, 4, "TC4 should become active");
+    assert.equal(debug.state.infiniteAngleSpeedLevel, 0, "TC4 entry should reset IA Speed");
+    assert.equal(debug.state.infiniteAngleVertexLevel, 0, "TC4 entry should reset IA Vertex");
+    assert.equal(debug.state.infiniteAngleGainLevel, 0, "TC4 entry should reset IA Gain");
+
+    assert.deepEqual(
+      Object.fromEntries(Object.keys(runtime.TC4_UPGRADE_DEFINITIONS).map((kind) => [kind, runtime.towerChallenge4UpgradePriceLog10(kind)])),
+      { baseGain: 100, infinityScoreVertexGain: 500, freeCoreBoost: 900 },
+      "TC4 upgrades should start on their authoritative price grid",
+    );
+    assert.equal(runtime.canBuyTowerChallenge4Upgrade("baseGain"), false, "TC4 purchases should require enough Score");
+    setEffectiveScoreLog(runtime, debug, 99);
+    assert.equal(runtime.canBuyTowerChallenge4Upgrade("baseGain"), false, "a price below the base cost should be unaffordable");
+    setEffectiveScoreLog(runtime, debug, 100);
+    assert.equal(runtime.buyTowerChallenge4Upgrade("baseGain", { refresh: false, save: false }), true, "TC4 base upgrade should be purchasable");
+    assert.equal(debug.state.tc4BaseGainLevel, 1, "a direct purchase should increase its level");
+    assert.equal(debug.state.tc4BaseGainPriceStep, 1, "a direct purchase should increase its price step");
+    assert.equal(debug.state.tc4BaseGainPriceStep, 1, "a direct purchase should be applied once");
+    assert.equal(debug.state.tc4InfinityScoreVertexGainPriceStep, 0, "unmatched upgrades should keep their price step");
+    assert.equal(debug.state.tc4FreeCoreBoostPriceStep, 0, "unmatched upgrades should keep their price step");
+
+    setEffectiveScoreLog(runtime, debug, 900);
+    assert.equal(runtime.buyTowerChallenge4Upgrade("baseGain", { refresh: false, save: false }), true, "a two-way collision should be purchasable");
+    assert.equal(debug.state.tc4BaseGainLevel, 2, "a direct collision purchase should still grant only the selected level");
+    assert.equal(debug.state.tc4BaseGainPriceStep, 2, "the selected upgrade should advance its price step");
+    assert.equal(debug.state.tc4FreeCoreBoostLevel, 0, "collision-only repricing must not grant a level");
+    assert.equal(debug.state.tc4FreeCoreBoostPriceStep, 1, "the equal-price upgrade should reprice once");
+    assert.equal(runtime.towerChallenge4UpgradePriceLog10("baseGain"), 1700, "the selected price should advance to e1700");
+    assert.equal(runtime.towerChallenge4UpgradePriceLog10("freeCoreBoost"), 2500, "the collision price should advance to e2500");
+
+    runtime.resetTowerChallenge4ExclusiveUpgrades();
+    debug.state.tc4BaseGainPriceStep = 1;
+    debug.state.tc4InfinityScoreVertexGainPriceStep = 1;
+    setEffectiveScoreLog(runtime, debug, 900);
+    assert.equal(runtime.buyTowerChallenge4Upgrade("baseGain", { refresh: false, save: false }), true, "a non-cascading collision should be purchasable");
+    assert.equal(debug.state.tc4InfinityScoreVertexGainPriceStep, 1, "a newly-created equality must not cascade");
+    assert.equal(runtime.towerChallenge4UpgradePriceLog10("infinityScoreVertexGain"), 1700, "the non-cascading price should remain unchanged");
+
+    runtime.resetTowerChallenge4ExclusiveUpgrades();
+    debug.state.tc4BaseGainPriceStep = 5;
+    debug.state.tc4InfinityScoreVertexGainPriceStep = 3;
+    debug.state.tc4FreeCoreBoostPriceStep = 2;
+    setEffectiveScoreLog(runtime, debug, 4100);
+    assert.equal(runtime.buyTowerChallenge4Upgrade("infinityScoreVertexGain", { refresh: false, save: false }), true, "the three-way collision should be atomic");
+    assert.equal(debug.state.tc4BaseGainPriceStep, 6, "the three-way collision should reprice A");
+    assert.equal(debug.state.tc4InfinityScoreVertexGainPriceStep, 4, "the three-way collision should reprice B");
+    assert.equal(debug.state.tc4FreeCoreBoostPriceStep, 3, "the three-way collision should reprice C");
+    assert.equal(debug.state.tc4InfinityScoreVertexGainLevel, 1, "the selected upgrade alone should gain a level");
+    assert.equal(debug.state.tc4BaseGainLevel, 0, "collision-only A repricing must not grant a level");
+    assert.equal(debug.state.tc4FreeCoreBoostLevel, 0, "collision-only C repricing must not grant a level");
+
+    runtime.resetTowerChallenge4ExclusiveUpgrades();
+    setEffectiveScoreLog(runtime, debug, 100);
+    assert.equal(runtime.buyTowerChallenge4Upgrade("baseGain", { refresh: false, save: false }), true, "the first repeated-input purchase should succeed");
+    assert.equal(runtime.buyTowerChallenge4Upgrade("baseGain", { refresh: false, save: false }), false, "a repeated input without funds should be rejected atomically");
+    debug.state.activeTowerChallenge = 0;
+    assert.equal(runtime.buyTowerChallenge4Upgrade("baseGain", { refresh: false, save: false }), false, "TC4 purchases should be gated by the active challenge");
+    runtime.resetTowerChallenge4ExclusiveUpgrades();
+    debug.state.activeTowerChallenge = 4;
+    assert.deepEqual(
+      [debug.state.tc4BaseGainLevel, debug.state.tc4BaseGainPriceStep, debug.state.tc4FreeCoreBoostPriceStep],
+      [0, 0, 0],
+      "inactive TC4 state should be cleared before another active run",
+    );
+
+    debug.state.scoreLog10 = 1000;
+    debug.state.score = Number.MAX_VALUE;
+    assert.equal(runtime.buyAllUpgrades({ refresh: false, save: false }), 3, "TC4 buy-max should allow one level of each normal upgrade");
+    assert.equal(debug.state.speedLevel, 1, "TC4 should allow normal Speed level 1");
+    assert.equal(debug.state.vertices, 4, "TC4 should allow normal Vertex level 1");
+    assert.equal(debug.state.gainLevel, 1, "TC4 should allow normal Gain level 1");
+    assert.equal(runtime.spendNormalUpgrade("speed"), false, "TC4 should block manual normal upgrades above level 1");
+    assert.equal(runtime.buyAllUpgrades({ refresh: false, save: false }), 0, "TC4 should block repeated normal buy-max purchases");
+
+    assert.equal(runtime.buyAllInfiniteAngleUpgrades({ refresh: false, save: false }), 3, "TC4 IA buy-max should allow one level of each upgrade");
+    assert.equal(debug.state.infiniteAngleSpeedLevel, 1, "TC4 should allow IA Speed level 1");
+    assert.equal(debug.state.infiniteAngleVertexLevel, 1, "TC4 should allow IA Vertex level 1");
+    assert.equal(debug.state.infiniteAngleGainLevel, 1, "TC4 should allow IA Gain level 1");
+    assert.equal(runtime.buyInfiniteAngleUpgrade("speed", { refresh: false, save: false }), false, "TC4 should block manual IA upgrades above level 1");
+    assert.equal(runtime.buyAllInfiniteAngleUpgrades({ refresh: false, save: false }), 0, "TC4 should block repeated IA buy-max purchases");
+
+    debug.state.tc4BaseGainLevel = 3;
+    debug.state.tc4BaseGainPriceStep = 4;
+    debug.state.tc4InfinityScoreVertexGainLevel = 5;
+    debug.state.tc4InfinityScoreVertexGainPriceStep = 6;
+    debug.state.tc4FreeCoreBoostLevel = 7;
+    debug.state.tc4FreeCoreBoostPriceStep = 8;
+    runtime.resetBelowInfinity();
+    assert.equal(debug.state.tc4BaseGainLevel, 3, "generation/Core Boost/Infinity reset scope should preserve TC4 levels");
+    assert.equal(debug.state.tc4FreeCoreBoostPriceStep, 8, "Infinity reset scope should preserve TC4 price steps");
+
+    assert.equal(runtime.toggleTowerChallenge(4), true, "TC4 should be stoppable");
+    assert.equal(debug.state.activeTowerChallenge, 0, "stopping TC4 should clear the active challenge");
+    assert.equal(debug.state.tc4BaseGainLevel, 0, "stopping TC4 should clear exclusive levels");
+    assert.equal(debug.state.tc4FreeCoreBoostPriceStep, 0, "stopping TC4 should clear exclusive price steps");
+    debug.state.scoreLog10 = 1000;
+    debug.state.score = Number.MAX_VALUE;
+    setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
+    assert.equal(runtime.canBuyNormalUpgrade("speed"), true, "normal upgrade eligibility should return after TC4");
+    assert.equal(runtime.canBuyInfiniteAngleUpgrade("speed"), true, "IA upgrade eligibility should return after TC4");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
     debug.state.towerFloor = 13;
     setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
     const costLog10 = runtime.towerNextFloorCostLog10();
@@ -337,6 +499,33 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(challengeReloaded.runtime.coreBoostRequirementRawGrowthPower(), 2, "TC2 reward scaling should use the saved Tower floor");
     assert.equal(challengeReloaded.runtime.coreBoostRequirementGrowthPower(), 2, "TC2 reward scaling should survive a local save");
 
+    source.debug.state.towerFloor = 12;
+    source.debug.state.activeTowerChallenge = 4;
+    source.debug.state.completedTowerChallenges = 11;
+    source.debug.state.activeTowerChallengeTime = 6;
+    source.debug.state.infiniteAngleSpeedLevel = 1;
+    source.debug.state.infiniteAngleVertexLevel = 1;
+    source.debug.state.infiniteAngleGainLevel = 1;
+    source.debug.state.tc4BaseGainLevel = 2;
+    source.debug.state.tc4BaseGainPriceStep = 3;
+    source.debug.state.tc4InfinityScoreVertexGainLevel = 4;
+    source.debug.state.tc4InfinityScoreVertexGainPriceStep = 5;
+    source.debug.state.tc4FreeCoreBoostLevel = 6;
+    source.debug.state.tc4FreeCoreBoostPriceStep = 7;
+    source.debug.saveGame("manual");
+    const tc4Reloaded = await loadRuntime(candidatePath, source.storage);
+    assert.equal(tc4Reloaded.debug.state.activeTowerChallenge, 4, "an active TC4 run should survive a local save");
+    assert.equal(tc4Reloaded.debug.state.completedTowerChallenges, 11, "current-run TC completion bits should survive a TC4 save");
+    assert.equal(tc4Reloaded.runtime.towerChallenge4CompletedForEternity(), true, "TC4 completion eligibility should survive a save/load");
+    assert.ok(tc4Reloaded.debug.state.activeTowerChallengeTime >= 6, "active TC4 time should survive a local save");
+    assert.equal(tc4Reloaded.debug.state.infiniteAngleSpeedLevel, 1, "valid TC4 IA levels should survive a local save");
+    assert.equal(tc4Reloaded.debug.state.tc4BaseGainLevel, 2, "active TC4 base level should survive a local save");
+    assert.equal(tc4Reloaded.debug.state.tc4BaseGainPriceStep, 3, "active TC4 base price step should survive a local save");
+    assert.equal(tc4Reloaded.debug.state.tc4InfinityScoreVertexGainLevel, 4, "active TC4 B level should survive a local save");
+    assert.equal(tc4Reloaded.debug.state.tc4InfinityScoreVertexGainPriceStep, 5, "active TC4 B price step should survive a local save");
+    assert.equal(tc4Reloaded.debug.state.tc4FreeCoreBoostLevel, 6, "active TC4 C level should survive a local save");
+    assert.equal(tc4Reloaded.debug.state.tc4FreeCoreBoostPriceStep, 7, "active TC4 C price step should survive a local save");
+
     const invalid = await loadRuntime(candidatePath);
     invalid.debug.state.towerFloor = 0;
     invalid.debug.state.activeTowerChallenge = 1;
@@ -346,6 +535,8 @@ async function runTowerModuleRuntimeTest() {
     invalid.debug.state.speedLevel = 4;
     invalid.debug.state.generationCount = 2;
     invalid.debug.state.coreBoostCount = 3;
+    invalid.debug.state.tc4BaseGainLevel = 9;
+    invalid.debug.state.tc4BaseGainPriceStep = 9;
     invalid.debug.saveGame("manual");
     const invalidReloaded = await loadRuntime(candidatePath, invalid.storage);
     assert.equal(invalidReloaded.debug.state.activeTowerChallenge, 0, "a locked Tower Challenge should be cleared on load");
@@ -354,6 +545,16 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(invalidReloaded.debug.state.speedLevel, 0, "invalid Tower Challenge progress should reset upgrades");
     assert.equal(invalidReloaded.debug.state.generationCount, 0, "invalid Tower Challenge progress should reset Generations");
     assert.equal(invalidReloaded.debug.state.coreBoostCount, 0, "invalid Tower Challenge progress should reset Core Boosts");
+    assert.equal(invalidReloaded.debug.state.tc4BaseGainLevel, 0, "inactive TC4 levels should not survive an invalid challenge save");
+    assert.equal(invalidReloaded.debug.state.tc4BaseGainPriceStep, 0, "inactive TC4 price steps should not survive an invalid challenge save");
+
+    const inactiveTc4 = await loadRuntime(candidatePath);
+    inactiveTc4.debug.state.tc4BaseGainLevel = 8;
+    inactiveTc4.debug.state.tc4FreeCoreBoostPriceStep = 8;
+    inactiveTc4.debug.saveGame("manual");
+    const inactiveTc4Reloaded = await loadRuntime(candidatePath, inactiveTc4.storage);
+    assert.equal(inactiveTc4Reloaded.debug.state.tc4BaseGainLevel, 0, "inactive TC4 levels should be cleared at save/load boundaries");
+    assert.equal(inactiveTc4Reloaded.debug.state.tc4FreeCoreBoostPriceStep, 0, "inactive TC4 price steps should be cleared at save/load boundaries");
 
     const invalidIc = await loadRuntime(candidatePath);
     invalidIc.debug.state.activeChallenge = 1;
@@ -366,6 +567,8 @@ async function runTowerModuleRuntimeTest() {
     const legacy = await loadRuntime(candidatePath);
     legacy.runtime.applySaveData({ score: 0, scoreLog10: -Infinity }, 10);
     assert.equal(legacy.debug.state.towerFloor, 0, "old saves without Tower data should start at Floor 0");
+    assert.equal(legacy.debug.state.tc4BaseGainLevel, 0, "old saves should default TC4 levels");
+    assert.equal(legacy.debug.state.tc4FreeCoreBoostPriceStep, 0, "old saves should default TC4 price steps");
     assert.deepEqual(Array.from(legacy.debug.state.fastestInfinityChallengeTimes), Array(8).fill(0), "old saves should default IC fastest times");
     assert.deepEqual(Array.from(legacy.debug.state.fastestTowerChallengeTimes), Array(4).fill(0), "old saves should default TC fastest times");
   }
