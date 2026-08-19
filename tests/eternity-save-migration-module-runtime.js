@@ -23,10 +23,12 @@ function setPersistentFixture(state) {
   state.timeFluxCustomSpeed = 6;
 }
 
-function assertPersistentFixture(state, messagePrefix) {
+function assertPersistentFixture(state, runtime, messagePrefix) {
   assert.equal(state.eternityCount, 12, `${messagePrefix}: Eternity count should persist`);
   assert.equal(state.eternityMilestoneMask, 5, `${messagePrefix}: Milestone ownership should persist`);
-  assert.equal(state.eternityMilestoneChoice, "1-2", `${messagePrefix}: pending first-tier choice should persist`);
+  assert.equal(state.eternityMilestoneChoice, "1-2", `${messagePrefix}: legacy pending-choice data should remain safely readable`);
+  assert.equal(runtime.firstTierMilestoneEntitlementCount(), 1, `${messagePrefix}: entitlement should derive from count and ownership`);
+  assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), ["1-2"], `${messagePrefix}: legacy pending-choice data must not consume the remaining entitlement`);
   assert.equal(
     state.achievementMaskHigh & ACHIEVEMENT_38_TO_41_MASK,
     ACHIEVEMENT_38_TO_41_MASK,
@@ -52,9 +54,10 @@ async function testLegacyDefaults() {
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(legacy)]]));
   assert.equal(loaded.debug.state.eternityCount, 0, "legacy saves should default Eternity count to zero");
   assert.equal(loaded.debug.state.eternityMilestoneMask, 0, "legacy saves should default Milestone ownership to zero");
-  assert.equal(loaded.debug.state.eternityMilestoneChoice, "", "legacy saves should default pending Milestone choice to empty");
+  assert.equal(loaded.debug.state.eternityMilestoneChoice, "", "legacy saves should default the retired pending-choice field to empty");
+  assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 0, "legacy saves without Eternities must not receive an acquisition entitlement");
   assert.equal(loaded.debug.state.achievementMaskHigh, 0, "legacy saves should default the high achievement mask safely");
-  assert.equal(loaded.runtime.SAVE_VERSION, 10, "optional Eternity fields should not require a speculative save-version bump");
+  assert.equal(loaded.runtime.SAVE_VERSION, 10, "derived entitlement should not require a speculative save-version bump");
 }
 
 async function testCurrentRoundTripAndSanitization() {
@@ -70,7 +73,7 @@ async function testCurrentRoundTripAndSanitization() {
   const serialized = runtime.serializeSaveData();
   serialized.savedAt = Date.now();
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(serialized)]]));
-  assertPersistentFixture(loaded.debug.state, "current save round-trip");
+  assertPersistentFixture(loaded.debug.state, loaded.runtime, "current save round-trip");
   assert.equal(loaded.debug.state.towerFloor, 12, "ordinary save/load should retain the Tower state that legally unlocks TC4");
   assert.equal(loaded.debug.state.activeTowerChallenge, 4, "ordinary save/load should retain a legal active TC4 run");
   assert.equal(loaded.debug.state.completedTowerChallenges, 0, "ordinary save/load must not invent TC completion during an active TC4 run");
@@ -82,12 +85,13 @@ async function testCurrentRoundTripAndSanitization() {
     eternityMilestoneChoice: "not-a-milestone",
   }, loaded.runtime.SAVE_VERSION);
   assert.equal(loaded.debug.state.eternityMilestoneMask, 7, "Milestone ownership should strip unknown bits during hydration");
-  assert.equal(loaded.debug.state.eternityMilestoneChoice, "", "invalid pending Milestone choices should hydrate to empty");
+  assert.equal(loaded.debug.state.eternityMilestoneChoice, "", "invalid legacy pending choices should hydrate to empty");
+  assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 0, "fully owned first-tier Milestones must not expose extra entitlement");
 }
 
 async function testSaveCodeImportAndCheckpointRestore() {
   const instance = await loadRuntime(candidatePath);
-  const { context, debug } = instance;
+  const { context, debug, runtime } = instance;
   setPersistentFixture(debug.state);
   const code = await debug.exportSaveCode();
 
@@ -101,7 +105,7 @@ async function testSaveCodeImportAndCheckpointRestore() {
   debug.state.timeFluxSpeed = 1;
   debug.state.timeFluxCustomSpeed = 1;
   assert.equal(await debug.importSaveCode(code), true, "save-code import should accept a valid Eternity-aware save");
-  assertPersistentFixture(debug.state, "save-code import");
+  assertPersistentFixture(debug.state, runtime, "save-code import");
 
   assert.equal(debug.createCheckpoint("eternity-save-migration", { force: true }), true, "Eternity persistent state should be checkpointable");
   debug.state.eternityCount = 2;
@@ -114,7 +118,7 @@ async function testSaveCodeImportAndCheckpointRestore() {
   context.window.confirm = () => true;
   assert.notEqual(checkpointIndex, -1, "the Eternity checkpoint should be discoverable");
   assert.equal(debug.restoreCheckpoint(checkpointIndex), true, "checkpoint recovery should use the same Eternity hydration semantics");
-  assertPersistentFixture(debug.state, "checkpoint recovery");
+  assertPersistentFixture(debug.state, runtime, "checkpoint recovery");
 }
 
 async function testEternityResetThenSaveLoad() {
@@ -140,10 +144,12 @@ async function testEternityResetThenSaveLoad() {
   state.tc4FreeCoreBoostPriceStep = 14;
   markEternityReady(runtime, state);
 
-  assert.equal(debug.performEternity({ save: false, update: false }), true, "a fully qualified Eternity should execute");
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "a fully qualified manual Eternity should execute");
   assert.equal(state.eternityCount, 3, "successful Eternity should increment the count exactly once");
-  assert.equal(state.eternityMilestoneMask, 3, "the pending 1-2 choice should be acquired exactly once");
-  assert.equal(state.eternityMilestoneChoice, "", "the pending first-tier choice should be consumed");
+  assert.equal(state.eternityMilestoneMask, 1, "legacy pending choice must not be auto-acquired by Eternity");
+  assert.equal(state.eternityMilestoneChoice, "", "manual Eternity should clear obsolete pending-choice state");
+  assert.equal(runtime.firstTierMilestoneEntitlementCount(), 2, "count 3 with only one owned first-tier Milestone should retain two acquisitions");
+  assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), ["1-2", "1-3"], "unused first-tier acquisition rights should remain available after Eternity");
   assert.equal(state.completedTowerChallenges, 0, "Eternity should reset current-run TC completion");
   assert.equal(state.tc4BaseGainLevel, 0, "Eternity should reset TC4 A level");
   assert.equal(state.tc4BaseGainPriceStep, 0, "Eternity should reset TC4 A price step");
@@ -162,17 +168,23 @@ async function testEternityResetThenSaveLoad() {
   postEternitySave.savedAt = Date.now();
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(postEternitySave)]]));
   assert.equal(loaded.debug.state.eternityCount, 3, "post-Eternity save/load should retain Eternity count");
-  assert.equal(loaded.debug.state.eternityMilestoneMask, 3, "post-Eternity save/load should retain acquired Milestones");
-  assert.equal(loaded.debug.state.eternityMilestoneChoice, "", "post-Eternity save/load should not resurrect a consumed choice");
+  assert.equal(loaded.debug.state.eternityMilestoneMask, 1, "post-Eternity save/load should retain acquired Milestones only");
+  assert.equal(loaded.debug.state.eternityMilestoneChoice, "", "post-Eternity save/load should not resurrect obsolete pending-choice state");
+  assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 2, "unused derived acquisition entitlement should survive save/load");
   assert.equal(loaded.debug.state.completedTowerChallenges, 0, "post-Eternity save/load must not resurrect TC completion");
   assert.equal(loaded.debug.state.tc4BaseGainLevel, 0, "post-Eternity save/load must not resurrect TC4 local progression");
   assert.equal(loaded.debug.state.achievementMaskHigh & ACHIEVEMENT_38_TO_41_MASK, ACHIEVEMENT_38_TO_41_MASK, "post-Eternity save/load should retain Achievements 38-41");
   assert.equal(loaded.debug.state.timeFlux, 444, "post-Eternity save/load should retain global Time Flux");
 
+  assert.equal(loaded.runtime.selectEternityMilestone("1-2"), true, "a saved unused entitlement should acquire a first-tier Milestone after reload");
+  assert.equal(loaded.debug.state.eternityMilestoneMask, 3, "post-load acquisition should add exactly the selected Milestone");
+  assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 1, "one unused acquisition should remain after buying 1-2");
+
   markEternityReady(loaded.runtime, loaded.debug.state);
-  assert.equal(loaded.debug.performEternity({ save: false, update: false }), true, "a later Eternity should still execute after reload");
+  assert.equal(loaded.debug.performEternity({ save: false, update: false }), true, "a later manual Eternity should still execute after reload");
   assert.equal(loaded.debug.state.eternityCount, 4, "the later Eternity should increment exactly once");
-  assert.equal(loaded.debug.state.eternityMilestoneMask, 3, "a consumed pending choice must not be acquired again on a later Eternity");
+  assert.equal(loaded.debug.state.eternityMilestoneMask, 3, "a later Eternity must not auto-acquire the remaining first-tier Milestone");
+  assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 1, "the cap of three earned first-tier slots should leave exactly one acquisition available");
 }
 
 async function runEternitySaveMigrationModuleRuntimeTest() {
