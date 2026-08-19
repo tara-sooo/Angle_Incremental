@@ -55,12 +55,16 @@ async function waitForGame() {
 }
 
 async function openEternityThroughUi() {
-  await page.click('[data-tab="infinity"]');
-  await page.click('[data-infinity-tab="eternity"]');
+  await page.click('[data-tab="eternity"]');
   assert.equal(
-    await page.locator('[data-infinity-panel="eternity"]').evaluate((element) => element.classList.contains("is-active")),
+    await page.locator('[data-panel="eternity"]').evaluate((element) => element.classList.contains("is-active")),
     true,
-    "Eternity should be reachable through the normal player-facing Infinity navigation",
+    "Eternity should be reachable through the normal player-facing top-level navigation",
+  );
+  assert.equal(
+    await page.locator('[data-infinity-tab="eternity"]').count(),
+    0,
+    "Infinity must not expose Eternity as a nested subtab",
   );
 }
 
@@ -151,9 +155,9 @@ try {
 
   await openEternityThroughUi();
   const releaseCopy = await page.evaluate(() => ({
-    missingKeys: Array.from(document.querySelectorAll('[data-infinity-panel="eternity"] [data-i18n]'))
+    missingKeys: Array.from(document.querySelectorAll('[data-panel="eternity"] [data-i18n]'))
       .filter((element) => !element.textContent.trim()).map((element) => element.dataset.i18n),
-    panelText: document.querySelector('[data-infinity-panel="eternity"]')?.textContent || "",
+    panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
     tc4Reward: window.__angleDebug.runtime.towerChallengeReward(4),
   }));
   assert.deepEqual(releaseCopy.missingKeys, [], "Japanese Eternity release UI should not contain missing/placeholder i18n strings");
@@ -301,10 +305,10 @@ try {
     debug.runtime.updateUi();
   });
   const english = await page.evaluate(() => ({
-    missingKeys: Array.from(document.querySelectorAll('[data-infinity-panel="eternity"] [data-i18n]'))
+    missingKeys: Array.from(document.querySelectorAll('[data-panel="eternity"] [data-i18n]'))
       .filter((element) => !element.textContent.trim()).map((element) => element.dataset.i18n),
     forced: document.getElementById("eternityForcedNote")?.textContent || "",
-    panelText: document.querySelector('[data-infinity-panel="eternity"]')?.textContent || "",
+    panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
   }));
   assert.deepEqual(english.missingKeys, [], "English Eternity release UI should not contain missing/placeholder i18n strings");
   assert.match(english.forced, /performed automatically/, "English release copy should explain pre-Break forced Eternity");
