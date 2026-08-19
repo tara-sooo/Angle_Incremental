@@ -18,25 +18,40 @@ async function testMilestoneChoiceLifecycle() {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
 
-  assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), ["1-1", "1-2", "1-3"]);
-  assert.equal(runtime.selectEternityMilestone("1-1"), true, "the first-tier choice should be selectable before the first Eternity");
+  assert.equal(runtime.firstTierMilestoneEntitlementCount(), 0, "no first-tier acquisition should exist before the first Eternity");
+  assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), [], "first-tier Milestones should not be acquirable before the first Eternity");
+  assert.equal(runtime.selectEternityMilestone("1-1"), false, "pre-Eternity reservation must no longer be possible");
+
   markEternityReady(runtime, state);
-  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.equal(runtime.canEternity(), true, "the full requirement should make Eternity available");
+  assert.equal(runtime.shouldForceEternity(), false, "qualified Eternity must not be forced");
+  assert.equal(runtime.maybeForceEternity({ save: false, update: false }), false, "legacy automatic trigger hooks must be inert");
+  assert.equal(state.eternityCount, 0, "automatic hooks must not increment Eternity count");
+
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "explicit Eternity should execute when qualified");
   assert.equal(state.eternityCount, 1);
-  assert.equal(state.eternityMilestoneMask, 1, "one selected first-tier milestone should be acquired");
-  assert.equal(state.eternityMilestoneChoice, "", "the pending choice should be consumed");
+  assert.equal(state.eternityMilestoneMask, 0, "Eternity itself must not auto-acquire a first-tier Milestone");
+  assert.equal(runtime.firstTierMilestoneEntitlementCount(), 1, "the first Eternity should grant one persistent first-tier acquisition");
+  assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), ["1-1", "1-2", "1-3"]);
+
+  assert.equal(runtime.selectEternityMilestone("1-1"), true, "an earned first-tier acquisition should be consumable after Eternity");
+  assert.equal(state.eternityMilestoneMask, 1, "the acquired first-tier Milestone should become owned immediately");
+  assert.equal(runtime.firstTierMilestoneEntitlementCount(), 0, "one Eternity must fund at most one first-tier acquisition");
+  assert.equal(runtime.selectEternityMilestone("1-2"), false, "a second first-tier acquisition must wait for another Eternity");
   assert.equal(runtime.normalAutomationUnlocked(), true, "1-1 should unlock pre-Infinity automation");
-  assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), ["1-2", "1-3"]);
 
-  state.eternityMilestoneChoice = "1-2";
   markEternityReady(runtime, state);
   assert.equal(debug.performEternity({ save: false, update: false }), true);
-  assert.equal(state.eternityMilestoneMask, 3, "one Eternity must not acquire multiple first-tier choices");
+  assert.equal(state.eternityCount, 2);
+  assert.equal(runtime.firstTierMilestoneEntitlementCount(), 1, "the second Eternity should add another acquisition right");
+  assert.equal(runtime.selectEternityMilestone("1-2"), true);
+  assert.equal(state.eternityMilestoneMask, 3, "the second acquisition should add 1-2 without duplicating 1-1");
 
-  state.eternityMilestoneChoice = "1-3";
   markEternityReady(runtime, state);
   assert.equal(debug.performEternity({ save: false, update: false }), true);
-  assert.equal(state.eternityMilestoneMask, 7, "all first-tier milestones should be acquirable over later Eternities");
+  assert.equal(runtime.selectEternityMilestone("1-3"), true);
+  assert.equal(state.eternityMilestoneMask, 7, "all first-tier Milestones should be acquirable over three successful Eternities");
+  assert.equal(runtime.firstTierMilestoneEntitlementCount(), 0);
   assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), [], "no first-tier offer remains after all three are owned");
   assert.equal(Object.hasOwn(state, "eternityPoints"), false, "milestones must not introduce an EP currency");
 }
@@ -135,9 +150,9 @@ async function testMilestoneStartingLevelsAndSaveLoad() {
   const { debug, runtime } = source;
   const { state } = debug;
 
-  state.eternityMilestoneChoice = "1-3";
   markEternityReady(runtime, state);
   assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.equal(runtime.selectEternityMilestone("1-3"), true, "1-3 should be acquired from the earned post-Eternity entitlement");
   assert.equal(state.infiniteAngleSpeedLevel, 5, "1-3 should start IA Speed at level 5");
   assert.equal(state.infiniteAngleVertexLevel, 5, "1-3 should start IA Vertex at level 5");
   assert.equal(state.infiniteAngleGainLevel, 5, "1-3 should start IA Gain at level 5");
@@ -149,7 +164,8 @@ async function testMilestoneStartingLevelsAndSaveLoad() {
   saveData.savedAt = Date.now();
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(saveData)]]));
   assert.equal(loaded.debug.state.eternityMilestoneMask, 5, "milestone ownership must survive save/load");
-  assert.equal(loaded.debug.state.eternityMilestoneChoice, "1-2", "a pending choice must survive save/load");
+  assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 1, "unused first-tier entitlement should be derived from count and ownership after save/load");
+  assert.deepEqual(Array.from(loaded.runtime.availableEternityMilestoneChoices()), ["1-2"], "legacy pending-choice state must not consume or auto-grant the available entitlement");
   assert.equal(loaded.runtime.eternityMilestoneActive("5"), true, "count-based milestones must survive save/load");
 }
 
@@ -166,6 +182,8 @@ async function testThresholdAndResetBoundary() {
   assert.equal(runtime.canEternity(), false, "the Eternity threshold must still require TC4 completion");
   state.completedTowerChallenges = 1 << 3;
   assert.equal(runtime.canEternity(), true, "the finite IP boundary plus TC4 must qualify for Eternity");
+  assert.equal(runtime.shouldForceEternity(), false, "qualification must not imply automatic Eternity");
+  assert.equal(runtime.maybeForceEternity({ save: false, update: false }), false, "legacy automatic trigger calls must be inert at the threshold");
 
   state.scoreLog10 = 200;
   state.score = Number.MAX_VALUE;
@@ -217,7 +235,7 @@ async function testThresholdAndResetBoundary() {
   state.noGenerationCoreBoostReached = true;
   state.eternityCount = 8;
 
-  assert.equal(debug.performEternity({ save: false, update: false }), true, "a ready Eternity must execute");
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "an explicit ready Eternity must execute");
   assert.equal(state.eternityCount, 9, "Eternity must increment its count exactly once");
   assert.equal(state.infinityCount, 0, "Eternity must reset Infinity count");
   assert.equal(state.infinityPointsExact, "0", "Eternity must reset exact IP");
@@ -258,11 +276,11 @@ async function testThresholdAndResetBoundary() {
   assert.equal(state.noGenerationCoreBoostReached, true, "Eternity must preserve achievement history flags");
 
   assert.equal(debug.performEternity({ save: false, update: false }), false, "a completed Eternity must not repeat without new TC4/IP state");
-  assert.equal(state.eternityCount, 9, "a repeated trigger must not increment Eternity count");
+  assert.equal(state.eternityCount, 9, "a repeated manual action must not increment Eternity count");
   assert.equal(Object.hasOwn(state, "eternityPoints"), false, "Eternity must not add an EP resource");
 }
 
-async function testForcedLoadAndImportPersistence() {
+async function testQualifiedLoadAndImportDoNotAutoEternity() {
   const source = await loadRuntime(candidatePath);
   const { debug, runtime } = source;
   markEternityReady(runtime, debug.state);
@@ -271,27 +289,25 @@ async function testForcedLoadAndImportPersistence() {
   const thresholdSave = runtime.serializeSaveData();
   thresholdSave.savedAt = Date.now();
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(thresholdSave)]]));
-  assert.equal(loaded.debug.state.eternityCount, 5, "loading a ready save must force exactly one Eternity");
-  assert.equal(loaded.debug.state.infinityPointsExact, "0", "forced load Eternity must persist the IP reset");
-  assert.equal(loaded.debug.state.completedTowerChallenges, 0, "forced load Eternity must persist the TC4 reset");
-  assert.equal(loaded.debug.state.timeFlux, 456, "forced load Eternity must preserve Time Flux");
-  const persistedAfterLoad = JSON.parse(loaded.storage.get(loaded.runtime.SAVE_KEY));
-  assert.equal(persistedAfterLoad.state.eternityCount, 5, "forced load Eternity must save the incremented count");
-  await loaded.debug.loadGame();
-  assert.equal(loaded.debug.state.eternityCount, 5, "reloading the reset save must not duplicate Eternity");
+  assert.equal(loaded.debug.state.eternityCount, 4, "loading a qualified save must not auto-Eternity");
+  assert.equal(loaded.debug.state.infinityPointsExact, runtime.MAX_EXACT_INFINITY_POINTS.toString(), "qualified load must preserve IP until the player acts");
+  assert.notEqual(loaded.debug.state.completedTowerChallenges & (1 << 3), 0, "qualified load must preserve TC4 completion until manual Eternity");
+  assert.equal(loaded.debug.state.timeFlux, 456, "qualified load must preserve Time Flux");
+  assert.equal(loaded.runtime.canEternity(), true, "a qualified loaded save should remain ready for manual Eternity");
 
   const importSource = await loadRuntime(candidatePath);
   markEternityReady(importSource.runtime, importSource.debug.state);
   importSource.debug.state.eternityCount = 2;
   const saveCode = await importSource.debug.exportSaveCode();
   const importTarget = await loadRuntime(candidatePath);
-  assert.equal(await importTarget.debug.importSaveCode(saveCode), true, "save-code import should accept a ready Eternity save");
-  assert.equal(importTarget.debug.state.eternityCount, 3, "save-code import must force one Eternity");
-  assert.equal(importTarget.debug.state.completedTowerChallenges, 0, "save-code import must reset TC4 completion");
-  assert.equal(importTarget.debug.state.infinityPointsExact, "0", "save-code import must reset exact IP");
+  assert.equal(await importTarget.debug.importSaveCode(saveCode), true, "save-code import should accept a qualified Eternity save");
+  assert.equal(importTarget.debug.state.eternityCount, 2, "save-code import must not auto-Eternity");
+  assert.notEqual(importTarget.debug.state.completedTowerChallenges & (1 << 3), 0, "save-code import must preserve TC4 completion until manual Eternity");
+  assert.equal(importTarget.debug.state.infinityPointsExact, importTarget.runtime.MAX_EXACT_INFINITY_POINTS.toString(), "save-code import must preserve exact IP until manual Eternity");
+  assert.equal(importTarget.runtime.canEternity(), true, "imported qualified state should remain ready for explicit Eternity");
 }
 
-async function testInfinityCompletionTrigger() {
+async function testInfinityCompletionMakesEternityAvailable() {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
   runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
@@ -300,11 +316,18 @@ async function testInfinityCompletionTrigger() {
   state.score = Number.MAX_VALUE;
   state.activeTowerChallenge = 4;
   assert.equal(debug.runInfinity(false), undefined, "Infinity completion keeps its existing void return contract");
-  assert.equal(state.eternityCount, 1, "successful TC4 Infinity completion must trigger Eternity");
-  assert.equal(state.completedTowerChallenges, 0, "the Infinity-triggered Eternity must clear TC4 completion");
-  assert.equal(state.infinityPointsExact, "0", "the Infinity-triggered Eternity must clear IP");
+  assert.equal(state.eternityCount, 0, "successful TC4 Infinity completion must not auto-Eternity");
+  assert.notEqual(state.completedTowerChallenges & (1 << 3), 0, "TC4 completion must remain set until manual Eternity");
+  assert.equal(runtime.currentExactInfinityPoints(), runtime.MAX_EXACT_INFINITY_POINTS, "qualified IP must remain available before manual Eternity");
+  assert.equal(runtime.canEternity(), true, "successful TC4 completion at the IP threshold should make Eternity available");
   assert.equal(runtime.isAchievementUnlocked(40), true, "successful TC4 completion must unlock achievement 40 before the reset");
-  assert.equal(runtime.isAchievementUnlocked(41), true, "the successful Eternity transition must unlock achievement 41");
+  assert.equal(runtime.isAchievementUnlocked(41), false, "Achievement 41 must wait for the explicit Eternity action");
+
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "the player-triggered Eternity should execute from the qualified state");
+  assert.equal(state.eternityCount, 1);
+  assert.equal(state.completedTowerChallenges, 0, "manual Eternity must clear TC4 completion");
+  assert.equal(state.infinityPointsExact, "0", "manual Eternity must clear IP");
+  assert.equal(runtime.isAchievementUnlocked(41), true, "the successful manual Eternity must unlock achievement 41");
 }
 
 async function runEternityModuleRuntimeTest() {
@@ -312,8 +335,8 @@ async function runEternityModuleRuntimeTest() {
   await testMilestoneThresholdsAndEffects();
   await testMilestoneStartingLevelsAndSaveLoad();
   await testThresholdAndResetBoundary();
-  await testInfinityCompletionTrigger();
-  await testForcedLoadAndImportPersistence();
+  await testInfinityCompletionMakesEternityAvailable();
+  await testQualifiedLoadAndImportDoNotAutoEternity();
   console.log("Eternity module runtime tests passed");
 }
 
