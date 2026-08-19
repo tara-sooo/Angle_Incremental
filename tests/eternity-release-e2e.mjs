@@ -83,13 +83,18 @@ async function clearTc4AtTarget() {
     }
     state.infinityCount = Math.max(1, state.infinityCount);
     state.score = Number.MAX_VALUE;
-    state.scoreLog10 = 7777 - 1e-6;
+    const target = runtime.towerChallengeTargetLog10(4);
+    state.scoreLog10 = runtime.rawScoreLog10FromEffective(target - 1);
+    const belowEffectiveScore = runtime.currentScoreLog10();
     const belowTarget = runtime.towerChallengeCanComplete(4);
-    state.scoreLog10 = 7777;
+    state.scoreLog10 = runtime.rawScoreLog10FromEffective(target);
+    const atEffectiveScore = runtime.currentScoreLog10();
     const atTarget = runtime.towerChallengeCanComplete(4);
     const completed = debug.completeTowerChallengeIfReady();
     return {
-      target: runtime.towerChallengeTargetLog10(4),
+      target,
+      belowEffectiveScore,
+      atEffectiveScore,
       belowTarget,
       atTarget,
       completed,
@@ -100,7 +105,9 @@ async function clearTc4AtTarget() {
   });
   assert.equal(result.error, undefined, result.error || "TC4 entry should succeed");
   assert.equal(result.target, 7777, "the shipped TC4 target should remain exactly 1e7777 Score");
+  assert.ok(result.belowEffectiveScore < 7777, "the controlled below-target fixture should be below 1e7777 effective Score");
   assert.equal(result.belowTarget, false, "TC4 must not complete below 1e7777 Score");
+  assert.ok(result.atEffectiveScore >= 7777, "the target fixture should reach at least 1e7777 effective Score");
   assert.equal(result.atTarget, true, "TC4 should become completable at exactly 1e7777 Score");
   assert.equal(result.completed, true, "the authoritative TC4 completion path should clear at the target");
   assert.equal(result.active, 0, "TC4 should leave the active challenge state after completion");
