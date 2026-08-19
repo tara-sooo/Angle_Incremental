@@ -59,7 +59,7 @@ function installEternityUi() {
   let tab = subtabNav.querySelector('[data-infinity-tab="eternity"]');
   if (!tab) {
     tab = document.createElement("button");
-    tab.className = "infinity-subtab";
+    tab.className = "eternity-infinity-subtab";
     tab.type = "button";
     tab.dataset.infinityTab = "eternity";
     tab.setAttribute("aria-selected", "false");
@@ -114,7 +114,9 @@ function installEternityUi() {
     subpanels.append(eternityRoot);
   }
 
-  runtime.elements.infinitySubtabs = Array.from(document.querySelectorAll(".infinity-subtab"));
+  const existingInfinitySubtabs = Array.from(document.querySelectorAll(".infinity-subtab"));
+  if (!existingInfinitySubtabs.includes(tab)) existingInfinitySubtabs.push(tab);
+  runtime.elements.infinitySubtabs = existingInfinitySubtabs;
   runtime.elements.infinitySubpanels = Array.from(document.querySelectorAll(".infinity-subpanel"));
   runtime.elements.i18nNodes = Array.from(document.querySelectorAll("[data-i18n]"));
 
