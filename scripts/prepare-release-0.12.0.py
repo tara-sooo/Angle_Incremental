@@ -1,0 +1,213 @@
+from pathlib import Path
+import json
+
+VERSION = "0.12.0"
+OLD = "0.11.1"
+
+
+def read(path):
+    return Path(path).read_text(encoding="utf-8")
+
+
+def write(path, text):
+    Path(path).write_text(text, encoding="utf-8")
+
+
+def replace_once(text, old, new, label):
+    count = text.count(old)
+    if count != 1:
+        raise SystemExit(f"{label}: expected exactly one match, found {count}")
+    return text.replace(old, new, 1)
+
+
+def replace_required(text, old, new, label, minimum=1):
+    count = text.count(old)
+    if count < minimum:
+        raise SystemExit(f"{label}: expected at least {minimum} match(es), found {count}")
+    return text.replace(old, new)
+
+
+manifest = json.loads(read("version.json"))
+if manifest.get("appVersion") != OLD:
+    raise SystemExit(f"version.json: expected {OLD}, found {manifest.get('appVersion')}")
+manifest["appVersion"] = VERSION
+write("version.json", json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+
+constants = read("src/core/constants.js")
+constants = replace_once(
+    constants,
+    f'const APP_VERSION = "{OLD}";',
+    f'const APP_VERSION = "{VERSION}";',
+    "APP_VERSION",
+)
+if 'const SAVE_VERSION = 10;' not in constants:
+    raise SystemExit("SAVE_VERSION is not 10; release prep must not change the schema implicitly")
+write("src/core/constants.js", constants)
+
+ja_old = {
+    'updateTitle: "0.11.1 アップデート",': 'updateTitle: "0.12.0 アップデート",',
+    'updateSummary: "オフライン進行の大量処理とInfinite Angleの負荷を改善しました。",': 'updateSummary: "Tower Challenge 4と第4リセット層Eternityを追加しました。",',
+    'updateResetDock: "最大100万ティックのオフライン処理を非同期化し、処理中も進捗を確認できるようになりました。",': 'updateResetDock: "TC4では専用強化A/B/Cを使って1e7777 Scoreを目指し、クリアがEternity条件になります。",',
+    'updateCanvas: "Auto InfinityとAngle/Infinite Angleの負荷を抑え、復帰時の応答性を改善しました。",': 'updateCanvas: "TC4クリア済みの周回で1.80e308 IPに到達するとEternityが発生し、Milestone 1-1〜5が進行します。",',
+    'updateModalNote: "セーブ形式10は変更ありません。既存のセーブデータをそのまま利用できます。",': 'updateModalNote: "セーブ形式10は変更ありません。既存セーブをそのまま利用でき、実績は41個になりました。",',
+}
+en_old = {
+    'updateTitle: "Version 0.11.1",': 'updateTitle: "Version 0.12.0",',
+    'updateSummary: "Improved large offline resumes and reduced Infinite Angle processing cost.",': 'updateSummary: "Added Tower Challenge 4 and the fourth reset layer, Eternity.",',
+    'updateResetDock: "Offline processing now supports up to 1,000,000 asynchronous ticks with visible progress.",': 'updateResetDock: "TC4 uses three dedicated upgrades to reach 1e7777 Score, and clearing it becomes part of the Eternity requirement.",',
+    'updateCanvas: "Auto Infinity and Angle/Infinite Angle workloads are bounded for a more responsive resume.",': 'updateCanvas: "After clearing TC4 in the current run, reaching 1.80e308 IP triggers Eternity and advances Milestones 1-1 through 5.",',
+    'updateModalNote: "Save format 10 is unchanged, so existing saves remain compatible.",': 'updateModalNote: "Save format 10 is unchanged, existing saves remain compatible, and there are now 41 achievements.",',
+}
+
+i18n = read("src/data/i18n.js")
+for old, new in {**ja_old, **en_old}.items():
+    i18n = replace_once(i18n, old, new, f"i18n {old[:32]}")
+write("src/data/i18n.js", i18n)
+
+index = read("index.html")
+index = replace_required(index, f"v={OLD}", f"v={VERSION}", "index cache busters", minimum=2)
+index_replacements = {
+    '>0.11.1 アップデート</h2>': '>0.12.0 アップデート</h2>',
+    '>オフライン進行の大量処理とInfinite Angleの負荷を改善しました。</p>': '>Tower Challenge 4と第4リセット層Eternityを追加しました。</p>',
+    '>最大100万ティックのオフライン処理を非同期化し、処理中も進捗を確認できるようになりました。</li>': '>TC4では専用強化A/B/Cを使って1e7777 Scoreを目指し、クリアがEternity条件になります。</li>',
+    '>Auto InfinityとAngle/Infinite Angleの負荷を抑え、復帰時の応答性を改善しました。</li>': '>TC4クリア済みの周回で1.80e308 IPに到達するとEternityが発生し、Milestone 1-1〜5が進行します。</li>',
+    '>セーブ形式10は変更ありません。既存のセーブデータをそのまま利用できます。</li>': '>セーブ形式10は変更ありません。既存セーブをそのまま利用でき、実績は41個になりました。</li>',
+}
+for old, new in index_replacements.items():
+    index = replace_once(index, old, new, f"index modal {old[:28]}")
+write("index.html", index)
+
+events = read("src/ui/events.js")
+events = replace_required(events, f"?v={OLD}", f"?v={VERSION}", "events cache busters", minimum=2)
+write("src/ui/events.js", events)
+
+spec = read("angle-incremental-spec.md")
+spec = replace_once(spec, "対象リリース: **0.11.1**", "対象リリース: **0.12.0**", "spec release target")
+spec = replace_once(
+    spec,
+    "5. Infinity Challenge、Infinity Angle、Tower、Break Infinite Cap でInfinity後半を進める。\n6. オフライン進行で、離席中の進行を管理する。",
+    "5. Infinity Challenge、Infinity Angle、Tower、Break Infinite Cap でInfinity後半を進める。\n6. Tower Challenge 4をクリアし、所持IPが1.80e308に到達すると第4リセット層Eternityへ進む。\n7. オフライン進行で、離席中の進行を管理する。",
+    "spec progression overview",
+)
+spec = replace_once(
+    spec,
+    "| Tower Challenge / TC | Towerの次階建設を制限するチャレンジ。TC1〜TC3に加え、TC4のライフサイクルとレベル1制限を実装済み。 |",
+    "| Tower Challenge / TC | Towerの次階建設を制限するチャレンジ。TC1〜TC4を実装済みで、TC4クリアは現在のEternity周回の条件になる。 |",
+    "spec TC term",
+)
+spec = replace_once(
+    spec,
+    "| Break Infinite Cap | Infinity後の強いスコアソフトキャップを恒久的に解除する要素。 |\n| オフライン進行 |",
+    "| Break Infinite Cap | Infinity後の強いスコアソフトキャップを恒久的に解除する要素。 |\n| Eternity | TC4をクリアした現在の周回で1.80e308 IPに到達すると発生する第4リセット層。Eternity回数とMilestone進行は保持する。 |\n| Eternity Milestone | Eternity回数または各Eternityでのfirst-tier選択によって有効になる恒久進行。 |\n| オフライン進行 |",
+    "spec Eternity terms",
+)
+spec = replace_once(spec, "| IP | 0 |\n| Infinity Angle |", "| IP | 0 |\n| Eternity | 0 |\n| Infinity Angle |", "spec initial Eternity")
+spec = replace_once(spec, "実績は37個あり、すべてのリセットを超えて保持される。", "実績は41個あり、すべてのリセットを超えて保持される。", "spec achievement count")
+spec = replace_once(
+    spec,
+    "| 37 | TC2をクリア | なし |\n\n## 14. 自動化と統計",
+    "| 37 | TC2をクリア | なし |\n| 38 | Infinity数が1.5e6を超える | Infinity数獲得量 `x2` |\n| 39 | TC3をクリア | なし |\n| 40 | TC4をクリア | なし |\n| 41 | 初回Eternityを実行 | なし |\n\n## 14. Eternity\n\nEternityは第4リセット層である。Break Eternity以前は、現在のEternity周回でTC4をクリアし、所持IPが`1.80e308`以上になると強制的に実行される。Break Eternityの本体機構は0.12.0では未実装だが、将来もTC4クリアがEternity条件であるという互換ガードは維持する。Eternity PointやEP通貨は存在しない。\n\nEternity成功時は`eternityCount`を1だけ増やし、Score、通常強化、Generation、Core Boost、Infinity回数、IP、IU、IC、IA、Tower、TC1〜TC4、TC4専用強化、Break Infinite Cap、現在周回のタイマー類をリセットする。実績、Eternity回数・Milestone所有、総プレイ時間・実プレイ時間、履歴・最速記録、各種設定・自動化設定、休眠中を含む全Time Flux保存状態は保持する。派生キャッシュと自動化の利用可否はリセット後の状態から再計算する。\n\n### 14.1 Eternity Milestone\n\nfirst-tierの1-1〜1-3はEternity回数1から候補になり、1回のEternity成功につき未取得のものを最大1つだけ選択・取得できる。通貨は消費しないため、最初の3回のEternityで3つすべてを取得できる。\n\n| Milestone | 条件 | 効果 |\n| --- | --- | --- |\n| 1-1 QoLの精神 | Eternity 1、first-tier選択 | Infinity以前の通常強化自動購入を最初から利用可能にする。 |\n| 1-2 高みの見物 | Eternity 1、first-tier選択 | 通常強化の実効レベルへ`Eternity回数 × 10`を加える。TC3報酬がある場合はTC3倍率適用後に加算する。 |\n| 1-3 2つの盾 | Eternity 1、first-tier選択 | Eternity後、IAのSpeed・Vertex・Gain強化をそれぞれ最低レベル5から開始する。 |\n| 2 真の倹約家 | Eternity 5 | IC7の通常強化無消費効果を有効にする。IC7クリア状態そのものは立てない。 |\n| 3 完璧な世代間継承 | Eternity 8 | GenerationとCore Boost実行時の下位リセットを抑止し、実行・正の効果は維持する。 |\n| 4 効率的なウラン235の探し方 | Eternity 12 | Core Boost要求量のlog10を`×0.9`する。 |\n| 5 自動植林 | Eternity 20 | Infinity自動化を解放する。 |\n\n## 15. 自動化と統計",
+    "spec achievements/Eternity section",
+)
+for old_num, new_num, title in [
+    (15, 16, "UI、ニュース、設定"),
+    (16, 17, "セーブと更新"),
+    (17, 18, "バージョン管理"),
+    (18, 19, "主要データ構造"),
+    (19, 20, "今後の拡張候補"),
+]:
+    spec = replace_once(spec, f"## {old_num}. {title}", f"## {new_num}. {title}", f"spec renumber {title}")
+spec = replace_once(
+    spec,
+    "Infinityタブ内には Upgrades、Infinite Angle、Tower の順でサブタブがある。",
+    "Infinityタブ内には Upgrades、Infinite Angle、Tower、Eternity の順でサブタブがある。",
+    "spec Infinity subtabs",
+)
+spec = replace_once(
+    spec,
+    "主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower階数、Break Infinite Cap、Infinite Score、実績、自動化、ゲーム時間統計、実プレイ時間統計、Infinity回数/秒の最高値、集約の小数繰越、表示設定、`offlineProgressEnabled`、オフラインティック数が含まれる。",
+    "主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower/TC状態、Break Infinite Cap、Infinite Score、実績、`eternityCount`、`eternityMilestoneMask`、`eternityMilestoneChoice`、自動化、ゲーム時間統計、実プレイ時間統計、Infinity回数/秒の最高値、集約の小数繰越、表示設定、`offlineProgressEnabled`、オフラインティック数が含まれる。",
+    "spec save fields",
+)
+spec = replace_once(
+    spec,
+    "0.11.1では、`APP_VERSION = 0.11.1`、`SAVE_VERSION = 10` とする。0.11.0のTC3とTower進行を維持し、オフライン進行を最大1,000,000ティックの非同期チャンクで処理する。Auto InfinityのUI更新を抑制し、Normal AngleとInfinite Angleのcore-hit処理には負荷上限と近似処理を適用する。既存セーブの形式、Time Flux関連の休眠フィールド、オフライン進行のサーバー時刻優先とローカル時刻フォールバックは維持する。",
+    "0.12.0では、`APP_VERSION = 0.12.0`、`SAVE_VERSION = 10` とする。TC4、Eternity、Eternity Milestone 1-1〜5、実績38〜41、Eternity UIと日英表示を追加する。既存セーブは新しいEternity関連フィールドを安全な初期値で補完し、Time Flux関連の休眠フィールドを含む既存の保存形式を維持する。",
+    "spec version section",
+)
+spec = replace_once(
+    spec,
+    "- Tower Challengeの具体的な制約・報酬\n- 後半の複数Point",
+    "- Break Eternityとそれ以降のEternity進行\n- Eternity Milestone 6以降\n- 実績42以降\n- 後半の複数Point",
+    "spec future work",
+)
+write("angle-incremental-spec.md", spec)
+
+guide = read("angle-incremental-guide.md")
+guide = replace_once(
+    guide,
+    "通常強化 -> Generation -> Core Boost -> Infinity -> IA / Tower / Infinity Challenge / Break Infinite Cap",
+    "通常強化 -> Generation -> Core Boost -> Infinity -> IA / Tower / Infinity Challenge / TC4 -> Eternity",
+    "guide progression",
+)
+guide = replace_once(
+    guide,
+    "TC4はまだ未実装です。",
+    "TC4はFloor 12で解放されます。通常強化とIA強化はレベル1までに制限され、TC4専用のA/B/C強化を使って **1e7777 Score** を目指します。TC4をクリアすると、そのEternity周回でEternity条件の片方を満たします。",
+    "guide TC4",
+)
+guide = replace_once(
+    guide,
+    "\n### オフライン進行\n",
+    "\n### Eternity\n\nEternityはInfinityより上の第4リセットです。現在の周回でTC4をクリアしたうえで **1.80e308 IP** に到達すると、Break Eternity以前は自動的にEternityが発生します。Eternity Pointのような通貨はありません。\n\nEternityではInfinity以下の進行、IA、Tower、TC進行が大きくリセットされます。一方で、実績、Eternity回数とMilestone、設定や統計、保存されているTime Flux状態は残ります。\n\n最初の3回のEternityではMilestone 1-1〜1-3から、1回につき未取得のものを1つ選べます。その後はEternity回数5・8・12・20でMilestone 2〜5が順に有効になります。Eternityタブで現在の回数、条件、Milestone状態を確認できます。\n\n### オフライン進行\n",
+    "guide Eternity section",
+)
+guide = replace_once(guide, "実績は37個あります。", "実績は41個あります。", "guide achievement count")
+write("angle-incremental-guide.md", guide)
+
+progress = read("progress.md")
+marker = "- Prepared the 0.12.0 release candidate metadata and documentation"
+if marker not in progress:
+    progress = progress.rstrip() + "\n" + marker + ", including TC4/Eternity release notes, version metadata, guide/spec synchronization, and save-format-10 compatibility.\n"
+write("progress.md", progress)
+
+release_notes = """## Angle Incremental 0.12.0
+
+### 主な変更
+
+- Tower Challenge 4を正式実装しました。通常強化・IA強化をレベル1までに制限し、専用強化A/B/Cを使って`1e7777 Score`を目指します。
+- 第4リセット層 **Eternity** を追加しました。現在の周回でTC4をクリアし、`1.80e308 IP`に到達すると、Break Eternity以前はEternityが強制的に発生します。
+- Eternity Milestone 1-1〜5を追加しました。最初の3回はfirst-tierから1回につき1つを選択し、その後はEternity回数5・8・12・20で追加効果が解放されます。
+- 実績38〜41を追加しました。TC3・TC4・Eternity進行を対象とし、実績41の名称は日本語UIでも`Time is generative`と表示します。
+- Eternity専用UIと日本語・英語表示を追加し、Eternity条件、回数、Milestone状態と選択を通常のプレイヤーUIから確認・操作できるようにしました。
+- `TC4 -> Eternity -> 再構築 -> TC4 -> Eternity`の代表的な周回、Eternity前後のセーブ/ロード、実績・Milestone・Time Fluxの保持境界を回帰テストでカバーしました。
+
+### セーブ互換性
+
+`SAVE_VERSION` は10のままです。既存セーブではEternity関連の新しい保存項目を安全な初期値で補完します。
+
+EternityではTC進行を含むInfinity以下の進行がリセットされますが、実績、Eternity進行、設定・統計、および保存されているTime Flux状態は保持されます。
+
+### 今回含まれないもの
+
+- Eternity Point / EP通貨
+- Break Eternityの取得・進行機構
+- Eternity Milestone 6以降
+- 実績42以降
+
+関連: #95, #120, #121, #122, #123, #124, #125, #149, #150, #151, #152
+"""
+release_path = Path(f"docs/releases/{VERSION}.md")
+if release_path.exists():
+    raise SystemExit(f"{release_path} already exists")
+release_path.write_text(release_notes, encoding="utf-8")
+
+assert json.loads(read("version.json"))["appVersion"] == VERSION
+assert f'const APP_VERSION = "{VERSION}";' in read("src/core/constants.js")
+assert 'const SAVE_VERSION = 10;' in read("src/core/constants.js")
+assert OLD not in read("index.html")
+assert OLD not in read("src/data/i18n.js")
+assert OLD not in read("src/ui/events.js")
+assert "実績は41個" in read("angle-incremental-spec.md")
+assert "## 14. Eternity" in read("angle-incremental-spec.md")
+assert "EternityはInfinityより上の第4リセット" in read("angle-incremental-guide.md")
