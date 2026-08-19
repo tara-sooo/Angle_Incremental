@@ -50,6 +50,8 @@ const url = `http://127.0.0.1:${address.port}/`;
 async function waitForGame() {
   await page.evaluate(() => window.__angleDebug.ready);
   await page.evaluate(() => window.__angleDebug.runtime.closeUpdateModal?.());
+  const offlineReportClose = page.locator("#offlineReportClose");
+  if (await offlineReportClose.isVisible()) await offlineReportClose.click();
 }
 
 async function openEternityThroughUi() {
