@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - hotfix/0.12.1
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
@@ -172,6 +175,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           rm .github/workflows/prepare-0.12.1-hotfix.yml
+          rm -f .hotfix-0.12.1-trigger
           git add -A
           git commit -m "Prepare 0.12.1 UI hotfix release"
           git push origin HEAD:hotfix/0.12.1
