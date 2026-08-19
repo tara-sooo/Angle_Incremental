@@ -52,7 +52,7 @@ async function testThresholdAndResetBoundary() {
   state.bestInfinityCountPerSecond = 13;
   state.infinityCountRateRemainder = 0.5;
   state.achievementMask = 0x1234;
-  state.achievementMaskHigh = 0x5678;
+  state.achievementMaskHigh = 0x5678 | (1 << (40 - 32)) | (1 << (41 - 32));
   state.totalPlayTime = 100;
   state.totalRealPlayTime = 200;
   state.fastestInfinityTime = 3;
@@ -94,8 +94,8 @@ async function testThresholdAndResetBoundary() {
   assert.equal(state.scoreLog10, -Infinity, "Eternity must reset Score");
   assert.equal(state.generationCount, 0, "Eternity must reset Generation");
 
-  assert.equal(state.achievementMask, 0x1234, "Eternity must preserve achievements");
-  assert.equal(state.achievementMaskHigh, 0x5678, "Eternity must preserve high achievement bits");
+  assert.equal(state.achievementMask & 0x1234, 0x1234, "Eternity must preserve existing achievements");
+  assert.equal(state.achievementMaskHigh & (0x5678 | (1 << (40 - 32)) | (1 << (41 - 32))), 0x5678 | (1 << (40 - 32)) | (1 << (41 - 32)), "Eternity must preserve existing high achievement bits");
   assert.equal(state.totalPlayTime, 100, "Eternity must preserve total play time");
   assert.equal(state.totalRealPlayTime, 200, "Eternity must preserve total real play time");
   assert.deepEqual(state.fastestInfinityChallengeTimes, [1, 2, 3, 4, 5, 6, 7, 8], "Eternity must preserve IC records");
@@ -159,6 +159,8 @@ async function testInfinityCompletionTrigger() {
   assert.equal(state.eternityCount, 1, "successful TC4 Infinity completion must trigger Eternity");
   assert.equal(state.completedTowerChallenges, 0, "the Infinity-triggered Eternity must clear TC4 completion");
   assert.equal(state.infinityPointsExact, "0", "the Infinity-triggered Eternity must clear IP");
+  assert.equal(runtime.isAchievementUnlocked(40), true, "successful TC4 completion must unlock achievement 40 before the reset");
+  assert.equal(runtime.isAchievementUnlocked(41), true, "the successful Eternity transition must unlock achievement 41");
 }
 
 async function runEternityModuleRuntimeTest() {

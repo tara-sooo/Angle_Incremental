@@ -72,6 +72,7 @@ function performEternity(options = {}) {
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-eternity", { force: true })) return false;
   resetEternityProgression();
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.state.eternityCount)) + 1;
+  runtime.checkAchievements(true);
   if (options.update !== false) runtime.updateUi?.();
   if (options.save !== false) runtime.saveGame?.("manual");
   return true;
