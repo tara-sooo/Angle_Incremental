@@ -1,0 +1,284 @@
+name: Apply Issue 163 Eternity UI Hotfix
+
+on:
+  push:
+    branches:
+      - issue/163-eternity-ui-hotfix
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: issue/163-eternity-ui-hotfix
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply focused UI and browser-test changes
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
+              return text.replace(old, new, 1)
+
+          render_path = Path("src/ui/render-eternity.js")
+          render = render_path.read_text()
+          render = replace_once(
+              render,
+              'let eternityRoot = null;\nlet wrappedUpdateUi = false;',
+              'let eternityRoot = null;\nlet eternityTab = null;\nlet wrappedUpdateUi = false;',
+              "render state",
+          )
+          new_install = r'''function installEternityUi() {
+            if (
+              typeof document === "undefined"
+              || typeof document.querySelector !== "function"
+              || typeof document.querySelectorAll !== "function"
+            ) return null;
+            if (eternityRoot?.isConnected && eternityTab?.isConnected) return eternityRoot;
+
+            const mainTabs = document.querySelector(".main-tabs");
+            const mainPanels = document.querySelector(".main-panels");
+            if (!mainTabs || !mainPanels) return null;
+
+            installEternityStyles();
+
+            // 0.12.0 initially nested Eternity under Infinity. Keep Infinity's
+            // navigation at its original three subtabs and promote Eternity to
+            // the reset layer's own top-level page instead.
+            document.querySelector(".infinity-subtabs")?.classList.remove("has-eternity");
+            document.querySelector('[data-infinity-tab="eternity"]')?.remove();
+            document.querySelector('[data-infinity-panel="eternity"]')?.remove();
+
+            eternityTab = mainTabs.querySelector('[data-tab="eternity"]');
+            if (!eternityTab) {
+              eternityTab = document.createElement("button");
+              eternityTab.className = "main-tab";
+              eternityTab.type = "button";
+              eternityTab.dataset.tab = "eternity";
+              eternityTab.setAttribute("aria-selected", "false");
+              eternityTab.innerHTML = '<span class="tab-icon">E</span><span class="tab-code">ETR</span><small data-i18n="eternityTab">Eternity</small>';
+              const infinityTab = mainTabs.querySelector('[data-tab="infinity"]');
+              if (infinityTab) infinityTab.after(eternityTab);
+              else mainTabs.append(eternityTab);
+            }
+
+            eternityRoot = mainPanels.querySelector('[data-panel="eternity"]');
+            if (!eternityRoot) {
+              eternityRoot = document.createElement("section");
+              eternityRoot.className = "main-panel eternity-page";
+              eternityRoot.dataset.panel = "eternity";
+              eternityRoot.setAttribute("aria-label", "Eternity");
+              eternityRoot.innerHTML = `
+                <header class="page-heading">
+                  <div>
+                    <p class="eyebrow">Eternity</p>
+                    <h1 data-i18n="eternity">Eternity</h1>
+                  </div>
+                </header>
+                <section class="eternity-surface">
+                  <div class="panel-heading">
+                    <span data-i18n="eternity">Eternity</span>
+                    <strong id="eternityHeadingCount">Eternity 0</strong>
+                  </div>
+                  <div class="eternity-panel">
+                    <section class="eternity-overview" aria-label="Eternity status">
+                      <div>
+                        <span data-i18n="eternityCountLabel"></span>
+                        <strong id="eternityCountValue">0</strong>
+                      </div>
+                      <div>
+                        <span data-i18n="eternityRequirementTc4"></span>
+                        <strong id="eternityTc4Requirement" class="eternity-requirement-status"></strong>
+                      </div>
+                      <div>
+                        <span data-i18n="eternityRequirementIp"></span>
+                        <strong id="eternityIpRequirement" class="eternity-requirement-status"></strong>
+                      </div>
+                      <div>
+                        <span data-i18n="eternityCurrentIp"></span>
+                        <strong id="eternityCurrentIp">0 IP</strong>
+                      </div>
+                      <div>
+                        <span data-i18n="eternityRequirement"></span>
+                        <strong id="eternityRequirementState"></strong>
+                      </div>
+                    </section>
+                    <p id="eternityForcedNote" class="eternity-forced-note" data-i18n="eternityForcedNotice"></p>
+                    <section class="eternity-choice-panel" aria-label="First-tier Eternity Milestone choice">
+                      <h2 data-i18n="eternityFirstTierChoice"></h2>
+                      <p class="eternity-choice-hint" data-i18n="eternityFirstTierHint"></p>
+                      <p id="eternityChoiceAllOwned" class="eternity-choice-all-owned" data-i18n="eternityChoiceAllOwned" hidden></p>
+                    </section>
+                    <h2 class="eternity-milestones-heading" data-i18n="eternityMilestones"></h2>
+                    <section class="eternity-milestone-grid" aria-label="Eternity Milestones">
+                      ${MILESTONES.map(milestoneMarkup).join("")}
+                    </section>
+                  </div>
+                </section>`;
+              mainPanels.append(eternityRoot);
+            }
+
+            runtime.elements.mainTabs = Array.from(document.querySelectorAll(".main-tab"));
+            runtime.elements.mainPanels = Array.from(document.querySelectorAll(".main-panel"));
+            runtime.elements.infinitySubtabs = Array.from(document.querySelectorAll(".infinity-subtab"));
+            runtime.elements.infinitySubpanels = Array.from(document.querySelectorAll(".infinity-subpanel"));
+            runtime.elements.i18nNodes = Array.from(document.querySelectorAll("[data-i18n]"));
+
+            if (!eternityRoot.dataset.choiceBound) {
+              eternityRoot.dataset.choiceBound = "true";
+              eternityRoot.addEventListener("click", (event) => {
+                const button = event.target?.closest?.("[data-eternity-choice]");
+                if (!button || button.disabled) return;
+                const id = button.dataset.eternityChoice;
+                if (!runtime.selectEternityMilestone?.(id)) return;
+                runtime.saveGame?.("manual");
+                runtime.updateUi?.();
+              });
+            }
+            return eternityRoot;
+          }'''
+          render, count = re.subn(
+              r'function installEternityUi\(\) \{.*?\n\}\n\nfunction setRequirementState',
+              new_install + '\n\nfunction setRequirementState',
+              render,
+              count=1,
+              flags=re.S,
+          )
+          if count != 1:
+              raise SystemExit(f"installEternityUi: expected one function block, found {count}")
+          render_path.write_text(render)
+
+          css_path = Path("src/ui/eternity-ui.css")
+          css = css_path.read_text()
+          prefix = r'''.eternity-page {
+            overflow: auto;
+            padding: 0 14px 14px;
+          }
+
+          .eternity-page .page-heading {
+            min-height: 70px;
+            margin-bottom: 8px;
+            padding: 10px 14px 8px;
+          }
+
+          .eternity-page h1 {
+            font-size: clamp(1.8rem, 3.2vw, 3rem);
+            line-height: 1;
+          }
+
+          .eternity-surface {
+            padding: 12px;
+            background: linear-gradient(180deg, rgba(23, 36, 59, 0.96), rgba(12, 20, 35, 0.96));
+            border: 2px solid var(--line-strong);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 18px 46px rgba(0, 0, 0, 0.3);
+          }
+
+          '''
+          css, count = re.subn(r'\A.*?(?=\.eternity-panel \{)', prefix, css, count=1, flags=re.S)
+          if count != 1:
+              raise SystemExit("eternity CSS legacy navigation prefix not found")
+          css = replace_once(
+              css,
+              '@media (max-width: 820px) {\n  .infinity-subtabs.has-eternity {\n    grid-template-columns: repeat(2, minmax(0, 1fr));\n  }\n\n  .eternity-overview,',
+              '@media (max-width: 820px) {\n  .eternity-overview,',
+              "mobile legacy Infinity layout",
+          )
+          css_path.write_text(css)
+
+          ui_path = Path("tests/eternity-ui-browser.mjs")
+          ui = ui_path.read_text()
+          ui = replace_once(
+              ui,
+              '    debug.switchMainTab("infinity");\n    debug.switchInfinitySubtab("eternity");',
+              '    debug.switchMainTab("eternity");',
+              "UI test navigation setup",
+          )
+          old_initial = r'''  const initial = await page.evaluate(() => ({
+            tabActive: document.querySelector('[data-infinity-tab="eternity"]')?.classList.contains("is-active"),
+            panelActive: document.querySelector('[data-infinity-panel="eternity"]')?.classList.contains("is-active"),
+            count: document.getElementById("eternityCountValue")?.textContent,
+            tc4: document.getElementById("eternityTc4Requirement")?.textContent,
+            ip: document.getElementById("eternityIpRequirement")?.textContent,
+            title11: document.querySelector('[data-eternity-milestone="1-1"] [data-i18n="eternityMilestone11Name"]')?.textContent,
+            button11: document.querySelector('[data-eternity-choice="1-1"]')?.textContent,
+            panelText: document.querySelector('[data-infinity-panel="eternity"]')?.textContent || "",
+          }));
+          assert.equal(initial.tabActive, true, "Eternity subtab should be selectable through the normal Infinity UI");
+          assert.equal(initial.panelActive, true, "Eternity panel should become active through the normal subtab path");'''
+          new_initial = r'''  const initial = await page.evaluate(() => ({
+            tabActive: document.querySelector('[data-tab="eternity"]')?.classList.contains("is-active"),
+            panelActive: document.querySelector('[data-panel="eternity"]')?.classList.contains("is-active"),
+            legacyInfinityTab: document.querySelector('[data-infinity-tab="eternity"]') !== null,
+            infinitySubtabCount: document.querySelectorAll(".infinity-subtab").length,
+            count: document.getElementById("eternityCountValue")?.textContent,
+            tc4: document.getElementById("eternityTc4Requirement")?.textContent,
+            ip: document.getElementById("eternityIpRequirement")?.textContent,
+            title11: document.querySelector('[data-eternity-milestone="1-1"] [data-i18n="eternityMilestone11Name"]')?.textContent,
+            button11: document.querySelector('[data-eternity-choice="1-1"]')?.textContent,
+            panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
+          }));
+          assert.equal(initial.tabActive, true, "Eternity should be selectable as a top-level main tab");
+          assert.equal(initial.panelActive, true, "Eternity top-level panel should become active through main navigation");
+          assert.equal(initial.legacyInfinityTab, false, "Infinity must not contain an Eternity subtab");
+          assert.equal(initial.infinitySubtabCount, 3, "Infinity navigation should remain Upgrades / Infinite Angle / Tower");'''
+          ui = replace_once(ui, old_initial, new_initial, "UI test initial assertions")
+          ui = ui.replace("[data-infinity-panel=\"eternity\"]", "[data-panel=\"eternity\"]")
+          ui = ui.replace("Eternity panel should remain usable at a mobile viewport", "Eternity top-level panel should remain usable at a mobile viewport")
+          ui_path.write_text(ui)
+
+          e2e_path = Path("tests/eternity-release-e2e.mjs")
+          e2e = e2e_path.read_text()
+          old_open = r'''async function openEternityThroughUi() {
+            await page.click('[data-tab="infinity"]');
+            await page.click('[data-infinity-tab="eternity"]');
+            assert.equal(
+              await page.locator('[data-infinity-panel="eternity"]').evaluate((element) => element.classList.contains("is-active")),
+              true,
+              "Eternity should be reachable through the normal player-facing Infinity navigation",
+            );
+          }'''
+          new_open = r'''async function openEternityThroughUi() {
+            await page.click('[data-tab="eternity"]');
+            assert.equal(
+              await page.locator('[data-panel="eternity"]').evaluate((element) => element.classList.contains("is-active")),
+              true,
+              "Eternity should be reachable through the normal player-facing top-level navigation",
+            );
+            assert.equal(
+              await page.locator('[data-infinity-tab="eternity"]').count(),
+              0,
+              "Infinity must not expose Eternity as a nested subtab",
+            );
+          }'''
+          e2e = replace_once(e2e, old_open, new_open, "release E2E navigation helper")
+          e2e = e2e.replace("[data-infinity-panel=\"eternity\"]", "[data-panel=\"eternity\"]")
+          e2e_path.write_text(e2e)
+          PY
+
+          node --check src/ui/render-eternity.js
+          node --check tests/eternity-ui-browser.mjs
+          node --check tests/eternity-release-e2e.mjs
+          git diff --check
+
+      - name: Commit hotfix and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm .github/workflows/issue-163-eternity-ui-hotfix.yml
+          git add src/ui/render-eternity.js src/ui/eternity-ui.css tests/eternity-ui-browser.mjs tests/eternity-release-e2e.mjs
+          git add -u .github/workflows/issue-163-eternity-ui-hotfix.yml
+          git commit -m "Fix Eternity top-level navigation and release UI"
+          git push origin HEAD:issue/163-eternity-ui-hotfix
