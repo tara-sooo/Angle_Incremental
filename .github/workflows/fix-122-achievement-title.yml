@@ -1,0 +1,70 @@
+name: Fix Achievement 41 title
+
+on:
+  push:
+    branches:
+      - fix/122-achievement-41-title
+
+permissions:
+  contents: write
+
+jobs:
+  fix-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply maintainer title correction
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path("src/systems/achievements.js"): [
+                  ('title: { ja: "時間は生成的", en: "Time is generative" }',
+                   'title: { ja: "Time is generative", en: "Time is generative" }'),
+              ],
+              Path("tests/achievements-v2-module-runtime.js"): [
+                  ('["時間は生成的", "初回Eternityを実行", true]',
+                   '["Time is generative", "初回Eternityを実行", true]'),
+              ],
+              Path("tests/browser-smoke.mjs"): [
+                  ('{ title: "時間は生成的", condition: "初回Eternityを実行", rewardHidden: true }',
+                   '{ title: "Time is generative", condition: "初回Eternityを実行", rewardHidden: true }'),
+                  ('mobileAchievements.lastTitle, "時間は生成的"',
+                   'mobileAchievements.lastTitle, "Time is generative"'),
+              ],
+          }
+
+          for path, pairs in replacements.items():
+              text = path.read_text()
+              for old, new in pairs:
+                  text = text.replace(old, new)
+              path.write_text(text)
+
+          targeted = [
+              Path("src/systems/achievements.js"),
+              Path("tests/achievements-v2-module-runtime.js"),
+              Path("tests/browser-smoke.mjs"),
+          ]
+          for path in targeted:
+              assert "時間は生成的" not in path.read_text(), f"stale translated title remains in {path}"
+          assert 'title: { ja: "Time is generative", en: "Time is generative" }' in Path("src/systems/achievements.js").read_text()
+          PY
+
+      - name: Syntax-check touched JavaScript
+        run: |
+          node --check src/systems/achievements.js
+          node --check tests/achievements-v2-module-runtime.js
+          node --check tests/browser-smoke.mjs
+
+      - name: Commit correction and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/fix-122-achievement-title.yml
+          git add src/systems/achievements.js tests/achievements-v2-module-runtime.js tests/browser-smoke.mjs
+          git commit -m "Correct Achievement 41 Japanese title"
+          git push origin HEAD:fix/122-achievement-41-title
