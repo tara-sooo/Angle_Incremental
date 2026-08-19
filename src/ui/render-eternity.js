@@ -13,6 +13,7 @@ const MILESTONES = Object.freeze([
 ]);
 
 let eternityRoot = null;
+let eternityTab = null;
 let wrappedUpdateUi = false;
 
 function installEternityStyles() {
@@ -48,75 +49,95 @@ function installEternityUi() {
     || typeof document.querySelector !== "function"
     || typeof document.querySelectorAll !== "function"
   ) return null;
-  if (eternityRoot?.isConnected) return eternityRoot;
-  const subtabNav = document.querySelector(".infinity-subtabs");
-  const subpanels = document.querySelector(".infinity-subpanels");
-  if (!subtabNav || !subpanels) return null;
+  if (eternityRoot?.isConnected && eternityTab?.isConnected) return eternityRoot;
+
+  const mainTabs = document.querySelector(".main-tabs");
+  const mainPanels = document.querySelector(".main-panels");
+  if (!mainTabs || !mainPanels) return null;
 
   installEternityStyles();
-  subtabNav.classList.add("has-eternity");
 
-  let tab = subtabNav.querySelector('[data-infinity-tab="eternity"]');
-  if (!tab) {
-    tab = document.createElement("button");
-    tab.className = "eternity-infinity-subtab";
-    tab.type = "button";
-    tab.dataset.infinityTab = "eternity";
-    tab.setAttribute("aria-selected", "false");
-    tab.innerHTML = '<span>ETR</span><strong data-i18n="eternityTab">Eternity</strong>';
-    subtabNav.append(tab);
+  document.querySelector(".infinity-subtabs")?.classList.remove("has-eternity");
+  document.querySelector('[data-infinity-tab="eternity"]')?.remove();
+  document.querySelector('[data-infinity-panel="eternity"]')?.remove();
+
+  eternityTab = mainTabs.querySelector('[data-tab="eternity"]');
+  if (!eternityTab) {
+    eternityTab = document.createElement("button");
+    eternityTab.className = "eternity-main-tab";
+    eternityTab.type = "button";
+    eternityTab.dataset.tab = "eternity";
+    eternityTab.setAttribute("aria-selected", "false");
+    eternityTab.innerHTML = '<span class="tab-icon">E</span><span class="tab-code">ETR</span><small data-i18n="eternityTab">Eternity</small>';
+    const infinityTab = mainTabs.querySelector('[data-tab="infinity"]');
+    if (infinityTab) infinityTab.after(eternityTab);
+    else mainTabs.append(eternityTab);
   }
 
-  eternityRoot = subpanels.querySelector('[data-infinity-panel="eternity"]');
+  eternityRoot = mainPanels.querySelector('[data-panel="eternity"]');
   if (!eternityRoot) {
     eternityRoot = document.createElement("section");
-    eternityRoot.className = "infinity-panel infinity-subpanel";
-    eternityRoot.dataset.infinityPanel = "eternity";
+    eternityRoot.className = "main-panel eternity-page";
+    eternityRoot.dataset.panel = "eternity";
+    eternityRoot.setAttribute("aria-label", "Eternity");
     eternityRoot.innerHTML = `
-      <div class="panel-heading">
-        <span data-i18n="eternity">Eternity</span>
-        <strong id="eternityHeadingCount">Eternity 0</strong>
-      </div>
-      <div class="eternity-panel">
-        <section class="eternity-overview" aria-label="Eternity status">
-          <div>
-            <span data-i18n="eternityCountLabel"></span>
-            <strong id="eternityCountValue">0</strong>
-          </div>
-          <div>
-            <span data-i18n="eternityRequirementTc4"></span>
-            <strong id="eternityTc4Requirement" class="eternity-requirement-status"></strong>
-          </div>
-          <div>
-            <span data-i18n="eternityRequirementIp"></span>
-            <strong id="eternityIpRequirement" class="eternity-requirement-status"></strong>
-          </div>
-          <div>
-            <span data-i18n="eternityCurrentIp"></span>
-            <strong id="eternityCurrentIp">0 IP</strong>
-          </div>
-          <div>
-            <span data-i18n="eternityRequirement"></span>
-            <strong id="eternityRequirementState"></strong>
-          </div>
-        </section>
-        <p id="eternityForcedNote" class="eternity-forced-note" data-i18n="eternityForcedNotice"></p>
-        <section class="eternity-choice-panel" aria-label="First-tier Eternity Milestone choice">
-          <h2 data-i18n="eternityFirstTierChoice"></h2>
-          <p class="eternity-choice-hint" data-i18n="eternityFirstTierHint"></p>
-          <p id="eternityChoiceAllOwned" class="eternity-choice-all-owned" data-i18n="eternityChoiceAllOwned" hidden></p>
-        </section>
-        <h2 class="eternity-milestones-heading" data-i18n="eternityMilestones"></h2>
-        <section class="eternity-milestone-grid" aria-label="Eternity Milestones">
-          ${MILESTONES.map(milestoneMarkup).join("")}
-        </section>
-      </div>`;
-    subpanels.append(eternityRoot);
+      <header class="page-heading">
+        <div>
+          <p class="eyebrow">Eternity</p>
+          <h1 data-i18n="eternity">Eternity</h1>
+        </div>
+      </header>
+      <section class="eternity-surface">
+        <div class="panel-heading">
+          <span data-i18n="eternity">Eternity</span>
+          <strong id="eternityHeadingCount">Eternity 0</strong>
+        </div>
+        <div class="eternity-panel">
+          <section class="eternity-overview" aria-label="Eternity status">
+            <div>
+              <span data-i18n="eternityCountLabel"></span>
+              <strong id="eternityCountValue">0</strong>
+            </div>
+            <div>
+              <span data-i18n="eternityRequirementTc4"></span>
+              <strong id="eternityTc4Requirement" class="eternity-requirement-status"></strong>
+            </div>
+            <div>
+              <span data-i18n="eternityRequirementIp"></span>
+              <strong id="eternityIpRequirement" class="eternity-requirement-status"></strong>
+            </div>
+            <div>
+              <span data-i18n="eternityCurrentIp"></span>
+              <strong id="eternityCurrentIp">0 IP</strong>
+            </div>
+            <div>
+              <span data-i18n="eternityRequirement"></span>
+              <strong id="eternityRequirementState"></strong>
+            </div>
+          </section>
+          <p id="eternityForcedNote" class="eternity-forced-note" data-i18n="eternityForcedNotice"></p>
+          <section class="eternity-choice-panel" aria-label="First-tier Eternity Milestone choice">
+            <h2 data-i18n="eternityFirstTierChoice"></h2>
+            <p class="eternity-choice-hint" data-i18n="eternityFirstTierHint"></p>
+            <p id="eternityChoiceAllOwned" class="eternity-choice-all-owned" data-i18n="eternityChoiceAllOwned" hidden></p>
+          </section>
+          <h2 class="eternity-milestones-heading" data-i18n="eternityMilestones"></h2>
+          <section class="eternity-milestone-grid" aria-label="Eternity Milestones">
+            ${MILESTONES.map(milestoneMarkup).join("")}
+          </section>
+        </div>
+      </section>`;
+    mainPanels.append(eternityRoot);
   }
 
-  const existingInfinitySubtabs = Array.from(document.querySelectorAll(".infinity-subtab"));
-  if (!existingInfinitySubtabs.includes(tab)) existingInfinitySubtabs.push(tab);
-  runtime.elements.infinitySubtabs = existingInfinitySubtabs;
+  const existingMainTabs = Array.from(document.querySelectorAll(".main-tab"));
+  if (!existingMainTabs.includes(eternityTab)) {
+    const infinityIndex = existingMainTabs.findIndex((button) => button.dataset.tab === "infinity");
+    existingMainTabs.splice(infinityIndex >= 0 ? infinityIndex + 1 : existingMainTabs.length, 0, eternityTab);
+  }
+  runtime.elements.mainTabs = existingMainTabs;
+  runtime.elements.mainPanels = Array.from(document.querySelectorAll(".main-panel"));
+  runtime.elements.infinitySubtabs = Array.from(document.querySelectorAll(".infinity-subtab"));
   runtime.elements.infinitySubpanels = Array.from(document.querySelectorAll(".infinity-subpanel"));
   runtime.elements.i18nNodes = Array.from(document.querySelectorAll("[data-i18n]"));
 
