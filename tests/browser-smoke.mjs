@@ -561,7 +561,7 @@ try {
     { title: "無限万長者", condition: "Infinity数が1.5e6を超える", rewardHidden: false },
     { title: "とうに越した先に", condition: "TC3をクリア", rewardHidden: true },
     { title: "挑戦権、そして時空の片道切符", condition: "TC4をクリア", rewardHidden: true },
-    { title: "時間は生成的", condition: "初回Eternityを実行", rewardHidden: true },
+    { title: "Time is generative", condition: "初回Eternityを実行", rewardHidden: true },
   ], "the desktop Japanese achievement definitions should be exact");
   assert.deepEqual(achievementUi.english, [
     { title: "Assuming It Is Unlucky", condition: "Hold at least 1e44 IP." },
@@ -1585,7 +1585,7 @@ try {
     });
     assert.equal(mobileAchievements.panelActive, true, "the Achievements panel should activate on mobile");
     assert.equal(mobileAchievements.count, 41, "the mobile Achievements panel should render 41 rows");
-    assert.equal(mobileAchievements.lastTitle, "時間は生成的", "the mobile Achievements panel should keep the final row visible");
+    assert.equal(mobileAchievements.lastTitle, "Time is generative", "the mobile Achievements panel should keep the final row visible");
     assert.ok(mobileAchievements.listWidth > 0, "the mobile achievement list should have a visible layout");
 
     const mobileVertexGainDisplay = await mobilePage.evaluate(() => {
