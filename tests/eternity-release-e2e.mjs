@@ -68,14 +68,19 @@ async function openEternityThroughUi() {
   );
 }
 
-async function chooseFirstTier(id) {
+async function acquireFirstTier(id) {
   await openEternityThroughUi();
+  const before = await page.evaluate(() => window.__angleDebug.runtime.firstTierMilestoneEntitlementCount());
+  assert.ok(before > 0, `${id} should only be acquired when a first-tier entitlement exists`);
   await page.click(`[data-eternity-choice="${id}"]`);
-  assert.equal(
-    await page.evaluate(() => window.__angleDebug.state.eternityMilestoneChoice),
-    id,
-    `normal Eternity UI should select ${id} for the next successful Eternity`,
-  );
+  const acquired = await page.evaluate((milestoneId) => ({
+    active: window.__angleDebug.runtime.eternityMilestoneActive(milestoneId),
+    choice: window.__angleDebug.state.eternityMilestoneChoice,
+    entitlement: window.__angleDebug.runtime.firstTierMilestoneEntitlementCount(),
+  }), id);
+  assert.equal(acquired.active, true, `normal Eternity UI should acquire ${id} immediately`);
+  assert.equal(acquired.choice, "", "the post-Eternity acquisition flow must not use pending-choice state");
+  assert.equal(acquired.entitlement, before - 1, "one acquisition should consume exactly one earned entitlement");
 }
 
 async function clearTc4AtTarget() {
@@ -121,15 +126,22 @@ async function clearTc4AtTarget() {
   assert.equal(result.achievement40, true, "TC4 completion should grant Achievement 40 through the normal achievement path");
 }
 
-async function forceQualifiedEternity() {
-  return page.evaluate(() => {
+async function performQualifiedEternityThroughUi() {
+  await page.evaluate(() => {
     const debug = window.__angleDebug;
     debug.runtime.syncInfinityPointCachesFromExact(debug.runtime.MAX_EXACT_INFINITY_POINTS);
-    const canEternity = debug.canEternity();
-    const performed = debug.maybeForceEternity({ save: false, update: false });
     debug.runtime.updateUi();
-    return { canEternity, performed };
   });
+  await openEternityThroughUi();
+  const ready = await page.evaluate(() => ({
+    canEternity: window.__angleDebug.canEternity(),
+    legacyForced: window.__angleDebug.maybeForceEternity({ save: false, update: false }),
+    buttonDisabled: document.getElementById("eternityPerformButton")?.disabled,
+  }));
+  assert.equal(ready.canEternity, true, "TC4 completion plus 1.80e308 IP should make Eternity available");
+  assert.equal(ready.legacyForced, false, "qualified state must not trigger Eternity through the legacy automatic hook");
+  assert.equal(ready.buttonDisabled, false, "the player-facing Eternity button should enable when qualified");
+  await page.click("#eternityPerformButton");
 }
 
 try {
@@ -159,12 +171,13 @@ try {
       .filter((element) => !element.textContent.trim()).map((element) => element.dataset.i18n),
     panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
     tc4Reward: window.__angleDebug.runtime.towerChallengeReward(4),
+    entitlement: window.__angleDebug.runtime.firstTierMilestoneEntitlementCount(),
   }));
   assert.deepEqual(releaseCopy.missingKeys, [], "Japanese Eternity release UI should not contain missing/placeholder i18n strings");
   assert.equal(releaseCopy.panelText.includes("Eternity Point"), false, "release UI must not introduce an Eternity Point surface");
   assert.match(releaseCopy.tc4Reward, /Eternity周回/, "TC4 reward copy should describe the shipped Eternity requirement rather than a future placeholder");
+  assert.equal(releaseCopy.entitlement, 0, "no first-tier acquisition should exist before the first Eternity");
 
-  await chooseFirstTier("1-1");
   await clearTc4AtTarget();
 
   const beforeFullRequirement = await page.evaluate(() => {
@@ -176,12 +189,10 @@ try {
     };
   });
   assert.equal(beforeFullRequirement.canEternity, false, "TC4 completion alone must not satisfy Eternity without 1.80e308 IP");
-  assert.equal(beforeFullRequirement.forced, false, "pre-Break Eternity must not fire before the full requirement is met");
+  assert.equal(beforeFullRequirement.forced, false, "Eternity must not fire before the full requirement is met");
   assert.equal(beforeFullRequirement.count, 0, "failed Eternity eligibility must not increment Eternity count");
 
-  const firstEternity = await forceQualifiedEternity();
-  assert.equal(firstEternity.canEternity, true, "TC4 completion plus 1.80e308 IP should satisfy Eternity");
-  assert.equal(firstEternity.performed, true, "the pre-Break forced Eternity path should execute exactly once when qualified");
+  await performQualifiedEternityThroughUi();
 
   const firstState = await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -189,6 +200,7 @@ try {
       count: debug.state.eternityCount,
       mask: debug.state.eternityMilestoneMask,
       choice: debug.state.eternityMilestoneChoice,
+      entitlement: debug.runtime.firstTierMilestoneEntitlementCount(),
       completedTc: debug.state.completedTowerChallenges,
       achievement40: debug.runtime.isAchievementUnlocked(40),
       achievement41: debug.runtime.isAchievementUnlocked(41),
@@ -199,17 +211,26 @@ try {
       timeFluxCustomSpeed: debug.state.timeFluxCustomSpeed,
     };
   });
-  assert.equal(firstState.count, 1, "first Eternity should increment count exactly once");
-  assert.equal(firstState.mask, 1, "first Eternity should acquire only the selected 1-1 Milestone");
-  assert.equal(firstState.choice, "", "first Eternity should consume the pending first-tier choice");
+  assert.equal(firstState.count, 1, "first manual Eternity should increment count exactly once");
+  assert.equal(firstState.mask, 0, "Eternity should not auto-acquire a first-tier Milestone");
+  assert.equal(firstState.choice, "", "Eternity should not create a pending first-tier choice");
+  assert.equal(firstState.entitlement, 1, "first Eternity should grant one persistent first-tier acquisition");
   assert.equal(firstState.completedTc, 0, "Eternity should reset all current-run TC completion");
   assert.equal(firstState.achievement40, true, "Achievement 40 should persist after TC4 completion is reset");
-  assert.equal(firstState.achievement41, true, "the first successful Eternity should grant Achievement 41");
+  assert.equal(firstState.achievement41, true, "the first successful manual Eternity should grant Achievement 41");
   assert.deepEqual(
     [firstState.timeFlux, firstState.timeFluxCapacityLevel, firstState.timeFluxGainLevel, firstState.timeFluxSpeed, firstState.timeFluxCustomSpeed],
     [246, 2, 3, 4, 5],
     "all global Time Flux gameplay state should persist through Eternity",
   );
+
+  await acquireFirstTier("1-1");
+  const firstAcquired = await page.evaluate(() => ({
+    mask: window.__angleDebug.state.eternityMilestoneMask,
+    entitlement: window.__angleDebug.runtime.firstTierMilestoneEntitlementCount(),
+  }));
+  assert.equal(firstAcquired.mask, 1, "1-1 should be acquired after the first Eternity");
+  assert.equal(firstAcquired.entitlement, 0, "the first acquisition should consume the first entitlement");
 
   await page.evaluate(() => window.__angleDebug.saveGame("manual"));
   await page.reload({ waitUntil: "networkidle" });
@@ -220,6 +241,7 @@ try {
       count: debug.state.eternityCount,
       mask: debug.state.eternityMilestoneMask,
       choice: debug.state.eternityMilestoneChoice,
+      entitlement: debug.runtime.firstTierMilestoneEntitlementCount(),
       completedTc: debug.state.completedTowerChallenges,
       achievementMaskHigh: debug.state.achievementMaskHigh,
       timeFlux: debug.state.timeFlux,
@@ -227,12 +249,12 @@ try {
   });
   assert.equal(reloaded.count, 1, "normal browser save/load should retain Eternity count");
   assert.equal(reloaded.mask, 1, "normal browser save/load should retain first-tier ownership");
-  assert.equal(reloaded.choice, "", "normal browser save/load should not resurrect the consumed first-tier choice");
+  assert.equal(reloaded.choice, "", "normal browser save/load should not create pending first-tier choice state");
+  assert.equal(reloaded.entitlement, 0, "derived entitlement should remain consumed after save/load");
   assert.equal(reloaded.completedTc, 0, "normal browser save/load should not resurrect pre-Eternity TC completion");
   assert.equal(reloaded.achievementMaskHigh & ACHIEVEMENT_38_TO_41_MASK, ACHIEVEMENT_38_TO_41_MASK, "Achievements 38-41 should all persist through the first Eternity and reload");
   assert.equal(reloaded.timeFlux, 246, "global Time Flux should persist through browser save/load");
 
-  await chooseFirstTier("1-2");
   const rebuilt = await page.evaluate(() => {
     const debug = window.__angleDebug;
     const { runtime, state } = debug;
@@ -254,48 +276,69 @@ try {
   assert.equal(rebuilt.prerequisiteMask & 0b111, 0b111, "controlled rebuild fixture should retain re-cleared TC1-TC3 prerequisites");
 
   await clearTc4AtTarget();
-  const secondEternity = await forceQualifiedEternity();
-  assert.equal(secondEternity.canEternity, true, "the rebuilt run should qualify for a second Eternity after re-clearing TC4");
-  assert.equal(secondEternity.performed, true, "the second qualified run should perform Eternity");
-  const secondState = await page.evaluate(() => ({
+  await performQualifiedEternityThroughUi();
+  const secondBeforeAcquire = await page.evaluate(() => ({
     count: window.__angleDebug.state.eternityCount,
     mask: window.__angleDebug.state.eternityMilestoneMask,
+    entitlement: window.__angleDebug.runtime.firstTierMilestoneEntitlementCount(),
     completedTc: window.__angleDebug.state.completedTowerChallenges,
     achievementMaskHigh: window.__angleDebug.state.achievementMaskHigh,
     timeFlux: window.__angleDebug.state.timeFlux,
   }));
-  assert.equal(secondState.count, 2, "the representative TC4 -> Eternity -> rebuild -> TC4 -> Eternity loop should reach Eternity count 2");
-  assert.equal(secondState.mask, 3, "the second Eternity should acquire 1-2 without duplicating 1-1");
-  assert.equal(secondState.completedTc, 0, "the second Eternity should reset TC completion again");
-  assert.equal(secondState.achievementMaskHigh & ACHIEVEMENT_38_TO_41_MASK, ACHIEVEMENT_38_TO_41_MASK, "Achievements 38-41 should remain persistent across repeated Eternities");
-  assert.equal(secondState.timeFlux, 246, "global Time Flux should remain persistent across repeated Eternities");
+  assert.equal(secondBeforeAcquire.count, 2, "the representative TC4 -> Eternity -> rebuild -> TC4 -> Eternity loop should reach Eternity count 2");
+  assert.equal(secondBeforeAcquire.mask, 1, "the second Eternity should not auto-acquire another first-tier Milestone");
+  assert.equal(secondBeforeAcquire.entitlement, 1, "the second Eternity should grant another first-tier acquisition");
+  assert.equal(secondBeforeAcquire.completedTc, 0, "the second Eternity should reset TC completion again");
+  assert.equal(secondBeforeAcquire.achievementMaskHigh & ACHIEVEMENT_38_TO_41_MASK, ACHIEVEMENT_38_TO_41_MASK, "Achievements 38-41 should remain persistent across repeated Eternities");
+  assert.equal(secondBeforeAcquire.timeFlux, 246, "global Time Flux should remain persistent across repeated Eternities");
 
-  await chooseFirstTier("1-3");
-  const thresholdState = await page.evaluate(() => {
+  await acquireFirstTier("1-2");
+  assert.equal(
+    await page.evaluate(() => window.__angleDebug.state.eternityMilestoneMask),
+    3,
+    "the second earned acquisition should add 1-2 without duplicating 1-1",
+  );
+
+  await page.evaluate(() => {
     const debug = window.__angleDebug;
     debug.state.eternityCount = 4;
+    debug.state.eternityMilestoneMask = 3;
     debug.state.completedTowerChallenges = 1 << 3;
     debug.runtime.syncInfinityPointCachesFromExact(debug.runtime.MAX_EXACT_INFINITY_POINTS);
-    const before = debug.runtime.eternityMilestoneActive("2");
-    const performed = debug.maybeForceEternity({ save: false, update: false });
     debug.runtime.updateUi();
-    return {
-      before,
-      performed,
-      count: debug.state.eternityCount,
-      mask: debug.state.eternityMilestoneMask,
-      milestone2: debug.runtime.eternityMilestoneActive("2"),
-    };
   });
-  assert.equal(thresholdState.before, false, "Milestone 2 should remain inactive at Eternity count 4");
-  assert.equal(thresholdState.performed, true, "a controlled qualifying run should advance the threshold fixture through a real Eternity transition");
-  assert.equal(thresholdState.count, 5, "the threshold fixture should advance to Eternity count 5 through the real transition");
-  assert.equal(thresholdState.mask, 7, "the third first-tier choice should be acquired once on that successful Eternity");
+  const thresholdBefore = await page.evaluate(() => ({
+    milestone2: window.__angleDebug.runtime.eternityMilestoneActive("2"),
+    canEternity: window.__angleDebug.canEternity(),
+    forced: window.__angleDebug.maybeForceEternity({ save: false, update: false }),
+  }));
+  assert.equal(thresholdBefore.milestone2, false, "Milestone 2 should remain inactive at Eternity count 4");
+  assert.equal(thresholdBefore.canEternity, true, "the controlled threshold fixture should qualify for manual Eternity");
+  assert.equal(thresholdBefore.forced, false, "the threshold fixture must remain stable until the player acts");
+
+  await openEternityThroughUi();
+  await page.click("#eternityPerformButton");
+  const thresholdState = await page.evaluate(() => ({
+    count: window.__angleDebug.state.eternityCount,
+    mask: window.__angleDebug.state.eternityMilestoneMask,
+    entitlement: window.__angleDebug.runtime.firstTierMilestoneEntitlementCount(),
+    milestone2: window.__angleDebug.runtime.eternityMilestoneActive("2"),
+  }));
+  assert.equal(thresholdState.count, 5, "the threshold fixture should advance to Eternity count 5 through the manual transition");
+  assert.equal(thresholdState.mask, 3, "the threshold Eternity should not auto-acquire the remaining first-tier Milestone");
+  assert.equal(thresholdState.entitlement, 1, "the unused third first-tier acquisition should remain available");
   assert.equal(thresholdState.milestone2, true, "Milestone 2 should activate at Eternity count 5");
   assert.equal(
     await page.locator('[data-eternity-milestone="2"] .eternity-milestone-status').textContent(),
     "有効",
     "player-facing UI should reflect the count-5 Milestone activation",
+  );
+
+  await acquireFirstTier("1-3");
+  assert.equal(
+    await page.evaluate(() => window.__angleDebug.state.eternityMilestoneMask),
+    7,
+    "the remaining first-tier Milestone should be acquired after the successful Eternity",
   );
 
   await page.evaluate(() => {
@@ -307,11 +350,12 @@ try {
   const english = await page.evaluate(() => ({
     missingKeys: Array.from(document.querySelectorAll('[data-panel="eternity"] [data-i18n]'))
       .filter((element) => !element.textContent.trim()).map((element) => element.dataset.i18n),
-    forced: document.getElementById("eternityForcedNote")?.textContent || "",
+    manual: document.getElementById("eternityForcedNote")?.textContent || "",
     panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
   }));
   assert.deepEqual(english.missingKeys, [], "English Eternity release UI should not contain missing/placeholder i18n strings");
-  assert.match(english.forced, /performed automatically/, "English release copy should explain pre-Break forced Eternity");
+  assert.match(english.manual, /manually/, "English release copy should explain manual Eternity");
+  assert.doesNotMatch(english.manual, /performed automatically/, "English release copy must not describe forced Eternity");
   assert.equal(english.panelText.includes("Eternity Point"), false, "English release UI must not introduce an Eternity Point surface");
 
   await page.evaluate(() => {
