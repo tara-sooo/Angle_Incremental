@@ -245,7 +245,7 @@ const ACHIEVEMENTS = [
     isUnlocked: () => runtime.towerChallengeCompleted(4),
   },
   {
-    title: { ja: "時間は生成的", en: "Time is generative" },
+    title: { ja: "Time is generative", en: "Time is generative" },
     condition: { ja: "初回Eternityを実行", en: "Perform Eternity for the first time." },
     reward: { ja: "", en: "" },
     isUnlocked: () => runtime.state.eternityCount > 0,
