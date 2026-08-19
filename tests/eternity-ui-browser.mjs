@@ -50,8 +50,6 @@ try {
   await page.evaluate(() => {
     const debug = window.__angleDebug;
     debug.runtime.closeUpdateModal?.();
-    debug.switchMainTab("infinity");
-    debug.switchInfinitySubtab("eternity");
     debug.state.language = "ja";
     debug.state.eternityCount = 0;
     debug.state.eternityMilestoneMask = 0;
@@ -61,19 +59,24 @@ try {
     debug.runtime.appliedLanguage = "";
     debug.runtime.updateUi();
   });
+  await page.click('[data-tab="eternity"]');
 
   const initial = await page.evaluate(() => ({
-    tabActive: document.querySelector('[data-infinity-tab="eternity"]')?.classList.contains("is-active"),
-    panelActive: document.querySelector('[data-infinity-panel="eternity"]')?.classList.contains("is-active"),
+    tabActive: document.querySelector('[data-tab="eternity"]')?.classList.contains("is-active"),
+    panelActive: document.querySelector('[data-panel="eternity"]')?.classList.contains("is-active"),
+    legacyInfinityTab: document.querySelector('[data-infinity-tab="eternity"]') !== null,
+    infinitySubtabCount: document.querySelectorAll(".infinity-subtab").length,
     count: document.getElementById("eternityCountValue")?.textContent,
     tc4: document.getElementById("eternityTc4Requirement")?.textContent,
     ip: document.getElementById("eternityIpRequirement")?.textContent,
     title11: document.querySelector('[data-eternity-milestone="1-1"] [data-i18n="eternityMilestone11Name"]')?.textContent,
     button11: document.querySelector('[data-eternity-choice="1-1"]')?.textContent,
-    panelText: document.querySelector('[data-infinity-panel="eternity"]')?.textContent || "",
+    panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
   }));
-  assert.equal(initial.tabActive, true, "Eternity subtab should be selectable through the normal Infinity UI");
-  assert.equal(initial.panelActive, true, "Eternity panel should become active through the normal subtab path");
+  assert.equal(initial.tabActive, true, "Eternity should be selectable as a top-level main tab");
+  assert.equal(initial.panelActive, true, "Eternity top-level panel should become active through main navigation");
+  assert.equal(initial.legacyInfinityTab, false, "Infinity must not contain an Eternity subtab");
+  assert.equal(initial.infinitySubtabCount, 3, "Infinity navigation should remain Upgrades / Infinite Angle / Tower");
   assert.equal(initial.count, "0", "Eternity count should be visible");
   assert.equal(initial.tc4, "未達成", "TC4 requirement should show its current state");
   assert.equal(initial.ip, "未達成", "IP requirement should show its current state");
@@ -126,11 +129,11 @@ try {
 
   await page.setViewportSize({ width: 412, height: 915 });
   const mobile = await page.evaluate(() => ({
-    visible: document.querySelector('[data-infinity-panel="eternity"]')?.classList.contains("is-active"),
-    width: document.querySelector('[data-infinity-panel="eternity"]')?.getBoundingClientRect().width || 0,
+    visible: document.querySelector('[data-panel="eternity"]')?.classList.contains("is-active"),
+    width: document.querySelector('[data-panel="eternity"]')?.getBoundingClientRect().width || 0,
     firstButtonWidth: document.querySelector('[data-eternity-choice="1-2"]')?.getBoundingClientRect().width || 0,
   }));
-  assert.equal(mobile.visible, true, "Eternity panel should remain usable at a mobile viewport");
+  assert.equal(mobile.visible, true, "Eternity top-level panel should remain usable at a mobile viewport");
   assert.ok(mobile.width > 0 && mobile.firstButtonWidth > 0, "Eternity controls should keep a visible mobile layout");
 
   console.log("Eternity UI browser test passed");
