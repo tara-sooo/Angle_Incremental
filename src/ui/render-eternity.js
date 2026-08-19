@@ -43,6 +43,11 @@ function milestoneMarkup(milestone) {
 }
 
 function installEternityUi() {
+  if (
+    typeof document === "undefined"
+    || typeof document.querySelector !== "function"
+    || typeof document.querySelectorAll !== "function"
+  ) return null;
   if (eternityRoot?.isConnected) return eternityRoot;
   const subtabNav = document.querySelector(".infinity-subtabs");
   const subpanels = document.querySelector(".infinity-subpanels");
