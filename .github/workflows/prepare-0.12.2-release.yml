@@ -1,21 +1,18 @@
 name: Prepare 0.12.2 Release
 
 on:
-  push:
-    branches:
-      - release-0.12.2
-    paths:
-      - .prepare-0.12.2-trigger
   pull_request:
     branches:
-      - main
+      - release-0.12.2
+    types:
+      - opened
 
 permissions:
   contents: write
 
 jobs:
   prepare:
-    if: github.head_ref == 'release-0.12.2' || github.ref == 'refs/heads/release-0.12.2'
+    if: github.head_ref == 'chore/run-0.12.2-preparer'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
