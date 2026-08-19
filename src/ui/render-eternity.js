@@ -64,7 +64,7 @@ function installEternityUi() {
   eternityTab = mainTabs.querySelector('[data-tab="eternity"]');
   if (!eternityTab) {
     eternityTab = document.createElement("button");
-    eternityTab.className = "main-tab";
+    eternityTab.className = "eternity-main-tab";
     eternityTab.type = "button";
     eternityTab.dataset.tab = "eternity";
     eternityTab.setAttribute("aria-selected", "false");
@@ -130,7 +130,12 @@ function installEternityUi() {
     mainPanels.append(eternityRoot);
   }
 
-  runtime.elements.mainTabs = Array.from(document.querySelectorAll(".main-tab"));
+  const existingMainTabs = Array.from(document.querySelectorAll(".main-tab"));
+  if (!existingMainTabs.includes(eternityTab)) {
+    const infinityIndex = existingMainTabs.findIndex((button) => button.dataset.tab === "infinity");
+    existingMainTabs.splice(infinityIndex >= 0 ? infinityIndex + 1 : existingMainTabs.length, 0, eternityTab);
+  }
+  runtime.elements.mainTabs = existingMainTabs;
   runtime.elements.mainPanels = Array.from(document.querySelectorAll(".main-panel"));
   runtime.elements.infinitySubtabs = Array.from(document.querySelectorAll(".infinity-subtab"));
   runtime.elements.infinitySubpanels = Array.from(document.querySelectorAll(".infinity-subpanel"));
