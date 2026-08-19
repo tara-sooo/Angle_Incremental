@@ -55,7 +55,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
-      github.head_ref == 'chore/run-clean-0.12.2-preparer-ci'
+      github.head_ref == 'chore/run-clean-0.12.2-preparer-ci-2'
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -81,6 +81,7 @@ jobs:
           set -euo pipefail
           python ../helper/scripts/prepare-0.12.2-release.py
           npm ci
+          npx playwright install chromium
           npm run validate
           git diff --check
       - name: Commit prepared clean 0.12.2 release
