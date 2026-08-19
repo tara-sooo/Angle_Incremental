@@ -470,7 +470,7 @@ async function runAchievementV2ModuleRuntimeTest() {
       ["無限万長者", "Infinity数が1.5e6を超える", false],
       ["とうに越した先に", "TC3をクリア", true],
       ["挑戦権、そして時空の片道切符", "TC4をクリア", true],
-      ["時間は生成的", "初回Eternityを実行", true],
+      ["Time is generative", "初回Eternityを実行", true],
     ];
     japaneseDefinitions.forEach(([title, condition, rewardHidden], offset) => {
       const row = rows[31 + offset];
