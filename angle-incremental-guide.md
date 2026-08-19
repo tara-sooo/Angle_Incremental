@@ -11,7 +11,7 @@
 大まかな進行順は次の通りです。
 
 ```text
-通常強化 -> Generation -> Core Boost -> Infinity -> IA / Tower / Infinity Challenge / Break Infinite Cap
+通常強化 -> Generation -> Core Boost -> Infinity -> IA / Tower / Infinity Challenge / TC4 -> Eternity
 ```
 
 ## 2. 最初に見るところ
@@ -131,7 +131,15 @@ IAには周回速度、角の追加、頂点獲得量の専用強化がありま
 
 **Tower** は **1.00e50 IP** から建設できます。TowerはInfinityでリセットされず、階数ごとに通常スコア累乗へ `+^0.05` の補正が加わります。Floor 3、5、8、12でそれぞれTC1〜TC4が解放され、その先の建設には対応するTCのクリアが必要です。
 
-TC1の目標は **1e1000 Score** で、クリアするとFloor 3を基準に1階層ごとにInfinity Scoreの累乗へ`+0.077`が加わります。TC2の目標は **1e3000 Score** で、クリア後はFloor 5を基準にCore Boost要求量の生指数が1階層ごとに`-0.03`されます。生指数が`1.50`未満になると強いソフトキャップがかかりますが、効果は固定されずに少しずつ伸び続けます。TC3はFloor 8で解放され、**1e5000 Score** が目標です。TC3中はScore獲得とInfinity Score生成を`^0.001`／`^0.1`から開始し、Infinity回数600,000で`^0.8`／`^0.5`まで緩和します。クリア後はFloor 8以降の追加階層ごとにSpeed・Vertex・Gainの有効購入数が`×1.05`されます。TC4はまだ未実装です。
+TC1の目標は **1e1000 Score** で、クリアするとFloor 3を基準に1階層ごとにInfinity Scoreの累乗へ`+0.077`が加わります。TC2の目標は **1e3000 Score** で、クリア後はFloor 5を基準にCore Boost要求量の生指数が1階層ごとに`-0.03`されます。生指数が`1.50`未満になると強いソフトキャップがかかりますが、効果は固定されずに少しずつ伸び続けます。TC3はFloor 8で解放され、**1e5000 Score** が目標です。TC3中はScore獲得とInfinity Score生成を`^0.001`／`^0.1`から開始し、Infinity回数600,000で`^0.8`／`^0.5`まで緩和します。クリア後はFloor 8以降の追加階層ごとにSpeed・Vertex・Gainの有効購入数が`×1.05`されます。TC4はFloor 12で解放されます。通常強化とIA強化はレベル1までに制限され、TC4専用のA/B/C強化を使って **1e7777 Score** を目指します。TC4をクリアすると、そのEternity周回でEternity条件の片方を満たします。
+
+### Eternity
+
+EternityはInfinityより上の第4リセットです。現在の周回でTC4をクリアしたうえで **1.80e308 IP** に到達すると、Break Eternity以前は自動的にEternityが発生します。Eternity Pointのような通貨はありません。
+
+EternityではInfinity以下の進行、IA、Tower、TC進行が大きくリセットされます。一方で、実績、Eternity回数とMilestone、設定や統計、保存されているTime Flux状態は残ります。
+
+最初の3回のEternityではMilestone 1-1〜1-3から、1回につき未取得のものを1つ選べます。その後はEternity回数5・8・12・20でMilestone 2〜5が順に有効になります。Eternityタブで現在の回数、条件、Milestone状態を確認できます。
 
 ### オフライン進行
 
@@ -141,7 +149,7 @@ Settingsタブの「オフライン進行」で、離席中の進行を有効／
 
 ## 10. 実績
 
-実績は37個あります。実績を取るたびに、頂点通過ごとの増加に少しずつ倍率がかかります。
+実績は41個あります。実績を取るたびに、頂点通過ごとの増加に少しずつ倍率がかかります。
 
 一部の実績には追加報酬があります。
 
