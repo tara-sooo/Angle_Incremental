@@ -49,6 +49,7 @@ try {
   await page.evaluate(() => window.__angleDebug.ready);
   await page.evaluate(() => {
     const debug = window.__angleDebug;
+    debug.runtime.closeUpdateModal?.();
     debug.switchMainTab("infinity");
     debug.switchInfinitySubtab("eternity");
     debug.state.language = "ja";
