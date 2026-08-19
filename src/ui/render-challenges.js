@@ -117,6 +117,13 @@ function createTowerChallengeRows() {
   }
 }
 
+function towerChallengeDisplayName(index) {
+  if (index !== 4) return runtime.towerChallengeName(index);
+  return runtime.state.language === "en"
+    ? "TC4 Substitute for Existing Products"
+    : "TC4 既存品の代替";
+}
+
 function towerChallenge4UpgradeEffectText(kind, effectKey, level) {
   if (kind === "baseGain") {
     return `${runtime.t(effectKey)}: +${runtime.tc4BaseGainPartsBonus().toFixed(2)} parts`;
@@ -154,7 +161,7 @@ function updateTowerChallengeRows() {
     const button = row.querySelector("button");
     row.classList.toggle("is-completed", completed);
     row.classList.toggle("is-active", active);
-    row.querySelector(".challenge-name").textContent = runtime.towerChallengeName(index) || `TC${index}`;
+    row.querySelector(".challenge-name").textContent = towerChallengeDisplayName(index) || `TC${index}`;
     row.querySelector(".challenge-state").textContent = !implemented
       ? runtime.t("towerChallengeComingSoon")
       : active
