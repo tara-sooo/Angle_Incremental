@@ -238,6 +238,18 @@ const ACHIEVEMENTS = [
     reward: { ja: "", en: "" },
     isUnlocked: () => runtime.towerChallengeCompleted(3),
   },
+  {
+    title: { ja: "挑戦権、そして時空の片道切符", en: "The Right to Challenge, and a One-Way Ticket Through Spacetime" },
+    condition: { ja: "TC4をクリア", en: "Complete TC4." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.towerChallengeCompleted(4),
+  },
+  {
+    title: { ja: "時間は生成的", en: "Time is generative" },
+    condition: { ja: "初回Eternityを実行", en: "Perform Eternity for the first time." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.state.eternityCount > 0,
+  },
 ];
 
 let cachedAchievementSignature = null;

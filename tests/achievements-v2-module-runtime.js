@@ -19,8 +19,8 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { state } = instance.debug;
     const { runtime } = instance;
 
-    assert.equal(runtime.ACHIEVEMENT_COUNT, 39, "achievement total should be derived from the 39 definitions");
-    assert.equal(runtime.ACHIEVEMENTS.length, 39, "achievement definition array should contain 39 entries");
+    assert.equal(runtime.ACHIEVEMENT_COUNT, 41, "achievement total should be derived from the 41 definitions");
+    assert.equal(runtime.ACHIEVEMENTS.length, 41, "achievement definition array should contain 41 entries");
 
     state.achievementMask = 0;
     state.gainLevel = 10;
@@ -129,6 +129,16 @@ async function runAchievementV2ModuleRuntimeTest() {
         before: (state) => { state.completedTowerChallenges = 0; },
         after: (state) => { state.completedTowerChallenges = 1 << 2; },
       },
+      {
+        id: 40,
+        before: (state) => { state.completedTowerChallenges = 0; },
+        after: (state) => { state.completedTowerChallenges = 1 << 3; },
+      },
+      {
+        id: 41,
+        before: (state) => { state.eternityCount = 0; },
+        after: (state) => { state.eternityCount = 1; },
+      },
     ];
     for (const testCase of cases) {
       const instance = await loadRuntime(candidatePath);
@@ -151,10 +161,32 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { runtime } = instance;
 
     state.achievementMask = 0;
-    state.achievementMaskHigh = 0b11111111;
+    state.achievementMaskHigh = 0;
+    runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
+    state.completedTowerChallenges = 1 << 3;
+    runtime.checkAchievements(false);
+    assert.equal(runtime.isAchievementUnlocked(40), true, "TC4 completion should unlock achievement 40 before Eternity reset");
+    assert.equal(runtime.isAchievementUnlocked(41), false, "Eternity eligibility alone must not unlock achievement 41");
+
+    assert.equal(runtime.performEternity({ save: false, update: false }), true, "a successful Eternity should execute for achievement coverage");
+    assert.equal(state.eternityCount, 1, "successful Eternity should increment the count once");
+    assert.equal(state.completedTowerChallenges, 0, "Eternity should reset current-run TC completion");
+    assert.equal(runtime.isAchievementUnlocked(40), true, "achievement 40 should survive the Eternity reset");
+    assert.equal(runtime.isAchievementUnlocked(41), true, "achievement 41 should unlock after the successful Eternity transition");
+    assert.ok(runtime.achievementCount() >= 2, "achievements 40 and 41 should be counted after the successful Eternity");
+    assertNearlyEqual(runtime.achievementGainMultiplier(), Math.pow(1.01, runtime.achievementCount()), "achievements 40 and 41 should use the shared multiplier");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
+    state.achievementMask = 0;
+    state.achievementMaskHigh = 0b1111111111;
     assert.equal(runtime.isAchievementUnlocked(1), false, "high achievement bits must not unlock achievement 1");
     assert.equal(runtime.isAchievementUnlocked(2), false, "high achievement bits must not unlock achievement 2");
-    [32, 33, 34, 35, 36, 37, 38, 39].forEach((id) => {
+    [32, 33, 34, 35, 36, 37, 38, 39, 40, 41].forEach((id) => {
       assert.equal(runtime.isAchievementUnlocked(id), true, `achievement ${id} should use its high-mask bit`);
     });
 
@@ -165,9 +197,9 @@ async function runAchievementV2ModuleRuntimeTest() {
     assert.equal(runtime.isAchievementUnlocked(32), false, "low achievement bits must not unlock achievement 32");
 
     state.achievementMask = 0x7fffffff;
-    state.achievementMaskHigh = 0b11111111;
-    assert.equal(runtime.achievementCount(), 39, "all 39 achievements should be counted across both masks");
-    assertNearlyEqual(runtime.achievementGainMultiplier(), Math.pow(1.01, 39), "all 39 achievements should apply the shared multiplier");
+    state.achievementMaskHigh = 0b1111111111;
+    assert.equal(runtime.achievementCount(), 41, "all 41 achievements should be counted across both masks");
+    assertNearlyEqual(runtime.achievementGainMultiplier(), Math.pow(1.01, 41), "all 41 achievements should apply the shared multiplier");
   }
 
   {
@@ -312,7 +344,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     const lowMask = 1 << (31 - 1);
-    const highMask = 0b11111111;
+    const highMask = 0b1111111111;
 
     runtime.applySaveData({ achievementMask: lowMask }, 10);
     assert.equal(debug.state.achievementMask, lowMask, "old v10 saves should preserve the low achievement mask");
@@ -331,7 +363,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     const reloaded = await loadRuntime(candidatePath);
     reloaded.runtime.applySaveData(serialized.state, serialized.version);
     assert.equal(reloaded.debug.state.achievementMask, lowMask, "save reload should retain achievement 31");
-    assert.equal(reloaded.debug.state.achievementMaskHigh, highMask, "save reload should retain achievements 32-39");
+    assert.equal(reloaded.debug.state.achievementMaskHigh, highMask, "save reload should retain achievements 32-41");
 
     const code = await runtime.exportSaveCode();
     debug.state.achievementMask = 0;
@@ -345,13 +377,13 @@ async function runAchievementV2ModuleRuntimeTest() {
     const instance = await loadRuntime(candidatePath);
     const { state } = instance.debug;
     const { runtime } = instance;
-    state.achievementMaskHigh = (1 << (38 - 32)) | (1 << (39 - 32));
+    state.achievementMaskHigh = (1 << (40 - 32)) | (1 << (41 - 32));
 
     runtime.resetBelowCoreBoost();
     runtime.resetBelowInfinity();
 
-    assert.equal(runtime.isAchievementUnlocked(38), true, "achievement 38 should survive normal layer resets");
-    assert.equal(runtime.isAchievementUnlocked(39), true, "achievement 39 should survive normal layer resets");
+    assert.equal(runtime.isAchievementUnlocked(40), true, "achievement 40 should survive normal layer resets");
+    assert.equal(runtime.isAchievementUnlocked(41), true, "achievement 41 should survive normal layer resets");
   }
 
   {
@@ -402,7 +434,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     runtime.updateAchievementRows();
 
     const rows = runtime.elements.achievementList.querySelectorAll(".achievement-row");
-    assert.equal(rows.length, 39, "achievement rows should be rendered in the module runtime");
+    assert.equal(rows.length, 41, "achievement rows should be rendered in the module runtime");
 
     const firstReward = rows[0].querySelector(".achievement-reward");
     assert.equal(firstReward.textContent, "", "achievements without individual rewards should not repeat the shared reward");
@@ -437,6 +469,8 @@ async function runAchievementV2ModuleRuntimeTest() {
       ["物騒な名前", "TC2をクリア", true],
       ["無限万長者", "Infinity数が1.5e6を超える", false],
       ["とうに越した先に", "TC3をクリア", true],
+      ["挑戦権、そして時空の片道切符", "TC4をクリア", true],
+      ["時間は生成的", "初回Eternityを実行", true],
     ];
     japaneseDefinitions.forEach(([title, condition, rewardHidden], offset) => {
       const row = rows[31 + offset];
@@ -456,6 +490,8 @@ async function runAchievementV2ModuleRuntimeTest() {
       ["A Violent-Sounding Name", "Complete TC2."],
       ["Infinity Millionaire", "Have more than 1.5e6 Infinity."],
       ["Far Beyond", "Complete TC3."],
+      ["The Right to Challenge, and a One-Way Ticket Through Spacetime", "Complete TC4."],
+      ["Time is generative", "Perform Eternity for the first time."],
     ];
     state.language = "en";
     runtime.updateAchievementRows();
