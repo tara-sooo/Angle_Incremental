@@ -1,0 +1,39 @@
+name: Prepare 0.12.0 Release
+
+on:
+  pull_request:
+    branches:
+      - "release/**"
+    types:
+      - opened
+      - synchronize
+      - reopened
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.head_ref == 'chore/0.12.0-release-prep' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Prepare release candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/prepare-release-0.12.0.py
+          npm run check:version
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add version.json src/core/constants.js index.html src/data/i18n.js src/ui/events.js \
+            angle-incremental-spec.md angle-incremental-guide.md progress.md docs/releases/0.12.0.md
+          git commit -m "Prepare 0.12.0 release candidate"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
