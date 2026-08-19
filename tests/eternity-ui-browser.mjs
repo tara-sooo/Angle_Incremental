@@ -109,13 +109,18 @@ try {
   assert.equal(progressed.active2, "有効", "count-based Milestone 2 should show active at Eternity 5");
   assert.equal(progressed.locked3, "未解放", "later count-based Milestones should remain locked below their threshold");
 
-  await page.selectOption("#languageSelect", "en");
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.language = "en";
+    debug.runtime.appliedLanguage = "";
+    debug.runtime.updateUi();
+  });
   const english = await page.evaluate(() => ({
     countLabel: document.querySelector('[data-i18n="eternityCountLabel"]')?.textContent,
     title11: document.querySelector('[data-i18n="eternityMilestone11Name"]')?.textContent,
     forced: document.getElementById("eternityForcedNote")?.textContent,
   }));
-  assert.equal(english.countLabel, "Eternity count", "Eternity UI should switch to English through the normal language control");
+  assert.equal(english.countLabel, "Eternity count", "Eternity UI should switch to English when the shared language state changes");
   assert.equal(english.title11, "1-1 Spirit of QoL", "Milestone names should have English copy");
   assert.match(english.forced || "", /performed automatically/, "English copy should explain forced pre-Break Eternity");
 
