@@ -4,6 +4,8 @@ on:
   pull_request_target:
     types:
       - synchronize
+      - ready_for_review
+      - reopened
 
 permissions:
   contents: write
