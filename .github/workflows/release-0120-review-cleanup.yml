@@ -1,0 +1,233 @@
+name: Release 0.12.0 review cleanup
+
+on:
+  push:
+    branches:
+      - fix/157-release-review-cleanup
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/157-release-review-cleanup
+          fetch-depth: 0
+
+      - name: Compact research reports and synchronize release docs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          ROOT = Path('.')
+          REPORTS = ROOT / 'reports'
+
+          def load(name):
+              return json.loads((REPORTS / name).read_text())
+
+          def write(name, value):
+              (REPORTS / name).write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n')
+
+          note = (
+              'Compact tracked research summary for release history. '
+              'Full route/search output is reproducible from the corresponding simulator script and Markdown report.'
+          )
+
+          data = load('tc4-balance-candidate-a.json')
+          write('tc4-balance-candidate-a.json', {
+              '_artifactPolicy': note,
+              'issue': data['issue'],
+              'title': data['title'],
+              'researchOnly': data['researchOnly'],
+              'sourceIssue': data['sourceIssue'],
+              'targetLog10': data['targetLog10'],
+              'horizonSeconds': data['horizonSeconds'],
+              'stepSeconds': data['stepSeconds'],
+              'routeSearchLimits': data['routeSearchLimits'],
+              'stallSeconds': data['stallSeconds'],
+              'policyComparisons': [
+                  {
+                      'policy': item['policy'],
+                      'peakScoreLog10': item['peakScoreLog10'],
+                      'thresholdReached': item['thresholdReached'],
+                  }
+                  for item in data['policyComparisons']
+                  if item['policy']['id'] in ('gain-aware-2x', 'threshold-aware')
+              ],
+          })
+
+          data = load('tc4-balance-sweep.json')
+          write('tc4-balance-sweep.json', {
+              '_artifactPolicy': note,
+              'issue': data['issue'],
+              'title': data['title'],
+              'researchOnly': data['researchOnly'],
+              'sourceIssue': data['sourceIssue'],
+              'strategySourceIssue': data['strategySourceIssue'],
+              'targetLog10': data['targetLog10'],
+              'evaluatedResetPolicies': data['evaluatedResetPolicies'],
+              'candidateGrid': data['candidateGrid'],
+              'candidateAComparability': {
+                  'sourceIssue': data['candidateAComparability'].get('sourceIssue'),
+                  'referenceReport': data['candidateAComparability'].get('referenceReport'),
+                  'toleranceLog10': data['candidateAComparability'].get('toleranceLog10'),
+                  'optionsMatch': data['candidateAComparability'].get('optionsMatch'),
+                  'withinTolerance': data['candidateAComparability'].get('withinTolerance'),
+              },
+              'candidateClassifications': data['candidateClassifications'],
+          })
+
+          data = load('tc4-a-form-frontier.json')
+          target_id = 'log-A1.00-B0.35-C1'
+          compact_candidates = []
+          for candidate in data['candidates']:
+              if candidate['candidateId'] != target_id:
+                  compact_candidates.append({'candidateId': candidate['candidateId']})
+                  continue
+              compact_candidates.append({
+                  'candidateId': candidate['candidateId'],
+                  'frontierSearch': [
+                      {
+                          'policy': entry['policy'],
+                          'allLegal': {
+                              'continuation': {
+                                  'frontierCount': entry['allLegal']['continuation']['frontierCount'],
+                                  'frontier': entry['allLegal']['continuation']['frontier'],
+                              },
+                          },
+                      }
+                      for entry in candidate['frontierSearch']
+                  ],
+              })
+          write('tc4-a-form-frontier.json', {
+              '_artifactPolicy': (
+                  'Compact replay fixture retained because Issue #139 reconstructs the log-A continuation from this frontier. '
+                  'Non-replay route/search detail remains summarized in reports/tc4-a-form-frontier.md.'
+              ),
+              'issue': data['issue'],
+              'title': data['title'],
+              'researchOnly': data['researchOnly'],
+              'noProductionChanges': data['noProductionChanges'],
+              'sourceIssue': data.get('sourceIssue'),
+              'sourceCommit': data['sourceCommit'],
+              'targetLog10': data['targetLog10'],
+              'options': data['options'],
+              'candidateDefinitions': data['candidateDefinitions'],
+              'candidates': compact_candidates,
+          })
+
+          summary_keys = (
+              'issue', 'title', 'researchOnly', 'sourceIssue', 'sourceIssues',
+              'relationshipToIssue98', 'relationshipToIssue125', 'targetLog10',
+              'evaluatedResetPolicies', 'probeDesign', 'candidateDesign',
+              'diagnosticControl', 'fixedParameters', 'mode', 'sourceReport',
+              'candidate', 'stagePlan', 'progressionAssessment', 'outcome',
+              'recommendation', 'nextSearchRecommendation', 'uncertainty',
+              'noProductionChanges', 'sourceCommit', 'options',
+              'freshnessVerification', 'anyReachedE2500', 'anyReachedE7777',
+          )
+          for name in (
+              'tc4-balance-followup.json',
+              'tc4-balance-sensitivity.json',
+              'tc4-balance-a-search.json',
+              'tc4-a-form-search.json',
+              'tc4-log-frontier-continuation.json',
+          ):
+              data = load(name)
+              compact = {'_artifactPolicy': note}
+              for key in summary_keys:
+                  if key in data:
+                      compact[key] = data[key]
+              write(name, compact)
+
+          def replace_exact(path, old, new):
+              text = Path(path).read_text()
+              if old not in text:
+                  raise SystemExit(f'missing expected text in {path}: {old!r}')
+              Path(path).write_text(text.replace(old, new))
+
+          replace_exact(
+              'docs/releases/0.12.0.md',
+              '- Eternity Milestone 1-1〜5を追加しました。最初の3回はfirst-tierから1回につき1つを選択し、その後はEternity回数5・8・12・20で追加効果が解放されます。',
+              '- Eternity Milestone 1-1〜5を追加しました。各Eternityで未取得のfirst-tierから最大1つを選択でき、最初の3回で1つずつ選べば3つすべてを揃えられます。その後はEternity回数5・8・12・20で追加効果が解放されます。',
+          )
+          replace_exact(
+              'docs/releases/0.12.0.md',
+              '- 実績38〜41を追加しました。TC3・TC4・Eternity進行を対象とし、実績41の名称は日本語UIでも`Time is generative`と表示します。',
+              '- 実績38〜41を追加しました。Infinity回数1.5e6超、TC3クリア、TC4クリア、初回Eternityをそれぞれ対象とし、実績41の名称は日本語UIでも`Time is generative`と表示します。',
+          )
+          replace_exact(
+              'angle-incremental-guide.md',
+              '最初の3回のEternityではMilestone 1-1〜1-3から、1回につき未取得のものを1つ選べます。その後はEternity回数5・8・12・20でMilestone 2〜5が順に有効になります。Eternityタブで現在の回数、条件、Milestone状態を確認できます。',
+              'Milestone 1-1〜1-3は、各Eternityで未取得のものを最大1つ選べます。最初の3回で1つずつ選べば3つすべてを揃えられますが、選ばなかった回があっても後のEternityで取得できます。Eternity回数5・8・12・20ではMilestone 2〜5が順に有効になります。Eternityタブで現在の回数、条件、Milestone状態を確認できます。',
+          )
+          replace_exact(
+              'angle-incremental-guide.md',
+              '| IU 1-2 | 通常強化の自動購入 |',
+              '| IU 1-2 または Eternity Milestone 1-1 | 通常強化の自動購入 |',
+          )
+          replace_exact(
+              'angle-incremental-guide.md',
+              '| IU 8-1 | Infinity自動実行 |',
+              '| IU 8-1 または Eternity Milestone 5 | Infinity自動実行 |',
+          )
+          replace_exact(
+              'angle-incremental-spec.md',
+              'オフライン復帰開始時点で自動化全体、Infinity自動化、最小IPしきい値、IU8-1が有効で、チャレンジ中でない場合は、保存済み最高速度を使って不足分のInfinity回数を直接集約する。',
+              'オフライン復帰開始時点で自動化全体、Infinity自動化、最小IPしきい値が有効で、IU8-1またはEternity Milestone 5によってInfinity自動化が解放されており、チャレンジ中でない場合は、保存済み最高速度を使って不足分のInfinity回数を直接集約する。',
+          )
+          replace_exact(
+              'angle-incremental-spec.md',
+              '| IU 1-2 | 通常強化の自動購入。全体オン/オフと3種個別オン/オフを持つ。 |',
+              '| IU 1-2 または Eternity Milestone 1-1 | 通常強化の自動購入。全体オン/オフと3種個別オン/オフを持つ。 |',
+          )
+          replace_exact(
+              'angle-incremental-spec.md',
+              '| IU 8-1 | Infinity自動実行。 |',
+              '| IU 8-1 または Eternity Milestone 5 | Infinity自動実行。 |',
+          )
+
+          gitignore = Path('.gitignore').read_text()
+          if 'reports/generated/\n' not in gitignore:
+              gitignore = gitignore.replace('browser-smoke-report.json\n', 'browser-smoke-report.json\nreports/generated/\n')
+              Path('.gitignore').write_text(gitignore)
+          PY
+
+      - name: Verify compact fixtures and syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          paths = sorted(Path('reports').glob('*.json'))
+          for path in paths:
+              json.loads(path.read_text())
+              if path.stat().st_size > 1024 * 1024:
+                  raise SystemExit(f'{path} is still larger than 1 MiB: {path.stat().st_size}')
+          print('Tracked JSON report sizes:')
+          for path in paths:
+              print(f'  {path}: {path.stat().st_size} bytes')
+          PY
+          node --check scripts/simulate-tc4-balance.js
+          node --check scripts/simulate-tc4-log-frontier-continuation.js
+          node --check tests/tc4-balance-simulation.js
+          node --check tests/tc4-log-frontier-continuation.js
+
+      - name: Commit cleanup and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/release-0120-review-cleanup.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Clean up 0.12.0 release review findings'
+          git push origin HEAD:fix/157-release-review-cleanup
