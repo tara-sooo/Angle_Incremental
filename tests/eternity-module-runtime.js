@@ -9,6 +9,150 @@ function markEternityReady(runtime, state) {
   state.completedTowerChallenges = 1 << 3;
 }
 
+function setScore(state, log10) {
+  state.scoreLog10 = log10;
+  state.score = log10 <= 308 ? 10 ** log10 : Number.MAX_VALUE;
+}
+
+async function testMilestoneChoiceLifecycle() {
+  const { debug, runtime } = await loadRuntime(candidatePath);
+  const { state } = debug;
+
+  assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), ["1-1", "1-2", "1-3"]);
+  assert.equal(runtime.selectEternityMilestone("1-1"), true, "the first-tier choice should be selectable before the first Eternity");
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.equal(state.eternityCount, 1);
+  assert.equal(state.eternityMilestoneMask, 1, "one selected first-tier milestone should be acquired");
+  assert.equal(state.eternityMilestoneChoice, "", "the pending choice should be consumed");
+  assert.equal(runtime.normalAutomationUnlocked(), true, "1-1 should unlock pre-Infinity automation");
+  assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), ["1-2", "1-3"]);
+
+  state.eternityMilestoneChoice = "1-2";
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.equal(state.eternityMilestoneMask, 3, "one Eternity must not acquire multiple first-tier choices");
+
+  state.eternityMilestoneChoice = "1-3";
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.equal(state.eternityMilestoneMask, 7, "all first-tier milestones should be acquirable over later Eternities");
+  assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), [], "no first-tier offer remains after all three are owned");
+  assert.equal(Object.hasOwn(state, "eternityPoints"), false, "milestones must not introduce an EP currency");
+}
+
+async function testMilestoneThresholdsAndEffects() {
+  const { debug, runtime } = await loadRuntime(candidatePath);
+  const { state } = debug;
+
+  state.eternityCount = 4;
+  assert.equal(runtime.eternityMilestoneActive("2"), false);
+  state.eternityCount = 5;
+  assert.equal(runtime.eternityMilestoneActive("2"), true);
+  state.eternityCount = 7;
+  assert.equal(runtime.eternityMilestoneActive("3"), false);
+  state.eternityCount = 8;
+  assert.equal(runtime.eternityMilestoneActive("3"), true);
+  state.eternityCount = 11;
+  assert.equal(runtime.eternityMilestoneActive("4"), false);
+  assert.equal(runtime.eternityMilestoneActive("5"), false);
+  state.eternityCount = 12;
+  assert.equal(runtime.eternityMilestoneActive("4"), true);
+  state.eternityCount = 20;
+  assert.equal(runtime.eternityMilestoneActive("5"), true);
+  assert.equal(runtime.infinityAutomationUnlocked(), true, "5 should unlock the existing Infinity automation path");
+
+  state.eternityMilestoneMask = 1;
+  state.eternityCount = 1;
+  state.automationEnabled = true;
+  state.autoBuySpeed = true;
+  state.autoBuyVertex = false;
+  state.autoBuyGain = false;
+  setScore(state, 20);
+  state.speedLevel = 0;
+  runtime.runAutobuyers();
+  assert.ok(state.speedLevel > 0, "1-1 should unlock the existing normal-upgrade autobuyer");
+
+  state.eternityMilestoneMask = 0;
+  state.eternityCount = 20;
+  state.autoRunInfinity = true;
+  state.autoInfinityPointThresholdLog10 = 0;
+  state.infinityCount = 1;
+  state.activeChallenge = 0;
+  state.activeTowerChallenge = 0;
+  setScore(state, 309);
+  assert.equal(runtime.runLayerAutomation(), true, "5 should unlock the existing Infinity-layer automation");
+  assert.equal(state.infinityCount, 2, "milestone 5 automation should still use the normal Infinity action");
+
+  state.eternityMilestoneMask = 2;
+  state.eternityCount = 2;
+  state.towerFloor = 13;
+  state.completedTowerChallenges = 1 << 2;
+  state.speedLevel = 100;
+  state.gainLevel = 100;
+  state.vertices = 103;
+  assert.ok(Math.abs(runtime.effectiveSpeedLevel() - 147.62815625) < 1e-12, "1-2 must add its bonus after TC3 Speed scaling");
+  assert.ok(Math.abs(runtime.effectiveGainLevel() - 147.62815625) < 1e-12, "1-2 must add its bonus after TC3 Gain scaling");
+  assert.equal(runtime.effectiveVertexCount(), 150, "1-2 must add its bonus after TC3 Vertex scaling");
+
+  state.eternityMilestoneMask = 0;
+  state.eternityCount = 5;
+  setScore(state, 10);
+  state.speedLevel = 1;
+  const scoreBeforeIc7Reward = state.scoreLog10;
+  assert.equal(runtime.isChallengeCompleted(7), false, "milestone 2 must not mark the raw IC7 completion bit");
+  assert.equal(runtime.spendNormalUpgrade("speed"), true, "milestone 2 must provide the IC7 score-spend reward");
+  assert.equal(state.scoreLog10, scoreBeforeIc7Reward, "milestone 2 must not spend score for a normal upgrade");
+
+  state.eternityCount = 8;
+  setScore(state, 20);
+  state.generationScoreLog10 = 10;
+  state.generationScore = 1e10;
+  state.generationCount = 1;
+  state.previousGenerationScoreLog10 = 6;
+  state.previousGenerationScore = 1e6;
+  state.speedLevel = 4;
+  state.gainLevel = 5;
+  assert.equal(runtime.runGeneration(), undefined);
+  assert.equal(state.scoreLog10, 20, "milestone 3 must preserve score through GR");
+  assert.equal(state.generationScoreLog10, 10, "milestone 3 must preserve Generation progress through GR");
+  assert.equal(state.speedLevel, 4, "milestone 3 must preserve normal upgrades through GR");
+  state.coreBoostCount = 0;
+  assert.equal(runtime.runCoreBoost(), undefined);
+  assert.equal(state.coreBoostCount, 1, "milestone 3 must preserve the CB action");
+  assert.equal(state.scoreLog10, 20, "milestone 3 must preserve score through CB");
+  assert.equal(state.generationCount, 2, "milestone 3 must preserve Generation count through CB");
+
+  state.eternityCount = 11;
+  state.coreBoostCount = 2;
+  assert.equal(runtime.coreBoostRequirementLog10(), 80, "CB cost must remain unchanged before milestone 4");
+  state.eternityCount = 12;
+  assert.equal(runtime.coreBoostRequirementLog10(), 72, "milestone 4 must raise only the CB cost to ^0.9");
+}
+
+async function testMilestoneStartingLevelsAndSaveLoad() {
+  const source = await loadRuntime(candidatePath);
+  const { debug, runtime } = source;
+  const { state } = debug;
+
+  state.eternityMilestoneChoice = "1-3";
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.equal(state.infiniteAngleSpeedLevel, 5, "1-3 should start IA Speed at level 5");
+  assert.equal(state.infiniteAngleVertexLevel, 5, "1-3 should start IA Vertex at level 5");
+  assert.equal(state.infiniteAngleGainLevel, 5, "1-3 should start IA Gain at level 5");
+
+  state.eternityMilestoneMask = 5;
+  state.eternityCount = 20;
+  state.eternityMilestoneChoice = "1-2";
+  const saveData = runtime.serializeSaveData();
+  saveData.savedAt = Date.now();
+  const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(saveData)]]));
+  assert.equal(loaded.debug.state.eternityMilestoneMask, 5, "milestone ownership must survive save/load");
+  assert.equal(loaded.debug.state.eternityMilestoneChoice, "1-2", "a pending choice must survive save/load");
+  assert.equal(loaded.runtime.eternityMilestoneActive("5"), true, "count-based milestones must survive save/load");
+}
+
 async function testThresholdAndResetBoundary() {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
@@ -164,6 +308,9 @@ async function testInfinityCompletionTrigger() {
 }
 
 async function runEternityModuleRuntimeTest() {
+  await testMilestoneChoiceLifecycle();
+  await testMilestoneThresholdsAndEffects();
+  await testMilestoneStartingLevelsAndSaveLoad();
   await testThresholdAndResetBoundary();
   await testInfinityCompletionTrigger();
   await testForcedLoadAndImportPersistence();

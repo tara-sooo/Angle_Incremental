@@ -690,7 +690,7 @@ async function checkForRemoteUpdate() {
 }
 
 function runAutobuyers() {
-  if (!runtime.hasInfinityUpgrade("1-2") || !runtime.state.automationEnabled) return;
+  if (!runtime.normalAutomationUnlocked?.() || !runtime.state.automationEnabled) return;
   runtime.buyAllUpgrades({
     refresh: false,
     save: false,
@@ -729,7 +729,7 @@ function shouldAutoRunGeneration() {
 
 function runLayerAutomation() {
   if (!runtime.state.automationEnabled) return false;
-  const infinityAutomationUnlocked = runtime.hasInfinityUpgrade("8-1");
+  const infinityAutomationUnlocked = runtime.infinityAutomationUnlocked?.() || false;
   const generationCoreAutomationUnlocked = runtime.isAchievementUnlocked(19);
 
   if (
@@ -772,7 +772,7 @@ function update(dt, allowOffline = false) {
   runtime.updateChallengeTimers(dt);
   runtime.updateInfiniteAngle(dt);
 
-  if (runtime.hasInfinityUpgrade("1-2") && runtime.state.automationEnabled) {
+  if (runtime.normalAutomationUnlocked?.() && runtime.state.automationEnabled) {
     normalAutobuyElapsed += dt;
     if (normalAutobuyElapsed >= runtime.AUTOBUY_INTERVAL_SECONDS) {
       normalAutobuyElapsed %= runtime.AUTOBUY_INTERVAL_SECONDS;
@@ -874,7 +874,7 @@ function offlineInfinityAggregationEnabled() {
     && runtime.state.autoRunInfinity
     && runtime.state.autoInfinityPointThresholdLog10 === 0
     && runtime.state.infinityCount > 0
-    && runtime.hasInfinityUpgrade("8-1")
+    && (runtime.infinityAutomationUnlocked?.() || false)
     && runtime.state.activeChallenge <= 0
     && runtime.state.activeTowerChallenge <= 0;
 }
@@ -1775,8 +1775,8 @@ function renderGameToText() {
       activeStatisticsSubtab,
     },
     automation: {
-      unlocked: runtime.hasInfinityUpgrade("1-2"),
-      layerUnlocked: runtime.hasInfinityUpgrade("8-1"),
+      unlocked: runtime.normalAutomationUnlocked?.() || false,
+      layerUnlocked: runtime.infinityAutomationUnlocked?.() || false,
       enabled: runtime.state.automationEnabled,
       speed: runtime.state.autoBuySpeed,
       vertex: runtime.state.autoBuyVertex,
@@ -1928,6 +1928,7 @@ window.__angleDebug = {
   canEternity: runtime.canEternity,
   performEternity: runtime.performEternity,
   maybeForceEternity: runtime.maybeForceEternity,
+  selectEternityMilestone: runtime.selectEternityMilestone,
   buyInfinityUpgrade: runtime.buyInfinityUpgrade,
   buyAllUpgrades: runtime.buyAllUpgrades,
   generationRewardFor: runtime.generationRewardFor,

@@ -28,7 +28,8 @@ function coreBoostRequirementLog10() {
   if (!Number.isFinite(multiplier)) return runtime.MAX_TRACKED_LOG10;
   const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
   const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
-  return Math.min(challengeAdjustedLog10, runtime.MAX_TRACKED_LOG10);
+  const cappedLog10 = Math.min(challengeAdjustedLog10, runtime.MAX_TRACKED_LOG10);
+  return runtime.eternityMilestoneCoreBoostRequirementLog10?.(cappedLog10) ?? cappedLog10;
 }
 
 function coreBoostRequirement() {
@@ -125,7 +126,7 @@ function runCoreBoost() {
   runtime.state.currentInfinityRunHadCoreBoost = true;
   runtime.state.coreBoostCount += 1;
   runtime.checkAchievements(true);
-  resetBelowCoreBoost();
+  if (!runtime.eternityMilestonePreservesCoreBoostReset?.()) resetBelowCoreBoost();
   runtime.updateUi();
   runtime.saveGame("manual");
 }

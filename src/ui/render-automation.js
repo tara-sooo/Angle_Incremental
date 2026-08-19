@@ -15,9 +15,9 @@ function infinityRunRecordText(record, index) {
 }
 
 function updateAutomationUi() {
-  const unlocked = runtime.hasInfinityUpgrade("1-2");
+  const unlocked = runtime.normalAutomationUnlocked?.() || false;
   const generationCoreUnlocked = runtime.isAchievementUnlocked(19);
-  const infinityUnlocked = runtime.hasInfinityUpgrade("8-1");
+  const infinityUnlocked = runtime.infinityAutomationUnlocked?.() || false;
   if (!runtime.elements.automationMasterToggle) return;
   runtime.elements.automationLockNote.textContent = unlocked ? runtime.t("infinityUpgradeAvailable") : runtime.t("automationLocked");
   runtime.elements.automationMasterToggle.disabled = !unlocked;

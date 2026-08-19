@@ -596,6 +596,8 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.coreBoostCount = Math.floor(runtime.sanitizeNumber(data.coreBoostCount, 0));
   runtime.state.infinityCount = Math.floor(runtime.sanitizeNumber(data.infinityCount, 0));
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.sanitizeNumber(data.eternityCount, 0)));
+  runtime.state.eternityMilestoneMask = runtime.normalizeEternityMilestoneMask?.(data.eternityMilestoneMask) ?? 0;
+  runtime.state.eternityMilestoneChoice = runtime.normalizeEternityMilestoneChoice?.(data.eternityMilestoneChoice) || "";
   const infinityPoints = runtime.hydrateLogResource(data.infinityPoints, data.infinityPointsLog10, -Infinity, true);
   runtime.state.infinityPoints = infinityPoints.value;
   runtime.state.infinityPointsLog10 = infinityPoints.log;
@@ -1222,6 +1224,8 @@ function resetSave() {
     coreBoostCount: 0,
     infinityCount: 0,
     eternityCount: 0,
+    eternityMilestoneMask: 0,
+    eternityMilestoneChoice: "",
     infinityPoints: 0,
     infinityPointsLog10: -Infinity,
     infinityPointsExact: "0",
