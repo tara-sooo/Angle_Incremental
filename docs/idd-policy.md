@@ -34,6 +34,19 @@
 - **Issue-authoring companion**: not installed
 - **Worktree guard**: 有効。`core.hooksPath=.githooks`をローカルで設定する
 
+## IDD experience memory
+
+IDDの実行状態とは別に、再利用価値のあるプロジェクト固有の経験を `docs/idd-experience/` に保存します。共通の実行規則は `.github/instructions/idd-experience.instructions.md` に置き、特定のモデルやセッションの隠れたメモリには依存しません。
+
+- B2/B3では、Issue・Candidate files・予定変更箇所から関連topicを決め、`docs/idd-experience/index.md`経由で関連する経験だけを読みます。全topicの一括ロードは行いません。
+- 経験は現在のIssue、maintainer判断、現行spec/code、IDD policy/config、現行test/CIより低い権威です。競合時は現行の権威側を優先し、古い経験を更新またはsupersedeします。
+- 再利用できる非自明な知見が得られた場合だけ、Cでdiffが安定した後かつPR submissionへ進む前に経験を追加・更新します。通常の成功だけでは記録を要求しません。
+- 同じ知見は重複追加せず既存recordを更新します。安定した規則は通常docs/policyへ、機械化できる規則はtest/helper/CIへ昇格させ、経験recordは`promoted`として権威先を指します。
+- F4は既にmergeされたdiffに含まれる経験を報告できますが、experienceのためにpost-merge repository mutationを新設しません。経験記録の有無は新しいhuman gateやcompletion gateではありません。
+- private chain-of-thought、完全なagent transcript、credential、外部SaaS memory/databaseは経験ストアの対象外です。
+
+この層はDiscoverの範囲を変更しません。引き続き作業対象は明示されたGitHub Issueだけです。
+
 ## No-advisory verification boundary
 
 The repository relies on CI, branch protection/rulesets, unresolved review
