@@ -30,6 +30,18 @@ Because this lesson is promoted, future workers must follow the listed authorita
 - Authoritative at: not yet promoted; `.github/instructions/idd-experience.instructions.md` is the current implementation of this active lesson
 - Last verified: 2026-08-21
 
+### EXP-WF-003 — Check live Issue state immediately before creating Issues
+
+- Status: active
+- Scope: GitHub Issue creation; batch Issue creation; concurrent/multi-agent repository work
+- Learned from: duplicate Issues #205-#209; canonical Issues #200-#204
+- Context: a second set of Eternity Milestone 6-10 Issues was created because the creation step relied on conversation-local understanding instead of re-checking the repository immediately before the write. The canonical Issues had already been created in the live repository.
+- Cause: Issue creation was treated as if the repository state had not changed since the preceding discussion, which is unsafe when another session, agent, or concurrent workflow may have written related Issues.
+- Reusable lesson: immediately before creating one or more Issues, search the live repository for existing open and recently created Issues matching each planned scope/title. For batch creation, verify every planned Issue against live results before the first write; do not rely on conversation memory alone to conclude that an Issue does not exist.
+- Verification: search Issues using the planned feature names, milestone numbers, and distinctive scope keywords, and inspect recent Issues when concurrent work is plausible. If a matching Issue exists, update/reuse it instead of creating another.
+- Authoritative at: not yet promoted
+- Last verified: 2026-08-21
+
 ## Superseded lessons
 
 None yet.
