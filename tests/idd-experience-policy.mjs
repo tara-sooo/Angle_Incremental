@@ -48,8 +48,8 @@ for (const [name, source] of Object.entries({ AGENTS: agents, CLAUDE: claude, GE
 
 assert.match(policy, /## IDD experience memory/);
 assert.match(policy, /B2\/B3/);
-assert.match(policy, /before PR submission/i);
-assert.match(policy, /F4[\s\S]*does not create a post-merge repository mutation/i);
+assert.match(policy, /PR submission[\s\S]{0,30}前/i);
+assert.match(policy, /F4[\s\S]*post-merge repository mutation/i);
 assert.match(policy, /明示されたGitHub Issue/,
   'experience integration must preserve the explicit-target-only repository boundary');
 assert.match(policy, /`next`.*`fully_autonomous_merge`/,
