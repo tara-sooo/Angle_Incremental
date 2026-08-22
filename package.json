@@ -1,9 +1,9 @@
 {
   "scripts": {
     "check:runtime-order": "node scripts/check-runtime-esm-loader-order.js",
-    "check:syntax": "node --check regression-tests-esm.js && node --check tests/version-consistency.mjs && node --check scripts/idd-issue-association.mjs && node --check scripts/local-performance-gate.mjs && node --check tests/local-performance-gate.mjs && node --check tests/browser-harness.mjs && node --check tests/performance-smoke.mjs && node --check tests/render-regression.mjs && node --check tests/offline-stress.mjs && find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check",
+    "check:syntax": "node --check regression-tests-esm.js && node --check tests/version-consistency.mjs && node --check scripts/idd-issue-association.mjs && node --check scripts/local-performance-gate.mjs && node --check tests/local-performance-gate.mjs && node --check tests/browser-harness.mjs && node --check tests/performance-smoke.mjs && node --check tests/render-regression.mjs && node --check tests/offline-stress.mjs && node --check tests/validation-layer-policy.mjs && find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check",
     "check:version": "node tests/version-consistency.mjs",
-    "check:idd-policy": "node tests/idd-no-advisory-policy.mjs && node tests/idd-experience-policy.mjs",
+    "check:idd-policy": "node tests/idd-no-advisory-policy.mjs && node tests/idd-experience-policy.mjs && node tests/validation-layer-policy.mjs",
     "test:regression": "node --experimental-vm-modules regression-tests-esm.js",
     "test:browser": "node tests/browser-smoke.mjs && node tests/eternity-ui-browser.mjs && node tests/eternity-release-e2e.mjs && npm run test:render-regression",
     "test:render-regression": "node tests/render-regression.mjs",
@@ -20,7 +20,9 @@
     "test:tc4-a-form-search": "node --experimental-vm-modules tests/tc4-a-form-search.js",
     "test:tc4-a-form-frontier": "node --experimental-vm-modules tests/tc4-a-form-frontier.js",
     "test:tc4-log-frontier-continuation": "node --experimental-vm-modules tests/tc4-log-frontier-continuation.js",
-    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run check:idd-policy && npm run test:regression && npm run test:browser && npm run test:local-performance-gate && npm run test:performance:local && npm run test:tc4-balance && npm run test:tc4-balance-followup && npm run test:tc4-balance-sensitivity && npm run test:tc4-balance-a-search && npm run test:tc4-a-form-search && npm run test:tc4-a-form-frontier && npm run test:tc4-log-frontier-continuation"
+    "validate:research": "npm run test:tc4-balance && npm run test:tc4-balance-followup && npm run test:tc4-balance-sensitivity && npm run test:tc4-balance-a-search && npm run test:tc4-a-form-search && npm run test:tc4-a-form-frontier && npm run test:tc4-log-frontier-continuation",
+    "validate:full": "npm run validate && npm run test:performance && npm run test:offline-stress && npm run validate:research",
+    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run check:idd-policy && npm run test:regression && npm run test:browser && npm run test:local-performance-gate && npm run test:performance:local"
   },
   "devDependencies": {
     "playwright": "^1.61.1"
