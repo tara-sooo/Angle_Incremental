@@ -40,6 +40,8 @@ jobs:
         run: npm run test:local-performance-gate
       - name: Run performance smoke test
         run: npm run test:performance
+      - name: Run offline stress test
+        run: npm run test:offline-stress
       - name: Upload test diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,5 +50,7 @@ jobs:
           path: |
             browser-smoke-report.json
             output/performance-smoke.json
+            output/render-regression.json
+            output/offline-stress.json
             regression-failure.txt
           if-no-files-found: warn
