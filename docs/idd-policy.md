@@ -72,4 +72,20 @@ IDDの標準ラベルは`roadmap`、`status:blocked-by-human`、`status:needs-de
 - fix-validate: `npm run check:runtime-order && npm run check:syntax`
 - pre-push/post-fix: `npm run validate`
 
-`npm run validate`はruntime順序、構文、version consistency、ESM回帰、browser smoke、ローカル性能ゲート、TC4検証を実行します。ローカル性能ゲートは候補と再取得した`origin/next`を比較し、Hosted CIの`npm run test:performance`は既存の絶対予算をハードに検証します。
+検証は、日常のproduction変更で必ず行うroutine層、研究Issueが明示的に選ぶresearch層、リリース準備などで全層を確認するfull層に分けます。
+
+### Routine production validation
+
+`npm run validate`はruntime順序、構文、version consistency、IDD policy、ESM回帰、browser smoke、ローカル性能ゲートを実行します。TC4などの研究シミュレータはroutine層には含めません。IDDのfix-validate／pre-push／post-fixは、引き続きこのroutine層を使用します。
+
+### Explicit research validation
+
+`npm run validate:research`は、既存の7つのTC4 balance/research simulator checkを同じ順序で実行します。研究シミュレータ本体・その出力・研究専用fixtureを変更するIssue、production helperの意味を研究シミュレータが意図的に再現していて互換性確認が必要なIssue、研究レポートを受入れ証拠に使うIssue、またはIssue本文がresearch suiteを明示するIssueでは、このコマンドを必須検証として実行し、結果をPRの証拠に含めます。無関係なgameplay/UI/docs/maintenance変更は、研究層を実行する必要はありません。
+
+### Full and hosted validation
+
+`npm run validate:full`はroutine validation、Hosted CI向けの絶対性能テスト（`npm run test:performance`）、offline stress（`npm run test:offline-stress`）、research validationを順に実行する明示的な広範囲aggregateです。routine `validate`を重く戻すための別名ではありません。
+
+Hosted regression workflowは、production correctness、local classifier、絶対性能、offline stressを独立したステップとして実行し、性能予算を緩和しません。`npm run test:performance`の絶対予算とoffline/work-budget検証はHosted CIを権威とします。TC4/research evidenceが必要なIssueでは、上記のresearch層またはfull層を追加で実行します。
+
+スクリプトの層分離は`tests/validation-layer-policy.mjs`で機械的に検証します。各層は研究シミュレータのアルゴリズム、結果、production gameplay/balanceを変更しません。
