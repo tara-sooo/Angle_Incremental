@@ -143,6 +143,52 @@ async function testMilestoneThresholdsAndEffects() {
   assert.equal(runtime.coreBoostRequirementLog10(), 80, "CB cost must remain unchanged before milestone 4");
   state.eternityCount = 12;
   assert.equal(runtime.coreBoostRequirementLog10(), 72, "milestone 4 must raise only the CB cost to ^0.9");
+  state.eternityCount = 26;
+  assert.equal(runtime.eternityMilestoneActive("6"), false, "milestone 6 must remain locked below Eternity 27");
+  state.eternityCount = 27;
+  assert.equal(runtime.eternityMilestoneActive("6"), true, "milestone 6 must activate at Eternity 27");
+}
+
+async function testMilestoneSixCompletionState() {
+  const source = await loadRuntime(candidatePath);
+  const { debug, runtime } = source;
+  const { state } = debug;
+  const allChallengesMask = (1 << runtime.INFINITY_CHALLENGE_COUNT) - 1;
+  const challengeTimes = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  state.eternityCount = 25;
+  state.completedChallenges = 1;
+  state.activeChallenge = 2;
+  state.activeChallengeTime = 12;
+  state.fastestInfinityChallengeTimes = [...challengeTimes];
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "Eternity 26 should still execute normally");
+  assert.equal(state.eternityCount, 26, "the pre-Milestone 6 Eternity should increment normally");
+  assert.equal(state.completedChallenges, 0, "Eternity 26 should leave Infinity Challenges incomplete");
+  assert.equal(state.activeChallenge, 0, "Eternity should clear an active Infinity Challenge");
+  assert.deepEqual(state.fastestInfinityChallengeTimes, challengeTimes, "Milestone 6 must not replay or rewrite IC clear times");
+
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "the 27th Eternity should execute normally");
+  assert.equal(state.eternityCount, 27, "the 27th successful Eternity should reach the Milestone 6 threshold");
+  assert.equal(state.completedChallenges, allChallengesMask, "Milestone 6 should directly complete IC1 through IC8");
+  assert.equal(runtime.completedChallengeCount(), runtime.INFINITY_CHALLENGE_COUNT, "normal completion counts should see every IC as completed");
+  assert.equal(runtime.isChallengeCompleted(1), true, "IC1 should be completed by the Milestone 6 state");
+  assert.equal(runtime.isChallengeCompleted(8), true, "IC8 should be completed by the Milestone 6 state");
+  assert.equal(runtime.infinityCountGain(), 2, "existing IC6 reward logic should see the Milestone 6 completion state");
+  assert.deepEqual(state.fastestInfinityChallengeTimes, challengeTimes, "Milestone 6 should not trigger manual clear timing side effects");
+
+  const saveData = runtime.serializeSaveData();
+  saveData.savedAt = Date.now();
+  const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(saveData)]]));
+  assert.equal(loaded.debug.state.completedChallenges, allChallengesMask, "the existing completedChallenges save field should preserve Milestone 6 state");
+  assert.equal(loaded.runtime.completedChallengeCount(), loaded.runtime.INFINITY_CHALLENGE_COUNT, "save/load should preserve all completed IC predicates");
+
+  loaded.debug.state.completedChallenges = 0;
+  markEternityReady(loaded.runtime, loaded.debug.state);
+  assert.equal(loaded.debug.performEternity({ save: false, update: false }), true, "a later Eternity should still execute with Milestone 6 active");
+  assert.equal(loaded.debug.state.eternityCount, 28, "later Eternity resets should remain available after save/load");
+  assert.equal(loaded.debug.state.completedChallenges, allChallengesMask, "later Eternity resets should restore all IC completion directly");
 }
 
 async function testMilestoneFreeLevelsAndSaveLoad() {
@@ -358,6 +404,7 @@ async function testInfinityCompletionMakesEternityAvailable() {
 async function runEternityModuleRuntimeTest() {
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
+  await testMilestoneSixCompletionState();
   await testMilestoneFreeLevelsAndSaveLoad();
   await testThresholdAndResetBoundary();
   await testInfinityCompletionMakesEternityAvailable();

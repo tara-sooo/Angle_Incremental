@@ -70,6 +70,9 @@ try {
     tc4: document.getElementById("eternityTc4Requirement")?.textContent,
     ip: document.getElementById("eternityIpRequirement")?.textContent,
     title11: document.querySelector('[data-eternity-milestone="1-1"] [data-i18n="eternityMilestone11Name"]')?.textContent,
+    title6: document.querySelector('[data-eternity-milestone="6"] [data-i18n="eternityMilestone6Name"]')?.textContent,
+    status6: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-status')?.textContent,
+    requirement6: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-requirement')?.textContent,
     button11: document.querySelector('[data-eternity-choice="1-1"]')?.textContent,
     disabled11: document.querySelector('[data-eternity-choice="1-1"]')?.disabled,
     entitlement: document.getElementById("eternityChoiceEntitlement")?.textContent,
@@ -85,6 +88,9 @@ try {
   assert.equal(initial.tc4, "未達成", "TC4 requirement should show its current state");
   assert.equal(initial.ip, "未達成", "IP requirement should show its current state");
   assert.equal(initial.title11, "1-1 QoLの精神", "Japanese Milestone copy should render");
+  assert.equal(initial.title6, "6 有限回の無限チャレンジを0に", "Milestone 6 Japanese copy should render");
+  assert.equal(initial.status6, "未解放", "Milestone 6 should remain locked before Eternity 27");
+  assert.equal(initial.requirement6, "Eternity 27", "Milestone 6 should show its Eternity 27 requirement");
   assert.equal(initial.button11, "未解放", "first-tier Milestones should not be acquirable before the first Eternity");
   assert.equal(initial.disabled11, true, "first-tier acquisition controls should be disabled before an entitlement exists");
   assert.equal(initial.entitlement, "現在取得できるMilestoneはありません。", "the UI should explain the lack of a current acquisition right");
@@ -133,13 +139,27 @@ try {
     disabled11: document.querySelector('[data-eternity-choice="1-1"]')?.disabled,
     active2: document.querySelector('[data-eternity-milestone="2"] .eternity-milestone-status')?.textContent,
     locked3: document.querySelector('[data-eternity-milestone="3"] .eternity-milestone-status')?.textContent,
+    locked6: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-status')?.textContent,
     entitlement: document.getElementById("eternityChoiceEntitlement")?.textContent,
   }));
   assert.equal(progressed.owned11, "取得済み", "owned first-tier Milestones should be represented as owned");
   assert.equal(progressed.disabled11, true, "owned first-tier Milestones should no longer be selectable");
   assert.equal(progressed.active2, "有効", "count-based Milestone 2 should show active at Eternity 5");
   assert.equal(progressed.locked3, "未解放", "later count-based Milestones should remain locked below their threshold");
+  assert.equal(progressed.locked6, "未解放", "Milestone 6 should remain locked at Eternity 5");
   assert.equal(progressed.entitlement, "現在取得可能: 2", "unused first-tier acquisition rights should accumulate and remain visible");
+
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.eternityCount = 27;
+    debug.runtime.updateUi();
+  });
+  const milestoneSix = await page.evaluate(() => ({
+    status: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-status')?.textContent,
+    effect: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-effect')?.textContent,
+  }));
+  assert.equal(milestoneSix.status, "有効", "Milestone 6 should become active at Eternity 27");
+  assert.match(milestoneSix.effect || "", /IC1.*IC8.*クリア済み/, "Milestone 6 should explain the all-completed IC state");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -150,10 +170,14 @@ try {
   const english = await page.evaluate(() => ({
     countLabel: document.querySelector('[data-i18n="eternityCountLabel"]')?.textContent,
     title11: document.querySelector('[data-i18n="eternityMilestone11Name"]')?.textContent,
+    title6: document.querySelector('[data-i18n="eternityMilestone6Name"]')?.textContent,
+    effect6: document.querySelector('[data-i18n="eternityMilestone6Effect"]')?.textContent,
     manual: document.getElementById("eternityForcedNote")?.textContent,
   }));
   assert.equal(english.countLabel, "Eternity count", "Eternity UI should switch to English when the shared language state changes");
   assert.equal(english.title11, "1-1 Spirit of QoL", "Milestone names should have English copy");
+  assert.equal(english.title6, "6 Finite Infinity Challenges", "Milestone 6 should have English copy");
+  assert.match(english.effect6 || "", /Eternity 27\+.*IC1.*IC8.*completed/, "Milestone 6 English copy should describe the completed IC state");
   assert.match(english.manual || "", /manually/, "English copy should explain that Eternity is player-triggered");
   assert.doesNotMatch(english.manual || "", /performed automatically/, "English copy must not describe forced pre-Break Eternity");
 
