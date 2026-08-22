@@ -69,12 +69,26 @@ function splitViolations(report) {
 function collectFailingScenarioP95(report) {
   const budgets = report.budgets || {};
   const failures = [];
-  for (const result of report.results || []) {
+  const simulationResults = report.simulationResults || report.results || [];
+  const renderResults = report.renderResults || report.results || [];
+  for (const result of simulationResults) {
     for (const scenario of result.scenarios || []) {
       const prefix = `${result.viewport.name}/DPR${result.deviceScaleFactor}`;
       const metrics = [
         [`${prefix}/angle/${scenario.vertices}`, "simulation", scenario.angle?.simulation?.p95Ms, budgets.simulationP95Ms],
         [`${prefix}/infinite-angle/${scenario.vertices}`, "simulation", scenario.infiniteAngle?.simulation?.p95Ms, budgets.simulationP95Ms],
+      ];
+      for (const [scenarioName, metric, p95Ms, budgetMs] of metrics) {
+        if (Number.isFinite(p95Ms) && Number.isFinite(budgetMs) && p95Ms > budgetMs) {
+          failures.push({ scenario: scenarioName, metric, p95Ms, budgetMs });
+        }
+      }
+    }
+  }
+  for (const result of renderResults) {
+    for (const scenario of result.scenarios || []) {
+      const prefix = `${result.viewport.name}/DPR${result.deviceScaleFactor}`;
+      const metrics = [
         [
           `${prefix}/angle/${scenario.vertices}`,
           "frame",
@@ -102,7 +116,10 @@ function readPerformanceReport(cwd) {
   } catch (error) {
     throw new Error(`invalid performance report: ${error.message}`);
   }
-  if (!Array.isArray(report.results)) throw new Error(`invalid performance report results: ${reportPath}`);
+  if (!Array.isArray(report.simulationResults || report.results)
+    || !Array.isArray(report.renderResults || report.results)) {
+    throw new Error(`invalid performance report results: ${reportPath}`);
+  }
   const { budgetViolations, qualityViolations } = splitViolations(report);
   return {
     status: report.status,

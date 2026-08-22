@@ -1,14 +1,16 @@
 {
   "scripts": {
     "check:runtime-order": "node scripts/check-runtime-esm-loader-order.js",
-    "check:syntax": "node --check regression-tests-esm.js && node --check tests/version-consistency.mjs && node --check scripts/idd-issue-association.mjs && node --check scripts/local-performance-gate.mjs && node --check tests/local-performance-gate.mjs && find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check",
+    "check:syntax": "node --check regression-tests-esm.js && node --check tests/version-consistency.mjs && node --check scripts/idd-issue-association.mjs && node --check scripts/local-performance-gate.mjs && node --check tests/local-performance-gate.mjs && node --check tests/browser-harness.mjs && node --check tests/performance-smoke.mjs && node --check tests/render-regression.mjs && node --check tests/offline-stress.mjs && find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check",
     "check:version": "node tests/version-consistency.mjs",
     "check:idd-policy": "node tests/idd-no-advisory-policy.mjs && node tests/idd-experience-policy.mjs",
     "test:regression": "node --experimental-vm-modules regression-tests-esm.js",
-    "test:browser": "node tests/browser-smoke.mjs && node tests/eternity-ui-browser.mjs && node tests/eternity-release-e2e.mjs",
+    "test:browser": "node tests/browser-smoke.mjs && node tests/eternity-ui-browser.mjs && node tests/eternity-release-e2e.mjs && npm run test:render-regression",
+    "test:render-regression": "node tests/render-regression.mjs",
     "test:eternity-ui": "node tests/eternity-ui-browser.mjs",
     "test:eternity-release-e2e": "node tests/eternity-release-e2e.mjs",
     "test:performance": "node tests/performance-smoke.mjs",
+    "test:offline-stress": "node tests/offline-stress.mjs",
     "test:performance:local": "node scripts/local-performance-gate.mjs",
     "test:local-performance-gate": "node tests/local-performance-gate.mjs",
     "test:tc4-balance": "node --experimental-vm-modules tests/tc4-balance-simulation.js",
