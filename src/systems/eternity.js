@@ -11,6 +11,7 @@ const COUNT_MILESTONE_REQUIREMENTS = Object.freeze({
   3: 8,
   4: 12,
   5: 20,
+  6: 27,
 });
 
 const FIRST_TIER_MILESTONE_MASK = Object.values(FIRST_TIER_MILESTONE_BITS)
@@ -163,11 +164,18 @@ function resetEternityProgression() {
   runtime.normalizeTowerChallenge4State?.();
 }
 
+function applyEternityMilestoneSixCompletionState() {
+  if (eternityMilestoneActive("6")) {
+    runtime.state.completedChallenges = (1 << runtime.INFINITY_CHALLENGE_COUNT) - 1;
+  }
+}
+
 function performEternity(options = {}) {
   if (!canEternity()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-eternity", { force: true })) return false;
   resetEternityProgression();
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.state.eternityCount)) + 1;
+  applyEternityMilestoneSixCompletionState();
   runtime.state.eternityMilestoneChoice = "";
   runtime.checkAchievements(true);
   if (options.update !== false) runtime.updateUi?.();

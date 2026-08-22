@@ -44,6 +44,8 @@ const ETERNITY_TEXT = {
     eternityMilestone4Effect: "核増幅に必要なコストを^0.9",
     eternityMilestone5Name: "5 自動植林",
     eternityMilestone5Effect: "IUの自動化を解放",
+    eternityMilestone6Name: "6 有限回の無限チャレンジを0に",
+    eternityMilestone6Effect: "Eternity 27以降、各Eternity後の周回でIC1〜IC8をクリア済みにする",
   },
   en: {
     eternity: "Eternity",
@@ -88,6 +90,8 @@ const ETERNITY_TEXT = {
     eternityMilestone4Effect: "Raise the Nuclear Amplification requirement to ^0.9",
     eternityMilestone5Name: "5 Automatic Afforestation",
     eternityMilestone5Effect: "Unlock Infinity Upgrade automation",
+    eternityMilestone6Name: "6 Finite Infinity Challenges",
+    eternityMilestone6Effect: "At Eternity 27+, start every run with IC1–IC8 completed",
   },
 };
 
