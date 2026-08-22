@@ -145,25 +145,50 @@ async function testMilestoneThresholdsAndEffects() {
   assert.equal(runtime.coreBoostRequirementLog10(), 72, "milestone 4 must raise only the CB cost to ^0.9");
 }
 
-async function testMilestoneStartingLevelsAndSaveLoad() {
+async function testMilestoneFreeLevelsAndSaveLoad() {
   const source = await loadRuntime(candidatePath);
   const { debug, runtime } = source;
   const { state } = debug;
 
   markEternityReady(runtime, state);
   assert.equal(debug.performEternity({ save: false, update: false }), true);
+  state.infiniteAngleSpeedLevel = 2;
+  state.infiniteAngleVertexLevel = 3;
+  state.infiniteAngleGainLevel = 4;
   assert.equal(runtime.selectEternityMilestone("1-3"), true, "1-3 should be acquired from the earned post-Eternity entitlement");
-  assert.equal(state.infiniteAngleSpeedLevel, 5, "1-3 should start IA Speed at level 5");
-  assert.equal(state.infiniteAngleVertexLevel, 5, "1-3 should start IA Vertex at level 5");
-  assert.equal(state.infiniteAngleGainLevel, 5, "1-3 should start IA Gain at level 5");
+  assert.equal(state.infiniteAngleSpeedLevel, 2, "acquiring 1-3 must not rewrite purchased IA Speed levels");
+  assert.equal(state.infiniteAngleVertexLevel, 3, "acquiring 1-3 must not rewrite purchased IA Vertex levels");
+  assert.equal(state.infiniteAngleGainLevel, 4, "acquiring 1-3 must not rewrite purchased IA Gain levels");
+  assert.equal(runtime.infiniteAngleFreeUpgradeLevel("speed"), 5, "1-3 should derive five free IA Speed levels");
+  assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 7, "1-3 should add free levels to purchased IA Speed");
+  assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), 8, "1-3 should add free levels to purchased IA Vertex");
+  assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("gain"), 9, "1-3 should add free levels to purchased IA Gain");
+
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "Eternity should still reset purchased IA levels normally");
+  assert.equal(state.infiniteAngleSpeedLevel, 0, "Eternity should reset purchased IA Speed levels");
+  assert.equal(state.infiniteAngleVertexLevel, 0, "Eternity should reset purchased IA Vertex levels");
+  assert.equal(state.infiniteAngleGainLevel, 0, "Eternity should reset purchased IA Gain levels");
+  assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 5, "persistent 1-3 ownership should restore effective IA Speed level five");
+  assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), 5, "persistent 1-3 ownership should restore effective IA Vertex level five");
+  assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("gain"), 5, "persistent 1-3 ownership should restore effective IA Gain level five");
 
   state.eternityMilestoneMask = 5;
   state.eternityCount = 20;
   state.eternityMilestoneChoice = "1-2";
+  state.infiniteAngleSpeedLevel = 0;
+  state.infiniteAngleVertexLevel = 1;
+  state.infiniteAngleGainLevel = 2;
   const saveData = runtime.serializeSaveData();
   saveData.savedAt = Date.now();
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(saveData)]]));
   assert.equal(loaded.debug.state.eternityMilestoneMask, 5, "milestone ownership must survive save/load");
+  assert.equal(loaded.debug.state.infiniteAngleSpeedLevel, 0, "v11 saves must preserve purchased IA Speed levels");
+  assert.equal(loaded.debug.state.infiniteAngleVertexLevel, 1, "v11 saves must preserve purchased IA Vertex levels");
+  assert.equal(loaded.debug.state.infiniteAngleGainLevel, 2, "v11 saves must preserve purchased IA Gain levels");
+  assert.equal(loaded.runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 5, "v11 save/load should derive effective IA Speed level");
+  assert.equal(loaded.runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), 6, "v11 save/load should derive effective IA Vertex level");
+  assert.equal(loaded.runtime.infiniteAngleEffectiveUpgradeLevel("gain"), 7, "v11 save/load should derive effective IA Gain level");
   assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 1, "unused first-tier entitlement should be derived from count and ownership after save/load");
   assert.deepEqual(Array.from(loaded.runtime.availableEternityMilestoneChoices()), ["1-2"], "legacy pending-choice state must not consume or auto-grant the available entitlement");
   assert.equal(loaded.runtime.eternityMilestoneActive("5"), true, "count-based milestones must survive save/load");
@@ -333,7 +358,7 @@ async function testInfinityCompletionMakesEternityAvailable() {
 async function runEternityModuleRuntimeTest() {
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
-  await testMilestoneStartingLevelsAndSaveLoad();
+  await testMilestoneFreeLevelsAndSaveLoad();
   await testThresholdAndResetBoundary();
   await testInfinityCompletionMakesEternityAvailable();
   await testQualifiedLoadAndImportDoNotAutoEternity();

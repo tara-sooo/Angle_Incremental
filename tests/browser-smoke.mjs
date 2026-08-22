@@ -1260,6 +1260,12 @@ try {
 
   const infiniteAnglePanel = await page.evaluate(() => {
     const { state, switchMainTab, switchInfinitySubtab, buyInfiniteAngleUpgrade } = window.__angleDebug;
+    const originalMilestoneMask = state.eternityMilestoneMask;
+    const originalLevels = [state.infiniteAngleSpeedLevel, state.infiniteAngleVertexLevel, state.infiniteAngleGainLevel];
+    state.eternityMilestoneMask = 4;
+    state.infiniteAngleSpeedLevel = 0;
+    state.infiniteAngleVertexLevel = 0;
+    state.infiniteAngleGainLevel = 0;
     state.infinityPointsExact = "100000000000000000100";
     state.infinityPoints = 1e20;
     state.infinityPointsLog10 = 20;
@@ -1274,10 +1280,20 @@ try {
       document.querySelector("#infiniteAngleVertexCost")?.textContent?.trim() ?? "",
       document.querySelector("#infiniteAngleGainCost")?.textContent?.trim() ?? "",
     ];
+    const levelLabelsBeforePaidPurchase = [
+      document.querySelector("#infiniteAngleSpeedLevel")?.textContent?.trim() ?? "",
+      document.querySelector("#infiniteAngleVertexLevel")?.textContent?.trim() ?? "",
+      document.querySelector("#infiniteAngleGainLevel")?.textContent?.trim() ?? "",
+    ];
     const bought = buyInfiniteAngleUpgrade("speed");
     window.advanceTime(0);
     const ipExactAfterSingle = state.infinityPointsExact;
     const speedLevelAfterSingle = state.infiniteAngleSpeedLevel;
+    const levelLabelsAfterPaidPurchase = [
+      document.querySelector("#infiniteAngleSpeedLevel")?.textContent?.trim() ?? "",
+      document.querySelector("#infiniteAngleVertexLevel")?.textContent?.trim() ?? "",
+      document.querySelector("#infiniteAngleGainLevel")?.textContent?.trim() ?? "",
+    ];
     state.infinityPointsExact = "100000000000000000000000";
     state.infinityPoints = 1e23;
     state.infinityPointsLog10 = 23;
@@ -1286,6 +1302,9 @@ try {
     const levelsBeforeBuyAll = state.infiniteAngleSpeedLevel + state.infiniteAngleVertexLevel + state.infiniteAngleGainLevel;
     document.querySelector("#infiniteAngleBuyAllUpgrade")?.click();
     const levelsAfterBuyAll = state.infiniteAngleSpeedLevel + state.infiniteAngleVertexLevel + state.infiniteAngleGainLevel;
+    state.eternityMilestoneMask = originalMilestoneMask;
+    [state.infiniteAngleSpeedLevel, state.infiniteAngleVertexLevel, state.infiniteAngleGainLevel] = originalLevels;
+    window.advanceTime(0);
     return {
       panelActive: Boolean(panel?.classList.contains("is-active")),
       canvasWidth: canvas?.getBoundingClientRect().width ?? 0,
@@ -1297,6 +1316,8 @@ try {
       bought,
       speedLevel: speedLevelAfterSingle,
       expectedSpeedLevel: beforeLevel + 1,
+      levelLabelsBeforePaidPurchase,
+      levelLabelsAfterPaidPurchase,
       ipExact: ipExactAfterSingle,
       buyAllDisabledBefore,
       buyAllPurchases: levelsAfterBuyAll - levelsBeforeBuyAll,
@@ -1313,6 +1334,8 @@ try {
   assert.ok(infiniteAnglePanel.upgradeWidths.every((width) => width > 0), "IA upgrade controls should remain visible");
   assert.equal(infiniteAnglePanel.bought, true, "IA speed upgrade should be purchasable with IP");
   assert.equal(infiniteAnglePanel.speedLevel, infiniteAnglePanel.expectedSpeedLevel, "IA speed upgrade should increase its own level");
+  assert.deepEqual(infiniteAnglePanel.levelLabelsBeforePaidPurchase, ["Lv 5 (+5)", "Lv 5 (+5)", "Lv 5 (+5)"], "IA UI should show free levels before paid purchases");
+  assert.deepEqual(infiniteAnglePanel.levelLabelsAfterPaidPurchase, ["Lv 6 (+5)", "Lv 5 (+5)", "Lv 5 (+5)"], "IA UI should add purchased levels without losing the free contribution");
   assert.equal(infiniteAnglePanel.ipExact, "100", "IA speed upgrade should spend 1e20 IP");
   assert.equal(infiniteAnglePanel.buyAllDisabledBefore, false, "IA Buy All should enable when any IA upgrade is affordable");
   assert.ok(infiniteAnglePanel.buyAllPurchases > 0, "IA Buy All should purchase multiple affordable upgrades through the UI");

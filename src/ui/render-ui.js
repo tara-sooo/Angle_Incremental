@@ -61,6 +61,12 @@ function formatRecoveryTimestamp(timestamp) {
   }
 }
 
+function formatInfiniteAngleLevel(kind) {
+  const level = runtime.infiniteAngleEffectiveUpgradeLevel(kind);
+  const freeLevel = runtime.infiniteAngleFreeUpgradeLevel(kind);
+  return `Lv ${level}${freeLevel > 0 ? ` (+${freeLevel})` : ""}`;
+}
+
 function recoveryReasonText(reason) {
   const reasonKeys = {
     periodic: "checkpointReasonPeriodic",
@@ -291,9 +297,9 @@ function updateUi() {
   runtime.elements.infiniteAngleVertexCount.textContent = `${runtime.infiniteAngleVertexCount()} ${runtime.t("infiniteAngleVertices")}`;
   runtime.elements.infiniteAngleCurrentGain.textContent = runtime.formatUiLogNumber(runtime.infiniteAngleCurrentGainLog10());
   runtime.elements.infiniteAngleLap.textContent = runtime.formatDuration(runtime.infiniteAngleLapDuration());
-  runtime.elements.infiniteAngleSpeedLevel.textContent = `${runtime.t("level")} ${runtime.state.infiniteAngleSpeedLevel}`;
-  runtime.elements.infiniteAngleVertexLevel.textContent = `${runtime.t("level")} ${runtime.state.infiniteAngleVertexLevel}`;
-  runtime.elements.infiniteAngleGainLevel.textContent = `${runtime.t("level")} ${runtime.state.infiniteAngleGainLevel}`;
+  runtime.elements.infiniteAngleSpeedLevel.textContent = formatInfiniteAngleLevel("speed");
+  runtime.elements.infiniteAngleVertexLevel.textContent = formatInfiniteAngleLevel("vertex");
+  runtime.elements.infiniteAngleGainLevel.textContent = formatInfiniteAngleLevel("gain");
   runtime.elements.infiniteAngleSpeedCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.speed)} IP`;
   runtime.elements.infiniteAngleVertexCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.vertex)} IP`;
   runtime.elements.infiniteAngleGainCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.gain)} IP`;
