@@ -363,7 +363,7 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     assert.equal(state.infiniteScore, 0, "version 9 saves must reset Infinite Score once");
     assert.equal(state.infiniteScoreLog10, -Infinity, "version 9 Infinite Score correction must synchronize its log");
     assert.equal(debug.saveGame("manual"), true, "corrected version 9 state must save successfully");
-    assert.equal(JSON.parse(storage.get(runtime.SAVE_KEY)).version, 10, "corrected saves must persist as version 10");
+    assert.equal(JSON.parse(storage.get(runtime.SAVE_KEY)).version, 11, "corrected saves must persist as version 11");
 
     runtime.applySaveData({
       infinityPoints: 1e9,

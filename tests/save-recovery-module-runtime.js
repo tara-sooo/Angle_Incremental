@@ -278,7 +278,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     const purchasedMask = (1 << 19) | (1 << 20);
-    assert.equal(runtime.SAVE_VERSION, 10, "IU14-1 must keep the save version at 10");
+    assert.equal(runtime.SAVE_VERSION, 11, "IU14-1 must keep the save version at 11");
     debug.state.infinityUpgradeMask = purchasedMask;
     assert.equal(debug.createCheckpoint("periodic", { force: true }), true, "IU14-1 state should be checkpointed");
     debug.state.infinityUpgradeMask = 0;

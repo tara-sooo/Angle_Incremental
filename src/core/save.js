@@ -598,6 +598,12 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.sanitizeNumber(data.eternityCount, 0)));
   runtime.state.eternityMilestoneMask = runtime.normalizeEternityMilestoneMask?.(data.eternityMilestoneMask) ?? 0;
   runtime.state.eternityMilestoneChoice = runtime.normalizeEternityMilestoneChoice?.(data.eternityMilestoneChoice) || "";
+  const infiniteAngleFreeLevel = runtime.eternityMilestoneActive?.("1-3") === true ? 5 : 0;
+  const legacyInfiniteAngleFreeLevel = saveVersion < 11 ? infiniteAngleFreeLevel : 0;
+  const normalizeInfiniteAngleLevel = (value) => Math.max(
+    0,
+    Math.floor(runtime.sanitizeNumber(value, 0)) - legacyInfiniteAngleFreeLevel,
+  );
   const infinityPoints = runtime.hydrateLogResource(data.infinityPoints, data.infinityPointsLog10, -Infinity, true);
   runtime.state.infinityPoints = infinityPoints.value;
   runtime.state.infinityPointsLog10 = infinityPoints.log;
@@ -629,12 +635,12 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
     || runtime.sanitizeNumber(data.infiniteAngleUpgradeLevel, 0) > 0
   );
   runtime.state.infiniteAngleUnlocked = runtime.sanitizeBoolean(data.infiniteAngleUnlocked, legacyInfiniteAngleUnlocked);
-  runtime.state.infiniteAngleSpeedLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleSpeedLevel, 0)));
+  runtime.state.infiniteAngleSpeedLevel = normalizeInfiniteAngleLevel(data.infiniteAngleSpeedLevel);
   runtime.state.infiniteAngleVertexLevel = Math.min(
-    runtime.MAX_RENDERED_VERTICES - 3,
-    Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleVertexLevel, 0))),
+    Math.max(0, runtime.MAX_RENDERED_VERTICES - 3 - infiniteAngleFreeLevel),
+    normalizeInfiniteAngleLevel(data.infiniteAngleVertexLevel),
   );
-  runtime.state.infiniteAngleGainLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleGainLevel, 0)));
+  runtime.state.infiniteAngleGainLevel = normalizeInfiniteAngleLevel(data.infiniteAngleGainLevel);
   const infiniteAngleCurrentGain = runtime.hydrateLogResource(
     data.infiniteAngleCurrentGain,
     data.infiniteAngleCurrentGainLog10,
@@ -643,7 +649,8 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.infiniteAngleCurrentGain = infiniteAngleCurrentGain.value || 1;
   runtime.state.infiniteAngleCurrentGainLog10 = Math.max(0, infiniteAngleCurrentGain.log);
   runtime.state.infiniteAnglePointProgress = ((runtime.sanitizeNumber(data.infiniteAnglePointProgress, 0) % 1) + 1) % 1;
-  const infiniteAngleVertexCount = Math.max(3, runtime.state.infiniteAngleVertexLevel + 3);
+  const infiniteAngleVertexCount = runtime.infiniteAngleVertexCount?.()
+    ?? Math.max(3, runtime.state.infiniteAngleVertexLevel + 3);
   const loadedInfiniteAngleProgress = Math.max(
     0,
     runtime.sanitizeNumber(

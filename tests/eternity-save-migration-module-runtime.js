@@ -57,7 +57,49 @@ async function testLegacyDefaults() {
   assert.equal(loaded.debug.state.eternityMilestoneChoice, "", "legacy saves should default the retired pending-choice field to empty");
   assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 0, "legacy saves without Eternities must not receive an acquisition entitlement");
   assert.equal(loaded.debug.state.achievementMaskHigh, 0, "legacy saves should default the high achievement mask safely");
-  assert.equal(loaded.runtime.SAVE_VERSION, 10, "derived entitlement should not require a speculative save-version bump");
+  assert.equal(loaded.runtime.SAVE_VERSION, 11, "Milestone 1-3 free-level semantics should use save version 11");
+}
+
+async function testInfiniteAngleFreeLevelSaveMigration() {
+  const source = await loadRuntime(candidatePath);
+  const { runtime } = source;
+  const baseSave = runtime.serializeSaveData();
+  baseSave.savedAt = Date.now();
+  baseSave.version = 10;
+  baseSave.state.eternityMilestoneMask = 4;
+  baseSave.state.infiniteAngleUnlocked = true;
+  baseSave.state.infiniteAngleSpeedLevel = 5;
+  baseSave.state.infiniteAngleVertexLevel = 8;
+  baseSave.state.infiniteAngleGainLevel = 4;
+
+  const migrated = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(baseSave)]]));
+  assert.equal(migrated.debug.state.infiniteAngleSpeedLevel, 0, "v10 Lv5 should migrate to purchased IA Speed Lv0");
+  assert.equal(migrated.debug.state.infiniteAngleVertexLevel, 3, "v10 Lv8 should migrate to purchased IA Vertex Lv3");
+  assert.equal(migrated.debug.state.infiniteAngleGainLevel, 0, "v10 IA Gain below the free baseline should clamp to purchased Lv0");
+  assert.equal(migrated.runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 5, "v10 IA Speed effective level should be preserved");
+  assert.equal(migrated.runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), 8, "v10 IA Vertex effective level should be preserved");
+  assert.equal(migrated.runtime.infiniteAngleEffectiveUpgradeLevel("gain"), 5, "v10 IA Gain effective level should clamp to the free baseline");
+
+  const withoutMilestone = structuredClone(baseSave);
+  withoutMilestone.state.eternityMilestoneMask = 0;
+  withoutMilestone.state.infiniteAngleSpeedLevel = 5;
+  withoutMilestone.state.infiniteAngleVertexLevel = 8;
+  withoutMilestone.state.infiniteAngleGainLevel = 4;
+  const preserved = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(withoutMilestone)]]));
+  assert.equal(preserved.debug.state.infiniteAngleSpeedLevel, 5, "v10 saves without 1-3 must preserve IA Speed levels");
+  assert.equal(preserved.debug.state.infiniteAngleVertexLevel, 8, "v10 saves without 1-3 must preserve IA Vertex levels");
+  assert.equal(preserved.debug.state.infiniteAngleGainLevel, 4, "v10 saves without 1-3 must preserve IA Gain levels");
+  assert.equal(preserved.runtime.infiniteAngleFreeUpgradeLevel("speed"), 0, "1-3-free migration must not apply without ownership");
+
+  const currentVersionSave = structuredClone(baseSave);
+  currentVersionSave.version = 11;
+  currentVersionSave.state.infiniteAngleSpeedLevel = 0;
+  currentVersionSave.state.infiniteAngleVertexLevel = 3;
+  currentVersionSave.state.infiniteAngleGainLevel = 0;
+  const loadedAgain = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(currentVersionSave)]]));
+  assert.equal(loadedAgain.debug.state.infiniteAngleSpeedLevel, 0, "v11 IA Speed must not be migrated a second time");
+  assert.equal(loadedAgain.debug.state.infiniteAngleVertexLevel, 3, "v11 IA Vertex must not be migrated a second time");
+  assert.equal(loadedAgain.debug.state.infiniteAngleGainLevel, 0, "v11 IA Gain must not be migrated a second time");
 }
 
 async function testCurrentRoundTripAndSanitization() {
@@ -189,6 +231,7 @@ async function testEternityResetThenSaveLoad() {
 
 async function runEternitySaveMigrationModuleRuntimeTest() {
   await testLegacyDefaults();
+  await testInfiniteAngleFreeLevelSaveMigration();
   await testCurrentRoundTripAndSanitization();
   await testSaveCodeImportAndCheckpointRestore();
   await testEternityResetThenSaveLoad();

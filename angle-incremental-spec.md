@@ -542,7 +542,7 @@ first-tierの1-1〜1-3はEternity回数1から候補になり、1回のEternity�
 | --- | --- | --- |
 | 1-1 QoLの精神 | Eternity 1、first-tier選択 | Infinity以前の通常強化自動購入を最初から利用可能にする。 |
 | 1-2 高みの見物 | Eternity 1、first-tier選択 | 通常強化の実効レベルへ`Eternity回数 × 10`を加える。TC3報酬がある場合はTC3倍率適用後に加算する。 |
-| 1-3 2つの盾 | Eternity 1、first-tier選択 | Eternity後、IAのSpeed・Vertex・Gain強化をそれぞれ最低レベル5から開始する。 |
+| 1-3 2つの盾 | Eternity 1、first-tier選択 | IAのSpeed・Vertex・Gainに無料レベルをそれぞれ+5付与する。実効レベルと効果計算に反映し、強化価格と購入レベルには影響しない。 |
 | 2 真の倹約家 | Eternity 5 | IC7の通常強化無消費効果を有効にする。IC7クリア状態そのものは立てない。 |
 | 3 完璧な世代間継承 | Eternity 8 | GenerationとCore Boost実行時の下位リセットを抑止し、実行・正の効果は維持する。 |
 | 4 効率的なウラン235の探し方 | Eternity 12 | Core Boost要求量のlog10を`×0.9`する。 |
@@ -606,7 +606,7 @@ Time Fluxのゲーム内効果とUIは一時的に削除している。オンラ
 
 セーブはローカルストレージへ自動保存し、手動保存とリセットも提供する。セーブコードは `ANGLE_SAVE_V2:` で始まり、AES-GCMを使って書き出し・読み込みする。
 
-主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower/TC状態、Break Infinite Cap、Infinite Score、実績、`eternityCount`、`eternityMilestoneMask`、`eternityMilestoneChoice`、自動化、ゲーム時間統計、実プレイ時間統計、Infinity回数/秒の最高値、集約の小数繰越、表示設定、`offlineProgressEnabled`、オフラインティック数が含まれる。旧版との互換性のため、Time Flux量、現在速度、任意倍率、Time Flux強化レベル、旧クイックバー表示設定も保存項目として残すが、現行版では休眠値として扱う。ローカルセーブには互換用の `savedAt` と、サーバー時刻基準の離席処理に使う任意項目 `serverSavedAt` を保存する。既存セーブに `offlineProgressEnabled` がない場合は有効として読み込み、その他の新しい項目がない場合も安全な初期値を使用する。SAVE_VERSIONは10のまま維持する。
+主要な保存項目には、各リソースとlog10値、Generation、Core Boost、Infinity、IP正確値、IUマスク、IC状態、Tower/TC状態、Break Infinite Cap、Infinite Score、実績、`eternityCount`、`eternityMilestoneMask`、`eternityMilestoneChoice`、自動化、ゲーム時間統計、実プレイ時間統計、Infinity回数/秒の最高値、集約の小数繰越、表示設定、`offlineProgressEnabled`、オフラインティック数が含まれる。旧版との互換性のため、Time Flux量、現在速度、任意倍率、Time Flux強化レベル、旧クイックバー表示設定も保存項目として残すが、現行版では休眠値として扱う。ローカルセーブには互換用の `savedAt` と、サーバー時刻基準の離席処理に使う任意項目 `serverSavedAt` を保存する。既存セーブに `offlineProgressEnabled` がない場合は有効として読み込み、その他の新しい項目がない場合も安全な初期値を使用する。SAVE_VERSIONは11とする。
 
 IPは大きい整数を正確に扱うため `infinityPointsExact` を正本にし、表示用に通常数値とlog10値を同期する。
 
@@ -625,7 +625,7 @@ major.minor.patch
 - `APP_VERSION`: 公開アプリのバージョン。`version.json` の `appVersion` と一致させる。
 - `SAVE_VERSION`: セーブデータの移行が必要な場合に上げる保存形式バージョン。
 
-0.12.0では、`APP_VERSION = 0.12.0`、`SAVE_VERSION = 10` とする。TC4、Eternity、Eternity Milestone 1-1〜5、実績38〜41、Eternity UIと日英表示を追加する。既存セーブは新しいEternity関連フィールドを安全な初期値で補完し、Time Flux関連の休眠フィールドを含む既存の保存形式を維持する。
+0.12.0では、`APP_VERSION = 0.12.0`、`SAVE_VERSION = 11` とする。TC4、Eternity、Eternity Milestone 1-1〜5、実績38〜41、Eternity UIと日英表示を追加する。v10以下で1-3を所有する既存セーブは、保存されたIAの旧実効レベルから無料+5を分離して購入レベルへ移行し、1-3を所有しないセーブのIAレベルは維持する。v11以降ではこの移行を再適用しない。
 
 ブラウザのキャッシュ対策として、CSS/JSのURLにはアプリバージョンのクエリを付ける。起動中クライアントは `version.json` を定期確認し、新しい `appVersion` を検出したら保存してリロードを促す。
 

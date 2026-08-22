@@ -47,6 +47,43 @@ async function runInfiniteAngleModuleRuntimeTest() {
     const { debug, runtime } = instance;
     const { state } = debug;
     state.infiniteAngleUnlocked = true;
+    state.eternityMilestoneMask = 4;
+    state.infiniteAngleSpeedLevel = 0;
+    state.infiniteAngleVertexLevel = 0;
+    state.infiniteAngleGainLevel = 0;
+    setInfinityPoints(runtime, 1_000_000_000_000_000_000_000n);
+
+    assert.equal(runtime.infiniteAnglePurchasedUpgradeLevel("speed"), 0, "Milestone 1-3 must not invent purchased IA Speed levels");
+    assert.equal(runtime.infiniteAngleFreeUpgradeLevel("speed"), 5, "Milestone 1-3 should provide five free IA Speed levels");
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 5, "IA Speed effective level should include the free levels");
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), 5, "IA Vertex effective level should include the free levels");
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("gain"), 5, "IA Gain effective level should include the free levels");
+    assert.equal(runtime.infiniteAngleVertexCount(), 8, "IA Vertex count should use the effective level");
+    assert.equal(
+      runtime.infiniteAngleRawLapSpeedLog10(),
+      5 * Math.log10(1.22),
+      "IA lap speed should use the effective Speed level",
+    );
+
+    const levelZeroSpeedCost = runtime.infiniteAngleUpgradeCostLog10("speed");
+    assert.equal(levelZeroSpeedCost, 20, "IA price should remain based on purchased level zero");
+    assert.equal(debug.buyInfiniteAngleUpgrade("speed", { refresh: false, save: false }), true, "free IA levels must not block the first paid purchase");
+    assert.equal(state.infiniteAngleSpeedLevel, 1, "an IA purchase should increment only the purchased level");
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 6, "one IA purchase should raise the effective level to six");
+    assert.ok(runtime.infiniteAngleUpgradeCostLog10("speed") > levelZeroSpeedCost, "the next IA price should use purchased level one");
+
+    state.infiniteAngleVertexLevel = runtime.MAX_RENDERED_VERTICES - 3 - 5;
+    setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), runtime.MAX_RENDERED_VERTICES - 3, "free Vertex levels must count toward the cap");
+    assert.equal(runtime.infiniteAngleVertexCount(), runtime.MAX_RENDERED_VERTICES, "effective Vertex levels must respect the rendered-vertex cap");
+    assert.equal(runtime.canBuyInfiniteAngleUpgrade("vertex"), false, "the Vertex cap must block purchases at the effective maximum");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
     state.speedLevel = 7;
     state.gainLevel = 8;
     state.vertices = 11;

@@ -61,7 +61,6 @@ function acquireEternityMilestone(id) {
     runtime.state.eternityMilestoneMask,
   ) | bit;
   runtime.state.eternityMilestoneChoice = "";
-  applyEternityMilestoneStartingLevels();
   return true;
 }
 
@@ -95,13 +94,6 @@ function normalAutomationUnlocked() {
 
 function infinityAutomationUnlocked() {
   return runtime.hasInfinityUpgrade("8-1") || eternityMilestoneActive("5");
-}
-
-function applyEternityMilestoneStartingLevels() {
-  if (!eternityMilestoneActive("1-3")) return;
-  runtime.state.infiniteAngleSpeedLevel = Math.max(5, Math.floor(runtime.state.infiniteAngleSpeedLevel));
-  runtime.state.infiniteAngleVertexLevel = Math.max(5, Math.floor(runtime.state.infiniteAngleVertexLevel));
-  runtime.state.infiniteAngleGainLevel = Math.max(5, Math.floor(runtime.state.infiniteAngleGainLevel));
 }
 
 function eternityRequirementExact() {
@@ -178,7 +170,6 @@ function performEternity(options = {}) {
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.state.eternityCount)) + 1;
   runtime.state.eternityMilestoneChoice = "";
   runtime.checkAchievements(true);
-  applyEternityMilestoneStartingLevels();
   if (options.update !== false) runtime.updateUi?.();
   if (options.save !== false) runtime.saveGame?.("manual");
   return true;
@@ -205,7 +196,6 @@ expose("eternityMilestonePreservesCoreBoostReset", () => eternityMilestonePreser
 expose("eternityMilestoneCoreBoostRequirementLog10", () => eternityMilestoneCoreBoostRequirementLog10);
 expose("normalAutomationUnlocked", () => normalAutomationUnlocked);
 expose("infinityAutomationUnlocked", () => infinityAutomationUnlocked);
-expose("applyEternityMilestoneStartingLevels", () => applyEternityMilestoneStartingLevels);
 expose("canEternity", () => canEternity);
 expose("shouldForceEternity", () => shouldForceEternity);
 expose("resetEternityProgression", () => resetEternityProgression);
