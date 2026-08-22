@@ -88,4 +88,10 @@ IDDの標準ラベルは`roadmap`、`status:blocked-by-human`、`status:needs-de
 
 Hosted regression workflowは、production correctness、local classifier、絶対性能、offline stressを独立したステップとして実行し、性能予算を緩和しません。`npm run test:performance`の絶対予算とoffline/work-budget検証はHosted CIを権威とします。TC4/research evidenceが必要なIssueでは、上記のresearch層またはfull層を追加で実行します。
 
+### Local and hosted performance boundary
+
+`npm run test:performance:local`は、#219で確立した共通のfocused timing surfaceである`npm run test:performance`をcandidateとfreshな`origin/next`で交互に3回ずつ測定します。ゲートはreportがsimulation/renderingのtiming matrixだけを含むことを確認し、offline stress、deterministic quality/cache、research検証を比較ループへ戻しません。同一のcandidate-only failure keyがbaselineの全runに存在しない場合だけ`local-performance-regression`とし、baseline全体に別のfailureがあってもkey単位の判定を維持します。
+
+共有または移動するtiming evidenceは`local-performance-inconclusive`として`hostedCiRequired: true`を記録します。`npm run test:performance`はHosted CIのfocused absolute timing matrix、`npm run test:offline-stress`は長時間・work-budget検証として独立して実行され、絶対性能budgetやHosted CIのhard gateは変更しません。
+
 スクリプトの層分離は`tests/validation-layer-policy.mjs`で機械的に検証します。各層は研究シミュレータのアルゴリズム、結果、production gameplay/balanceを変更しません。
