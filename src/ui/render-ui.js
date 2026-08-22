@@ -67,6 +67,16 @@ function formatInfiniteAngleLevel(kind) {
   return `Lv ${level}${freeLevel > 0 ? ` (+${freeLevel})` : ""}`;
 }
 
+function formatNormalUpgradeTotal(level) {
+  return level < 1000 ? runtime.formatSmallDecimal(level) : runtime.formatUiNumber(level);
+}
+
+function formatNormalUpgradeLevel(rawLevel, effectiveLevel, freeLevel) {
+  return freeLevel > 0
+    ? `Lv ${formatNormalUpgradeTotal(effectiveLevel)} (+${freeLevel})`
+    : formatEffectiveLevel(rawLevel, effectiveLevel);
+}
+
 function recoveryReasonText(reason) {
   const reasonKeys = {
     periodic: "checkpointReasonPeriodic",
@@ -226,16 +236,24 @@ function updateUi() {
   runtime.elements.lapSpeedValue.textContent = runtime.isLapSpeedSoftcapped()
     ? `${formatMultiplierLog(runtime.effectiveLapSpeedLog10())} ${runtime.t("lapSpeedSoftcapped")} / raw ${formatMultiplierLog(runtime.rawLapSpeedLog10())}`
     : formatMultiplierLog(runtime.effectiveLapSpeedLog10());
-  runtime.elements.speedLevel.textContent = formatEffectiveLevel(
+  const freeNormalUpgradeLevel = runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0;
+  const effectiveSpeedLevel = runtime.effectiveSpeedLevel();
+  const effectiveVertexCount = runtime.effectiveVertexCount();
+  const effectiveGainLevel = runtime.effectiveGainLevel();
+  runtime.elements.speedLevel.textContent = formatNormalUpgradeLevel(
     runtime.state.speedLevel,
-    runtime.effectiveSpeedLevel(),
+    effectiveSpeedLevel,
+    freeNormalUpgradeLevel,
   );
-  runtime.elements.vertexCount.textContent = runtime.effectiveVertexCount() === runtime.state.vertices
-    ? `${runtime.state.vertices} ${runtime.t("vertices")}`
-    : `${runtime.effectiveVertexCount()} ${runtime.t("vertices")} (${runtime.state.vertices} + ${runtime.effectiveVertexCount() - runtime.state.vertices})`;
-  runtime.elements.gainLevel.textContent = formatEffectiveLevel(
+  runtime.elements.vertexCount.textContent = freeNormalUpgradeLevel > 0
+    ? `${formatNormalUpgradeTotal(effectiveVertexCount)} ${runtime.t("vertices")} (+${freeNormalUpgradeLevel})`
+    : effectiveVertexCount === runtime.state.vertices
+      ? `${runtime.state.vertices} ${runtime.t("vertices")}`
+      : `${effectiveVertexCount} ${runtime.t("vertices")} (${runtime.state.vertices} + ${effectiveVertexCount - runtime.state.vertices})`;
+  runtime.elements.gainLevel.textContent = formatNormalUpgradeLevel(
     runtime.state.gainLevel,
-    runtime.effectiveGainLevel(),
+    effectiveGainLevel,
+    freeNormalUpgradeLevel,
   );
   runtime.elements.speedCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.speed)}`;
   runtime.elements.vertexCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.vertex)}`;
