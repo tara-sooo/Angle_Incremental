@@ -850,6 +850,89 @@ try {
   assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth (effective)", "TC2 exponent labels should be translated to English");
   assert.match(towerRewardDisplay.englishLabels.tc3Name, /Age When Infinity Was a Concept/, "TC3 name should be translated to English");
   assert.match(towerRewardDisplay.englishLabels.tc3Restriction, /Score gain starts/, "TC3 restriction should be translated to English");
+
+  const eternityNormalUpgradeDisplay = await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    const original = {
+      activeChallenge: state.activeChallenge,
+      activeTowerChallenge: state.activeTowerChallenge,
+      completedTowerChallenges: state.completedTowerChallenges,
+      eternityCount: state.eternityCount,
+      eternityMilestoneMask: state.eternityMilestoneMask,
+      gainLevel: state.gainLevel,
+      infinityPoints: state.infinityPoints,
+      infinityPointsExact: state.infinityPointsExact,
+      infinityPointsLog10: state.infinityPointsLog10,
+      infinityUpgradeMask: state.infinityUpgradeMask,
+      language: state.language,
+      numberFormat: state.numberFormat,
+      speedLevel: state.speedLevel,
+      towerFloor: state.towerFloor,
+      vertices: state.vertices,
+    };
+    const readLabels = () => ({
+      speed: document.querySelector("#speedLevel")?.textContent?.trim() ?? "",
+      vertex: document.querySelector("#vertexCount")?.textContent?.trim() ?? "",
+      gain: document.querySelector("#gainLevel")?.textContent?.trim() ?? "",
+    });
+    const readCosts = () => [
+      document.querySelector("#speedCost")?.textContent?.trim() ?? "",
+      document.querySelector("#vertexCost")?.textContent?.trim() ?? "",
+      document.querySelector("#gainCost")?.textContent?.trim() ?? "",
+    ];
+    Object.assign(state, {
+      activeChallenge: 0,
+      activeTowerChallenge: 0,
+      completedTowerChallenges: 0,
+      eternityCount: 3,
+      eternityMilestoneMask: 0,
+      gainLevel: 4,
+      infinityPoints: 0,
+      infinityPointsExact: "0",
+      infinityPointsLog10: -Infinity,
+      infinityUpgradeMask: 0,
+      language: "en",
+      numberFormat: "detailed",
+      speedLevel: 4,
+      towerFloor: 0,
+      vertices: 7,
+    });
+    window.advanceTime(0);
+    const inactive = { labels: readLabels(), costs: readCosts() };
+    state.eternityMilestoneMask = 2;
+    window.advanceTime(0);
+    const active = { labels: readLabels(), costs: readCosts() };
+    Object.assign(state, {
+      completedTowerChallenges: 4,
+      infinityPoints: 4000,
+      infinityPointsExact: "4000",
+      infinityPointsLog10: Math.log10(4000),
+      infinityUpgradeMask: 1 << 16,
+      towerFloor: 13,
+    });
+    window.advanceTime(0);
+    const stacked = { labels: readLabels(), costs: readCosts() };
+    Object.assign(state, original);
+    window.advanceTime(0);
+    return { inactive, active, stacked };
+  });
+  assert.deepEqual(eternityNormalUpgradeDisplay.inactive.labels, {
+    speed: "Level 4",
+    vertex: "7 vertices",
+    gain: "Level 4",
+  }, "Milestone 1-2 inactive UI should retain the existing normal-upgrade labels");
+  assert.deepEqual(eternityNormalUpgradeDisplay.active.labels, {
+    speed: "Lv 34 (+30)",
+    vertex: "37 vertices (+30)",
+    gain: "Lv 34 (+30)",
+  }, "Milestone 1-2 UI should expose its free level on all normal upgrades");
+  assert.deepEqual(eternityNormalUpgradeDisplay.stacked.labels, {
+    speed: "Lv 37.105 (+30)",
+    vertex: "40 vertices (+30)",
+    gain: "Lv 37.105 (+30)",
+  }, "normal-upgrade UI should show the effective total while isolating the Milestone 1-2 bonus");
+  assert.deepEqual(eternityNormalUpgradeDisplay.active.costs, eternityNormalUpgradeDisplay.inactive.costs, "Milestone 1-2 display should not change normal-upgrade costs");
+  assert.deepEqual(eternityNormalUpgradeDisplay.stacked.costs, eternityNormalUpgradeDisplay.inactive.costs, "TC3 and IU stacking should not change normal-upgrade costs");
   const timeFluxRemoval = await page.evaluate(async () => {
     const { state, advanceOnlineTime, processOfflineElapsed } = window.__angleDebug;
     state.totalPlayTime = 0;
