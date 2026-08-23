@@ -500,7 +500,7 @@ try {
   assert.equal(infinityAutomationThreshold.thresholdLog10, 9, "compact Infinity threshold input should round-trip through log space");
 
   const tabStructure = await page.evaluate(() => {
-    const mainTabs = Array.from(document.querySelectorAll(".main-tab"), (button) => button.dataset.tab);
+    const mainTabs = Array.from(document.querySelectorAll("[data-tab]"), (button) => button.dataset.tab);
     const infinityTabs = Array.from(document.querySelectorAll(".infinity-subtab"), (button) => button.dataset.infinityTab);
     const challengeTabs = Array.from(document.querySelectorAll(".challenge-subtab"), (button) => button.dataset.challengeTab);
     const statisticsTabs = Array.from(document.querySelectorAll(".statistics-subtab"), (button) => button.dataset.statisticsTab);
@@ -508,12 +508,153 @@ try {
   });
   assert.deepEqual(
     tabStructure.mainTabs,
-    ["angle", "infinity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
-    "main tabs should omit the dormant Time Flux tab",
+    ["angle", "infinity", "eternity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
+    "main tabs should omit the dormant Time Flux tab while retaining Eternity",
   );
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
   assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
   assert.deepEqual(tabStructure.statisticsTabs, ["overview", "challenges"], "Statistics subtabs should be ordered Overview, Challenge Records");
+  const mainTabVisibility = await page.evaluate(async () => {
+    const { state, switchMainTab, setMainTabVisibility, loadGame } = window.__angleDebug;
+    const original = {
+      infinityCount: state.infinityCount,
+      infinityUpgradeMask: state.infinityUpgradeMask,
+      hiddenTabs: [...state.hiddenTabs],
+      activeMainTab: window.__angleDebug.runtime.activeMainTab,
+    };
+    state.infinityCount = 0;
+    state.infinityUpgradeMask = 0;
+    state.hiddenTabs = [];
+    switchMainTab("angle");
+    window.advanceTime(0);
+    const visibleTabs = () => Array.from(document.querySelectorAll("[data-tab]"))
+      .filter((button) => !button.hidden)
+      .map((button) => button.dataset.tab);
+    const locked = {
+      visible: visibleTabs(),
+      hidden: Array.from(document.querySelectorAll("[data-tab][hidden]"), (button) => button.dataset.tab),
+      settingsControls: Array.from(document.querySelectorAll("#tabVisibilityList input"), (input) => ({
+        tab: input.dataset.mainTabVisibility,
+        checked: input.checked,
+        disabled: input.disabled,
+      })),
+    };
+    state.infinityCount = 1;
+    state.infinityUpgradeMask = (1 << 1) | (1 << 5);
+    window.advanceTime(0);
+    const unlocked = { visible: visibleTabs() };
+    setMainTabVisibility("help", false);
+    const hidden = {
+      visible: visibleTabs(),
+      hiddenTabs: [...state.hiddenTabs],
+    };
+    switchMainTab("help");
+    window.advanceTime(0);
+    hidden.panelRemainsAccessible = document.querySelector('[data-panel="help"]')?.classList.contains("is-active") ?? false;
+    hidden.persistedTabs = JSON.parse(localStorage.getItem("angle-incremental-save") || "{}").state?.hiddenTabs || [];
+    state.hiddenTabs = [];
+    await loadGame();
+    window.advanceTime(0);
+    hidden.loadedTabs = [...state.hiddenTabs];
+    hidden.renderTextTabs = JSON.parse(window.render_game_to_text()).settings.hiddenTabs;
+    state.infinityCount = original.infinityCount;
+    state.infinityUpgradeMask = original.infinityUpgradeMask;
+    state.hiddenTabs = original.hiddenTabs;
+    switchMainTab(original.activeMainTab);
+    window.advanceTime(0);
+    window.__angleDebug.saveGame("manual");
+    return { locked, unlocked, hidden };
+  });
+  assert.deepEqual(
+    mainTabVisibility.locked.visible,
+    ["angle", "eternity", "statistics", "achievements", "help", "settings"],
+    "locked progression tabs should be hidden from the default navigation",
+  );
+  assert.deepEqual(
+    mainTabVisibility.locked.hidden,
+    ["infinity", "challenges", "automation"],
+    "Infinity, Challenges, and Automation should be hidden until their existing unlocks are met",
+  );
+  assert.equal(mainTabVisibility.locked.settingsControls.length, 9, "SET should list every main tab in its visibility settings");
+  assert.ok(
+    mainTabVisibility.locked.settingsControls.filter((control) => control.disabled && !control.checked).map((control) => control.tab).includes("infinity"),
+    "locked tabs should be unavailable in the visibility settings until unlocked",
+  );
+  assert.deepEqual(
+    mainTabVisibility.unlocked.visible,
+    ["angle", "infinity", "eternity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
+    "newly unlocked tabs should be visible by default",
+  );
+  assert.deepEqual(mainTabVisibility.hidden.hiddenTabs, ["help"], "explicitly hidden tabs should be stored as a minimal list");
+  assert.deepEqual(mainTabVisibility.hidden.persistedTabs, ["help"], "hidden tab preferences should persist in the save");
+  assert.deepEqual(mainTabVisibility.hidden.loadedTabs, ["help"], "hidden tab preferences should survive save/load");
+  assert.deepEqual(mainTabVisibility.hidden.renderTextTabs, ["help"], "render_game_to_text should expose hidden tab state");
+  assert.equal(mainTabVisibility.hidden.panelRemainsAccessible, true, "hiding a tab should not disable its panel or feature access");
+
+  const measureMainTabBar = (targetPage) => targetPage.evaluate(() => {
+    const nav = document.querySelector(".main-tabs");
+    const strip = document.querySelector(".main-tab-scroll");
+    const settings = document.querySelector('[data-tab="settings"]');
+    const navRect = nav?.getBoundingClientRect();
+    const settingsRect = settings?.getBoundingClientRect();
+    const visibleButtons = Array.from(document.querySelectorAll("[data-tab]")).filter((button) => !button.hidden);
+    const tops = visibleButtons.map((button) => button.getBoundingClientRect().top);
+    return {
+      navDisplay: nav ? getComputedStyle(nav).display : "",
+      navFlexWrap: nav ? getComputedStyle(nav).flexWrap : "",
+      stripDisplay: strip ? getComputedStyle(strip).display : "",
+      stripFlexWrap: strip ? getComputedStyle(strip).flexWrap : "",
+      navHeight: nav?.getBoundingClientRect().height ?? 0,
+      navClientHeight: nav?.clientHeight ?? 0,
+      navScrollHeight: nav?.scrollHeight ?? 0,
+      stripClientWidth: strip?.clientWidth ?? 0,
+      stripScrollWidth: strip?.scrollWidth ?? 0,
+      rows: tops.length > 0 ? Math.max(...tops) - Math.min(...tops) : Infinity,
+      nonSettingsInStrip: visibleButtons.filter((button) => button.dataset.tab !== "settings")
+        .every((button) => button.parentElement === strip),
+      settingsPinned: Boolean(navRect && settingsRect && settings.parentElement === nav
+        && settingsRect.left >= navRect.left - 1
+        && settingsRect.right <= navRect.right + 1),
+    };
+  });
+  const layoutOriginal = await page.evaluate(() => ({
+    infinityCount: window.__angleDebug.state.infinityCount,
+    infinityUpgradeMask: window.__angleDebug.state.infinityUpgradeMask,
+    hiddenTabs: [...window.__angleDebug.state.hiddenTabs],
+    activeMainTab: window.__angleDebug.runtime.activeMainTab,
+  }));
+  await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    state.infinityCount = 1;
+    state.infinityUpgradeMask = (1 << 1) | (1 << 5);
+    state.hiddenTabs = [];
+    window.__angleDebug.switchMainTab("angle");
+    window.advanceTime(0);
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const desktopTabBar = await measureMainTabBar(page);
+  await page.setViewportSize({ width: 768, height: 900 });
+  const tabletTabBar = await measureMainTabBar(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.evaluate((original) => {
+    const { state } = window.__angleDebug;
+    state.infinityCount = original.infinityCount;
+    state.infinityUpgradeMask = original.infinityUpgradeMask;
+    state.hiddenTabs = original.hiddenTabs;
+    window.__angleDebug.switchMainTab(original.activeMainTab);
+    window.advanceTime(0);
+  }, layoutOriginal);
+  for (const [viewportName, layout] of [["desktop", desktopTabBar], ["tablet", tabletTabBar]]) {
+    assert.equal(layout.navDisplay, "flex", `${viewportName} navigation should use a compact flex bar`);
+    assert.equal(layout.navFlexWrap, "nowrap", `${viewportName} navigation should never wrap`);
+    assert.equal(layout.stripDisplay, "flex", `${viewportName} non-SET navigation should use a flex strip`);
+    assert.equal(layout.stripFlexWrap, "nowrap", `${viewportName} non-SET navigation should never wrap`);
+    assert.ok(layout.rows < 1, `${viewportName} tabs should share one row`);
+    assert.ok(layout.navScrollHeight <= layout.navClientHeight + 1, `${viewportName} navigation should not grow vertically for overflow`);
+    assert.equal(layout.nonSettingsInStrip, true, `${viewportName} non-SET tabs should stay inside the scrolling strip`);
+    assert.equal(layout.settingsPinned, true, `${viewportName} SET should remain reachable outside the scrolling strip`);
+  }
+  assert.ok(tabletTabBar.stripScrollWidth > tabletTabBar.stripClientWidth, "tablet overflow should remain horizontal inside the non-SET strip");
   const achievementUi = await page.evaluate(() => {
     const { state, switchMainTab } = window.__angleDebug;
     switchMainTab("achievements");
@@ -1645,19 +1786,44 @@ try {
     );
     const mobileStartup = await mobilePage.evaluate(() => ({
       updateTitle: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
-      tabCount: document.querySelectorAll(".main-tab").length,
+      tabCount: document.querySelectorAll("[data-tab]").length,
       timeFluxTab: Boolean(document.querySelector('[data-tab="timeFlux"]')),
       timeFluxPanel: Boolean(document.querySelector("#timeFluxPanel")),
       timeFluxQuickBar: Boolean(document.querySelector("#timeFluxQuickBar")),
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
     assert.equal(mobileStartup.updateTitle, `${EXPECTED_ASSET_VERSION} アップデート`, "mobile startup should use the release version");
-    assert.equal(mobileStartup.tabCount, 8, "mobile startup should expose the active main tabs");
+    assert.equal(mobileStartup.tabCount, 9, "mobile startup should expose the active main tabs");
     assert.equal(mobileStartup.timeFluxTab, false, "mobile startup should omit the dormant Time Flux tab");
     assert.equal(mobileStartup.timeFluxPanel, false, "mobile startup should omit the dormant Time Flux panel");
     assert.equal(mobileStartup.timeFluxQuickBar, false, "mobile startup should omit the dormant Time Flux quick bar");
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
     await mobilePage.locator("#updateModalClose").click();
+
+    await mobilePage.evaluate(() => {
+      const { state } = window.__angleDebug;
+      state.infinityCount = 1;
+      state.infinityUpgradeMask = (1 << 1) | (1 << 5);
+      state.hiddenTabs = [];
+      window.__angleDebug.switchMainTab("angle");
+      window.advanceTime(0);
+    });
+    const mobileTabBar = await measureMainTabBar(mobilePage);
+    assert.equal(mobileTabBar.navDisplay, "flex", "mobile navigation should use a compact flex bar");
+    assert.equal(mobileTabBar.navFlexWrap, "nowrap", "mobile navigation should never wrap");
+    assert.equal(mobileTabBar.stripFlexWrap, "nowrap", "mobile non-SET navigation should never wrap");
+    assert.ok(mobileTabBar.rows < 1, "mobile tabs should share one row");
+    assert.ok(mobileTabBar.navScrollHeight <= mobileTabBar.navClientHeight + 1, "mobile navigation should remain one row when it overflows");
+    assert.ok(mobileTabBar.stripScrollWidth > mobileTabBar.stripClientWidth, "mobile tabs should scroll horizontally when needed");
+    assert.equal(mobileTabBar.nonSettingsInStrip, true, "mobile non-SET tabs should stay inside the scrolling strip");
+    assert.equal(mobileTabBar.settingsPinned, true, "mobile SET should remain reachable while other tabs scroll");
+    await mobilePage.evaluate(() => {
+      const { state } = window.__angleDebug;
+      state.infinityCount = 0;
+      state.infinityUpgradeMask = 0;
+      state.hiddenTabs = [];
+      window.advanceTime(0);
+    });
 
     await mobilePage.locator('[data-tab="settings"]').click();
     const mobileOfflineSetting = await mobilePage.evaluate(() => ({
@@ -1801,6 +1967,7 @@ try {
     report.mobile = {
       viewport: "390x844",
       startup: mobileStartup,
+      tabBar: mobileTabBar,
       offlineSetting: mobileOfflineSetting,
       statistics: mobileStatistics,
       infiniteAngle: mobileInfiniteAngle,

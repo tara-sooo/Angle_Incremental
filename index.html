@@ -59,42 +59,44 @@
       </section>
 
       <nav class="main-tabs" aria-label="Main tabs">
-        <button class="main-tab is-active" type="button" data-tab="angle" aria-selected="true">
-          <span class="tab-icon">△</span>
-          <span class="tab-code">ANGLE</span>
-          <small data-i18n="tabAngle">図形</small>
-        </button>
-        <button class="main-tab" type="button" data-tab="infinity" aria-selected="false">
-          <span class="tab-icon">∞</span>
-          <span class="tab-code">INF</span>
-          <small id="infinityTabState">LOCKED</small>
-          <i id="infinityTabBadge" aria-hidden="true"></i>
-        </button>
-        <button class="main-tab" type="button" data-tab="challenges" aria-selected="false">
-          <span class="tab-icon">◆</span>
-          <span class="tab-code">CHAL</span>
-          <small id="challengeTabState">IC 0/8</small>
-        </button>
-        <button class="main-tab" type="button" data-tab="automation" aria-selected="false">
-          <span class="tab-icon">⟳</span>
-          <span class="tab-code">AUTO</span>
-          <small data-i18n="tabAutomation">自動化</small>
-        </button>
-        <button class="main-tab" type="button" data-tab="statistics" aria-selected="false">
-          <span class="tab-icon">#</span>
-          <span class="tab-code">STAT</span>
-          <small data-i18n="tabStatistics">統計</small>
-        </button>
-        <button class="main-tab" type="button" data-tab="achievements" aria-selected="false">
-          <span class="tab-icon">★</span>
-          <span class="tab-code">ACH</span>
-          <small id="achievementTabState">0/41</small>
-        </button>
-        <button class="main-tab" type="button" data-tab="help" aria-selected="false">
-          <span class="tab-icon">?</span>
-          <span class="tab-code">HELP</span>
-          <small data-i18n="tabHelp">説明</small>
-        </button>
+        <div class="main-tab-scroll">
+          <button class="main-tab is-active" type="button" data-tab="angle" aria-selected="true">
+            <span class="tab-icon">△</span>
+            <span class="tab-code">ANGLE</span>
+            <small data-i18n="tabAngle">図形</small>
+          </button>
+          <button class="main-tab" type="button" data-tab="infinity" aria-selected="false">
+            <span class="tab-icon">∞</span>
+            <span class="tab-code">INF</span>
+            <small id="infinityTabState">LOCKED</small>
+            <i id="infinityTabBadge" aria-hidden="true"></i>
+          </button>
+          <button class="main-tab" type="button" data-tab="challenges" aria-selected="false">
+            <span class="tab-icon">◆</span>
+            <span class="tab-code">CHAL</span>
+            <small id="challengeTabState">IC 0/8</small>
+          </button>
+          <button class="main-tab" type="button" data-tab="automation" aria-selected="false">
+            <span class="tab-icon">⟳</span>
+            <span class="tab-code">AUTO</span>
+            <small data-i18n="tabAutomation">自動化</small>
+          </button>
+          <button class="main-tab" type="button" data-tab="statistics" aria-selected="false">
+            <span class="tab-icon">#</span>
+            <span class="tab-code">STAT</span>
+            <small data-i18n="tabStatistics">統計</small>
+          </button>
+          <button class="main-tab" type="button" data-tab="achievements" aria-selected="false">
+            <span class="tab-icon">★</span>
+            <span class="tab-code">ACH</span>
+            <small id="achievementTabState">0/41</small>
+          </button>
+          <button class="main-tab" type="button" data-tab="help" aria-selected="false">
+            <span class="tab-icon">?</span>
+            <span class="tab-code">HELP</span>
+            <small data-i18n="tabHelp">説明</small>
+          </button>
+        </div>
         <button class="main-tab" type="button" data-tab="settings" aria-selected="false">
           <span class="tab-icon">⚙</span>
           <span class="tab-code">SET</span>
@@ -713,6 +715,12 @@
                 <label for="fpsToggle" data-i18n="showFps">FPS表示</label>
                 <input id="fpsToggle" type="checkbox" />
               </div>
+            </section>
+
+            <section class="settings-card tab-visibility-card">
+              <h2 class="settings-card-heading" data-i18n="tabVisibility">タブ表示</h2>
+              <p class="tab-visibility-description" data-i18n="tabVisibilityDescription">下部タブバーに表示するタブ</p>
+              <div id="tabVisibilityList" class="tab-visibility-list"></div>
             </section>
 
             <section class="save-panel" aria-label="Save data">

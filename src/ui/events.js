@@ -5,6 +5,74 @@ import "./render-eternity.js?v=0.12.0";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
+const MAIN_TAB_UNLOCKS = Object.freeze({
+  angle: () => true,
+  infinity: () => runtime.state.infinityCount > 0,
+  eternity: () => true,
+  challenges: () => runtime.infinityChallengesUnlocked?.() === true,
+  automation: () => runtime.normalAutomationUnlocked?.() === true,
+  statistics: () => true,
+  achievements: () => true,
+  help: () => true,
+  settings: () => true,
+});
+
+let mainTabVisibilitySignature = "";
+
+function mainTabIsUnlocked(tab) {
+  return Boolean(MAIN_TAB_UNLOCKS[tab]?.());
+}
+
+function mainTabIsVisible(tab) {
+  if (tab === "settings") return true;
+  return mainTabIsUnlocked(tab) && !runtime.normalizeHiddenTabs(runtime.state.hiddenTabs).includes(tab);
+}
+
+function setMainTabVisibility(tab, visible) {
+  if (tab === "settings" || !mainTabIsUnlocked(tab)) return;
+  const hiddenTabs = new Set(runtime.normalizeHiddenTabs(runtime.state.hiddenTabs));
+  if (visible) hiddenTabs.delete(tab);
+  else hiddenTabs.add(tab);
+  runtime.state.hiddenTabs = runtime.normalizeHiddenTabs([...hiddenTabs]);
+  runtime.updateUi();
+  runtime.draw();
+  runtime.saveGame("manual");
+}
+
+function updateMainTabVisibility() {
+  const tabStates = runtime.MAIN_TAB_IDS.map((tab) => `${tab}:${mainTabIsUnlocked(tab) ? 1 : 0}:${mainTabIsVisible(tab) ? 1 : 0}`);
+  const signature = tabStates.join("|");
+  runtime.elements.mainTabs.forEach((button) => {
+    const tab = button.dataset.tab;
+    const unlocked = mainTabIsUnlocked(tab);
+    button.hidden = !mainTabIsVisible(tab);
+    button.tabIndex = button.hidden ? -1 : 0;
+    button.dataset.unlocked = String(unlocked);
+  });
+  if (signature === mainTabVisibilitySignature || !runtime.elements.tabVisibilityList) return;
+  mainTabVisibilitySignature = signature;
+  while (runtime.elements.tabVisibilityList.firstChild) {
+    runtime.elements.tabVisibilityList.removeChild(runtime.elements.tabVisibilityList.firstChild);
+  }
+  runtime.elements.mainTabs.forEach((button) => {
+    const tab = button.dataset.tab;
+    const unlocked = mainTabIsUnlocked(tab);
+    const row = document.createElement("label");
+    row.className = "setting-row tab-visibility-row";
+    const label = document.createElement("span");
+    label.textContent = button.querySelector(".tab-code")?.textContent?.trim() || tab;
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = mainTabIsVisible(tab);
+    input.disabled = tab === "settings" || !unlocked;
+    input.dataset.mainTabVisibility = tab;
+    input.setAttribute("aria-label", label.textContent);
+    input.addEventListener("change", () => setMainTabVisibility(tab, input.checked));
+    row.append(label, input);
+    runtime.elements.tabVisibilityList.append(row);
+  });
+}
+
 function switchMainTab(tab) {
   runtime.activeMainTab = tab;
   runtime.elements.mainTabs.forEach((button) => {
@@ -244,5 +312,9 @@ expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchIn
 expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
 expose("switchStatisticsSubtab", () => switchStatisticsSubtab, (value) => { switchStatisticsSubtab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
+expose("mainTabIsUnlocked", () => mainTabIsUnlocked);
+expose("mainTabIsVisible", () => mainTabIsVisible);
+expose("setMainTabVisibility", () => setMainTabVisibility);
+expose("updateMainTabVisibility", () => updateMainTabVisibility);
 expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
 expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });

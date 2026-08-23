@@ -227,6 +227,7 @@ function updateUi() {
   if (unlockedAchievementsNow.length > 0) runtime.saveGame("manual");
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
   applyLanguage();
+  runtime.updateMainTabVisibility?.();
   runtime.updateTopBar();
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());

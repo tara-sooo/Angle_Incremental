@@ -125,6 +125,7 @@ const elements = {
   topBarModeSelect: document.getElementById("topBarModeSelect"),
   offlineProgressToggle: document.getElementById("offlineProgressToggle"),
   offlineTickInput: document.getElementById("offlineTickInput"),
+  tabVisibilityList: document.getElementById("tabVisibilityList"),
   updateModal: document.getElementById("updateModal"),
   updateModalClose: document.getElementById("updateModalClose"),
   i18nNodes: Array.from(document.querySelectorAll("[data-i18n]")),
