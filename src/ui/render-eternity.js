@@ -61,12 +61,13 @@ function installEternityUi() {
   if (!mainTabs || !mainPanels) return null;
 
   installEternityStyles();
+  const mainTabHost = mainTabs.querySelector(".main-tab-scroll") || mainTabs;
 
   document.querySelector(".infinity-subtabs")?.classList.remove("has-eternity");
   document.querySelector('[data-infinity-tab="eternity"]')?.remove();
   document.querySelector('[data-infinity-panel="eternity"]')?.remove();
 
-  eternityTab = mainTabs.querySelector('[data-tab="eternity"]');
+  eternityTab = mainTabHost.querySelector('[data-tab="eternity"]');
   if (!eternityTab) {
     eternityTab = document.createElement("button");
     eternityTab.className = "eternity-main-tab";
@@ -74,9 +75,9 @@ function installEternityUi() {
     eternityTab.dataset.tab = "eternity";
     eternityTab.setAttribute("aria-selected", "false");
     eternityTab.innerHTML = '<span class="tab-icon">E</span><span class="tab-code">ETR</span><small data-i18n="eternityTab">Eternity</small>';
-    const infinityTab = mainTabs.querySelector('[data-tab="infinity"]');
+    const infinityTab = mainTabHost.querySelector('[data-tab="infinity"]');
     if (infinityTab) infinityTab.after(eternityTab);
-    else mainTabs.append(eternityTab);
+    else mainTabHost.append(eternityTab);
   }
 
   eternityRoot = mainPanels.querySelector('[data-panel="eternity"]');

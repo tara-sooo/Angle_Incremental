@@ -864,6 +864,7 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.timeUnit = runtime.normalizeChoice(data.timeUnit, ["auto", "seconds", "milliseconds"], "auto");
   runtime.state.topBarMode = runtime.normalizeChoice(data.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
   runtime.state.showTimeFluxQuickBar = data.showTimeFluxQuickBar !== false;
+  runtime.state.hiddenTabs = runtime.normalizeHiddenTabs(data.hiddenTabs);
   const lastEarned = runtime.hydrateLogResource(data.lastEarned, data.lastEarnedLog10);
   runtime.state.lastEarned = lastEarned.value;
   runtime.state.lastEarnedLog10 = lastEarned.log;
@@ -1320,6 +1321,7 @@ function resetSave() {
     timeUnit: "auto",
     topBarMode: "news",
     showTimeFluxQuickBar: true,
+    hiddenTabs: [],
     floatingTexts: [],
     lastEarned: 0,
     lastEarnedLog10: -Infinity,

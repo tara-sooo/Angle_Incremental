@@ -48,15 +48,15 @@ button {
   min-height: 0;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 10px;
   align-items: stretch;
   padding: 9px 0;
 }
 
 .shell.is-top-bar-hidden {
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .news-ticker {
@@ -145,31 +145,52 @@ button {
 }
 
 .main-tabs {
-  grid-column: 2;
-  grid-row: 2;
+  grid-column: 1;
+  grid-row: 3;
   order: 2;
-  height: 100%;
+  min-width: 0;
   min-height: 0;
-  padding: 10px 8px;
-  display: grid;
-  grid-auto-rows: 80px;
-  align-content: start;
-  gap: 8px;
-  overflow-y: auto;
+  height: auto;
+  padding: 6px;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  overflow: hidden;
   overscroll-behavior: contain;
 }
 
-.shell.is-top-bar-hidden .main-tabs,
+.shell.is-top-bar-hidden .main-tabs {
+  grid-row: 2;
+}
+
 .shell.is-top-bar-hidden .main-panels {
   grid-row: 1;
+}
+
+.main-tab-scroll {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
 }
 
 .main-tab {
   position: relative;
   display: grid;
-  grid-template-rows: auto auto auto;
-  place-items: center;
-  min-height: 74px;
+  grid-template-columns: auto auto auto;
+  grid-template-rows: 1fr;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: max-content;
+  min-height: 42px;
+  padding: 5px 8px;
+  gap: 4px;
   border: 2px solid var(--line);
   background: linear-gradient(180deg, #19253e, #0f182a);
   color: var(--muted);
@@ -195,11 +216,11 @@ button {
 
 .main-tab.is-active {
   background: linear-gradient(180deg, #4f6fb8, #253f82);
-  box-shadow: inset -4px 0 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+  box-shadow: inset 0 -3px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
 }
 
 .tab-icon {
-  font-size: 1.28rem;
+  font-size: 1rem;
   line-height: 1;
 }
 
@@ -211,9 +232,14 @@ button {
 
 .main-tab small {
   color: rgba(255, 255, 255, 0.58);
-  font-size: 0.54rem;
+  font-size: 0.58rem;
   letter-spacing: 0;
   line-height: 1;
+  white-space: nowrap;
+}
+
+.main-tab[data-tab="settings"] {
+  flex: 0 0 auto;
 }
 
 .main-tab i {
@@ -1421,6 +1447,31 @@ canvas {
   align-items: start;
 }
 
+.settings-card-heading {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.tab-visibility-description {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.tab-visibility-list {
+  display: grid;
+}
+
+.tab-visibility-row {
+  min-height: 36px;
+  padding: 6px 0;
+}
+
+.tab-visibility-row span {
+  overflow-wrap: anywhere;
+}
+
 .statistics-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(180px, 1fr));
@@ -1959,11 +2010,14 @@ canvas {
     order: 2;
     position: relative;
     z-index: 10;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 0;
     min-height: auto;
     height: auto;
-    grid-template-columns: repeat(4, minmax(58px, 1fr));
-    grid-auto-rows: 56px;
-    padding: 8px;
+    padding: 6px;
+    overflow: hidden;
   }
 
   .shell.is-top-bar-hidden .main-tabs {
@@ -1975,14 +2029,17 @@ canvas {
   }
 
   .main-tab {
-    min-height: 48px;
-    grid-template-columns: auto auto;
-    grid-template-rows: auto auto;
-    gap: 2px 6px;
+    min-height: 40px;
+    padding: 4px 7px;
+    gap: 4px;
   }
 
   .main-tab.is-active {
-    box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+    box-shadow: inset 0 -3px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+  }
+
+  .main-tab-scroll {
+    min-width: 0;
   }
 
   .main-panels {
@@ -1996,7 +2053,7 @@ canvas {
   }
 
   .main-tab small {
-    grid-column: 1 / -1;
+    white-space: nowrap;
   }
 
   .main-panels,

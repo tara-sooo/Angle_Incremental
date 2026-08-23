@@ -2,6 +2,23 @@ import { runtime, expose } from "../runtime/shared.js";
 
 // Mutable game state and the serialized-field schema.
 
+const MAIN_TAB_IDS = Object.freeze([
+  "angle",
+  "infinity",
+  "eternity",
+  "challenges",
+  "automation",
+  "statistics",
+  "achievements",
+  "help",
+  "settings",
+]);
+
+function normalizeHiddenTabs(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((tab) => MAIN_TAB_IDS.includes(tab) && tab !== "settings"))];
+}
+
 const state = {
   score: 0,
   scoreLog10: -Infinity,
@@ -112,6 +129,7 @@ const state = {
   timeUnit: "auto",
   topBarMode: "news",
   showTimeFluxQuickBar: true,
+  hiddenTabs: [],
   floatingTexts: [],
   lastEarned: 0,
   lastEarnedLog10: -Infinity,
@@ -227,6 +245,7 @@ const SAVE_FIELDS = [
   "timeUnit",
   "topBarMode",
   "showTimeFluxQuickBar",
+  "hiddenTabs",
   "lastEarned",
   "lastEarnedLog10",
 ];
@@ -236,4 +255,6 @@ function normalizeChoice(value, allowed, fallback) {
 }
 expose("state", () => state);
 expose("SAVE_FIELDS", () => SAVE_FIELDS);
+expose("MAIN_TAB_IDS", () => MAIN_TAB_IDS);
+expose("normalizeHiddenTabs", () => normalizeHiddenTabs);
 expose("normalizeChoice", () => normalizeChoice, (value) => { normalizeChoice = value; });
