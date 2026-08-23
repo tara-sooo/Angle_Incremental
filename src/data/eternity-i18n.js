@@ -46,6 +46,8 @@ const ETERNITY_TEXT = {
     eternityMilestone5Effect: "IUの自動化を解放",
     eternityMilestone6Name: "6 有限回の無限チャレンジを0に",
     eternityMilestone6Effect: "Eternity 27以降、各Eternity後の周回でIC1〜IC8をクリア済みにする",
+    eternityMilestone7Name: "7 ワンポイントチャレンジ",
+    eternityMilestone7Effect: "Eternity 44以降、各Tower Challengeを通常の解放階でクリア済みにする",
   },
   en: {
     eternity: "Eternity",
@@ -92,6 +94,8 @@ const ETERNITY_TEXT = {
     eternityMilestone5Effect: "Unlock Infinity Upgrade automation",
     eternityMilestone6Name: "6 Finite Infinity Challenges",
     eternityMilestone6Effect: "At Eternity 27+, start every run with IC1–IC8 completed",
+    eternityMilestone7Name: "7 One-Point Challenges",
+    eternityMilestone7Effect: "At Eternity 44+, each Tower Challenge is completed when its normal unlock floor is reached",
   },
 };
 
