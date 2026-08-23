@@ -316,17 +316,28 @@ button {
 .page-heading {
   display: flex;
   justify-content: space-between;
-  align-items: end;
-  gap: 18px;
-  min-height: 86px;
-  padding: 14px 18px 10px;
+  align-items: center;
+  gap: 12px;
+  min-height: 70px;
+  padding: 10px 14px 8px;
   border-bottom: 2px solid var(--line);
   background: linear-gradient(180deg, rgba(20, 32, 54, 0.9), rgba(15, 25, 44, 0.65));
 }
 
 .page-heading {
-  min-height: 112px;
-  margin-bottom: 14px;
+  margin-bottom: 8px;
+}
+
+.topbar > div:first-child,
+.page-heading > div:first-child {
+  min-width: 0;
+}
+
+.topbar h1,
+.page-heading h1 {
+  font-size: clamp(1.8rem, 3.2vw, 3rem);
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .eyebrow {
@@ -655,28 +666,6 @@ canvas {
 .settings-panel {
   overflow: auto;
   overscroll-behavior: contain;
-}
-
-.infinity-page .page-heading {
-  min-height: 70px;
-  margin-bottom: 8px;
-  padding: 10px 14px 8px;
-}
-
-.challenges-panel .page-heading {
-  min-height: 70px;
-  margin-bottom: 8px;
-  padding: 10px 14px 8px;
-}
-
-.infinity-page h1 {
-  font-size: clamp(1.8rem, 3.2vw, 3rem);
-  line-height: 1;
-}
-
-.challenges-panel h1 {
-  font-size: clamp(1.8rem, 3.2vw, 3rem);
-  line-height: 1;
 }
 
 .infinity-page,
@@ -2275,7 +2264,8 @@ canvas {
     padding: 7px;
   }
 
-  .infinity-page .page-heading {
+  .topbar,
+  .page-heading {
     align-items: center;
     flex-direction: row;
     min-height: 48px;
@@ -2284,43 +2274,25 @@ canvas {
     gap: 8px;
   }
 
-  .challenges-panel .page-heading {
-    align-items: center;
-    flex-direction: row;
-    min-height: 48px;
-    margin-bottom: 5px;
-    padding: 6px 9px 5px;
-    gap: 8px;
-  }
-
-  .infinity-page h1 {
+  .topbar h1,
+  .page-heading h1 {
     font-size: 1.55rem;
   }
 
-  .challenges-panel h1 {
-    font-size: 1.55rem;
-  }
-
-  .infinity-page .eyebrow {
+  .topbar .eyebrow,
+  .page-heading .eyebrow {
     margin-bottom: 1px;
     font-size: 0.62rem;
   }
 
-  .challenges-panel .eyebrow {
-    margin-bottom: 1px;
-    font-size: 0.62rem;
-  }
-
-  .infinity-page .unlock-note {
-    flex: 0 0 auto;
+  .page-heading .unlock-note {
+    flex: 0 1 auto;
+    max-width: 45%;
     padding: 5px 7px;
     font-size: 0.68rem;
-  }
-
-  .challenges-panel .unlock-note {
-    flex: 0 0 auto;
-    padding: 5px 7px;
-    font-size: 0.68rem;
+    line-height: 1.1;
+    overflow-wrap: anywhere;
+    text-align: right;
   }
 
   .infinity-page .panel-heading {
@@ -2496,31 +2468,8 @@ canvas {
     font-size: 0.72rem;
   }
 
-  .topbar,
-  .page-heading {
-    align-items: start;
-    flex-direction: column;
-    min-height: auto;
-  }
-
-  .stage-panel .topbar {
-    align-items: end;
-    flex-direction: row;
-    min-height: 54px;
-    padding: 7px 10px 6px;
-    gap: 4px;
-  }
-
   h1 {
     font-size: clamp(2.1rem, 12vw, 4rem);
-  }
-
-  .stage-panel h1 {
-    font-size: 1.72rem;
-  }
-
-  .stage-panel .eyebrow {
-    font-size: 0.68rem;
   }
 
   .playfield-wrap {
