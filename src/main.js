@@ -760,7 +760,22 @@ function runLayerAutomation() {
     return true;
   }
 
+  if (runEternityMilestoneEightAutomation()) return true;
   return false;
+}
+
+function runEternityMilestoneEightAutomation() {
+  if (runtime.eternityMilestoneActive?.("8") !== true || !runtime.state.automationEnabled) return false;
+  let changed = false;
+  if (runtime.state.autoBuildTower && runtime.buildTower({ refresh: false, save: false })) changed = true;
+  const purchases = runtime.buyAllInfiniteAngleUpgrades({
+    refresh: false,
+    save: false,
+    allowSpeed: runtime.state.autoBuyInfiniteAngleSpeed,
+    allowVertex: runtime.state.autoBuyInfiniteAngleVertex,
+    allowGain: runtime.state.autoBuyInfiniteAngleGain,
+  });
+  return changed || purchases > 0;
 }
 
 function update(dt, allowOffline = false) {
@@ -1900,6 +1915,7 @@ expose("checkForRemoteUpdate", () => checkForRemoteUpdate, (value) => { checkFor
 expose("runAutobuyers", () => runAutobuyers, (value) => { runAutobuyers = value; });
 expose("shouldAutoRunGeneration", () => shouldAutoRunGeneration, (value) => { shouldAutoRunGeneration = value; });
 expose("runLayerAutomation", () => runLayerAutomation, (value) => { runLayerAutomation = value; });
+expose("runEternityMilestoneEightAutomation", () => runEternityMilestoneEightAutomation);
 expose("update", () => update, (value) => { update = value; });
 expose("advanceOnlineTime", () => advanceOnlineTime, (value) => { advanceOnlineTime = value; });
 expose("processOfflineElapsed", () => processOfflineElapsed, (value) => { processOfflineElapsed = value; });

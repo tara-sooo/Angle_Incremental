@@ -48,6 +48,8 @@ const ETERNITY_TEXT = {
     eternityMilestone6Effect: "Eternity 27以降、各Eternity後の周回でIC1〜IC8をクリア済みにする",
     eternityMilestone7Name: "7 ワンポイントチャレンジ",
     eternityMilestone7Effect: "Eternity 44以降、各Tower Challengeを通常の解放階でクリア済みにする",
+    eternityMilestone8Name: "8 バベル・オブ・インフィニット",
+    eternityMilestone8Effect: "Eternity 81以降、IAとTowerの自動購入・自動建設を解放",
   },
   en: {
     eternity: "Eternity",
@@ -96,6 +98,8 @@ const ETERNITY_TEXT = {
     eternityMilestone6Effect: "At Eternity 27+, start every run with IC1–IC8 completed",
     eternityMilestone7Name: "7 One-Point Challenges",
     eternityMilestone7Effect: "At Eternity 44+, each Tower Challenge is completed when its normal unlock floor is reached",
+    eternityMilestone8Name: "8 Babel of Infinite",
+    eternityMilestone8Effect: "At Eternity 81+, unlock Infinite Angle autobuyers and Tower auto-build",
   },
 };
 

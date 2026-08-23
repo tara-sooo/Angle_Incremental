@@ -13,6 +13,7 @@ const COUNT_MILESTONE_REQUIREMENTS = Object.freeze({
   5: 20,
   6: 27,
   7: 44,
+  8: 81,
 });
 
 const FIRST_TIER_MILESTONE_MASK = Object.values(FIRST_TIER_MILESTONE_BITS)

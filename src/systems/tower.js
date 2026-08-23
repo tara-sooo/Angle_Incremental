@@ -486,13 +486,14 @@ function canBuildTower() {
     && runtime.canSpendInfinityPoints(costLog10);
 }
 
-function buildTower() {
+function buildTower(options = {}) {
+  if (typeof Event !== "undefined" && options instanceof Event) options = {};
   if (!canBuildTower()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-tower-build", { force: true })) return false;
   if (!runtime.spendInfinityPoints(towerNextFloorCostLog10())) return false;
   runtime.state.towerFloor = towerNextFloor();
-  runtime.updateUi();
-  runtime.saveGame("manual");
+  if (options.refresh !== false) runtime.updateUi();
+  if (options.save !== false) runtime.saveGame("manual");
   return true;
 }
 
