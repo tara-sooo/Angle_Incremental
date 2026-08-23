@@ -24,6 +24,15 @@ function updateAutomationUi() {
   runtime.elements.autoBuySpeedToggle.disabled = !unlocked;
   runtime.elements.autoBuyVertexToggle.disabled = !unlocked;
   runtime.elements.autoBuyGainToggle.disabled = !unlocked;
+  const milestoneEightUnlocked = runtime.eternityMilestoneActive?.("8") === true;
+  [
+    runtime.elements.autoBuyInfiniteAngleSpeedToggle,
+    runtime.elements.autoBuyInfiniteAngleVertexToggle,
+    runtime.elements.autoBuyInfiniteAngleGainToggle,
+    runtime.elements.autoBuildTowerToggle,
+  ].forEach((element) => {
+    if (element) element.disabled = !milestoneEightUnlocked;
+  });
   if (runtime.elements.autoCompleteChallengesToggle) runtime.elements.autoCompleteChallengesToggle.disabled = !runtime.infinityChallengesUnlocked();
   [
     runtime.elements.autoRunGenerationToggle,
@@ -41,6 +50,10 @@ function updateAutomationUi() {
   runtime.syncFormControl(runtime.elements.autoBuySpeedToggle, runtime.state.autoBuySpeed);
   runtime.syncFormControl(runtime.elements.autoBuyVertexToggle, runtime.state.autoBuyVertex);
   runtime.syncFormControl(runtime.elements.autoBuyGainToggle, runtime.state.autoBuyGain);
+  runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleSpeedToggle, runtime.state.autoBuyInfiniteAngleSpeed);
+  runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleVertexToggle, runtime.state.autoBuyInfiniteAngleVertex);
+  runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleGainToggle, runtime.state.autoBuyInfiniteAngleGain);
+  runtime.syncFormControl(runtime.elements.autoBuildTowerToggle, runtime.state.autoBuildTower);
   if (runtime.elements.autoCompleteChallengesToggle) runtime.syncFormControl(runtime.elements.autoCompleteChallengesToggle, runtime.state.autoCompleteChallenges);
   if (runtime.elements.autoRunGenerationToggle) runtime.syncFormControl(runtime.elements.autoRunGenerationToggle, runtime.state.autoRunGeneration);
   if (runtime.elements.autoGenerationScoreThresholdInput) runtime.syncFormControl(runtime.elements.autoGenerationScoreThresholdInput, runtime.state.autoGenerationScoreMultiplierThreshold);

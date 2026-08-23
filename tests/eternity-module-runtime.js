@@ -151,6 +151,84 @@ async function testMilestoneThresholdsAndEffects() {
   assert.equal(runtime.eternityMilestoneActive("7"), false, "milestone 7 must remain locked below Eternity 44");
   state.eternityCount = 44;
   assert.equal(runtime.eternityMilestoneActive("7"), true, "milestone 7 must activate at Eternity 44");
+
+  assert.equal(state.autoBuyInfiniteAngleSpeed, false, "Milestone 8 IA Speed automation should default off");
+  assert.equal(state.autoBuyInfiniteAngleVertex, false, "Milestone 8 IA Vertex automation should default off");
+  assert.equal(state.autoBuyInfiniteAngleGain, false, "Milestone 8 IA Gain automation should default off");
+  assert.equal(state.autoBuildTower, false, "Milestone 8 Tower automation should default off");
+  state.eternityCount = 80;
+  assert.equal(runtime.eternityMilestoneActive("8"), false, "milestone 8 must remain locked below Eternity 81");
+  state.eternityCount = 81;
+  assert.equal(runtime.eternityMilestoneActive("8"), true, "milestone 8 must activate at Eternity 81");
+
+  state.automationEnabled = true;
+  state.autoRunInfinity = false;
+  state.autoRunCoreBoost = false;
+  state.autoRunGeneration = false;
+  state.activeChallenge = 0;
+  state.activeTowerChallenge = 0;
+  state.towerFloor = 0;
+  state.completedTowerChallenges = 0;
+  state.infiniteAngleUnlocked = true;
+  state.infiniteAngleSpeedLevel = 0;
+  state.infiniteAngleVertexLevel = 0;
+  state.infiniteAngleGainLevel = 0;
+  state.autoBuyInfiniteAngleSpeed = true;
+  state.autoBuyInfiniteAngleVertex = false;
+  state.autoBuyInfiniteAngleGain = true;
+  state.autoBuildTower = false;
+  runtime.syncInfinityPointCachesFromExact(10n ** 22n);
+  state.eternityCount = 80;
+  assert.equal(runtime.runEternityMilestoneEightAutomation(), false, "Milestone 8 automation must not run below Eternity 81");
+  assert.deepEqual(
+    [state.infiniteAngleSpeedLevel, state.infiniteAngleVertexLevel, state.infiniteAngleGainLevel],
+    [0, 0, 0],
+    "locked Milestone 8 must not purchase IA upgrades",
+  );
+  state.eternityCount = 81;
+  assert.equal(runtime.runEternityMilestoneEightAutomation(), true, "Milestone 8 automation should run at Eternity 81");
+  assert.ok(state.infiniteAngleSpeedLevel > 0, "enabled IA Speed automation should purchase Speed");
+  assert.equal(state.infiniteAngleVertexLevel, 0, "disabled IA Vertex automation must not purchase Vertex");
+  assert.ok(state.infiniteAngleGainLevel > 0, "enabled IA Gain automation should purchase Gain");
+
+  state.autoBuyInfiniteAngleSpeed = false;
+  state.autoBuyInfiniteAngleVertex = false;
+  state.autoBuyInfiniteAngleGain = false;
+  state.autoBuildTower = true;
+  state.infiniteAngleUnlocked = false;
+  state.towerFloor = 0;
+  state.completedTowerChallenges = 0;
+  runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
+  assert.equal(runtime.runEternityMilestoneEightAutomation(), true, "Tower auto-build should use the normal build action");
+  assert.equal(state.towerFloor, 1, "Tower automation should build one normal next floor");
+
+  state.towerFloor = 3;
+  state.completedTowerChallenges = 0;
+  runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
+  assert.equal(runtime.runEternityMilestoneEightAutomation(), true, "Milestone 7 should allow the normal Tower gate at its unlock floor");
+  assert.equal(state.towerFloor, 4, "Tower automation should build past a Milestone 7-completed gate");
+  assert.notEqual(state.completedTowerChallenges & 1, 0, "Milestone 7 should mark the normal Tower challenge complete");
+
+  runtime.syncInfinityPointCachesFromExact(0n);
+  assert.equal(runtime.runEternityMilestoneEightAutomation(), false, "Tower automation must respect insufficient IP");
+  assert.equal(state.towerFloor, 4, "insufficient IP must not advance Tower");
+
+  state.autoBuildTower = false;
+  state.infiniteAngleUnlocked = true;
+  state.activeTowerChallenge = 4;
+  state.infiniteAngleSpeedLevel = 0;
+  state.infiniteAngleVertexLevel = 0;
+  state.infiniteAngleGainLevel = 0;
+  state.autoBuyInfiniteAngleSpeed = true;
+  state.autoBuyInfiniteAngleVertex = true;
+  state.autoBuyInfiniteAngleGain = true;
+  runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
+  assert.equal(runtime.runEternityMilestoneEightAutomation(), true, "IA automation should use the normal TC4 purchase path");
+  assert.deepEqual(
+    [state.infiniteAngleSpeedLevel, state.infiniteAngleVertexLevel, state.infiniteAngleGainLevel],
+    [1, 1, 1],
+    "TC4 must keep each IA track at its normal one-level restriction",
+  );
 }
 
 async function testMilestoneSixCompletionState() {
@@ -229,6 +307,10 @@ async function testMilestoneFreeLevelsAndSaveLoad() {
   state.infiniteAngleSpeedLevel = 0;
   state.infiniteAngleVertexLevel = 1;
   state.infiniteAngleGainLevel = 2;
+  state.autoBuyInfiniteAngleSpeed = true;
+  state.autoBuyInfiniteAngleVertex = false;
+  state.autoBuyInfiniteAngleGain = true;
+  state.autoBuildTower = true;
   const saveData = runtime.serializeSaveData();
   saveData.savedAt = Date.now();
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(saveData)]]));
@@ -239,6 +321,10 @@ async function testMilestoneFreeLevelsAndSaveLoad() {
   assert.equal(loaded.runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 5, "v11 save/load should derive effective IA Speed level");
   assert.equal(loaded.runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), 6, "v11 save/load should derive effective IA Vertex level");
   assert.equal(loaded.runtime.infiniteAngleEffectiveUpgradeLevel("gain"), 7, "v11 save/load should derive effective IA Gain level");
+  assert.equal(loaded.debug.state.autoBuyInfiniteAngleSpeed, true, "IA Speed automation should survive save/load");
+  assert.equal(loaded.debug.state.autoBuyInfiniteAngleVertex, false, "IA Vertex automation should survive save/load");
+  assert.equal(loaded.debug.state.autoBuyInfiniteAngleGain, true, "IA Gain automation should survive save/load");
+  assert.equal(loaded.debug.state.autoBuildTower, true, "Tower automation should survive save/load");
   assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 1, "unused first-tier entitlement should be derived from count and ownership after save/load");
   assert.deepEqual(Array.from(loaded.runtime.availableEternityMilestoneChoices()), ["1-2"], "legacy pending-choice state must not consume or auto-grant the available entitlement");
   assert.equal(loaded.runtime.eternityMilestoneActive("5"), true, "count-based milestones must survive save/load");
@@ -305,6 +391,10 @@ async function testThresholdAndResetBoundary() {
   state.automationEnabled = true;
   state.autoRunInfinity = true;
   state.autoInfinityPointThresholdLog10 = 77;
+  state.autoBuyInfiniteAngleSpeed = true;
+  state.autoBuyInfiniteAngleVertex = false;
+  state.autoBuyInfiniteAngleGain = true;
+  state.autoBuildTower = true;
   state.offlineProgressEnabled = false;
   state.language = "en";
   state.noGenerationCoreBoostReached = true;
@@ -346,6 +436,10 @@ async function testThresholdAndResetBoundary() {
   assert.equal(state.automationEnabled, true, "Eternity must preserve automation settings");
   assert.equal(state.autoRunInfinity, true, "Eternity must preserve automation toggles");
   assert.equal(state.autoInfinityPointThresholdLog10, 77, "Eternity must preserve automation thresholds");
+  assert.equal(state.autoBuyInfiniteAngleSpeed, true, "Eternity must preserve IA Speed automation");
+  assert.equal(state.autoBuyInfiniteAngleVertex, false, "Eternity must preserve IA Vertex automation");
+  assert.equal(state.autoBuyInfiniteAngleGain, true, "Eternity must preserve IA Gain automation");
+  assert.equal(state.autoBuildTower, true, "Eternity must preserve Tower automation");
   assert.equal(state.offlineProgressEnabled, false, "Eternity must preserve offline settings");
   assert.equal(state.language, "en", "Eternity must preserve UI settings");
   assert.equal(state.noGenerationCoreBoostReached, true, "Eternity must preserve achievement history flags");
