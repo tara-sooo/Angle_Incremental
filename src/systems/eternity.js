@@ -14,6 +14,7 @@ const COUNT_MILESTONE_REQUIREMENTS = Object.freeze({
   6: 27,
   7: 44,
   8: 81,
+  9: 108,
 });
 
 const FIRST_TIER_MILESTONE_MASK = Object.values(FIRST_TIER_MILESTONE_BITS)
@@ -178,6 +179,7 @@ function performEternity(options = {}) {
   resetEternityProgression();
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.state.eternityCount)) + 1;
   applyEternityMilestoneSixCompletionState();
+  if (eternityMilestoneActive("9")) runtime.syncInfinityPointCachesFromExact(1000n);
   runtime.state.eternityMilestoneChoice = "";
   runtime.checkAchievements(true);
   if (options.update !== false) runtime.updateUi?.();

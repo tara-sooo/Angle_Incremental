@@ -13,6 +13,7 @@ const MILESTONES = Object.freeze([
   Object.freeze({ id: "6", count: 27, nameKey: "eternityMilestone6Name", effectKey: "eternityMilestone6Effect", choice: false }),
   Object.freeze({ id: "7", count: 44, nameKey: "eternityMilestone7Name", effectKey: "eternityMilestone7Effect", choice: false }),
   Object.freeze({ id: "8", count: 81, nameKey: "eternityMilestone8Name", effectKey: "eternityMilestone8Effect", choice: false }),
+  Object.freeze({ id: "9", count: 108, nameKey: "eternityMilestone9Name", effectKey: "eternityMilestone9Effect", choice: false }),
 ]);
 
 let eternityRoot = null;

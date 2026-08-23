@@ -151,6 +151,10 @@ async function testMilestoneThresholdsAndEffects() {
   assert.equal(runtime.eternityMilestoneActive("7"), false, "milestone 7 must remain locked below Eternity 44");
   state.eternityCount = 44;
   assert.equal(runtime.eternityMilestoneActive("7"), true, "milestone 7 must activate at Eternity 44");
+  state.eternityCount = 107;
+  assert.equal(runtime.eternityMilestoneActive("9"), false, "milestone 9 must remain locked below Eternity 108");
+  state.eternityCount = 108;
+  assert.equal(runtime.eternityMilestoneActive("9"), true, "milestone 9 must activate at Eternity 108");
 
   assert.equal(state.autoBuyInfiniteAngleSpeed, false, "Milestone 8 IA Speed automation should default off");
   assert.equal(state.autoBuyInfiniteAngleVertex, false, "Milestone 8 IA Vertex automation should default off");
@@ -499,6 +503,42 @@ async function testInfinityCompletionMakesEternityAvailable() {
   assert.equal(runtime.isAchievementUnlocked(41), true, "the successful manual Eternity must unlock achievement 41");
 }
 
+async function testMilestoneNineStartingIp() {
+  const beforeThreshold = await loadRuntime(candidatePath);
+  beforeThreshold.debug.state.eternityCount = 106;
+  markEternityReady(beforeThreshold.runtime, beforeThreshold.debug.state);
+  assert.equal(beforeThreshold.debug.performEternity({ save: false, update: false }), true, "Eternity 107 should still execute below Milestone 9");
+  assert.equal(beforeThreshold.debug.state.eternityCount, 107);
+  assert.equal(beforeThreshold.debug.state.infinityPointsExact, "0", "pre-Milestone 9 runs should still start with zero IP");
+
+  const boundary = await loadRuntime(candidatePath);
+  boundary.debug.state.eternityCount = 107;
+  markEternityReady(boundary.runtime, boundary.debug.state);
+  assert.equal(boundary.debug.performEternity({ save: false, update: false }), true, "the 108th Eternity should execute");
+  assert.equal(boundary.debug.state.eternityCount, 108);
+  assert.equal(boundary.runtime.eternityMilestoneActive("9"), true);
+  assert.equal(boundary.debug.state.infinityPointsExact, "1000", "the 108th Eternity should start with exactly 1000 IP");
+  assert.equal(boundary.debug.state.infinityPointsLog10, 3, "Milestone 9 should synchronize the IP log cache");
+  assert.equal(boundary.debug.state.infinityPoints, 1000, "Milestone 9 should synchronize the numeric IP cache");
+  assert.equal(boundary.runtime.currentExactInfinityPoints(), 1000n, "Milestone 9 should synchronize exact IP");
+
+  boundary.runtime.syncInfinityPointCachesFromExact(2500n);
+  const saveData = boundary.runtime.serializeSaveData();
+  saveData.savedAt = Date.now();
+  const loaded = await loadRuntime(candidatePath, new Map([[boundary.runtime.SAVE_KEY, JSON.stringify(saveData)]]));
+  loaded.debug.update(0);
+  assert.equal(loaded.debug.state.infinityPointsExact, "2500", "loading a post-Eternity run must not re-grant 1000 IP");
+  assert.equal(loaded.debug.state.infinityPointsLog10, Math.log10(2500), "save/load must preserve the current IP log cache");
+  assert.equal(loaded.debug.state.infinityPoints, 2500, "save/load must preserve the numeric IP cache");
+
+  markEternityReady(loaded.runtime, loaded.debug.state);
+  assert.equal(loaded.debug.performEternity({ save: false, update: false }), true, "later Eternity resets should remain available");
+  assert.equal(loaded.debug.state.eternityCount, 109);
+  assert.equal(loaded.debug.state.infinityPointsExact, "1000", "later Milestone 9 resets should restart at 1000 rather than accumulate");
+  assert.equal(loaded.debug.state.infinityPointsLog10, 3);
+  assert.equal(loaded.debug.state.infinityPoints, 1000);
+}
+
 async function runEternityModuleRuntimeTest() {
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
@@ -506,6 +546,7 @@ async function runEternityModuleRuntimeTest() {
   await testMilestoneFreeLevelsAndSaveLoad();
   await testThresholdAndResetBoundary();
   await testInfinityCompletionMakesEternityAvailable();
+  await testMilestoneNineStartingIp();
   await testQualifiedLoadAndImportDoNotAutoEternity();
   console.log("Eternity module runtime tests passed");
 }
