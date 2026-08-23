@@ -142,6 +142,75 @@ async function runTowerModuleRuntimeTest() {
   {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
+    const { state } = debug;
+    const unlockFloors = Array.from(runtime.TOWER_CHALLENGE_UNLOCK_FLOORS);
+
+    state.eternityCount = 43;
+    state.towerFloor = 12;
+    state.completedTowerChallenges = 0;
+    assert.equal(runtime.towerChallengeUnlocked(4), true, "TC4 should still unlock normally below Milestone 7");
+    assert.equal(runtime.towerChallengeCompleted(4), false, "Milestone 7 must not complete TC4 below Eternity 44");
+
+    state.eternityCount = 44;
+    state.towerFloor = 0;
+    state.completedTowerChallenges = 0;
+    state.activeTowerChallenge = 2;
+    state.activeTowerChallengeTime = 17;
+    state.fastestTowerChallengeTimes = [11, 12, 13, 14];
+    state.infinityCount = 23;
+    setInfinityPoints(runtime, 123n);
+    const before = {
+      activeTowerChallenge: state.activeTowerChallenge,
+      activeTowerChallengeTime: state.activeTowerChallengeTime,
+      fastestTowerChallengeTimes: [...state.fastestTowerChallengeTimes],
+      infinityCount: state.infinityCount,
+      infinityPoints: runtime.currentExactInfinityPoints(),
+    };
+
+    unlockFloors.forEach((unlockFloor, offset) => {
+      const index = offset + 1;
+      state.towerFloor = unlockFloor - 1;
+      assert.equal(runtime.towerChallengeUnlocked(index), false, `TC${index} should remain locked below its normal floor`);
+      assert.equal(runtime.towerChallengeCompleted(index), false, `TC${index} should remain incomplete while locked`);
+    });
+    assert.equal(state.completedTowerChallenges, 0, "locked Tower Challenges must not be pre-completed");
+
+    unlockFloors.forEach((unlockFloor, offset) => {
+      const index = offset + 1;
+      state.towerFloor = unlockFloor;
+      assert.equal(runtime.towerChallengeUnlocked(index), true, `TC${index} should unlock at its normal floor`);
+      assert.equal(state.completedTowerChallenges, (1 << index) - 1, `TC${index} should be auto-completed at its unlock`);
+      assert.equal(runtime.towerChallengeCompleted(index), true, `TC${index} completion should expose its existing reward bit`);
+      assert.equal(runtime.towerChallengeCompleted(index), true, `TC${index} completion should remain idempotent`);
+    });
+
+    assert.deepEqual(
+      {
+        activeTowerChallenge: state.activeTowerChallenge,
+        activeTowerChallengeTime: state.activeTowerChallengeTime,
+        fastestTowerChallengeTimes: [...state.fastestTowerChallengeTimes],
+        infinityCount: state.infinityCount,
+        infinityPoints: runtime.currentExactInfinityPoints(),
+      },
+      before,
+      "Milestone 7 auto-completion must not replay challenge or Infinity side effects",
+    );
+    assert.equal(runtime.towerChallenge4CompletedForEternity(), true, "auto-completed TC4 should satisfy the current-run Eternity condition");
+    setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
+    assert.equal(runtime.canEternity(), true, "auto-completed TC4 plus the IP threshold should make manual Eternity available");
+    assert.equal(runtime.maybeForceEternity({ save: false, update: false }), false, "Milestone 7 must not force Eternity automatically");
+    assert.equal(state.eternityCount, 44, "checking Milestone 7 must not perform Eternity");
+
+    state.activeTowerChallenge = 0;
+    debug.saveGame("manual");
+    const reloaded = await loadRuntime(candidatePath, instance.storage);
+    assert.equal(reloaded.debug.state.completedTowerChallenges, 15, "auto-completed Tower Challenge bits should survive save/load");
+    assert.equal(reloaded.runtime.towerChallenge4CompletedForEternity(), true, "saved auto-completed TC4 should preserve Eternity eligibility");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
     debug.state.towerFloor = 3;
     debug.state.infinityCount = 5;
     debug.state.infinityUpgradeMask = 1 << 16;

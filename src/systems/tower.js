@@ -181,13 +181,29 @@ function towerChallengeUnlockFloor(index) {
   return TOWER_CHALLENGES[normalizedIndex]?.unlockFloor || Infinity;
 }
 
+function applyEternityMilestoneSevenCompletion(index) {
+  const definition = towerChallengeDefinition(index);
+  if (
+    !definition?.implemented
+    || runtime.eternityMilestoneActive?.("7") !== true
+    || towerFloor() < definition.unlockFloor
+  ) return false;
+  const bit = 1 << (definition.index - 1);
+  if ((runtime.state.completedTowerChallenges & bit) !== 0) return false;
+  runtime.state.completedTowerChallenges |= bit;
+  return true;
+}
+
 function towerChallengeUnlocked(index) {
-  return towerFloor() >= towerChallengeUnlockFloor(index);
+  const unlocked = towerFloor() >= towerChallengeUnlockFloor(index);
+  if (unlocked) applyEternityMilestoneSevenCompletion(index);
+  return unlocked;
 }
 
 function towerChallengeCompleted(index) {
   const normalizedIndex = Math.floor(index);
   if (normalizedIndex < 1 || normalizedIndex > runtime.TOWER_CHALLENGE_COUNT) return false;
+  applyEternityMilestoneSevenCompletion(normalizedIndex);
   return (runtime.state.completedTowerChallenges & (1 << (normalizedIndex - 1))) !== 0;
 }
 

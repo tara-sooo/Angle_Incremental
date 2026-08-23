@@ -147,6 +147,10 @@ async function testMilestoneThresholdsAndEffects() {
   assert.equal(runtime.eternityMilestoneActive("6"), false, "milestone 6 must remain locked below Eternity 27");
   state.eternityCount = 27;
   assert.equal(runtime.eternityMilestoneActive("6"), true, "milestone 6 must activate at Eternity 27");
+  state.eternityCount = 43;
+  assert.equal(runtime.eternityMilestoneActive("7"), false, "milestone 7 must remain locked below Eternity 44");
+  state.eternityCount = 44;
+  assert.equal(runtime.eternityMilestoneActive("7"), true, "milestone 7 must activate at Eternity 44");
 }
 
 async function testMilestoneSixCompletionState() {
