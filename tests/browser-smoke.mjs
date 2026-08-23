@@ -655,6 +655,75 @@ try {
     assert.equal(layout.settingsPinned, true, `${viewportName} SET should remain reachable outside the scrolling strip`);
   }
   assert.ok(tabletTabBar.stripScrollWidth > tabletTabBar.stripClientWidth, "tablet overflow should remain horizontal inside the non-SET strip");
+
+  const headerOriginal = await page.evaluate(() => ({
+    infinityCount: window.__angleDebug.state.infinityCount,
+    infinityUpgradeMask: window.__angleDebug.state.infinityUpgradeMask,
+    hiddenTabs: [...window.__angleDebug.state.hiddenTabs],
+    activeMainTab: window.__angleDebug.runtime.activeMainTab,
+  }));
+  await page.evaluate(() => {
+    const { state, switchMainTab } = window.__angleDebug;
+    state.infinityCount = 1;
+    state.infinityUpgradeMask = (1 << 1) | (1 << 5);
+    state.hiddenTabs = [];
+    switchMainTab("angle");
+    window.advanceTime(0);
+  });
+  const measurePageHeaders = () => page.evaluate(() => {
+    const panelNames = ["angle", "infinity", "eternity", "challenges", "automation", "statistics", "achievements", "help", "settings"];
+    const { switchMainTab } = window.__angleDebug;
+    return panelNames.map((panelName) => {
+      switchMainTab(panelName);
+      window.advanceTime(0);
+      const panel = document.querySelector(`[data-panel="${panelName}"]`);
+      const header = panel?.querySelector(".page-heading, .topbar");
+      const title = header?.querySelector("h1");
+      const status = header?.querySelector(".unlock-note");
+      const headerStyle = header ? getComputedStyle(header) : null;
+      const headerRect = header?.getBoundingClientRect();
+      const statusRect = status?.getBoundingClientRect();
+      return {
+        panelName,
+        height: headerRect?.height ?? 0,
+        minHeight: headerStyle?.minHeight ?? "",
+        padding: headerStyle ? `${headerStyle.paddingTop} ${headerStyle.paddingRight} ${headerStyle.paddingBottom} ${headerStyle.paddingLeft}` : "",
+        titleFontSize: title ? getComputedStyle(title).fontSize : "",
+        titleOverflow: Boolean(title && title.scrollWidth > title.clientWidth + 1),
+        headerOverflow: Boolean(header && header.scrollWidth > header.clientWidth + 1),
+        statusInside: !status || status.hidden || Boolean(statusRect && headerRect && statusRect.top >= headerRect.top - 1 && statusRect.bottom <= headerRect.bottom + 1),
+      };
+    });
+  });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const desktopPageHeaders = await measurePageHeaders();
+  await page.setViewportSize({ width: 768, height: 900 });
+  const tabletPageHeaders = await measurePageHeaders();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobilePageHeaders = await measurePageHeaders();
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.evaluate((original) => {
+    const { state, switchMainTab } = window.__angleDebug;
+    state.infinityCount = original.infinityCount;
+    state.infinityUpgradeMask = original.infinityUpgradeMask;
+    state.hiddenTabs = original.hiddenTabs;
+    switchMainTab(original.activeMainTab);
+    window.advanceTime(0);
+  }, headerOriginal);
+  for (const [viewportName, headers, maxHeight] of [
+    ["desktop", desktopPageHeaders, 86],
+    ["tablet", tabletPageHeaders, 56],
+    ["mobile", mobilePageHeaders, 56],
+  ]) {
+    const heights = headers.map((header) => header.height);
+    assert.equal(new Set(headers.map((header) => header.minHeight)).size, 1, `${viewportName} top-level headers should share one min-height`);
+    assert.equal(new Set(headers.map((header) => header.padding)).size, 1, `${viewportName} top-level headers should share one padding rule`);
+    assert.equal(new Set(headers.map((header) => header.titleFontSize)).size, 1, `${viewportName} top-level headers should share one title size`);
+    assert.ok(Math.max(...heights) <= maxHeight, `${viewportName} top-level headers should stay compact`);
+    assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, `${viewportName} top-level headers should have consistent heights`);
+    assert.ok(headers.every((header) => !header.titleOverflow && !header.headerOverflow && header.statusInside), `${viewportName} top-level headers should not clip titles or status badges`);
+  }
+
   const achievementUi = await page.evaluate(() => {
     const { state, switchMainTab } = window.__angleDebug;
     switchMainTab("achievements");

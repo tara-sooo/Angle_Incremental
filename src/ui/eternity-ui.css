@@ -48,17 +48,6 @@
   padding: 0 14px 14px;
 }
 
-.eternity-page .page-heading {
-  min-height: 70px;
-  margin-bottom: 8px;
-  padding: 10px 14px 8px;
-}
-
-.eternity-page h1 {
-  font-size: clamp(1.8rem, 3.2vw, 3rem);
-  line-height: 1;
-}
-
 .eternity-surface {
   padding: 12px;
   background: linear-gradient(180deg, rgba(23, 36, 59, 0.96), rgba(12, 20, 35, 0.96));
