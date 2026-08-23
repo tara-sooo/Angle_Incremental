@@ -339,7 +339,7 @@ function updateUi() {
   const towerGate = runtime.towerGateForFloor(nextTowerFloor);
   const towerGateReady = runtime.towerCanBuildNextFloor();
   const maximumInfinityPointLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
-  const towerCostAffordable = nextTowerCostLog10 <= maximumInfinityPointLog10
+  const towerCostAffordable = (!runtime.infinityPointCapActive() || nextTowerCostLog10 <= maximumInfinityPointLog10)
     && runtime.canSpendInfinityPoints(nextTowerCostLog10);
   runtime.elements.towerFloorHeading.textContent = `Floor ${currentTowerFloor}`;
   runtime.elements.towerFloorValue.textContent = String(currentTowerFloor);

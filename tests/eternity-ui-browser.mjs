@@ -279,6 +279,30 @@ try {
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
+    debug.state.eternityCount = 127;
+    debug.runtime.updateUi();
+  });
+  const milestoneTenLocked = await page.evaluate(() => ({
+    status: document.querySelector('[data-eternity-milestone="10"] .eternity-milestone-status')?.textContent,
+    requirement: document.querySelector('[data-eternity-milestone="10"] .eternity-milestone-requirement')?.textContent,
+  }));
+  assert.equal(milestoneTenLocked.status, "未解放", "Milestone 10 should remain locked at Eternity 127");
+  assert.equal(milestoneTenLocked.requirement, "Eternity 128", "Milestone 10 should require Eternity 128");
+
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.eternityCount = 128;
+    debug.runtime.updateUi();
+  });
+  const milestoneTen = await page.evaluate(() => ({
+    status: document.querySelector('[data-eternity-milestone="10"] .eternity-milestone-status')?.textContent,
+    effect: document.querySelector('[data-eternity-milestone="10"] .eternity-milestone-effect')?.textContent,
+  }));
+  assert.equal(milestoneTen.status, "有効", "Milestone 10 should activate at Eternity 128");
+  assert.match(milestoneTen.effect || "", /Eternity 128.*Infinity Point.*上限.*解除/, "Milestone 10 should describe Break Eternity without changing the requirement");
+
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
     debug.state.language = "en";
     debug.runtime.appliedLanguage = "";
     debug.runtime.updateUi();
@@ -294,6 +318,8 @@ try {
     effect8: document.querySelector('[data-i18n="eternityMilestone8Effect"]')?.textContent,
     title9: document.querySelector('[data-i18n="eternityMilestone9Name"]')?.textContent,
     effect9: document.querySelector('[data-i18n="eternityMilestone9Effect"]')?.textContent,
+    title10: document.querySelector('[data-i18n="eternityMilestone10Name"]')?.textContent,
+    effect10: document.querySelector('[data-i18n="eternityMilestone10Effect"]')?.textContent,
     manual: document.getElementById("eternityForcedNote")?.textContent,
   }));
   assert.equal(english.countLabel, "Eternity count", "Eternity UI should switch to English when the shared language state changes");
@@ -306,6 +332,8 @@ try {
   assert.match(english.effect8 || "", /Eternity 81\+.*Infinite Angle.*Tower.*auto/, "Milestone 8 English copy should describe IA and Tower automation");
   assert.equal(english.title9, "9 Worldly Desires", "Milestone 9 should have English copy");
   assert.match(english.effect9 || "", /Eternity 108\+.*1000.*Infinity Points/, "Milestone 9 English copy should describe the 1000 IP starting baseline");
+  assert.equal(english.title10, "10 Eternity Is Balance", "Milestone 10 should have English copy");
+  assert.match(english.effect10 || "", /Eternity 128\+.*Infinity Point cap.*requirement remains unchanged/, "Milestone 10 English copy should describe the uncapped IP range and unchanged requirement");
   assert.match(english.manual || "", /manually/, "English copy should explain that Eternity is player-triggered");
   assert.doesNotMatch(english.manual || "", /performed automatically/, "English copy must not describe forced pre-Break Eternity");
 

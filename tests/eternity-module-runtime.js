@@ -539,6 +539,74 @@ async function testMilestoneNineStartingIp() {
   assert.equal(loaded.debug.state.infinityPoints, 1000);
 }
 
+async function testBreakEternityBoundaryAndPersistence() {
+  const source = await loadRuntime(candidatePath);
+  const { debug, runtime } = source;
+  const { state } = debug;
+  const cap = runtime.MAX_EXACT_INFINITY_POINTS;
+  const threshold = runtime.eternityRequirementExact();
+
+  state.eternityCount = 126;
+  runtime.syncInfinityPointCachesFromExact(cap - 1n);
+  assert.equal(runtime.infinityPointCapActive(), true, "the IP cap should remain active below Milestone 10");
+  assert.equal(runtime.currentExactInfinityPoints(), cap - 1n, "IP below the old ceiling should remain exact");
+  runtime.syncInfinityPointCachesFromExact(cap + 1n);
+  assert.equal(runtime.currentExactInfinityPoints(), cap, "IP above the old ceiling should clamp before Break Eternity");
+
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "the 127th Eternity should still execute normally");
+  assert.equal(state.eternityCount, 127);
+  assert.equal(runtime.eternityMilestoneActive("10"), false, "Milestone 10 must remain locked at Eternity 127");
+  assert.equal(runtime.infinityPointCapActive(), true, "Break Eternity must not activate at Eternity 127");
+
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "the 128th Eternity should execute normally");
+  assert.equal(state.eternityCount, 128);
+  assert.equal(runtime.eternityMilestoneActive("10"), true, "Milestone 10 should activate at Eternity 128");
+  assert.equal(runtime.infinityPointCapActive(), false, "the 128th Eternity should remove the IP cap immediately");
+  assert.equal(runtime.eternityRequirementExact(), threshold, "Break Eternity must not change the existing Eternity IP threshold");
+  assert.equal(debug.maybeForceEternity({ save: false, update: false }), false, "Break Eternity must not make Eternity automatic");
+
+  runtime.syncInfinityPointCachesFromExact(cap * 2n);
+  state.completedTowerChallenges = 0;
+  assert.equal(runtime.canEternity(), false, "TC4 must remain required after Break Eternity");
+  state.completedTowerChallenges = 1 << 3;
+  assert.equal(runtime.canEternity(), true, "the existing threshold plus TC4 should remain the manual Eternity gate");
+  assert.equal(runtime.currentExactInfinityPoints(), cap * 2n, "above-cap IP should remain exact after Break Eternity");
+  assert.ok(state.infinityPointsLog10 > Math.log10(Number.MAX_VALUE), "above-cap IP should retain an above-cap log cache");
+  assert.equal(state.infinityPoints, Number.MAX_VALUE, "the finite numeric cache should remain a compatibility projection");
+  assert.match(runtime.formatUiLogNumber(state.infinityPointsLog10), /e308$/, "above-cap IP should remain displayable");
+
+  assert.equal(runtime.spendInfinityPoints(Math.log10(100)), true, "above-cap IP should remain spendable through the exact path");
+  assert.equal(runtime.currentExactInfinityPoints(), cap * 2n - 100n, "spending should preserve exact above-cap remainders");
+
+  const saveData = runtime.serializeSaveData();
+  saveData.savedAt = Date.now();
+  const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(saveData)]]));
+  assert.equal(loaded.debug.state.eternityCount, 128, "save/load should preserve the Break Eternity count-derived state");
+  assert.equal(loaded.runtime.infinityPointCapActive(), false, "save/load should retain the uncapped progression state");
+  assert.equal(loaded.debug.state.infinityPointsExact, (cap * 2n - 100n).toString(), "save/load should preserve above-cap exact IP");
+  assert.equal(loaded.runtime.eternityRequirementExact(), threshold, "save/load should preserve the unchanged Eternity threshold");
+
+  markEternityReady(loaded.runtime, loaded.debug.state);
+  assert.equal(loaded.debug.performEternity({ save: false, update: false }), true, "a later manual Eternity should remain available");
+  assert.equal(loaded.debug.state.eternityCount, 129, "later Eternity should increment normally after Break Eternity");
+  assert.equal(loaded.runtime.infinityPointCapActive(), false, "Break Eternity should persist through later Eternities");
+
+  loaded.debug.state.automationEnabled = true;
+  loaded.debug.state.autoRunInfinity = true;
+  loaded.debug.state.autoInfinityPointThresholdLog10 = 0;
+  loaded.debug.state.infinityCount = 1;
+  loaded.debug.state.activeChallenge = 0;
+  loaded.debug.state.activeTowerChallenge = 0;
+  loaded.debug.state.scoreLog10 = 7777;
+  loaded.debug.state.score = Number.MAX_VALUE;
+  loaded.runtime.syncInfinityPointCachesFromExact(cap * 2n);
+  const offlineBefore = loaded.runtime.currentExactInfinityPoints();
+  loaded.debug.update(1 / 60, true);
+  assert.ok(loaded.runtime.currentExactInfinityPoints() > offlineBefore, "the offline update path should continue adding exact IP above the old ceiling");
+}
+
 async function runEternityModuleRuntimeTest() {
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
@@ -547,6 +615,7 @@ async function runEternityModuleRuntimeTest() {
   await testThresholdAndResetBoundary();
   await testInfinityCompletionMakesEternityAvailable();
   await testMilestoneNineStartingIp();
+  await testBreakEternityBoundaryAndPersistence();
   await testQualifiedLoadAndImportDoNotAutoEternity();
   console.log("Eternity module runtime tests passed");
 }

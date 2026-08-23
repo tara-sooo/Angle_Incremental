@@ -182,7 +182,7 @@ function canBuyInfiniteAngleUpgrade(kind) {
     && Boolean(INFINITE_ANGLE_UPGRADES[kind])
     && runtime.towerChallenge4AllowsInfiniteAngleUpgrade(kind)
     && (kind !== "vertex" || infiniteAngleEffectiveUpgradeLevel("vertex") < runtime.MAX_RENDERED_VERTICES - 3)
-    && costLog10 <= maximumCostLog10
+    && (!runtime.infinityPointCapActive() || costLog10 <= maximumCostLog10)
     && runtime.canSpendInfinityPoints(costLog10);
 }
 
