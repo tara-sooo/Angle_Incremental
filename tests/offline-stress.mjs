@@ -214,7 +214,6 @@ async function measureOfflineStress(page) {
       state.autoRunInfinity = false;
       state.autoRunGeneration = false;
       state.autoRunCoreBoost = false;
-      state.autoCompleteChallenges = false;
       state.infinityUpgradeMask = 0;
       state.infinityCount = 1;
       state.gainLevel = 0;
@@ -284,7 +283,6 @@ async function measureOfflineStress(page) {
       state.autoRunInfinity = true;
       state.autoRunGeneration = false;
       state.autoRunCoreBoost = false;
-      state.autoCompleteChallenges = false;
       state.autoInfinityPointThresholdLog10 = 0;
       state.activeChallenge = 0;
       state.activeTowerChallenge = 0;
@@ -344,7 +342,6 @@ async function measureOfflineStress(page) {
     state.autoRunInfinity = false;
     state.autoRunGeneration = false;
     state.autoRunCoreBoost = false;
-    state.autoCompleteChallenges = false;
     state.activeChallenge = 0;
     state.activeTowerChallenge = 0;
     const offlineStartedAt = performance.now();

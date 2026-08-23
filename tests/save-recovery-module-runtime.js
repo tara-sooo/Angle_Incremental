@@ -7,6 +7,22 @@ const candidatePath = path.join(__dirname, "..", "src", "main.js");
 async function runSaveRecoveryModuleRuntimeTest() {
   {
     const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const legacySave = runtime.serializeSaveData();
+    legacySave.autoCompleteChallenges = true;
+    legacySave.activeChallenge = 1;
+    legacySave.infinityCount = 1;
+    legacySave.infinityUpgradeMask = 1 << 5;
+    legacySave.score = Number.MAX_VALUE;
+    legacySave.scoreLog10 = 309;
+    runtime.applySaveData(legacySave);
+    assert.equal(debug.state.autoCompleteChallenges, undefined, "legacy IC auto-complete saves must not create an active setting");
+    debug.update(0);
+    assert.equal(debug.state.activeChallenge, 1, "legacy IC auto-complete data must not complete a goal-only IC");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { context, debug, runtime, storage } = instance;
     const { state } = debug;
     state.generationCount = 7;
@@ -561,7 +577,10 @@ async function runSaveRecoveryModuleRuntimeTest() {
     runtime.lapDuration = () => Infinity;
     state.infinityCount = 1;
     state.activeChallenge = 1;
-    state.autoCompleteChallenges = true;
+    state.automationEnabled = true;
+    state.autoRunInfinity = true;
+    state.infinityUpgradeMask = (1 << 5) | (1 << 12);
+    state.autoInfinityPointThresholdLog10 = 0;
     state.score = Number.MAX_VALUE;
     state.scoreLog10 = 309;
     try {

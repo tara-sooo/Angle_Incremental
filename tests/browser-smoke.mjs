@@ -1737,17 +1737,46 @@ try {
   );
 
   await page.locator('[data-tab="automation"]').click();
-  await page.evaluate(() => {
+  const challengeAutomation = await page.evaluate(() => {
     window.__angleDebug.state.infinityCount = Math.max(1, window.__angleDebug.state.infinityCount);
-    window.__angleDebug.state.infinityUpgradeMask |= 1 << 5;
+    window.__angleDebug.state.infinityUpgradeMask |= (1 << 5) | (1 << 12);
+    window.__angleDebug.state.activeChallenge = 1;
+    window.__angleDebug.state.score = Number.MAX_VALUE;
+    window.__angleDebug.state.scoreLog10 = 309;
+    window.__angleDebug.state.automationEnabled = false;
+    window.__angleDebug.state.autoRunInfinity = false;
     window.advanceTime(0);
+    const withoutAutomation = window.__angleDebug.state.activeChallenge;
+    window.__angleDebug.state.automationEnabled = true;
+    window.__angleDebug.state.autoRunInfinity = true;
+    window.__angleDebug.state.autoInfinityPointThresholdLog10 = 0;
+    window.advanceTime(0);
+    return {
+      autoCompleteToggle: Boolean(document.querySelector("#autoCompleteChallengesToggle")),
+      autoInfinityToggle: Boolean(document.querySelector("#autoRunInfinityToggle")),
+      withoutAutomation,
+      withAutoInfinity: window.__angleDebug.state.activeChallenge,
+    };
   });
-  const autoCompleteToggle = page.locator("#autoCompleteChallengesToggle");
-  await autoCompleteToggle.check();
   assert.equal(
-    await page.evaluate(() => window.__angleDebug.state.autoCompleteChallenges),
+    challengeAutomation.autoCompleteToggle,
+    false,
+    "the dedicated IC auto-complete control should be removed",
+  );
+  assert.equal(
+    challengeAutomation.autoInfinityToggle,
     true,
-    "the IC auto-complete setting should persist through its UI toggle",
+    "the normal Auto Infinity control should remain available",
+  );
+  assert.equal(
+    challengeAutomation.withoutAutomation,
+    1,
+    "an IC goal should remain active when Auto Infinity is disabled",
+  );
+  assert.equal(
+    challengeAutomation.withAutoInfinity,
+    0,
+    "normal Auto Infinity should complete the active IC",
   );
 
   await page.locator('[data-tab="challenges"]').click();

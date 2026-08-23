@@ -33,7 +33,6 @@ function updateAutomationUi() {
   ].forEach((element) => {
     if (element) element.disabled = !milestoneEightUnlocked;
   });
-  if (runtime.elements.autoCompleteChallengesToggle) runtime.elements.autoCompleteChallengesToggle.disabled = !runtime.infinityChallengesUnlocked();
   [
     runtime.elements.autoRunGenerationToggle,
     runtime.elements.autoGenerationScoreThresholdInput,
@@ -54,7 +53,6 @@ function updateAutomationUi() {
   runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleVertexToggle, runtime.state.autoBuyInfiniteAngleVertex);
   runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleGainToggle, runtime.state.autoBuyInfiniteAngleGain);
   runtime.syncFormControl(runtime.elements.autoBuildTowerToggle, runtime.state.autoBuildTower);
-  if (runtime.elements.autoCompleteChallengesToggle) runtime.syncFormControl(runtime.elements.autoCompleteChallengesToggle, runtime.state.autoCompleteChallenges);
   if (runtime.elements.autoRunGenerationToggle) runtime.syncFormControl(runtime.elements.autoRunGenerationToggle, runtime.state.autoRunGeneration);
   if (runtime.elements.autoGenerationScoreThresholdInput) runtime.syncFormControl(runtime.elements.autoGenerationScoreThresholdInput, runtime.state.autoGenerationScoreMultiplierThreshold);
   if (runtime.elements.autoGenerationCostThresholdInput) runtime.syncFormControl(runtime.elements.autoGenerationCostThresholdInput, runtime.state.autoGenerationCostMultiplierThreshold);

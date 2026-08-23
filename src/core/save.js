@@ -764,7 +764,6 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.autoBuyInfiniteAngleVertex = runtime.sanitizeBoolean(data.autoBuyInfiniteAngleVertex, false);
   runtime.state.autoBuyInfiniteAngleGain = runtime.sanitizeBoolean(data.autoBuyInfiniteAngleGain, false);
   runtime.state.autoBuildTower = runtime.sanitizeBoolean(data.autoBuildTower, false);
-  runtime.state.autoCompleteChallenges = runtime.sanitizeBoolean(data.autoCompleteChallenges, false);
   runtime.state.autoRunGeneration = runtime.sanitizeBoolean(data.autoRunGeneration, false);
   const legacyScoreThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationScoreThreshold, 10));
   const legacyCostThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationCostThreshold, 1));
@@ -1298,7 +1297,6 @@ function resetSave() {
     autoBuyInfiniteAngleVertex: false,
     autoBuyInfiniteAngleGain: false,
     autoBuildTower: false,
-    autoCompleteChallenges: false,
     autoRunGeneration: false,
     autoGenerationScoreMultiplierThreshold: 2,
     autoGenerationCostMultiplierThreshold: 1,

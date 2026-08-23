@@ -41,7 +41,6 @@ function prepareVertexScenario(instance, { scoreLog10, currentGainLog10, infinit
   setLogResource(state, "generationScore", -Infinity);
   setLogResource(state, "currentGain", currentGainLog10);
   runtime.checkAchievements = () => [];
-  runtime.completeChallengeIfReady = () => false;
 }
 
 async function simulateVertexSteps({

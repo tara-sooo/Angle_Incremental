@@ -96,23 +96,38 @@ async function testSaveCodeRoundTrip() {
   assert.equal(state.scoreLog10, 55);
 }
 
-async function testChallengeAutomationToggle() {
-  const { debug, runtime } = await loadRuntime(runtimePath);
+async function testChallengeCompletionUsesNormalInfinityExecution() {
+  const manual = await loadRuntime(runtimePath);
+  const { debug, runtime } = manual;
   const { state } = debug;
 
+  assert.equal(runtime.completeChallengeIfReady, undefined, "the dedicated IC completion helper must be removed");
+  assert.equal(debug.completeChallengeIfReady, undefined, "the debug API must not expose dedicated IC completion");
   state.infinityCount = 1;
   state.infinityUpgradeMask = 1 << 5;
   state.activeChallenge = 1;
+  state.automationEnabled = false;
+  state.autoRunInfinity = false;
   setLogResource(state, "score", 309);
-  state.autoCompleteChallenges = false;
-  debug.completeChallengeIfReady();
-  assert.equal(state.activeChallenge, 1);
+  debug.update(0);
+  assert.equal(state.activeChallenge, 1, "reaching an IC goal must not complete it with automation disabled");
 
-  state.autoCompleteChallenges = true;
-  debug.completeChallengeIfReady();
-  assert.equal(state.activeChallenge, 0);
+  runtime.runInfinity(false);
+  assert.equal(state.activeChallenge, 0, "manual Infinity must complete the active IC");
   assert.equal((state.completedChallenges & 1) !== 0, true);
   assert.equal(runtime.completedChallengeCount() >= 1, true);
+
+  const automatic = await loadRuntime(runtimePath);
+  const automaticState = automatic.debug.state;
+  automaticState.infinityCount = 1;
+  automaticState.infinityUpgradeMask = (1 << 5) | (1 << 12);
+  automaticState.activeChallenge = 1;
+  automaticState.automationEnabled = true;
+  automaticState.autoRunInfinity = true;
+  automaticState.autoInfinityPointThresholdLog10 = 0;
+  setLogResource(automaticState, "score", 309);
+  assert.equal(automatic.runtime.runLayerAutomation(), true, "normal Auto Infinity must run when its threshold is met");
+  assert.equal(automaticState.activeChallenge, 0, "normal Auto Infinity must complete the active IC");
 }
 
 async function runRuntimeInvariantTests() {
@@ -120,7 +135,7 @@ async function runRuntimeInvariantTests() {
   await testAngleScalingRemainsFinite();
   await testChallengeRulesAndAutomation();
   await testSaveCodeRoundTrip();
-  await testChallengeAutomationToggle();
+  await testChallengeCompletionUsesNormalInfinityExecution();
   console.log("Runtime invariant tests passed");
 }
 

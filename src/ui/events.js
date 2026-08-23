@@ -147,7 +147,6 @@ function applySetting(key, value) {
   if (key === "showFloatingText" && !value) runtime.state.floatingTexts = [];
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
   if (key === "showFps") runtime.state.showFps = Boolean(value);
-  if (key === "autoCompleteChallenges") runtime.state.autoCompleteChallenges = Boolean(value);
   if (key === "autoGenerationScoreMultiplierThreshold") {
     runtime.state.autoGenerationScoreMultiplierThreshold = Math.max(0, Number(value) || 0);
     runtime.state.autoGenerationLegacyOrMode = false;
@@ -237,7 +236,6 @@ function bindEvents() {
   if (runtime.elements.autoBuyInfiniteAngleVertexToggle) runtime.elements.autoBuyInfiniteAngleVertexToggle.addEventListener("change", () => applySetting("autoBuyInfiniteAngleVertex", runtime.elements.autoBuyInfiniteAngleVertexToggle.checked));
   if (runtime.elements.autoBuyInfiniteAngleGainToggle) runtime.elements.autoBuyInfiniteAngleGainToggle.addEventListener("change", () => applySetting("autoBuyInfiniteAngleGain", runtime.elements.autoBuyInfiniteAngleGainToggle.checked));
   if (runtime.elements.autoBuildTowerToggle) runtime.elements.autoBuildTowerToggle.addEventListener("change", () => applySetting("autoBuildTower", runtime.elements.autoBuildTowerToggle.checked));
-  if (runtime.elements.autoCompleteChallengesToggle) runtime.elements.autoCompleteChallengesToggle.addEventListener("change", () => applySetting("autoCompleteChallenges", runtime.elements.autoCompleteChallengesToggle.checked));
   if (runtime.elements.autoRunGenerationToggle) runtime.elements.autoRunGenerationToggle.addEventListener("change", () => applySetting("autoRunGeneration", runtime.elements.autoRunGenerationToggle.checked));
   if (runtime.elements.autoGenerationScoreThresholdInput) runtime.elements.autoGenerationScoreThresholdInput.addEventListener("change", () => applySetting("autoGenerationScoreMultiplierThreshold", runtime.elements.autoGenerationScoreThresholdInput.value));
   if (runtime.elements.autoGenerationCostThresholdInput) runtime.elements.autoGenerationCostThresholdInput.addEventListener("change", () => applySetting("autoGenerationCostMultiplierThreshold", runtime.elements.autoGenerationCostThresholdInput.value));
