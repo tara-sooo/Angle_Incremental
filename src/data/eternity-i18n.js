@@ -52,6 +52,8 @@ const ETERNITY_TEXT = {
     eternityMilestone8Effect: "Eternity 81以降、IAとTowerの自動購入・自動建設を解放",
     eternityMilestone9Name: "9 煩悩まみれ",
     eternityMilestone9Effect: "Eternity 108以降、各Eternity後の周回を1000 IPから開始",
+    eternityMilestone10Name: "10 永遠とは均衡である",
+    eternityMilestone10Effect: "Eternity 128以降、Infinity Pointの上限を解除（Eternity条件は変更しない）",
   },
   en: {
     eternity: "Eternity",
@@ -104,6 +106,8 @@ const ETERNITY_TEXT = {
     eternityMilestone8Effect: "At Eternity 81+, unlock Infinite Angle autobuyers and Tower auto-build",
     eternityMilestone9Name: "9 Worldly Desires",
     eternityMilestone9Effect: "At Eternity 108+, start each new run with 1000 Infinity Points",
+    eternityMilestone10Name: "10 Eternity Is Balance",
+    eternityMilestone10Effect: "At Eternity 128+, remove the Infinity Point cap; the Eternity requirement remains unchanged",
   },
 };
 

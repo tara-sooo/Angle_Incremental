@@ -482,7 +482,7 @@ function canBuildTower() {
   const costLog10 = towerNextFloorCostLog10();
   const maximumCostLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
   return towerCanBuildNextFloor()
-    && costLog10 <= maximumCostLog10
+    && (!runtime.infinityPointCapActive() || costLog10 <= maximumCostLog10)
     && runtime.canSpendInfinityPoints(costLog10);
 }
 

@@ -15,6 +15,7 @@ const COUNT_MILESTONE_REQUIREMENTS = Object.freeze({
   7: 44,
   8: 81,
   9: 108,
+  10: 128,
 });
 
 const FIRST_TIER_MILESTONE_MASK = Object.values(FIRST_TIER_MILESTONE_BITS)
@@ -101,7 +102,7 @@ function infinityAutomationUnlocked() {
 }
 
 function eternityRequirementExact() {
-  return runtime.exactInfinityPointsFromLog10(runtime.ETERNITY_REQUIREMENT_LOG10);
+  return runtime.MAX_EXACT_INFINITY_POINTS;
 }
 
 function eternityIpThresholdMet() {

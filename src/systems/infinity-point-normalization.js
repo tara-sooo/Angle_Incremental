@@ -2,9 +2,15 @@ import { runtime } from "../runtime/shared.js";
 
 const MAX_EXACT_INFINITY_POINTS = BigInt("17976931348623157") * (10n ** 292n);
 
+function infinityPointCapActive() {
+  return runtime.eternityMilestoneActive?.("10") !== true;
+}
+
 function clampExactInfinityPoints(value) {
   if (value <= 0n) return 0n;
-  return value > MAX_EXACT_INFINITY_POINTS ? MAX_EXACT_INFINITY_POINTS : value;
+  return infinityPointCapActive() && value > MAX_EXACT_INFINITY_POINTS
+    ? MAX_EXACT_INFINITY_POINTS
+    : value;
 }
 
 function parseExactInfinityPoints(value) {
@@ -25,7 +31,7 @@ function exactInfinityPointsFromLog10(log) {
   log = runtime.sanitizeLog10(log, -Infinity);
   if (log === -Infinity) return 0n;
   const maxLog = Math.log10(Number.MAX_VALUE);
-  if (log >= maxLog) return MAX_EXACT_INFINITY_POINTS;
+  if (infinityPointCapActive() && log >= maxLog) return MAX_EXACT_INFINITY_POINTS;
   if (log < 15) return clampExactInfinityPoints(BigInt(Math.floor(10 ** log + 1e-12)));
 
   const exponent = Math.floor(log);
@@ -90,6 +96,7 @@ function normalizeInfinityPointState() {
 }
 
 runtime.MAX_EXACT_INFINITY_POINTS = MAX_EXACT_INFINITY_POINTS;
+runtime.infinityPointCapActive = infinityPointCapActive;
 runtime.parseExactInfinityPoints = parseExactInfinityPoints;
 runtime.exactInfinityPointsFromLog10 = exactInfinityPointsFromLog10;
 runtime.exactInfinityPointsFromCostLog10 = exactInfinityPointsFromCostLog10;
