@@ -141,7 +141,6 @@ const elements = {
   autoBuyInfiniteAngleVertexToggle: document.getElementById("autoBuyInfiniteAngleVertexToggle"),
   autoBuyInfiniteAngleGainToggle: document.getElementById("autoBuyInfiniteAngleGainToggle"),
   autoBuildTowerToggle: document.getElementById("autoBuildTowerToggle"),
-  autoCompleteChallengesToggle: document.getElementById("autoCompleteChallengesToggle"),
   autoRunGenerationToggle: document.getElementById("autoRunGenerationToggle"),
   autoGenerationScoreThresholdInput: document.getElementById("autoGenerationScoreThresholdInput"),
   autoGenerationCostThresholdInput: document.getElementById("autoGenerationCostThresholdInput"),

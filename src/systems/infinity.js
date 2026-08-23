@@ -139,13 +139,6 @@ function canBreakInfiniteCap() {
   return !runtime.state.infiniteCapBroken && runtime.currentScoreLog10() >= runtime.BREAK_CAP_REQUIREMENT_LOG10;
 }
 
-function completeChallengeIfReady() {
-  if (!runtime.state.autoCompleteChallenges || runtime.state.activeChallenge <= 0 || !canInfinity()) return false;
-  if (runtime.state.activeTowerChallenge > 0 && !runtime.towerChallengeCanComplete()) return false;
-  runInfinity(false);
-  return true;
-}
-
 function updateChallengeTimers(dt) {
   const delta = Math.max(0, runtime.sanitizeNumber(dt, 0));
   if (runtime.state.activeChallenge > 0) runtime.state.activeChallengeTime += delta;
@@ -413,7 +406,6 @@ expose("canSpendInfinityPoints", () => canSpendInfinityPoints, (value) => { canS
 expose("addInfinityPoints", () => addInfinityPoints, (value) => { addInfinityPoints = value; });
 expose("spendInfinityPoints", () => spendInfinityPoints, (value) => { spendInfinityPoints = value; });
 expose("canBreakInfiniteCap", () => canBreakInfiniteCap, (value) => { canBreakInfiniteCap = value; });
-expose("completeChallengeIfReady", () => completeChallengeIfReady, (value) => { completeChallengeIfReady = value; });
 expose("updateChallengeTimers", () => updateChallengeTimers, (value) => { updateChallengeTimers = value; });
 expose("recordInfinityChallengeTime", () => recordInfinityChallengeTime, (value) => { recordInfinityChallengeTime = value; });
 expose("resetBelowInfinity", () => resetBelowInfinity, (value) => { resetBelowInfinity = value; });

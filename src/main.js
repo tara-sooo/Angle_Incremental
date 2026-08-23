@@ -825,7 +825,6 @@ function update(dt, allowOffline = false) {
     }
   }
   if (runtime.completeTowerChallengeIfReady()) return;
-  if (runtime.completeChallengeIfReady()) return;
   if (runLayerAutomation()) return;
 
   runtime.normalizeVertexProgress();
@@ -1991,7 +1990,6 @@ window.__angleDebug = {
   resetSave: runtime.resetSave,
   exportSaveCode: runtime.exportSaveCode,
   importSaveCode: runtime.importSaveCode,
-  completeChallengeIfReady: runtime.completeChallengeIfReady,
   syncServerClock,
   offlineElapsedFromSave,
   renderQualityState,
