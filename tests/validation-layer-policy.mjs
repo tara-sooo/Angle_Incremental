@@ -11,13 +11,14 @@ const researchScripts = [
   "test:tc4-balance-a-search",
   "test:tc4-a-form-search",
   "test:tc4-a-form-frontier",
-  "test:tc4-log-frontier-continuation"
+  "test:tc4-log-frontier-continuation",
+  "test:ic8-eternity-progression"
 ];
 const researchSteps = researchScripts.map((name) => `npm run ${name}`);
 const routineSteps = packageJson.scripts.validate.split(" && ");
 const fullSteps = packageJson.scripts["validate:full"].split(" && ");
 
-assert.deepEqual(packageJson.scripts["validate:research"].split(" && "), researchSteps, "research validation must retain the seven TC4 checks");
+assert.deepEqual(packageJson.scripts["validate:research"].split(" && "), researchSteps, "research validation must retain the named research checks");
 for (const step of researchSteps) {
   assert.equal(routineSteps.includes(step), false, `${step} must not run in routine validation`);
 }
