@@ -80,7 +80,7 @@ IDDの標準ラベルは`roadmap`、`status:blocked-by-human`、`status:needs-de
 
 ### Explicit research validation
 
-`npm run validate:research`は、既存の7つのTC4 balance/research simulator checkを同じ順序で実行します。研究シミュレータ本体・その出力・研究専用fixtureを変更するIssue、production helperの意味を研究シミュレータが意図的に再現していて互換性確認が必要なIssue、研究レポートを受入れ証拠に使うIssue、またはIssue本文がresearch suiteを明示するIssueでは、このコマンドを必須検証として実行し、結果をPRの証拠に含めます。無関係なgameplay/UI/docs/maintenance変更は、研究層を実行する必要はありません。
+`npm run validate:research`は、既存のTC4 balance/research simulator checkと、Issue #217のIC8-to-Eternity progression simulator checkを同じ順序で実行します。研究シミュレータ本体・その出力・研究専用fixtureを変更するIssue、production helperの意味を研究シミュレータが意図的に再現していて互換性確認が必要なIssue、研究レポートを受入れ証拠に使うIssue、またはIssue本文がresearch suiteを明示するIssueでは、このコマンドを必須検証として実行し、結果をPRの証拠に含めます。無関係なgameplay/UI/docs/maintenance変更は、研究層を実行する必要はありません。
 
 ### Full and hosted validation
 

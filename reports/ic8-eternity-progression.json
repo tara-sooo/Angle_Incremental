@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "issue": 217,
+  "title": "Simulate IC8-to-Eternity progression for Timeline balance",
+  "researchOnly": true,
+  "noProductionChanges": true,
+  "productionRuntime": "src/main.js",
+  "options": {
+    "maxSetupSeconds": 600,
+    "maxRunSeconds": 120,
+    "maxStallSeconds": 30,
+    "requestedStepSeconds": 0.03333333333333333,
+    "actionIntervalSeconds": 0.1,
+    "parallelPostSoftcapPower": null
+  },
+  "policies": [
+    {
+      "id": "greedy",
+      "description": "buy legal upgrades, reset at the first payable Infinity, then take the first legal challenge",
+      "generationDepthLog10": 0.1,
+      "infinityGainLog10Reserve": 0
+    },
+    {
+      "id": "threshold-aware",
+      "description": "buy legal upgrades, wait for a ten-percent IP reserve or a deeper Generation run, then reset",
+      "generationDepthLog10": 0.5,
+      "infinityGainLog10Reserve": 1
+    }
+  ],
+  "researchEffects": [
+    {
+      "id": "timeline-free",
+      "family": "Timeline-free",
+      "formula": "normal runtime.infinityPointGain()",
+      "postSoftcapPower": null
+    },
+    {
+      "id": "real-bc16500",
+      "family": "Real-BC16500",
+      "formula": "normal IP gain × (1 + log10(current IP)); factor is 1 at 0/1 IP",
+      "postSoftcapPower": null
+    },
+    {
+      "id": "parallel-bc16500-root",
+      "family": "Parallel-BC16500",
+      "formula": "normal IP gain × 3^secondsSinceIC8Clear; raw multiplier cap 1e10; post-softcap power 0.50",
+      "rawMultiplierCap": 10000000000,
+      "postSoftcapPower": 0.5
+    },
+    {
+      "id": "parallel-bc16500-fourth-root",
+      "family": "Parallel-BC16500",
+      "formula": "normal IP gain × 3^secondsSinceIC8Clear; raw multiplier cap 1e10; post-softcap power 0.25",
+      "rawMultiplierCap": 10000000000,
+      "postSoftcapPower": 0.25
+    }
+  ],
+  "productionPredicates": {
+    "infinityRequirementLog10": 308.2552725051033,
+    "eternityIpThresholdLog10": 308.25471555991675,
+    "towerChallengeTargets": [
+      {
+        "index": 1,
+        "targetLog10": 1000
+      },
+      {
+        "index": 2,
+        "targetLog10": 3000
+      },
+      {
+        "index": 3,
+        "targetLog10": 5000
+      },
+      {
+        "index": 4,
+        "targetLog10": 7777
+      }
+    ],
+    "eternityRule": "currentExactInfinityPoints() >= MAX_EXACT_INFINITY_POINTS && towerChallenge4CompletedForEternity() === true",
+    "ic8TimerRule": "secondsSinceIC8Clear starts at the observed completedChallenges bit-8 transition",
+    "errorHandling": "exact IP stays BigInt in the production runtime; research multipliers are clamped to the production exact-IP ceiling before normal addInfinityPoints()"
+  },
+  "validation": {
+    "step": {
+      "requestedSeconds": 0.03333333333333333,
+      "effectiveSeconds": 0.03333333333333333
+    },
+    "convergence": {
+      "status": "not-applicable-setup-stall",
+      "criterion": "same production checkpoint and fixed policy replay; endpoint deltas are reported only after a real checkpoint exists",
+      "endpointDeltaLog10": null
+    },
+    "errors": [],
+    "stall": {
+      "maxSeconds": 30,
+      "attempts": [
+        {
+          "policy": "greedy",
+          "status": "stall-no-new-progress",
+          "elapsedSeconds": 131.86666666666176
+        },
+        {
+          "policy": "threshold-aware",
+          "status": "stall-no-new-progress",
+          "elapsedSeconds": 131.86666666666176
+        }
+      ]
+    }
+  },
+  "prelude": {
+    "status": "setup-stall",
+    "attempts": [
+      {
+        "policy": "greedy",
+        "status": "stall-no-new-progress",
+        "elapsedSeconds": 131.86666666666176,
+        "effectiveStepSeconds": 0.03333333333333333,
+        "firstReachSeconds": {
+          "break-infinite-cap": null,
+          "infinite-angle-unlock": null,
+          "tower-floor-1": null,
+          "tc1-unlock": null,
+          "tc1-clear": null,
+          "tc2-unlock": null,
+          "tc2-clear": null,
+          "tc3-unlock": null,
+          "tc3-clear": null,
+          "tc4-unlock": null,
+          "tc4-clear": null,
+          "ic8-clear": null,
+          "ip-1.80e308": null,
+          "eternity-eligibility": null
+        },
+        "actionCounts": {
+          "normalPurchase": 4
+        },
+        "lastState": {
+          "scoreLog10": 0.29788827333686363,
+          "generationScoreLog10": 1.6231001988124243,
+          "infinityPointLog10": "-Infinity",
+          "infinityCount": 0,
+          "generationCount": 0,
+          "coreBoostCount": 0,
+          "infinityUpgradeMask": 0,
+          "infiniteAngleUnlocked": false,
+          "towerFloor": 0,
+          "activeChallenge": 0,
+          "completedChallenges": 0,
+          "activeTowerChallenge": 0,
+          "completedTowerChallenges": 0,
+          "eternityCount": 0
+        },
+        "peakScoreLog10": 1.1439511164239626,
+        "events": [],
+        "productionPredicates": {
+          "infinityRequirementLog10": 308.2552725051033,
+          "eternityIpThresholdLog10": 308.25471555991675,
+          "towerChallengeTargets": [
+            {
+              "index": 1,
+              "targetLog10": 1000
+            },
+            {
+              "index": 2,
+              "targetLog10": 3000
+            },
+            {
+              "index": 3,
+              "targetLog10": 5000
+            },
+            {
+              "index": 4,
+              "targetLog10": 7777
+            }
+          ],
+          "eternityRule": "currentExactInfinityPoints() >= MAX_EXACT_INFINITY_POINTS && towerChallenge4CompletedForEternity() === true",
+          "ic8TimerRule": "secondsSinceIC8Clear starts at the observed completedChallenges bit-8 transition",
+          "errorHandling": "exact IP stays BigInt in the production runtime; research multipliers are clamped to the production exact-IP ceiling before normal addInfinityPoints()"
+        }
+      },
+      {
+        "policy": "threshold-aware",
+        "status": "stall-no-new-progress",
+        "elapsedSeconds": 131.86666666666176,
+        "effectiveStepSeconds": 0.03333333333333333,
+        "firstReachSeconds": {
+          "break-infinite-cap": null,
+          "infinite-angle-unlock": null,
+          "tower-floor-1": null,
+          "tc1-unlock": null,
+          "tc1-clear": null,
+          "tc2-unlock": null,
+          "tc2-clear": null,
+          "tc3-unlock": null,
+          "tc3-clear": null,
+          "tc4-unlock": null,
+          "tc4-clear": null,
+          "ic8-clear": null,
+          "ip-1.80e308": null,
+          "eternity-eligibility": null
+        },
+        "actionCounts": {
+          "normalPurchase": 4
+        },
+        "lastState": {
+          "scoreLog10": 0.29788827333686363,
+          "generationScoreLog10": 1.6231001988124243,
+          "infinityPointLog10": "-Infinity",
+          "infinityCount": 0,
+          "generationCount": 0,
+          "coreBoostCount": 0,
+          "infinityUpgradeMask": 0,
+          "infiniteAngleUnlocked": false,
+          "towerFloor": 0,
+          "activeChallenge": 0,
+          "completedChallenges": 0,
+          "activeTowerChallenge": 0,
+          "completedTowerChallenges": 0,
+          "eternityCount": 0
+        },
+        "peakScoreLog10": 1.1439511164239626,
+        "events": [],
+        "productionPredicates": {
+          "infinityRequirementLog10": 308.2552725051033,
+          "eternityIpThresholdLog10": 308.25471555991675,
+          "towerChallengeTargets": [
+            {
+              "index": 1,
+              "targetLog10": 1000
+            },
+            {
+              "index": 2,
+              "targetLog10": 3000
+            },
+            {
+              "index": 3,
+              "targetLog10": 5000
+            },
+            {
+              "index": 4,
+              "targetLog10": 7777
+            }
+          ],
+          "eternityRule": "currentExactInfinityPoints() >= MAX_EXACT_INFINITY_POINTS && towerChallenge4CompletedForEternity() === true",
+          "ic8TimerRule": "secondsSinceIC8Clear starts at the observed completedChallenges bit-8 transition",
+          "errorHandling": "exact IP stays BigInt in the production runtime; research multipliers are clamped to the production exact-IP ceiling before normal addInfinityPoints()"
+        }
+      }
+    ],
+    "canonicalPolicy": null,
+    "checkpoint": null
+  },
+  "cases": [],
+  "outcome": {
+    "status": "setup-stall",
+    "reason": "bounded production prelude did not reach a real first Eternity; no IC8 snapshot was fabricated"
+  }
+}
