@@ -42,6 +42,18 @@ Because this lesson is promoted, future workers must follow the listed authorita
 - Authoritative at: not yet promoted
 - Last verified: 2026-08-21
 
+### EXP-WF-004 — Do not remap authoritative feature terms to nearby existing mechanics
+
+- Status: active
+- Scope: IDD B2/B3 planning and critique; authoritative Issue interpretation; implementation mapping; regression-test semantics
+- Learned from: Issue #121; PR #148; PR #153
+- Context: Issue #121 explicitly specified Milestone 5 as `unlock IU automation`, and the later player-facing copy preserved that meaning. During implementation planning, the unfamiliar capability was reinterpreted as the already-existing IU 8-1 Infinity automation path, so PR #148 implemented Milestone 5 as an Auto Infinity unlock and tests then encoded that changed meaning as expected behavior.
+- Cause: the plan optimized for an existing implementation surface instead of preserving the authoritative Issue terminology. `IU automation` was silently mapped to the nearest known automation mechanic (`Infinity automation`) without an explicit maintainer decision or source text supporting that equivalence; critique and tests then validated the drifted plan rather than comparing it back to the Issue.
+- Reusable lesson: when an authoritative Issue names a capability that does not appear to exist in the codebase, do not substitute a nearby existing mechanic merely because it is easier to wire. Treat the missing capability as new implementation work or surface the ambiguity for an explicit maintainer decision. Preserve the Issue's nouns, verbs, targets, and scope through B2/B3, and require any semantic reinterpretation to be justified against the authoritative source rather than implementation convenience.
+- Verification: before implementation and again when finalizing tests, compare each user-visible effect in the plan/test assertions against the authoritative Issue wording. Flag terminology changes such as `IU automation` -> `Infinity automation`, verify that the named target object/action is the same, and stop for clarification when the requested capability has no matching implementation surface. Tests must validate the authoritative semantics, not merely the behavior introduced by the current patch.
+- Authoritative at: not yet promoted
+- Last verified: 2026-08-24
+
 ## Superseded lessons
 
 None yet.
