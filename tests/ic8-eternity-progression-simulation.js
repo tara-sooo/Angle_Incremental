@@ -7,8 +7,10 @@ const {
   MILESTONE_IDS,
   createMilestoneTracker,
   createReport,
+  formatMarkdown,
   installResearchEffect,
   parallelMultiplierLog10,
+  progressSnapshot,
   realMultiplierLog10,
 } = require("../scripts/simulate-ic8-eternity-progression.js");
 
@@ -66,7 +68,7 @@ async function runIc8EternityProgressionSimulationTest() {
     writeReports: false,
   });
   assert.deepEqual(first, second, "bounded setup output must be deterministic");
-  assert.equal(first.issue, 217);
+  assert.equal(first.issue, 237);
   assert.equal(first.researchOnly, true);
   assert.equal(first.noProductionChanges, true);
   assert.equal(first.prelude.status, "setup-stall");
@@ -74,27 +76,65 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.equal(first.cases.length, 0);
   assert.deepEqual(first.researchEffects.map(({ id }) => id), CANDIDATES.map(({ id }) => id));
   assert.equal(first.productionPredicates.towerChallengeTargets.find(({ index }) => index === 4).targetLog10, 7777);
-  assert.match(first.outcome.reason, /no IC8 snapshot was fabricated/);
+  assert.match(first.outcome.reason, /no IC8 or post-IC8 snapshot was fabricated/);
 
   const instance = await loadRuntime(path.resolve(__dirname, "..", "src", "main.js"));
   const tracker = createMilestoneTracker(instance.runtime);
+  const initialProgress = progressSnapshot(instance.runtime);
+  tracker.observe(0);
+  instance.debug.state.generationScore = 10;
+  instance.debug.state.generationScoreLog10 = 10;
+  assert.ok(progressSnapshot(instance.runtime).generationScoreLog10 > initialProgress.generationScoreLog10);
+  tracker.observe(5);
+  assert.equal(tracker.lastProgressSeconds, 5, "Generation score progress must refresh the stall clock");
+  instance.debug.state.infinityUpgradeMask = 1;
+  tracker.observe(6);
+  assert.equal(tracker.lastProgressSeconds, 6, "Infinity purchases must refresh the stall clock");
+
+  const relativeTracker = createMilestoneTracker(instance.runtime);
+  relativeTracker.observe(2);
   instance.debug.state.completedChallenges = 1 << 7;
-  tracker.observe(12);
-  assert.equal(tracker.clock.ic8ClearAtSeconds, 12);
-  assert.deepEqual(tracker.events.find(({ type }) => type === "ic8-clear"), {
-    type: "ic8-clear",
-    timeSeconds: 12,
-    timerResetSeconds: 0,
+  relativeTracker.observe(12);
+  assert.equal(relativeTracker.clock.ic8ClearAtSeconds, 12);
+  assert.equal(relativeTracker.relativeFirstReachSeconds["ic8-clear"], 0);
+  assert.equal(relativeTracker.milestoneTiming["ic8-clear"], "post-IC8");
+  assert.equal(relativeTracker.events.find(({ type }) => type === "ic8-clear").timerResetSeconds, 0);
+  instance.debug.state.infiniteCapBroken = true;
+  relativeTracker.observe(20);
+  assert.equal(relativeTracker.relativeFirstReachSeconds["break-infinite-cap"], 8);
+  assert.equal(relativeTracker.milestoneTiming["break-infinite-cap"], "post-IC8");
+
+  const mappingMarkdown = formatMarkdown({
+    issue: 237,
+    outcome: { status: "setup-stall", reason: "test" },
+    options: { requestedStepSeconds: 1, actionIntervalSeconds: 0.1, maxSetupSeconds: 1, maxRunSeconds: 1, maxStallSeconds: 1 },
+    researchEffects: [],
+    prelude: {
+      attempts: [{
+        policy: "greedy",
+        status: "horizon",
+        truncatedAtHorizon: false,
+        elapsedSeconds: 1,
+        peakScoreLog10: 1,
+        firstReachSeconds: { "ic8-clear": 12, "tc4-clear": 99, "eternity-eligibility": null },
+      }],
+      checkpoint: null,
+    },
+    cases: [],
   });
+  const preludeLine = mappingMarkdown.split("\n").find((line) => line.startsWith("| greedy |"));
+  assert.match(preludeLine, /12\.0s/);
+  assert.doesNotMatch(preludeLine, /99\.0s/);
 
   await testResearchBoundaryFeedback();
 
   const committed = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "reports", "ic8-eternity-progression.json"), "utf8"));
-  assert.equal(committed.issue, 217);
+  assert.equal(committed.issue, 237);
   assert.equal(committed.noProductionChanges, true);
   assert.equal(committed.prelude.status, "setup-stall");
   assert.equal(committed.prelude.checkpoint, null);
   assert.equal(committed.cases.length, 0);
+  assert.match(committed.outcome.reason, /no IC8 or post-IC8 snapshot was fabricated/);
 }
 
 if (require.main === module) {
