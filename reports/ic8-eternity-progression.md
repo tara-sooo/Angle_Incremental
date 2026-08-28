@@ -1,24 +1,31 @@
-# IC8-to-Eternity progression (Issue #237)
+# Milestone 1-2 post-IC8 progression (Issue #237)
 
 > Research evidence only. No production gameplay, Timeline, or balance formula was changed.
 
-- Outcome: **setup-stall** — bounded production prelude did not reach a real first Eternity; no IC8 or post-IC8 snapshot was fabricated
-- Step: requested **3600s**, action interval **3600s**; every tick calls the production runtime update path.
-- Horizons: setup **0.0s**, case **0.0s**, stall **30.00d**; truncation is reported per attempt/case.
+- Outcome: **measured** — all candidates reached production Eternity eligibility from the shared post-IC8 fixture
+- Representative case: **Eternity 1 / Milestone 1-2 / Achievements 1-41 / IC8 complete**; fixture initialization is **IC8 clear = t 0**.
+- Fixture: IP **1e100**, Infinity **600000**, IA levels **1000/1000/1000**, Tower Floor **4**, Time Flux **0**.
+- Step/action interval: **30.00d**; horizon **1000.00y**, stall **20.00y**.
 - Effects: **timeline-free**, **real-bc16500**, **parallel-bc16500-root**, **parallel-bc16500-fourth-root**
 
-## Prelude
+## Results
 
-| Policy | Status | Elapsed | Peak score log10 | IC8 clear | Eternity eligibility |
-| --- | --- | ---: | ---: | --- | --- |
-| greedy | horizon (horizon) | 0.0s | -Infinity | not reached | not reached |
-| threshold-aware | horizon (horizon) | 0.0s | -Infinity | not reached | not reached |
+| Effect | Status | IC8 → Eternity | Longest stage | Shortening vs baseline | Parallel raw x1e10 | Parallel effective at TC4 / end | Collapse risk |
+| --- | --- | ---: | --- | ---: | --- | --- | --- |
+| timeline-free | eligible | 192.25y | ic8-clear → ip-1.80e308 (191.75y) | 0.0s | n/a | n/a | not-applicable |
+| real-bc16500 | eligible | 195.37y | ic8-clear → ip-1.80e308 (194.88y) | -3.12y | n/a | n/a | not-applicable |
+| parallel-bc16500-root | eligible | 181.81y | ip-1.80e308 → eternity-eligibility (181.23y) | 10.44y | 21.0s | x10^1367788316.21 / x10^1367788316.21 | cap-exposed |
+| parallel-bc16500-fourth-root | eligible | 181.81y | ip-1.80e308 → eternity-eligibility (181.23y) | 10.44y | 21.0s | x10^683894163.11 / x10^683894163.11 | cap-exposed |
 
-No post-Eternity cases were run because the canonical setup did not reach a real first Eternity.
+## Milestones from fixture t = 0
 
-## Required milestones
+| Effect | break-infinite-cap | infinite-angle-unlock | tower-floor-1 | tc1-unlock | tc1-clear | tc2-unlock | tc2-clear | tc3-unlock | tc3-clear | tc4-unlock | tc4-clear | ic8-clear | ip-1.80e308 | eternity-eligibility |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| timeline-free | at-start | at-start | at-start | at-start | 30.00d | 0.0s | 210.00d | 3.95y | 184.68y | 191.84y | 192.25y | at-start | 191.75y | 192.25y |
+| real-bc16500 | at-start | at-start | at-start | at-start | 30.00d | 0.0s | 210.00d | 3.95y | 184.68y | 194.96y | 195.37y | at-start | 194.88y | 195.37y |
+| parallel-bc16500-root | at-start | at-start | at-start | at-start | 30.00d | 0.0s | 210.00d | 210.00d | 181.40y | 181.40y | 181.81y | at-start | 210.00d | 181.81y |
+| parallel-bc16500-fourth-root | at-start | at-start | at-start | at-start | 30.00d | 0.0s | 210.00d | 210.00d | 181.40y | 181.40y | 181.81y | at-start | 210.00d | 181.81y |
 
-- break-infinite-cap, infinite-angle-unlock, tower-floor-1, tc1-unlock, tc1-clear, tc2-unlock, tc2-clear, tc3-unlock, tc3-clear, tc4-unlock, tc4-clear, ic8-clear, ip-1.80e308, eternity-eligibility
-- IC8 timer starts only on the observed completed-challenges bit transition; setup-stall never claims IC8 completion.
-- Greedy and threshold-aware are bounded comparison policies, not a global-optimality claim.
-- A post-IC8 state is reported only after a real runtime `performEternity()` checkpoint and a fresh case runtime.
+- `at-start` means the milestone is already true in the documented fixture.
+- Every candidate starts in a fresh runtime cloned from the same fixture; only the research IP-gain effect differs.
+- Milestone 1-1 and 1-3 are intentionally not compared by this representative study.

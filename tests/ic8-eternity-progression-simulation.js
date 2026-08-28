@@ -5,13 +5,18 @@ const { loadRuntime } = require("./runtime-harness-esm.js");
 const {
   CANDIDATES,
   MILESTONE_IDS,
+  POLICIES,
+  REPRESENTATIVE_FIXTURE,
+  cloneState,
   createMilestoneTracker,
   createReport,
+  createRepresentativeFixture,
   formatMarkdown,
   installResearchEffect,
   parallelMultiplierLog10,
   progressSnapshot,
   realMultiplierLog10,
+  runPolicyAction,
 } = require("../scripts/simulate-ic8-eternity-progression.js");
 
 async function testResearchBoundaryFeedback() {
@@ -51,8 +56,24 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.equal(parallelMultiplierLog10(20 / Math.log10(3), 0.5), 15);
   assert.deepEqual(MILESTONE_IDS.slice(-4), ["tc4-clear", "ic8-clear", "ip-1.80e308", "eternity-eligibility"]);
 
+  const fixture = await createRepresentativeFixture();
+  assert.equal(fixture.id, REPRESENTATIVE_FIXTURE.id);
+  assert.equal(fixture.state.eternityCount, 1);
+  assert.equal(fixture.state.eternityMilestoneMask, 2);
+  assert.equal(fixture.state.completedChallenges, 255);
+  assert.equal(fixture.state.achievementMask, 0x7fffffff);
+  assert.equal(fixture.state.achievementMaskHigh, 0x3ff);
+  assert.equal(fixture.state.timeFlux, 0);
+  assert.equal(fixture.state.offlineProgressEnabled, false);
+  assert.equal(fixture.atStart["tc2-unlock"], false);
+  const cloneA = cloneState(fixture.state);
+  const cloneB = cloneState(fixture.state);
+  cloneA.infinityCount += 1;
+  cloneA.fastestInfinityChallengeTimes[0] = 99;
+  assert.equal(cloneB.infinityCount, fixture.state.infinityCount, "candidate fixture clones must not share scalar mutations");
+  assert.equal(cloneB.fastestInfinityChallengeTimes[0], 1, "candidate fixture clones must not share array mutations");
+
   const first = await createReport({
-    maxSetupSeconds: 0,
     maxRunSeconds: 0,
     maxStallSeconds: 1,
     stepSeconds: 1 / 30,
@@ -60,7 +81,6 @@ async function runIc8EternityProgressionSimulationTest() {
     writeReports: false,
   });
   const second = await createReport({
-    maxSetupSeconds: 0,
     maxRunSeconds: 0,
     maxStallSeconds: 1,
     stepSeconds: 1 / 30,
@@ -71,12 +91,20 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.equal(first.issue, 237);
   assert.equal(first.researchOnly, true);
   assert.equal(first.noProductionChanges, true);
-  assert.equal(first.prelude.status, "setup-stall");
-  assert.equal(first.prelude.checkpoint, null, "a stalled prelude must not fabricate a post-Eternity checkpoint");
-  assert.equal(first.cases.length, 0);
+  assert.equal(first.outcome.status, "incomplete");
+  assert.equal(first.cases.length, 4);
+  first.cases.forEach((entry) => {
+    assert.equal(entry.fixtureId, fixture.id);
+    assert.equal(entry.representativeMilestone, "1-2");
+    assert.equal(entry.ic8ClearAtSeconds, 0);
+    assert.equal(entry.relativeFirstReachSeconds["ic8-clear"], 0);
+    assert.equal(entry.milestoneTiming["ic8-clear"], "at-start");
+    assert.equal(entry.milestoneTiming["tc2-unlock"], "post-IC8");
+    assert.equal(entry.relativeFirstReachSeconds["tc2-unlock"], 0);
+  });
   assert.deepEqual(first.researchEffects.map(({ id }) => id), CANDIDATES.map(({ id }) => id));
   assert.equal(first.productionPredicates.towerChallengeTargets.find(({ index }) => index === 4).targetLog10, 7777);
-  assert.match(first.outcome.reason, /no IC8 or post-IC8 snapshot was fabricated/);
+  assert.match(first.fixture.representativeCase, /Milestone 1-2/);
 
   const instance = await loadRuntime(path.resolve(__dirname, "..", "src", "main.js"));
   const tracker = createMilestoneTracker(instance.runtime);
@@ -104,37 +132,36 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.equal(relativeTracker.relativeFirstReachSeconds["break-infinite-cap"], 8);
   assert.equal(relativeTracker.milestoneTiming["break-infinite-cap"], "post-IC8");
 
-  const mappingMarkdown = formatMarkdown({
-    issue: 237,
-    outcome: { status: "setup-stall", reason: "test" },
-    options: { requestedStepSeconds: 1, actionIntervalSeconds: 0.1, maxSetupSeconds: 1, maxRunSeconds: 1, maxStallSeconds: 1 },
-    researchEffects: [],
-    prelude: {
-      attempts: [{
-        policy: "greedy",
-        status: "horizon",
-        truncatedAtHorizon: false,
-        elapsedSeconds: 1,
-        peakScoreLog10: 1,
-        firstReachSeconds: { "ic8-clear": 12, "tc4-clear": 99, "eternity-eligibility": null },
-      }],
-      checkpoint: null,
-    },
-    cases: [],
-  });
-  const preludeLine = mappingMarkdown.split("\n").find((line) => line.startsWith("| greedy |"));
-  assert.match(preludeLine, /12\.0s/);
-  assert.doesNotMatch(preludeLine, /99\.0s/);
+  const mappingMarkdown = formatMarkdown(first);
+  assert.match(mappingMarkdown, /Milestone 1-2 post-IC8 progression/);
+  assert.match(mappingMarkdown, /ic8-clear/);
+  const baselineLine = mappingMarkdown.split("\n")
+    .filter((line) => line.startsWith("| timeline-free |"))
+    .at(-1);
+  assert.match(baselineLine, /at-start/);
+
+  const towerChallenge = await loadRuntime(path.resolve(__dirname, "..", "src", "main.js"));
+  towerChallenge.runtime.updateUi = () => {};
+  towerChallenge.runtime.saveGame = () => true;
+  towerChallenge.debug.state.infinityCount = 1;
+  towerChallenge.debug.state.towerFloor = 3;
+  towerChallenge.debug.state.activeTowerChallenge = 1;
+  towerChallenge.debug.state.score = Number.MAX_VALUE;
+  towerChallenge.debug.state.scoreLog10 = 310;
+  runPolicyAction(towerChallenge, POLICIES[0], {});
+  assert.equal(towerChallenge.debug.state.activeTowerChallenge, 1, "TC1 must remain active below its production target");
+  assert.equal(towerChallenge.debug.state.infinityCount, 1, "the policy must not Infinity-reset at 1e308 inside TC1");
 
   await testResearchBoundaryFeedback();
 
   const committed = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "reports", "ic8-eternity-progression.json"), "utf8"));
   assert.equal(committed.issue, 237);
   assert.equal(committed.noProductionChanges, true);
-  assert.equal(committed.prelude.status, "setup-stall");
-  assert.equal(committed.prelude.checkpoint, null);
-  assert.equal(committed.cases.length, 0);
-  assert.match(committed.outcome.reason, /no IC8 or post-IC8 snapshot was fabricated/);
+  assert.equal(committed.fixture.id, REPRESENTATIVE_FIXTURE.id);
+  assert.equal(committed.fixture.state.eternityMilestoneMask, 2);
+  assert.equal(committed.cases.length, 4);
+  assert.equal(committed.cases.find(({ candidateId }) => candidateId === "timeline-free").status, "eligible");
+  assert.equal(committed.outcome.status, "measured");
 }
 
 if (require.main === module) {

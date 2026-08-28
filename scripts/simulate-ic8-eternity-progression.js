@@ -26,22 +26,112 @@ const MILESTONE_IDS = Object.freeze([
   "ip-1.80e308",
   "eternity-eligibility",
 ]);
-const POLICIES = Object.freeze([
-  Object.freeze({
-    id: "greedy",
-    description: "buy legal upgrades, reset at the first payable Infinity, then take the first legal challenge",
-    maxGenerationDepthLog10: 5,
-    challengeGenerationDepthLog10: 5,
-    infinityGainLog10Reserve: 0,
+const POLICIES = Object.freeze([Object.freeze({
+  id: "representative-m1-2",
+  description: "fixed post-IC8 policy; deepen Generation/Core until one Infinity funds the next Tower/IP threshold",
+  maxGenerationDepthLog10: 8,
+  challengeGenerationDepthLog10: 5,
+  infinityGainLog10Reserve: 0,
+  buyInfiniteAngleUpgrades: false,
+})]);
+const REPRESENTATIVE_FIXTURE = Object.freeze({
+  id: "eternity-1-milestone-1-2-post-ic8",
+  boundary: "representative post-IC8 state; fixture initialization is t = 0",
+  exactInfinityPoints: (10n ** 100n).toString(),
+  state: Object.freeze({
+    score: 100,
+    scoreLog10: 2,
+    totalScore: 0,
+    totalScoreLog10: -Infinity,
+    generationScore: 0,
+    generationScoreLog10: -Infinity,
+    vertices: 3,
+    ic8VertexUpgradeLevel: 0,
+    speedLevel: 0,
+    gainLevel: 0,
+    currentGain: 1,
+    currentGainLog10: 0,
+    pointProgress: 0,
+    totalVertexProgress: 0,
+    lastVertexIndex: 0,
+    generationCount: 0,
+    previousGenerationScore: 0,
+    previousGenerationScoreLog10: -Infinity,
+    generationScoreMultiplier: 1,
+    generationScoreMultiplierLog10: 0,
+    generationCostFactor: 0.7,
+    coreBoostCount: 2,
+    infinityCount: 600000,
+    eternityCount: 1,
+    eternityMilestoneMask: 2,
+    eternityMilestoneChoice: "",
+    infinityUpgradeMask: (1 << 21) - 1,
+    infiniteScore: 0,
+    infiniteScoreLog10: -Infinity,
+    infiniteAngleUnlocked: true,
+    infiniteAngleSpeedLevel: 1000,
+    infiniteAngleVertexLevel: 1000,
+    infiniteAngleGainLevel: 1000,
+    infiniteAngleCurrentGain: 1,
+    infiniteAngleCurrentGainLog10: 0,
+    infiniteAnglePointProgress: 0,
+    infiniteAngleTotalVertexProgress: 0,
+    infiniteAngleLastVertexIndex: 0,
+    towerFloor: 4,
+    ipGainUpgradeLevel: 0,
+    infiniteAngleUpgradeLevel: 0,
+    softcapUpgradeLevel: 0,
+    activeChallenge: 0,
+    completedChallenges: (1 << 8) - 1,
+    activeChallengeTime: 0,
+    activeTowerChallenge: 0,
+    completedTowerChallenges: 0,
+    activeTowerChallengeTime: 0,
+    tc4BaseGainLevel: 0,
+    tc4BaseGainPriceStep: 0,
+    tc4InfinityScoreVertexGainLevel: 0,
+    tc4InfinityScoreVertexGainPriceStep: 0,
+    tc4FreeCoreBoostLevel: 0,
+    tc4FreeCoreBoostPriceStep: 0,
+    fastestInfinityChallengeTimes: Array(8).fill(1),
+    fastestTowerChallengeTimes: Array(4).fill(0),
+    infiniteCapBroken: true,
+    achievementMask: 0x7fffffff,
+    achievementMaskHigh: 0x3ff,
+    currentInfinityRunTime: 0,
+    currentInfinityRealTime: 0,
+    currentGenerationRunTime: 0,
+    bestInfinityCountPerSecond: 0,
+    infinityCountRateRemainder: 0,
+    offlineProgressEnabled: false,
+    offlineTickCount: 1000,
+    timeFlux: 0,
+    timeFluxCapacityLevel: 0,
+    timeFluxGainLevel: 0,
+    timeFluxSpeed: 1,
+    timeFluxCustomSpeed: 4,
+    automationEnabled: true,
+    autoBuySpeed: true,
+    autoBuyVertex: true,
+    autoBuyGain: true,
+    autoBuyInfiniteAngleSpeed: false,
+    autoBuyInfiniteAngleVertex: false,
+    autoBuyInfiniteAngleGain: false,
+    autoBuildTower: false,
+    autoRunGeneration: false,
+    autoGenerationScoreMultiplierThreshold: 2,
+    autoGenerationCostMultiplierThreshold: 1,
+    autoGenerationMinimumSeconds: 0,
+    autoGenerationLegacyOrMode: false,
+    autoRunCoreBoost: false,
+    autoRunInfinity: false,
+    autoInfinityPointThreshold: 10,
+    autoInfinityPointThresholdLog10: 1,
+    ic8VertexDecayElapsed: 0,
+    currentInfinityRunHadGeneration: false,
+    currentInfinityRunHadCoreBoost: false,
   }),
-  Object.freeze({
-    id: "threshold-aware",
-    description: "buy legal upgrades, use a deeper Generation run where possible, then reset at the next legal IP threshold",
-    maxGenerationDepthLog10: 8,
-    challengeGenerationDepthLog10: 5,
-    infinityGainLog10Reserve: 0,
-  }),
-]);
+});
 const REQUIRED_INFINITY_UPGRADE_IDS = Object.freeze([
   "1-1", "1-2", "2-1", "3-1", "3-2", "4-1",
   "5-1", "5-2", "6-1", "6-2", "7-1", "7-2", "8-1", "9-1", "10-1", "10-2",
@@ -75,11 +165,10 @@ const CANDIDATES = Object.freeze([
   }),
 ]);
 const DEFAULT_OPTIONS = Object.freeze({
-  maxSetupSeconds: 10 * 365 * 24 * 60 * 60,
-  maxRunSeconds: 10 * 365 * 24 * 60 * 60,
-  maxStallSeconds: 30 * 24 * 60 * 60,
-  stepSeconds: 3600,
-  actionIntervalSeconds: 3600,
+  maxRunSeconds: 1000 * 365 * 24 * 60 * 60,
+  maxStallSeconds: 20 * 365 * 24 * 60 * 60,
+  stepSeconds: 30 * 24 * 60 * 60,
+  actionIntervalSeconds: 30 * 24 * 60 * 60,
   maxActionsPerTick: 256,
   parallelPostSoftcapPower: null,
   writeReports: true,
@@ -96,7 +185,6 @@ function parseNumberOption(args, name, fallback, minimum = 0) {
 function parseArgs(argv) {
   const args = argv.slice(2);
   return {
-    maxSetupSeconds: parseNumberOption(args, "--max-setup-seconds", DEFAULT_OPTIONS.maxSetupSeconds),
     maxRunSeconds: parseNumberOption(args, "--max-run-seconds", DEFAULT_OPTIONS.maxRunSeconds),
     maxStallSeconds: parseNumberOption(args, "--max-stall-seconds", DEFAULT_OPTIONS.maxStallSeconds),
     stepSeconds: parseNumberOption(args, "--step", DEFAULT_OPTIONS.stepSeconds, Number.MIN_VALUE),
@@ -116,6 +204,13 @@ function cloneState(state) {
 
 function finiteOrString(value) {
   return Number.isFinite(value) ? value : String(value);
+}
+
+function jsonSafeState(state) {
+  return Object.fromEntries(Object.entries(state).map(([key, value]) => [
+    key,
+    Array.isArray(value) ? [...value] : typeof value === "number" ? finiteOrString(value) : value,
+  ]));
 }
 
 function currentIpLog10(runtime) {
@@ -209,7 +304,7 @@ function milestonePredicates(runtime) {
   };
 }
 
-function createMilestoneTracker(runtime) {
+function createMilestoneTracker(runtime, options = {}) {
   const firstReachSeconds = Object.fromEntries(MILESTONE_IDS.map((id) => [id, null]));
   const relativeFirstReachSeconds = Object.fromEntries(MILESTONE_IDS.map((id) => [id, null]));
   const milestoneTiming = Object.fromEntries(MILESTONE_IDS.map((id) => [id, null]));
@@ -228,9 +323,10 @@ function createMilestoneTracker(runtime) {
   let lastProgressEventScoreLog10 = -Infinity;
   const events = [];
   let droppedEvents = 0;
-  const clock = { ic8ClearAtSeconds: null };
-  const recordEvent = (event) => {
-    if (events.length < MAX_RECORDED_EVENTS) events.push({ ...event, state: reportState(runtime) });
+  const clock = { ic8ClearAtSeconds: options.ic8ClearAtSeconds ?? null };
+  let firstObservation = true;
+  const recordEvent = (event, includeState = false) => {
+    if (events.length < MAX_RECORDED_EVENTS) events.push(includeState ? { ...event, state: reportState(runtime) } : event);
     else droppedEvents += 1;
   };
   const stateChanged = (current, previous) => previous && Object.keys(current).some((key) => {
@@ -254,13 +350,13 @@ function createMilestoneTracker(runtime) {
           firstReachSeconds[id] = elapsedSeconds;
           if (clock.ic8ClearAtSeconds !== null) {
             relativeFirstReachSeconds[id] = Math.max(0, elapsedSeconds - clock.ic8ClearAtSeconds);
-            milestoneTiming[id] = "post-IC8";
+            milestoneTiming[id] = firstObservation && elapsedSeconds === 0 ? "at-start" : "post-IC8";
           } else if (id !== "ic8-clear") {
             milestoneTiming[id] = "pre-IC8";
           }
           const snapshot = reportState(runtime);
           stateSnapshots.push({ id, absoluteSeconds: elapsedSeconds, relativeSeconds: relativeFirstReachSeconds[id], snapshot });
-          recordEvent({ type: "milestone", id, timeSeconds: elapsedSeconds });
+          recordEvent({ type: "milestone", id, timeSeconds: elapsedSeconds }, true);
         }
       }
       const snapshot = progressSnapshot(runtime);
@@ -289,7 +385,7 @@ function createMilestoneTracker(runtime) {
           || elapsedSeconds - lastProgressEventSeconds >= 60
           || snapshot.scoreLog10 - lastProgressEventScoreLog10 >= 1;
         if (shouldRecord) {
-          recordEvent({ type: "progress", timeSeconds: elapsedSeconds, fields: advancedFields, snapshot: reportState(runtime) });
+          recordEvent({ type: "progress", timeSeconds: elapsedSeconds, fields: advancedFields });
           lastProgressEventSeconds = elapsedSeconds;
           lastProgressEventScoreLog10 = snapshot.scoreLog10;
         }
@@ -301,7 +397,7 @@ function createMilestoneTracker(runtime) {
         milestoneTiming["ic8-clear"] = "post-IC8";
         const ic8Snapshot = reportState(runtime);
         stateSnapshots.push({ id: "ic8-clear", absoluteSeconds: elapsedSeconds, relativeSeconds: 0, snapshot: ic8Snapshot });
-        recordEvent({ type: "ic8-clear", timeSeconds: elapsedSeconds, timerResetSeconds: 0 });
+        recordEvent({ type: "ic8-clear", timeSeconds: elapsedSeconds, timerResetSeconds: 0 }, true);
         lastProgressSeconds = elapsedSeconds;
         if (firstReachSeconds["ic8-clear"] === null) firstReachSeconds["ic8-clear"] = elapsedSeconds;
         for (const id of MILESTONE_IDS) {
@@ -313,6 +409,7 @@ function createMilestoneTracker(runtime) {
       }
       previousIc8 = ic8Completed;
       previousSnapshot = snapshot;
+      firstObservation = false;
       return predicates;
     },
   };
@@ -398,6 +495,7 @@ function progressionTargetLog10(runtime) {
     return runtime.towerChallengeTargetLog10(runtime.state.activeTowerChallenge);
   }
   if (runtime.state.activeChallenge > 0) return runtime.INFINITY_REQUIREMENT_LOG10;
+  if (runtime.isChallengeCompleted(8)) return runtime.MAX_TRACKED_LOG10;
   return runtime.state.infiniteCapBroken
     ? runtime.INFINITY_REQUIREMENT_LOG10
     : runtime.BREAK_CAP_REQUIREMENT_LOG10;
@@ -490,12 +588,15 @@ function runPolicyAction(instance, policy, actionCounts) {
   if (!state.infiniteAngleUnlocked && currentIpLog10(runtime) >= runtime.INFINITE_ANGLE_UNLOCK_COST_LOG10) {
     if (debug.unlockInfiniteAngle()) count("infiniteAngleUnlock");
   }
-  const infiniteAnglePurchases = debug.buyAllInfiniteAngleUpgrades({ refresh: false, save: false });
+  const infiniteAnglePurchases = policy.buyInfiniteAngleUpgrades === false
+    && !runtime.towerChallengeCompleted(4)
+    ? 0
+    : debug.buyAllInfiniteAngleUpgrades({ refresh: false, save: false });
   if (infiniteAnglePurchases > 0) count("infiniteAnglePurchase", infiniteAnglePurchases);
   let tc4Purchases = 0;
   if (state.activeTowerChallenge === 4) {
     for (const kind of ["baseGain", "infinityScoreVertexGain", "freeCoreBoost"]) {
-      while (debug.buyTowerChallenge4Upgrade(kind, { refresh: false, save: false })) tc4Purchases += 1;
+      while (runtime.buyTowerChallenge4Upgrade(kind, { refresh: false, save: false })) tc4Purchases += 1;
     }
   }
   if (tc4Purchases > 0) count("tc4Purchase", tc4Purchases);
@@ -503,10 +604,17 @@ function runPolicyAction(instance, policy, actionCounts) {
   while (debug.buildTower({ refresh: false, save: false })) towerPurchases += 1;
   if (towerPurchases > 0) count("towerPurchase", towerPurchases);
 
-  if (state.activeChallenge > 0 || state.activeTowerChallenge > 0) {
+  if (state.activeTowerChallenge > 0) {
     if (runtime.completeTowerChallengeIfReady()) {
       count("towerCompletion");
-    } else if (runtime.canInfinity() && state.infinityCount > 0) {
+    } else {
+      runGenerationOrCore(instance, policy, count);
+    }
+    return;
+  }
+
+  if (state.activeChallenge > 0) {
+    if (runtime.canInfinity() && state.infinityCount > 0) {
       debug.runInfinity(false);
       count("infinityReset");
     } else {
@@ -545,9 +653,15 @@ function runPolicyAction(instance, policy, actionCounts) {
     && !hasAffordableInfinityUpgrade(runtime)
     && !holdingForCap
     && (hasUnownedInfinityUpgrade(runtime)
+      || runtime.isChallengeCompleted(8)
       || currentScoreLog10(runtime) >= progressionTargetLog10(runtime) - 1)) {
     const gainLog10 = runtime.log10Value(runtime.infinityPointGain());
-    if (gainLog10 >= policy.infinityGainLog10Reserve) {
+    const targetGainLog10 = runtime.isChallengeCompleted(8)
+      ? state.towerFloor < 12
+        ? runtime.towerNextFloorCostLog10()
+        : runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS)
+      : policy.infinityGainLog10Reserve;
+    if (gainLog10 >= targetGainLog10) {
       debug.runInfinity(false);
       count("infinityReset");
       return;
@@ -568,7 +682,9 @@ function runPolicyAction(instance, policy, actionCounts) {
 
 function runBoundedLoop(instance, policy, maxSeconds, options, effect = null) {
   const { runtime, debug } = instance;
-  const tracker = createMilestoneTracker(runtime);
+  const tracker = createMilestoneTracker(runtime, {
+    ic8ClearAtSeconds: options.ic8ClearAtStart ? 0 : null,
+  });
   const actionCounts = {};
   let elapsedSeconds = 0;
   let nextActionSeconds = 0;
@@ -645,23 +761,33 @@ function runBoundedLoop(instance, policy, maxSeconds, options, effect = null) {
   };
 }
 
-function captureEternityCheckpoint(instance) {
-  const { debug, runtime } = instance;
-  assert.equal(runtime.canEternity(), true);
-  const preEternity = reportState(runtime);
-  assert.equal(debug.performEternity({ save: false, update: false }), true);
+function applyRepresentativeFixture(instance) {
+  configureRuntime(instance);
+  Object.assign(instance.debug.state, cloneState(REPRESENTATIVE_FIXTURE.state));
+  instance.runtime.syncInfinityPointCachesFromExact(BigInt(REPRESENTATIVE_FIXTURE.exactInfinityPoints));
+  const { runtime, debug } = instance;
   assert.equal(debug.state.eternityCount, 1);
+  assert.equal(runtime.eternityMilestoneActive("1-1"), false);
+  assert.equal(runtime.eternityMilestoneActive("1-2"), true);
+  assert.equal(runtime.eternityMilestoneActive("1-3"), false);
+  assert.equal(runtime.isChallengeCompleted(8), true);
+  assert.equal(runtime.achievementCount(), 41);
+  assert.equal(debug.state.timeFlux, 0);
+  assert.equal(debug.state.offlineProgressEnabled, false);
+  return cloneState(debug.state);
+}
+
+async function createRepresentativeFixture() {
+  const instance = await loadRuntime(CANDIDATE_PATH);
+  const state = applyRepresentativeFixture(instance);
   return {
-    source: "runtime.performEternity({ save: false, update: false })",
-    precondition: preEternity,
-    postcondition: {
-      eternityCount: debug.state.eternityCount,
-      completedChallenges: debug.state.completedChallenges,
-      completedTowerChallenges: debug.state.completedTowerChallenges,
-      currentInfinityPointsLog10: finiteOrString(currentIpLog10(runtime)),
-      canEternity: debug.canEternity(),
-    },
-    state: cloneState(debug.state),
+    id: REPRESENTATIVE_FIXTURE.id,
+    boundary: REPRESENTATIVE_FIXTURE.boundary,
+    exactInfinityPoints: REPRESENTATIVE_FIXTURE.exactInfinityPoints,
+    representativeCase: "Eternity 1 / Milestone 1-2 / Achievements 1-41 / IC8 complete",
+    state,
+    atStart: milestonePredicates(instance.runtime),
+    productionPredicates: productionPredicateReport(instance.runtime),
   };
 }
 
@@ -693,6 +819,10 @@ function runSummary(firstReachSeconds, relativeFirstReachSeconds, candidate, fin
     parallelRawMultiplierCapSeconds: rawMultiplierCapSeconds,
     parallelRawX1e10Reached: endpointSeconds !== null && endpointSeconds >= rawMultiplierCapSeconds,
     parallelEffectiveMultiplierLog10AtEndpoint: parallelEffectiveMultiplierLog10,
+    parallelEffectiveMultiplierLog10ByMilestone: Object.fromEntries(postMilestones.map(({ id, relativeSeconds }) => [
+      id,
+      candidate.postSoftcapPower === null ? 0 : parallelMultiplierLog10(relativeSeconds, candidate.postSoftcapPower),
+    ])),
     collapseRisk: status !== "eligible"
       ? "unmeasured-horizon"
       : candidate.postSoftcapPower === null
@@ -706,34 +836,29 @@ function runSummary(firstReachSeconds, relativeFirstReachSeconds, candidate, fin
   };
 }
 
-async function runPrelude(policy, options) {
+async function runCase(fixture, candidate, policy, options) {
   const instance = await loadRuntime(CANDIDATE_PATH);
   configureRuntime(instance);
-  const result = runBoundedLoop(instance, policy, options.maxSetupSeconds, options);
-  if (result.status !== "eligible") {
-    return { policy: policy.id, result, checkpoint: null };
-  }
-  return { policy: policy.id, result, checkpoint: captureEternityCheckpoint(instance) };
-}
-
-async function runCase(checkpoint, milestoneId, candidate, policy, options) {
-  const instance = await loadRuntime(CANDIDATE_PATH);
-  configureRuntime(instance);
-  Object.assign(instance.debug.state, cloneState(checkpoint.state));
+  Object.assign(instance.debug.state, cloneState(fixture.state));
+  instance.runtime.syncInfinityPointCachesFromExact(BigInt(fixture.state.infinityPointsExact));
   assert.equal(instance.debug.state.eternityCount, 1);
-  assert.equal(instance.debug.state.completedChallenges, 0);
+  assert.equal(instance.debug.state.eternityMilestoneMask, 2);
+  assert.equal(instance.debug.state.completedChallenges, 255);
   assert.equal(instance.debug.state.completedTowerChallenges, 0);
-  assert.equal(instance.debug.selectEternityMilestone(milestoneId), true);
-  const tracker = createMilestoneTracker(instance.runtime);
-  const effect = { clock: tracker.clock };
+  assert.equal(instance.runtime.achievementCount(), 41);
+  const effect = { clock: { nowSeconds: 0, ic8ClearAtSeconds: 0 } };
   const restore = installResearchEffect(instance.runtime, candidate, effect.clock);
-  const result = runBoundedLoop(instance, policy, options.maxRunSeconds, options, effect);
+  const result = runBoundedLoop(instance, policy, options.maxRunSeconds, {
+    ...options,
+    ic8ClearAtStart: true,
+  }, effect);
   restore();
   const predicates = milestonePredicates(instance.runtime);
   const ipEndpoint = instance.runtime.currentExactInfinityPoints() >= instance.runtime.MAX_EXACT_INFINITY_POINTS;
   const tc4Completed = instance.runtime.towerChallenge4CompletedForEternity() === true;
   return {
-    milestoneId,
+    fixtureId: fixture.id,
+    representativeMilestone: "1-2",
     candidateId: candidate.id,
     policyId: policy.id,
     selectedMask: instance.debug.state.eternityMilestoneMask,
@@ -742,7 +867,7 @@ async function runCase(checkpoint, milestoneId, candidate, policy, options) {
     truncatedAtHorizon: result.truncatedAtHorizon,
     elapsedSeconds: result.elapsedSeconds,
     firstReachSeconds: result.firstReachSeconds,
-    events: result.events,
+    events: result.events.filter(({ type }) => type !== "progress"),
     actionCounts: result.actionCounts,
     ic8ClearAtSeconds: result.ic8ClearAtSeconds,
     relativeFirstReachSeconds: result.relativeFirstReachSeconds,
@@ -778,7 +903,7 @@ function productionPredicateReport(runtime = null) {
       targetLog10: runtime?.towerChallengeTargetLog10(index) ?? null,
     })),
     eternityRule: "currentExactInfinityPoints() >= MAX_EXACT_INFINITY_POINTS && towerChallenge4CompletedForEternity() === true",
-    ic8TimerRule: "secondsSinceIC8Clear starts at the observed completedChallenges bit-8 transition",
+    ic8TimerRule: "representative fixture initialization is IC8 clear = t 0",
     errorHandling: "exact IP stays BigInt in the production runtime; research multipliers are clamped to the production exact-IP ceiling before normal addInfinityPoints()",
   };
 }
@@ -796,43 +921,15 @@ async function createReport(rawOptions = {}) {
         formula: candidate.formula.replace(/post-softcap power [0-9.]+/, `post-softcap power ${options.parallelPostSoftcapPower}`),
       });
   if (options.stepSeconds <= 0 || options.actionIntervalSeconds <= 0) throw new Error("step and action interval must be positive");
-  const attempts = [];
-  let canonicalPrelude = null;
-  for (const policy of POLICIES) {
-    const attempt = await runPrelude(policy, options);
-    attempts.push({
-      policy: attempt.policy,
-      status: attempt.result.status,
-      horizonSeconds: attempt.result.horizonSeconds,
-      truncatedAtHorizon: attempt.result.truncatedAtHorizon,
-      elapsedSeconds: attempt.result.elapsedSeconds,
-      effectiveStepSeconds: attempt.result.effectiveStepSeconds,
-      firstReachSeconds: attempt.result.firstReachSeconds,
-      relativeFirstReachSeconds: attempt.result.relativeFirstReachSeconds,
-      milestoneTiming: attempt.result.milestoneTiming,
-      stateSnapshots: attempt.result.stateSnapshots,
-      droppedEvents: attempt.result.droppedEvents,
-      actionCounts: attempt.result.actionCounts,
-      lastState: attempt.result.lastState,
-      peakScoreLog10: attempt.result.peakScoreLog10,
-      events: attempt.result.events,
-      productionPredicates: attempt.result.productionPredicates,
-    });
-    if (attempt.checkpoint) {
-      canonicalPrelude = attempt;
-      break;
-    }
-  }
-
+  const fixture = await createRepresentativeFixture();
   const report = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     issue: ISSUE,
-    title: "Make the IC8-to-Eternity simulator produce a real Eternity-1 post-IC8 baseline",
+    title: "Measure the Eternity-1 Milestone 1-2 post-IC8 baseline for Timeline balance",
     researchOnly: true,
     noProductionChanges: true,
     productionRuntime: "src/main.js",
     options: {
-      maxSetupSeconds: options.maxSetupSeconds,
       maxRunSeconds: options.maxRunSeconds,
       maxStallSeconds: options.maxStallSeconds,
       requestedStepSeconds: options.stepSeconds,
@@ -842,53 +939,52 @@ async function createReport(rawOptions = {}) {
     },
     policies: POLICIES,
     researchEffects: candidates,
-    productionPredicates: attempts[0]?.productionPredicates || productionPredicateReport(),
+    productionPredicates: fixture.productionPredicates,
+    fixture: {
+      ...fixture,
+      state: jsonSafeState(fixture.state),
+    },
     validation: {
       step: {
         requestedSeconds: options.stepSeconds,
-        effectiveSeconds: attempts[0]?.effectiveStepSeconds ?? null,
+        effectiveSeconds: options.stepSeconds,
       },
-      convergence: {
-        status: canonicalPrelude ? "case-dependent" : "not-applicable-setup-stall",
-        criterion: "same production checkpoint and fresh runtime per 1-1/1-2/1-3 case; endpoint deltas are reported only after a real checkpoint exists",
-        endpointDeltaLog10: null,
+      fixtureCloning: {
+        status: "fresh-runtime-per-candidate",
+        criterion: "every candidate receives a fresh clone of fixture.state",
       },
       errors: [],
-      stall: {
-        maxSeconds: options.maxStallSeconds,
-        attempts: attempts.map(({ policy, status, elapsedSeconds }) => ({ policy, status, elapsedSeconds })),
-      },
-    },
-    prelude: {
-      status: canonicalPrelude ? "completed-first-eternity" : "setup-stall",
-      attempts,
-      canonicalPolicy: canonicalPrelude?.policy || null,
-      checkpoint: canonicalPrelude?.checkpoint || null,
     },
     cases: [],
-    outcome: canonicalPrelude
-      ? { status: "measured", reason: "production-generated first-Eternity checkpoint replayed" }
-      : { status: "setup-stall", reason: "bounded production prelude did not reach a real first Eternity; no IC8 or post-IC8 snapshot was fabricated" },
+    outcome: null,
   };
-
-  if (!canonicalPrelude) return report;
-  const milestoneIds = ["1-1", "1-2", "1-3"];
-  for (const milestoneId of milestoneIds) {
-    for (const policy of POLICIES) {
-      for (const candidate of candidates) {
-        report.cases.push(await runCase(canonicalPrelude.checkpoint, milestoneId, candidate, policy, options));
-      }
-    }
+  for (const candidate of candidates) {
+    report.cases.push(await runCase(fixture, candidate, POLICIES[0], options));
   }
+  const baseline = report.cases.find(({ candidateId }) => candidateId === "timeline-free");
+  const baselineSeconds = baseline?.researchSummary.ic8ToEternitySeconds ?? null;
+  report.cases.forEach((entry) => {
+    const endpoint = entry.researchSummary.ic8ToEternitySeconds;
+    entry.researchSummary.shorteningVsBaselineSeconds = baselineSeconds === null || endpoint === null
+      ? null
+      : baselineSeconds - endpoint;
+  });
+  const successful = report.cases.filter(({ status }) => status === "eligible").length;
+  report.outcome = successful === report.cases.length
+    ? { status: "measured", reason: "all candidates reached production Eternity eligibility from the shared post-IC8 fixture" }
+    : { status: "incomplete", reason: `${successful}/${report.cases.length} candidates reached production Eternity eligibility within the configured horizon` };
   return report;
 }
 
 function formatSeconds(seconds) {
   if (seconds === null || seconds === undefined) return "not reached";
-  if (seconds >= 24 * 60 * 60) return `${(seconds / (24 * 60 * 60)).toFixed(2)}d`;
-  if (seconds >= 60 * 60) return `${(seconds / (60 * 60)).toFixed(2)}h`;
-  if (seconds < 60) return `${seconds.toFixed(1)}s`;
-  return `${(seconds / 60).toFixed(2)}m`;
+  const sign = seconds < 0 ? "-" : "";
+  const absoluteSeconds = Math.abs(seconds);
+  if (absoluteSeconds >= 365 * 24 * 60 * 60) return `${sign}${(absoluteSeconds / (365 * 24 * 60 * 60)).toFixed(2)}y`;
+  if (absoluteSeconds >= 24 * 60 * 60) return `${sign}${(absoluteSeconds / (24 * 60 * 60)).toFixed(2)}d`;
+  if (absoluteSeconds >= 60 * 60) return `${sign}${(absoluteSeconds / (60 * 60)).toFixed(2)}h`;
+  if (absoluteSeconds < 60) return `${sign}${absoluteSeconds.toFixed(1)}s`;
+  return `${sign}${(absoluteSeconds / 60).toFixed(2)}m`;
 }
 
 function formatLog10Multiplier(log10) {
@@ -897,62 +993,46 @@ function formatLog10Multiplier(log10) {
 }
 
 function formatMarkdown(report) {
+  const fixture = report.fixture;
+  const milestoneValue = (entry, id) => entry.milestoneTiming[id] === "at-start"
+    ? "at-start"
+    : formatSeconds(entry.relativeFirstReachSeconds[id]);
   const lines = [
-    `# IC8-to-Eternity progression (Issue #${report.issue})`,
+    `# Milestone 1-2 post-IC8 progression (Issue #${report.issue})`,
     "",
     "> Research evidence only. No production gameplay, Timeline, or balance formula was changed.",
     "",
     `- Outcome: **${report.outcome.status}** — ${report.outcome.reason}`,
-    `- Step: requested **${report.options.requestedStepSeconds}s**, action interval **${report.options.actionIntervalSeconds}s**; every tick calls the production runtime update path.`,
-    `- Horizons: setup **${formatSeconds(report.options.maxSetupSeconds)}**, case **${formatSeconds(report.options.maxRunSeconds)}**, stall **${formatSeconds(report.options.maxStallSeconds)}**; truncation is reported per attempt/case.`,
+    `- Representative case: **${fixture.representativeCase}**; fixture initialization is **IC8 clear = t 0**.`,
+    `- Fixture: IP **1e100**, Infinity **${fixture.state.infinityCount}**, IA levels **${fixture.state.infiniteAngleSpeedLevel}/${fixture.state.infiniteAngleVertexLevel}/${fixture.state.infiniteAngleGainLevel}**, Tower Floor **${fixture.state.towerFloor}**, Time Flux **${fixture.state.timeFlux}**.`,
+    `- Step/action interval: **${formatSeconds(report.options.requestedStepSeconds)}**; horizon **${formatSeconds(report.options.maxRunSeconds)}**, stall **${formatSeconds(report.options.maxStallSeconds)}**.`,
     `- Effects: ${report.researchEffects.map((candidate) => `**${candidate.id}**`).join(", ")}`,
     "",
-    "## Prelude",
+    "## Results",
     "",
-    "| Policy | Status | Elapsed | Peak score log10 | IC8 clear | Eternity eligibility |",
-    "| --- | --- | ---: | ---: | --- | --- |",
+    "| Effect | Status | IC8 → Eternity | Longest stage | Shortening vs baseline | Parallel raw x1e10 | Parallel effective at TC4 / end | Collapse risk |",
+    "| --- | --- | ---: | --- | ---: | --- | --- | --- |",
   ];
-  report.prelude.attempts.forEach((attempt) => lines.push(
-    `| ${attempt.policy} | ${attempt.status}${attempt.truncatedAtHorizon ? " (horizon)" : ""} | ${formatSeconds(attempt.elapsedSeconds)} | ${attempt.peakScoreLog10} | ${formatSeconds(attempt.firstReachSeconds["ic8-clear"])} | ${formatSeconds(attempt.firstReachSeconds["eternity-eligibility"])} |`,
-  ));
-  if (report.prelude.checkpoint) {
-    lines.push(
-      "",
-      "- Canonical checkpoint source: " + report.prelude.checkpoint.source
-        + "; postcondition eternityCount=" + report.prelude.checkpoint.postcondition.eternityCount + ".",
-      "",
-      "## Case results",
-      "",
-      "| Milestone | Effect | Policy | Status | IC8 clear (relative) | Eternity eligibility (relative) |",
-      "| --- | --- | --- | --- | ---: | ---: |",
-    );
-    report.cases.forEach((entry) => lines.push(
-      `| ${entry.milestoneId} | ${entry.candidateId} | ${entry.policyId} | ${entry.status}${entry.truncatedAtHorizon ? " (horizon)" : ""} | ${formatSeconds(entry.relativeFirstReachSeconds["ic8-clear"])} | ${formatSeconds(entry.researchSummary.ic8ToEternitySeconds)} |`,
-    ));
-    lines.push(
-      "",
-      "## Human-readable research answers",
-      "",
-      "| Case | Effect | Policy | IC8 → Eternity | Longest post-IC8 stage | Real shortening | Parallel raw x1e10 | Parallel effective multiplier | Collapse risk |",
-      "| --- | --- | --- | ---: | --- | --- | --- | --- |",
-    );
-    report.cases.forEach((entry) => {
-      const summary = entry.researchSummary;
-      lines.push(
-        `| ${entry.milestoneId} | ${entry.candidateId} | ${entry.policyId} | ${formatSeconds(summary.ic8ToEternitySeconds)} | ${summary.longestStage ? `${summary.longestStage.from} → ${summary.longestStage.to} (${formatSeconds(summary.longestStage.durationSeconds)})` : "not reached"} | ${formatLog10Multiplier(summary.realMultiplierLog10AtEndpoint)} IP gain | ${summary.parallelRawX1e10Reached ? "reached" : `not reached (at ${formatSeconds(summary.parallelRawMultiplierCapSeconds)})`} | ${formatLog10Multiplier(summary.parallelEffectiveMultiplierLog10AtEndpoint)} | ${summary.collapseRisk} |`,
-      );
-    });
-  } else {
-    lines.push("", "No post-Eternity cases were run because the canonical setup did not reach a real first Eternity.");
-  }
+  report.cases.forEach((entry) => {
+    const summary = entry.researchSummary;
+    const parallelByMilestone = summary.parallelEffectiveMultiplierLog10ByMilestone;
+    lines.push(`| ${entry.candidateId} | ${entry.status}${entry.truncatedAtHorizon ? " (horizon)" : ""} | ${formatSeconds(summary.ic8ToEternitySeconds)} | ${summary.longestStage ? `${summary.longestStage.from} → ${summary.longestStage.to} (${formatSeconds(summary.longestStage.durationSeconds)})` : "not reached"} | ${formatSeconds(summary.shorteningVsBaselineSeconds)} | ${entry.candidateId.startsWith("parallel-") ? formatSeconds(summary.parallelRawMultiplierCapSeconds) : "n/a"} | ${entry.candidateId.startsWith("parallel-") ? `${formatLog10Multiplier(parallelByMilestone["tc4-clear"])} / ${formatLog10Multiplier(summary.parallelEffectiveMultiplierLog10AtEndpoint)}` : "n/a"} | ${summary.collapseRisk} |`);
+  });
   lines.push(
     "",
-    "## Required milestones",
+    "## Milestones from fixture t = 0",
     "",
-    `- ${MILESTONE_IDS.join(", ")}`,
-    "- IC8 timer starts only on the observed completed-challenges bit transition; setup-stall never claims IC8 completion.",
-    "- Greedy and threshold-aware are bounded comparison policies, not a global-optimality claim.",
-    "- A post-IC8 state is reported only after a real runtime `performEternity()` checkpoint and a fresh case runtime.",
+    `| Effect | ${MILESTONE_IDS.join(" | ")} |`,
+    `| --- | ${MILESTONE_IDS.map(() => "---").join(" | ")} |`,
+  );
+  report.cases.forEach((entry) => lines.push(
+    `| ${entry.candidateId} | ${MILESTONE_IDS.map((id) => milestoneValue(entry, id)).join(" | ")} |`,
+  ));
+  lines.push(
+    "",
+    "- `at-start` means the milestone is already true in the documented fixture.",
+    "- Every candidate starts in a fresh runtime cloned from the same fixture; only the research IP-gain effect differs.",
+    "- Milestone 1-1 and 1-3 are intentionally not compared by this representative study.",
   );
   return `${lines.join("\n")}\n`;
 }
@@ -981,10 +1061,12 @@ module.exports = {
   DEFAULT_OPTIONS,
   MILESTONE_IDS,
   POLICIES,
+  REPRESENTATIVE_FIXTURE,
+  applyRepresentativeFixture,
   cloneState,
-  captureEternityCheckpoint,
   createMilestoneTracker,
   createReport,
+  createRepresentativeFixture,
   formatMarkdown,
   installResearchEffect,
   parallelMultiplierLog10,
@@ -992,7 +1074,7 @@ module.exports = {
   productionPredicateReport,
   realMultiplierLog10,
   runBoundedLoop,
+  runCase,
   runPolicyAction,
-  runPrelude,
   writeReports,
 };
