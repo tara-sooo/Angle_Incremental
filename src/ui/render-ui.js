@@ -89,6 +89,7 @@ function recoveryReasonText(reason) {
     "pre-infinite-angle": "checkpointReasonPreInfiniteAngle",
     "pre-tower-build": "checkpointReasonPreTowerBuild",
     "pre-tower-challenge": "checkpointReasonPreTowerChallenge",
+    "pre-timeline-respec": "checkpointReasonPreTimelineRespec",
     "pre-restore": "checkpointReasonPreRestore",
   };
   return runtime.t(reasonKeys[reason] || "checkpointReasonOther");
@@ -218,6 +219,81 @@ function formatVertexGainIncrease(log10Value) {
   if (log10Value === Infinity || log10Value === Number.MAX_VALUE) return "∞";
   if (log10Value < 3) return runtime.formatSmallDecimal(runtime.valueFromLog10(log10Value));
   return runtime.formatUiLogNumber(log10Value);
+}
+
+function setTimelineTrackStatus(element, met) {
+  if (!element) return;
+  element.textContent = runtime.t(met ? "timelineRequirementMet" : "timelineRequirementMissing");
+  element.classList.toggle("is-met", met);
+  element.classList.toggle("is-missing", !met);
+}
+
+function formatTimelineEternityRequirement() {
+  const claims = runtime.timelineTrackClaimCount("eternity");
+  const requirement = runtime.timelineEternityRequirement();
+  return requirement !== null && requirement <= 1000000n
+    ? requirement.toString()
+    : `2^${claims + 1}`;
+}
+
+function updateTimelineUi() {
+  if (!runtime.elements.timelineEarnedTf || typeof runtime.timelineEarnedTf !== "function") return;
+  runtime.normalizeTimelineState?.();
+  const earned = runtime.timelineEarnedTf();
+  const available = runtime.timelineAvailableTf();
+  const spent = runtime.timelineSpentTf();
+  runtime.elements.timelineEarnedTf.textContent = `${runtime.formatUiNumber(earned)} TF`;
+  runtime.elements.timelineAvailableTf.textContent = `${runtime.formatUiNumber(available)} TF`;
+  runtime.elements.timelineAvailableTfSummary.textContent = `${runtime.formatUiNumber(available)} TF`;
+  runtime.elements.timelineSpentTf.textContent = `${runtime.formatUiNumber(spent)} TF`;
+  runtime.elements.timelineSpentTfBuild.textContent = `${runtime.formatUiNumber(spent)} TF`;
+
+  const tracks = [
+    {
+      id: "score",
+      claims: runtime.elements.timelineScoreClaims,
+      requirement: runtime.elements.timelineScoreRequirement,
+      status: runtime.elements.timelineScoreStatus,
+      button: runtime.elements.timelineScoreClaimButton,
+      requirementText: `${runtime.formatPowerOfTen(runtime.timelineScoreRequirementLog10())} Score`,
+    },
+    {
+      id: "ip",
+      claims: runtime.elements.timelineIpClaims,
+      requirement: runtime.elements.timelineIpRequirement,
+      status: runtime.elements.timelineIpStatus,
+      button: runtime.elements.timelineIpClaimButton,
+      requirementText: `${runtime.formatPowerOfTen(runtime.timelineIpRequirementLog10())} IP`,
+    },
+    {
+      id: "eternity",
+      claims: runtime.elements.timelineEternityClaims,
+      requirement: runtime.elements.timelineEternityRequirement,
+      status: runtime.elements.timelineEternityStatus,
+      button: runtime.elements.timelineEternityClaimButton,
+      requirementText: formatTimelineEternityRequirement(),
+    },
+  ];
+  tracks.forEach((track) => {
+    const met = runtime.timelineRequirementMet(track.id);
+    if (track.claims) track.claims.textContent = runtime.formatUiNumber(runtime.timelineTrackClaimCount(track.id));
+    if (track.requirement) track.requirement.textContent = track.requirementText;
+    setTimelineTrackStatus(track.status, met);
+    if (track.button) {
+      track.button.disabled = !runtime.canClaimTimelineTf(track.id);
+      track.button.textContent = runtime.t("timelineClaim");
+    }
+  });
+
+  const purchasedNodes = runtime.state.timelinePurchasedNodes || [];
+  if (runtime.elements.timelinePurchasedNodes) {
+    runtime.elements.timelinePurchasedNodes.textContent = purchasedNodes.length === 0
+      ? runtime.t("timelineNoNodes")
+      : `${runtime.t("timelinePurchasedNodeCount").replace("{count}", String(purchasedNodes.length))}: ${purchasedNodes.map((node) => node.id).join(", ")}`;
+  }
+  if (runtime.elements.timelineRespecButton) {
+    runtime.elements.timelineRespecButton.disabled = runtime.timelineDiscovered?.() !== true;
+  }
 }
 
 function updateUi() {
@@ -369,6 +445,7 @@ function updateUi() {
   runtime.updateAutomationUi();
   runtime.updateStatisticsUi();
   runtime.updateOfflineReportUi();
+  updateTimelineUi();
 
   const unlockedAchievements = runtime.achievementCount();
   runtime.elements.achievementTabState.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT}`;
@@ -478,6 +555,7 @@ expose("updateSaveRecoveryUi", () => updateSaveRecoveryUi, (value) => { updateSa
 expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
 expose("formatVertexGainIncrease", () => formatVertexGainIncrease, (value) => { formatVertexGainIncrease = value; });
+expose("updateTimelineUi", () => updateTimelineUi);
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });
 expose("setSaveStatus", () => setSaveStatus, (value) => { setSaveStatus = value; });
 expose("gainExpressionConfig", () => gainExpressionConfig, (value) => { gainExpressionConfig = value; });

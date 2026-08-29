@@ -33,6 +33,7 @@ const expectedOrder = [
   "src/ui/events.js",
   "src/systems/balance.js",
   "src/systems/eternity.js",
+  "src/systems/timeline.js",
 ];
 
 assert.deepStrictEqual(

@@ -38,6 +38,7 @@
           "./src/systems/infinite-angle.js": "./src/systems/infinite-angle.js?v=0.12.0",
           "./src/systems/balance.js": "./src/systems/balance.js?v=0.12.0",
           "./src/systems/eternity.js": "./src/systems/eternity.js?v=0.12.0",
+          "./src/systems/timeline.js": "./src/systems/timeline.js?v=0.12.0",
           "./src/systems/balance-angle.js": "./src/systems/balance-angle.js?v=0.12.0",
           "./src/systems/balance-generation.js": "./src/systems/balance-generation.js?v=0.12.0",
           "./src/systems/balance-core-boost.js": "./src/systems/balance-core-boost.js?v=0.12.0",
@@ -70,6 +71,11 @@
             <span class="tab-code">INF</span>
             <small id="infinityTabState">LOCKED</small>
             <i id="infinityTabBadge" aria-hidden="true"></i>
+          </button>
+          <button class="main-tab" type="button" data-tab="timeline" aria-selected="false">
+            <span class="tab-icon">◈</span>
+            <span class="tab-code">TL</span>
+            <small data-i18n="timelineTab">Timeline</small>
           </button>
           <button class="main-tab" type="button" data-tab="challenges" aria-selected="false">
             <span class="tab-icon">◆</span>
@@ -420,6 +426,87 @@
               </div>
             </section>
           </div>
+        </section>
+
+        <section class="main-panel timeline-page" data-panel="timeline" aria-label="Timeline">
+          <header class="page-heading">
+            <div>
+              <p class="eyebrow">Timeline</p>
+              <h1 data-i18n="timeline">Timeline</h1>
+            </div>
+          </header>
+
+          <section class="timeline-surface">
+            <div class="panel-heading">
+              <span data-i18n="timelineTimeFragments">Time Fragments</span>
+              <strong id="timelineAvailableTf">0 TF</strong>
+            </div>
+            <div class="timeline-summary">
+              <div>
+                <span data-i18n="timelineEarned">Earned TF</span>
+                <strong id="timelineEarnedTf">0 TF</strong>
+              </div>
+              <div>
+                <span data-i18n="timelineAvailable">Available TF</span>
+                <strong id="timelineAvailableTfSummary">0 TF</strong>
+              </div>
+              <div>
+                <span data-i18n="timelineSpent">Spent TF</span>
+                <strong id="timelineSpentTf">0 TF</strong>
+              </div>
+            </div>
+            <p class="timeline-hint" data-i18n="timelineManualHint">
+              Meeting a requirement does not claim TF automatically. Claim one fragment manually from each track.
+            </p>
+            <div class="timeline-claim-grid">
+              <article class="timeline-track">
+                <div class="timeline-track-heading">
+                  <h2 data-i18n="timelineScoreTrack">Score</h2>
+                  <strong id="timelineScoreClaims">0</strong>
+                </div>
+                <p><span data-i18n="timelineNextRequirement">Next requirement</span>: <strong id="timelineScoreRequirement">1e20000 Score</strong></p>
+                <p id="timelineScoreStatus" class="timeline-track-status">Not met</p>
+                <button id="timelineScoreClaimButton" class="timeline-claim-button upgrade-button" type="button" disabled data-i18n="timelineClaim">
+                  Claim TF
+                </button>
+              </article>
+              <article class="timeline-track">
+                <div class="timeline-track-heading">
+                  <h2 data-i18n="timelineIpTrack">Infinity Points</h2>
+                  <strong id="timelineIpClaims">0</strong>
+                </div>
+                <p><span data-i18n="timelineNextRequirement">Next requirement</span>: <strong id="timelineIpRequirement">1e400 IP</strong></p>
+                <p id="timelineIpStatus" class="timeline-track-status">Not met</p>
+                <button id="timelineIpClaimButton" class="timeline-claim-button upgrade-button" type="button" disabled data-i18n="timelineClaim">
+                  Claim TF
+                </button>
+              </article>
+              <article class="timeline-track">
+                <div class="timeline-track-heading">
+                  <h2 data-i18n="timelineEternityTrack">Eternities</h2>
+                  <strong id="timelineEternityClaims">0</strong>
+                </div>
+                <p><span data-i18n="timelineNextRequirement">Next requirement</span>: <strong id="timelineEternityRequirement">2</strong></p>
+                <p id="timelineEternityStatus" class="timeline-track-status">Not met</p>
+                <button id="timelineEternityClaimButton" class="timeline-claim-button upgrade-button" type="button" disabled data-i18n="timelineClaim">
+                  Claim TF
+                </button>
+              </article>
+            </div>
+            <section class="timeline-build">
+              <div class="panel-heading">
+                <span data-i18n="timelineBuild">Timeline build</span>
+                <strong id="timelineSpentTfBuild">0 TF</strong>
+              </div>
+              <p id="timelinePurchasedNodes" data-i18n="timelineNoNodes">No Timeline nodes purchased.</p>
+            </section>
+            <div class="timeline-respec">
+              <p data-i18n="timelineRespecWarning">Respec removes every Timeline node, refunds all spent TF, and restarts the current Eternity run.</p>
+              <button id="timelineRespecButton" class="timeline-respec-button reset-button" type="button" disabled data-i18n="timelineRespec">
+                Respec Timeline
+              </button>
+            </div>
+          </section>
         </section>
 
         <section class="main-panel challenges-panel" data-panel="challenges" aria-label="Challenges">

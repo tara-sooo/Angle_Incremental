@@ -138,7 +138,9 @@ button {
 .statistics-subtabs,
 .achievement-overview,
 .settings-card,
-.save-panel {
+.save-panel,
+.timeline-surface,
+.timeline-track {
   background: linear-gradient(180deg, rgba(23, 36, 59, 0.96), rgba(12, 20, 35, 0.96));
   border: 2px solid var(--line-strong);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 18px 46px rgba(0, 0, 0, 0.3);
@@ -654,6 +656,7 @@ canvas {
 }
 
 .infinity-page,
+.timeline-page,
 .challenges-panel,
 .automation-panel,
 .statistics-panel,
@@ -678,6 +681,7 @@ canvas {
 
 .infinity-summary,
 .infinity-panel,
+.timeline-surface,
 .challenge-panel,
 .achievement-overview,
 .settings-card,
@@ -746,6 +750,137 @@ canvas {
 .infinity-page .panel-heading {
   min-height: 30px;
   padding-bottom: 5px;
+}
+
+.timeline-page {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.timeline-surface {
+  padding: 12px;
+}
+
+.timeline-summary,
+.timeline-claim-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.timeline-summary > div {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: rgba(10, 18, 34, 0.68);
+}
+
+.timeline-summary span,
+.timeline-track p {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.timeline-summary strong,
+.timeline-track strong {
+  color: var(--gold);
+  overflow-wrap: anywhere;
+}
+
+.timeline-hint,
+.timeline-build p,
+.timeline-respec p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.timeline-hint {
+  margin: 12px 0 0;
+}
+
+.timeline-track {
+  min-width: 0;
+  padding: 12px;
+  border-color: var(--line);
+  box-shadow: none;
+}
+
+.timeline-track-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 7px;
+}
+
+.timeline-track h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.timeline-track p {
+  margin: 10px 0 0;
+}
+
+.timeline-track-status {
+  font-weight: 900;
+}
+
+.timeline-track-status.is-met {
+  color: var(--green);
+}
+
+.timeline-track-status.is-missing {
+  color: var(--muted);
+}
+
+.timeline-claim-button {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.timeline-build {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgba(10, 18, 34, 0.52);
+}
+
+.timeline-build .panel-heading {
+  margin: -12px -12px 0;
+}
+
+.timeline-build p {
+  margin: 10px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.timeline-respec {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid rgba(255, 166, 89, 0.38);
+  background: rgba(112, 57, 28, 0.18);
+}
+
+.timeline-respec p {
+  margin: 0;
+}
+
+.timeline-respec-button {
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 8px 12px;
 }
 
 .infinity-summary .infinity-button {
@@ -2057,11 +2192,22 @@ canvas {
   .achievement-list,
   .infinite-angle-panel,
   .tower-metrics,
+  .timeline-summary,
+  .timeline-claim-grid,
   .settings-grid,
   .statistics-grid,
   .challenge-time-grid,
   .help-list {
     grid-template-columns: 1fr;
+  }
+
+  .timeline-respec {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .timeline-respec-button {
+    width: 100%;
   }
 
   .infinite-angle-panel .infinite-angle-playfield-wrap,

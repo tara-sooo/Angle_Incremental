@@ -25,6 +25,7 @@ import "./systems/infinite-angle.js";
 import "./ui/events.js";
 import "./systems/balance.js";
 import "./systems/eternity.js";
+import "./systems/timeline.js";
 
 let autoSaveElapsed = 0;
 let updateCheckElapsed = 0;
@@ -1632,6 +1633,7 @@ function renderGameToText() {
   const currentGainLog = runtime.currentGainLog10();
   const currentCostLogs = runtime.costLogs();
   const gainExpression = runtime.gainExpressionConfig();
+  const timelineEternityRequirement = runtime.timelineEternityRequirement();
   return JSON.stringify({
     coordinateSystem: "canvas pixels, origin top-left, x right, y down",
     score: runtime.scoreDisplay(),
@@ -1773,6 +1775,28 @@ function renderGameToText() {
         completed: runtime.towerChallengeCompleted(challenge.index),
         targetLog10: Number.isFinite(challenge.targetLog10) ? challenge.targetLog10 : null,
       })),
+    },
+    timeline: {
+      discovered: runtime.timelineDiscovered(),
+      earnedTf: runtime.timelineEarnedTf(),
+      availableTf: runtime.timelineAvailableTf(),
+      spentTf: runtime.timelineSpentTf(),
+      claims: {
+        score: runtime.timelineTrackClaimCount("score"),
+        ip: runtime.timelineTrackClaimCount("ip"),
+        eternity: runtime.timelineTrackClaimCount("eternity"),
+      },
+      nextRequirements: {
+        scoreLog10: runtime.timelineScoreRequirementLog10(),
+        ipLog10: runtime.timelineIpRequirementLog10(),
+        eternity: timelineEternityRequirement?.toString() || null,
+      },
+      canClaim: {
+        score: runtime.canClaimTimelineTf("score"),
+        ip: runtime.canClaimTimelineTf("ip"),
+        eternity: runtime.canClaimTimelineTf("eternity"),
+      },
+      purchasedNodes: runtime.state.timelinePurchasedNodes,
     },
     achievements: {
       unlocked: runtime.achievementCount(),
@@ -1958,6 +1982,15 @@ window.__angleDebug = {
   runInfinity: runtime.runInfinity,
   canEternity: runtime.canEternity,
   performEternity: runtime.performEternity,
+  claimTimelineTf: runtime.claimTimelineTf,
+  claimScoreTf: runtime.claimScoreTf,
+  claimIpTf: runtime.claimIpTf,
+  claimEternityTf: runtime.claimEternityTf,
+  canClaimTimelineTf: runtime.canClaimTimelineTf,
+  timelineEarnedTf: runtime.timelineEarnedTf,
+  timelineAvailableTf: runtime.timelineAvailableTf,
+  timelineSpentTf: runtime.timelineSpentTf,
+  respecTimeline: runtime.respecTimeline,
   maybeForceEternity: runtime.maybeForceEternity,
   selectEternityMilestone: runtime.selectEternityMilestone,
   buyInfinityUpgrade: runtime.buyInfinityUpgrade,

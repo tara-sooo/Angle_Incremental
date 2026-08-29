@@ -6,6 +6,7 @@ const MAIN_TAB_IDS = Object.freeze([
   "angle",
   "infinity",
   "eternity",
+  "timeline",
   "challenges",
   "automation",
   "statistics",
@@ -19,6 +20,7 @@ const MAIN_TAB_DISCOVERY_IDS = Object.freeze([
   "challenges",
   "automation",
   "eternity",
+  "timeline",
 ]);
 
 function normalizeHiddenTabs(value) {
@@ -67,6 +69,10 @@ const state = {
   coreBoostCount: 0,
   infinityCount: 0,
   eternityCount: 0,
+  scoreTfClaims: 0,
+  ipTfClaims: 0,
+  eternityTfClaims: 0,
+  timelinePurchasedNodes: [],
   eternityMilestoneMask: 0,
   eternityMilestoneChoice: "",
   infinityPoints: 0,
@@ -184,6 +190,10 @@ const SAVE_FIELDS = [
   "coreBoostCount",
   "infinityCount",
   "eternityCount",
+  "scoreTfClaims",
+  "ipTfClaims",
+  "eternityTfClaims",
+  "timelinePurchasedNodes",
   "eternityMilestoneMask",
   "eternityMilestoneChoice",
   "infinityPoints",

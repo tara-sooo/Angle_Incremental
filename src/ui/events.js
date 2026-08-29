@@ -9,6 +9,7 @@ const MAIN_TAB_UNLOCKS = Object.freeze({
   angle: () => true,
   infinity: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("infinity"),
   eternity: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("eternity"),
+  timeline: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("timeline"),
   challenges: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("challenges"),
   automation: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("automation"),
   statistics: () => true,
@@ -43,6 +44,7 @@ function discoverMainTabs() {
     || runtime.eternityMilestoneActive?.("8") === true
   ) discovered.push("automation");
   if (state.eternityCount > 0 || runtime.towerChallengeUnlocked?.(4) === true) discovered.push("eternity");
+  if (state.eternityCount > 0) discovered.push("timeline");
   return runtime.markMainTabsUnlocked(discovered) === true;
 }
 
@@ -227,6 +229,13 @@ function bindEvents() {
   runtime.elements.infiniteAngleGainUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("gain"));
   runtime.elements.towerBuildButton.addEventListener("click", runtime.buildTower);
   runtime.elements.breakCapButton.addEventListener("click", runtime.breakInfiniteCap);
+  runtime.elements.timelineScoreClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("score"));
+  runtime.elements.timelineIpClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("ip"));
+  runtime.elements.timelineEternityClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("eternity"));
+  runtime.elements.timelineRespecButton?.addEventListener("click", () => {
+    if (typeof window.confirm === "function" && !window.confirm(runtime.t("timelineRespecConfirm"))) return;
+    runtime.respecTimeline?.();
+  });
   runtime.elements.offlineTickInput.addEventListener("change", () => applySetting(
     "offlineTickCount",
     runtime.elements.offlineTickInput.value,
