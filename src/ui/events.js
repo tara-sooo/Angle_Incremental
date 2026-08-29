@@ -7,10 +7,10 @@ import "./render-eternity.js?v=0.12.0";
 
 const MAIN_TAB_UNLOCKS = Object.freeze({
   angle: () => true,
-  infinity: () => runtime.state.infinityCount > 0,
-  eternity: () => true,
-  challenges: () => runtime.infinityChallengesUnlocked?.() === true,
-  automation: () => runtime.normalAutomationUnlocked?.() === true,
+  infinity: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("infinity"),
+  eternity: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("eternity"),
+  challenges: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("challenges"),
+  automation: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("automation"),
   statistics: () => true,
   achievements: () => true,
   help: () => true,
@@ -18,6 +18,33 @@ const MAIN_TAB_UNLOCKS = Object.freeze({
 });
 
 let mainTabVisibilitySignature = "";
+
+function hasPositiveValue(values) {
+  return Array.isArray(values) && values.some((value) => Number(value) > 0);
+}
+
+function discoverMainTabs() {
+  const state = runtime.state;
+  const discovered = [];
+  if (state.eternityCount > 0 || state.infinityCount > 0) discovered.push("infinity");
+  if (
+    state.eternityCount > 0
+    || runtime.infinityChallengesUnlocked?.() === true
+    || state.activeChallenge > 0
+    || state.completedChallenges !== 0
+    || hasPositiveValue(state.fastestInfinityChallengeTimes)
+  ) discovered.push("challenges");
+  if (
+    state.eternityCount > 0
+    || runtime.normalAutomationUnlocked?.() === true
+    || runtime.isAchievementUnlocked?.(19) === true
+    || runtime.infinityAutomationUnlocked?.() === true
+    || runtime.infinityUpgradeAutomationUnlocked?.() === true
+    || runtime.eternityMilestoneActive?.("8") === true
+  ) discovered.push("automation");
+  if (state.eternityCount > 0 || runtime.towerChallengeUnlocked?.(4) === true) discovered.push("eternity");
+  return runtime.markMainTabsUnlocked(discovered) === true;
+}
 
 function mainTabIsUnlocked(tab) {
   return Boolean(MAIN_TAB_UNLOCKS[tab]?.());
@@ -314,6 +341,7 @@ expose("applySetting", () => applySetting, (value) => { applySetting = value; })
 expose("mainTabIsUnlocked", () => mainTabIsUnlocked);
 expose("mainTabIsVisible", () => mainTabIsVisible);
 expose("setMainTabVisibility", () => setMainTabVisibility);
+expose("discoverMainTabs", () => discoverMainTabs);
 expose("updateMainTabVisibility", () => updateMainTabVisibility);
 expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
 expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });

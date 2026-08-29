@@ -535,6 +535,73 @@ function sanitizeChallengeTimes(value, count) {
   return Array.from({ length: count }, (_, index) => Math.max(0, runtime.sanitizeNumber(source[index], 0)));
 }
 
+function savedInfinityUpgradeOwned(data, id) {
+  const upgrade = runtime.INFINITY_UPGRADES?.find((entry) => entry.id === id);
+  if (!upgrade) return false;
+  const mask = Math.floor(runtime.sanitizeNumber(data.infinityUpgradeMask, runtime.state.infinityUpgradeMask));
+  return (mask & (1 << upgrade.bit)) !== 0;
+}
+
+function savedChallengeProgress(data) {
+  const completed = Math.floor(runtime.sanitizeNumber(data.completedChallenges, runtime.state.completedChallenges));
+  const active = Math.floor(runtime.sanitizeNumber(data.activeChallenge, runtime.state.activeChallenge));
+  const activeTime = runtime.sanitizeNumber(data.activeChallengeTime, runtime.state.activeChallengeTime);
+  const times = Array.isArray(data.fastestInfinityChallengeTimes)
+    ? data.fastestInfinityChallengeTimes
+    : runtime.state.fastestInfinityChallengeTimes;
+  return completed !== 0 || active > 0 || activeTime > 0 || times.some((time) => runtime.sanitizeNumber(time, 0) > 0);
+}
+
+function inferUnlockedMainTabs(data) {
+  const eternityCount = runtime.state.eternityCount;
+  const infinityCount = runtime.state.infinityCount;
+  const milestoneMask = runtime.state.eternityMilestoneMask;
+  const achievementMask = runtime.state.achievementMask;
+  const automationSettings = [
+    "automationEnabled",
+    "autoBuyInfinityUpgrades",
+    "autoBuyInfiniteAngleSpeed",
+    "autoBuyInfiniteAngleVertex",
+    "autoBuyInfiniteAngleGain",
+    "autoBuildTower",
+    "autoRunGeneration",
+    "autoRunCoreBoost",
+    "autoRunInfinity",
+  ];
+  const automationEvidence = automationSettings.some((key) => data[key] === true || runtime.state[key] === true);
+  const towerFloor = Math.max(0, Math.floor(runtime.sanitizeNumber(data.towerFloor, runtime.state.towerFloor)));
+  const tc4UnlockFloor = runtime.towerChallengeUnlockFloor?.(4) ?? 12;
+  const completedTowerChallenges = Math.floor(runtime.sanitizeNumber(
+    data.completedTowerChallenges,
+    runtime.state.completedTowerChallenges,
+  ));
+  const tc4Progress = Math.floor(runtime.sanitizeNumber(data.activeTowerChallenge, runtime.state.activeTowerChallenge)) === 4
+    || (completedTowerChallenges & (1 << 3)) !== 0
+    || runtime.state.tc4BaseGainLevel > 0
+    || runtime.state.tc4InfinityScoreVertexGainLevel > 0
+    || runtime.state.tc4FreeCoreBoostLevel > 0;
+  const discovered = [];
+
+  if (eternityCount > 0 || infinityCount > 0) discovered.push("infinity");
+  if (
+    eternityCount > 0
+    || savedInfinityUpgradeOwned(data, "4-1")
+    || savedChallengeProgress(data)
+  ) discovered.push("challenges");
+  if (
+    eternityCount > 0
+    || savedInfinityUpgradeOwned(data, "1-2")
+    || savedInfinityUpgradeOwned(data, "8-1")
+    || (milestoneMask & 1) !== 0
+    || eternityCount >= 20
+    || eternityCount >= 81
+    || (achievementMask & (1 << (19 - 1))) !== 0
+    || automationEvidence
+  ) discovered.push("automation");
+  if (eternityCount > 0 || towerFloor >= tc4UnlockFloor || tc4Progress) discovered.push("eternity");
+  runtime.markMainTabsUnlocked(discovered);
+}
+
 function cloneStateValue(value) {
   if (Array.isArray(value)) return value.map(cloneStateValue);
   if (value && typeof value === "object") {
@@ -865,6 +932,8 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.topBarMode = runtime.normalizeChoice(data.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
   runtime.state.showTimeFluxQuickBar = data.showTimeFluxQuickBar !== false;
   runtime.state.hiddenTabs = runtime.normalizeHiddenTabs(data.hiddenTabs);
+  runtime.state.unlockedMainTabs = runtime.normalizeUnlockedMainTabs(data.unlockedMainTabs);
+  inferUnlockedMainTabs(data);
   const lastEarned = runtime.hydrateLogResource(data.lastEarned, data.lastEarnedLog10);
   runtime.state.lastEarned = lastEarned.value;
   runtime.state.lastEarnedLog10 = lastEarned.log;
@@ -886,6 +955,7 @@ function serializeSaveData() {
   runtime.normalizeTowerChallenge4State?.();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
   runtime.state.achievementMaskHigh = ((Number(runtime.state.achievementMaskHigh) || 0) >>> 0);
+  runtime.state.unlockedMainTabs = runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs);
   const data = {};
   runtime.SAVE_FIELDS.forEach((field) => {
     data[field] = runtime.state[field];
@@ -1322,6 +1392,7 @@ function resetSave() {
     topBarMode: "news",
     showTimeFluxQuickBar: true,
     hiddenTabs: [],
+    unlockedMainTabs: [],
     floatingTexts: [],
     lastEarned: 0,
     lastEarnedLog10: -Infinity,
