@@ -2,86 +2,56 @@
 
 > Research evidence only. No production gameplay, Timeline, or balance formula was changed.
 
-- Outcome: **measured** — all candidates reached production Eternity eligibility from the shared post-IC8 fixture
+- Outcome: **invalid** — parallel-bc16500-root: major milestone is horizon-bound (tc1-clear); parallel-bc16500-fourth-root: major milestone is horizon-bound (tc1-clear)
 - Representative case: **Eternity 1 / Milestone 1-2 / Achievements 1-41 / IC8 complete**; fixture initialization is **IC8 clear = t 0**.
 - Fixture: IP **1e5**, Infinity **10000**, IA levels **0/0/0**, Tower Floor **0**, Time Flux **0**.
 - Cadence: **1.0s** production seed; immediate actions are exhausted at a fixed point before and after each advance; no calendar-scale action interval is used.
-- Horizon/stall guard: **3.17e+300y** / **3.17e+300y**; action search iterations **6** after the initial bracket.
-- Convergence: **passed** (max relative difference 0).
+- Objective policy: **ip-threshold → tower-build → tower-challenge → infinity-count → eternity**; TC3 is blocked until exactly **600000** normal Infinity count.
+- Horizon/stall guard: **1.00y** / **14.00d**; action search iterations **6** after the initial bracket.
+- Convergence: **passed** (max relative difference 0); sanity guards: **failed**.
 - Effects: **timeline-free**, **real-bc16500**, **parallel-bc16500-root**, **parallel-bc16500-fourth-root**
 
 ## Results
 
 | Effect | Status | IC8 → Eternity | Longest stage | Shortening vs baseline | Parallel raw x1e10 | Parallel effective at TC4 / end | Collapse risk |
 | --- | --- | ---: | --- | ---: | --- | --- | --- |
-| timeline-free | eligible | 5.97e+296y | tc3-unlock → tc3-clear (5.97e+296y) | 0.0s | n/a | n/a | not-applicable |
-| real-bc16500 | eligible | 5.97e+296y | tc3-unlock → tc3-clear (5.97e+296y) | 3.66e+202y | n/a | n/a | not-applicable |
-| parallel-bc16500-root | eligible | 5.97e+296y | tc3-unlock → tc3-clear (5.97e+296y) | 9.53e+202y | 21.0s | x10^4.4886830830898685e+303 / x10^4.4886830830898685e+303 | cap-exposed |
-| parallel-bc16500-fourth-root | eligible | 5.97e+296y | tc3-unlock → tc3-clear (5.97e+296y) | 9.53e+202y | 21.0s | x10^2.2443415415449343e+303 / x10^2.2443415415449343e+303 | cap-exposed |
+| timeline-free | policy-stall (horizon) | not reached | not reached | not reached | n/a | n/a | unmeasured-horizon |
+| real-bc16500 | policy-stall (horizon) | not reached | not reached | not reached | n/a | n/a | unmeasured-horizon |
+| parallel-bc16500-root | policy-stall (horizon) | not reached | tc1-unlock → tc1-clear (365.00d) | not reached | 21.0s | x1 / x1 | unmeasured-horizon |
+| parallel-bc16500-fourth-root | policy-stall (horizon) | not reached | tc1-unlock → tc1-clear (364.99d) | not reached | 21.0s | x1 / x1 | unmeasured-horizon |
+
+## Final policy diagnostics
+
+| Effect | Status | Objective | Target | Elapsed | IP / gain | Infinity | GR / multiplier | CB | Tower / TC |
+| --- | --- | --- | ---: | ---: | --- | ---: | --- | ---: | --- |
+| timeline-free | policy-stall | ip-threshold (buy Infinity Upgrade 12-1) | 6.823474229170301 | 1.00y | 6.201172817493079 / 6.167470344893975 | 10012 | 37 / 20.524017950813867 | 5 | F0 / - (0) |
+| real-bc16500 | policy-stall | ip-threshold (unlock Infinite Angle) | 20 | 1.00y | 7.820469929478036 / -Infinity | 10036 | 21 / 20.668409911051878 | 5 | F0 / - (0) |
+| parallel-bc16500-root | policy-stall | ip-threshold (buy Infinity Upgrade 14-1) | 80 | 1.00y | 69.99102546339886 / -Infinity | 10812 | 0 / 0 | 2 | F3 / - (1) |
+| parallel-bc16500-fourth-root | policy-stall | ip-threshold (buy Infinity Upgrade 14-1) | 80 | 1.00y | 69.26104122931626 / -Infinity | 11584 | 0 / 0 | 2 | F3 / - (1) |
 
 ## Stage durations from fixture t = 0
 
 | Effect | From | To | Duration |
 | --- | --- | --- | ---: |
-| timeline-free | ic8-clear | infinite-angle-unlock | 6.78e+66y |
-| timeline-free | infinite-angle-unlock | tower-floor-1 | 1.99e+25y |
-| timeline-free | tower-floor-1 | tc1-unlock | 0.0s |
-| timeline-free | tc1-unlock | tc1-clear | 23568932.72y |
-| timeline-free | tc1-clear | tc2-unlock | 4207242792450583552.00y |
-| timeline-free | tc2-unlock | tc2-clear | 5765192465465516.00y |
-| timeline-free | tc2-clear | tc3-unlock | 35681487459753.17y |
-| timeline-free | tc3-unlock | tc3-clear | 5.97e+296y |
-| timeline-free | tc3-clear | tc4-unlock | 0.0s |
-| timeline-free | tc4-unlock | ip-1.80e308 | 0.0s |
-| timeline-free | ip-1.80e308 | tc4-clear | 14602154153.83y |
-| timeline-free | tc4-clear | eternity-eligibility | 14602154149.92y |
-| real-bc16500 | ic8-clear | infinite-angle-unlock | 6.78e+66y |
-| real-bc16500 | infinite-angle-unlock | tower-floor-1 | 1.51e+25y |
-| real-bc16500 | tower-floor-1 | tc1-unlock | 0.0s |
-| real-bc16500 | tc1-unlock | tc1-clear | 23568932.71y |
-| real-bc16500 | tc1-clear | tc2-unlock | 4063487343961390080.00y |
-| real-bc16500 | tc2-unlock | tc2-clear | 5765192465465516.00y |
-| real-bc16500 | tc2-clear | tc3-unlock | 524962970395.20y |
-| real-bc16500 | tc3-unlock | tc3-clear | 5.97e+296y |
-| real-bc16500 | tc3-clear | tc4-unlock | 0.0s |
-| real-bc16500 | tc4-unlock | ip-1.80e308 | 0.0s |
-| real-bc16500 | ip-1.80e308 | tc4-clear | 14602154153.83y |
-| real-bc16500 | tc4-clear | eternity-eligibility | 14602154149.92y |
-| parallel-bc16500-root | ic8-clear | infinite-angle-unlock | 6.78e+66y |
-| parallel-bc16500-root | infinite-angle-unlock | tower-floor-1 | 0.0s |
-| parallel-bc16500-root | tower-floor-1 | tc1-unlock | 0.0s |
-| parallel-bc16500-root | tc1-unlock | ip-1.80e308 | 0.0s |
-| parallel-bc16500-root | ip-1.80e308 | tc1-clear | 11017430.06y |
-| parallel-bc16500-root | tc1-clear | tc2-unlock | 0.0s |
-| parallel-bc16500-root | tc2-unlock | tc2-clear | 8307.74y |
-| parallel-bc16500-root | tc2-clear | tc3-unlock | 0.0s |
-| parallel-bc16500-root | tc3-unlock | tc3-clear | 5.97e+296y |
-| parallel-bc16500-root | tc3-clear | tc4-unlock | 0.0s |
-| parallel-bc16500-root | tc4-unlock | tc4-clear | 14602154153.81y |
-| parallel-bc16500-root | tc4-clear | eternity-eligibility | 0.0s |
-| parallel-bc16500-fourth-root | ic8-clear | infinite-angle-unlock | 6.78e+66y |
-| parallel-bc16500-fourth-root | infinite-angle-unlock | tower-floor-1 | 0.0s |
-| parallel-bc16500-fourth-root | tower-floor-1 | tc1-unlock | 0.0s |
-| parallel-bc16500-fourth-root | tc1-unlock | ip-1.80e308 | 0.0s |
-| parallel-bc16500-fourth-root | ip-1.80e308 | tc1-clear | 11017430.06y |
-| parallel-bc16500-fourth-root | tc1-clear | tc2-unlock | 0.0s |
-| parallel-bc16500-fourth-root | tc2-unlock | tc2-clear | 8307.74y |
-| parallel-bc16500-fourth-root | tc2-clear | tc3-unlock | 0.0s |
-| parallel-bc16500-fourth-root | tc3-unlock | tc3-clear | 5.97e+296y |
-| parallel-bc16500-fourth-root | tc3-clear | tc4-unlock | 0.0s |
-| parallel-bc16500-fourth-root | tc4-unlock | tc4-clear | 14602154153.81y |
-| parallel-bc16500-fourth-root | tc4-clear | eternity-eligibility | 0.0s |
+| parallel-bc16500-root | ic8-clear | infinite-angle-unlock | 53.0s |
+| parallel-bc16500-root | infinite-angle-unlock | tower-floor-1 | 1.95m |
+| parallel-bc16500-root | tower-floor-1 | tc1-unlock | 1.38m |
+| parallel-bc16500-root | tc1-unlock | tc1-clear | 365.00d |
+| parallel-bc16500-fourth-root | ic8-clear | infinite-angle-unlock | 1.18m |
+| parallel-bc16500-fourth-root | infinite-angle-unlock | tower-floor-1 | 4.05m |
+| parallel-bc16500-fourth-root | tower-floor-1 | tc1-unlock | 2.77m |
+| parallel-bc16500-fourth-root | tc1-unlock | tc1-clear | 364.99d |
 
 ## Milestones from fixture t = 0
 
-| Effect | break-infinite-cap | infinite-angle-unlock | tower-floor-1 | tc1-unlock | tc1-clear | tc2-unlock | tc2-clear | tc3-unlock | tc3-clear | tc4-unlock | tc4-clear | ic8-clear | ip-1.80e308 | eternity-eligibility |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| timeline-free | at-start | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 5.97e+296y | 5.97e+296y | 5.97e+296y | at-start | 5.97e+296y | 5.97e+296y |
-| real-bc16500 | at-start | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 5.97e+296y | 5.97e+296y | 5.97e+296y | at-start | 5.97e+296y | 5.97e+296y |
-| parallel-bc16500-root | at-start | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 5.97e+296y | 5.97e+296y | 5.97e+296y | at-start | 6.78e+66y | 5.97e+296y |
-| parallel-bc16500-fourth-root | at-start | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 6.78e+66y | 5.97e+296y | 5.97e+296y | 5.97e+296y | at-start | 6.78e+66y | 5.97e+296y |
+| Effect | break-infinite-cap | infinite-angle-unlock | tower-floor-1 | tc1-unlock | tc1-clear | tc2-unlock | tc2-clear | infinity-count-600000 | tc3-unlock | tc3-clear | tc4-unlock | tc4-clear | ic8-clear | ip-1.80e308 | eternity-eligibility |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| timeline-free | at-start | not reached | not reached | not reached | not reached | not reached | not reached | not reached | not reached | not reached | not reached | not reached | at-start | not reached | not reached |
+| real-bc16500 | at-start | not reached | not reached | not reached | not reached | not reached | not reached | not reached | not reached | not reached | not reached | not reached | at-start | not reached | not reached |
+| parallel-bc16500-root | at-start | 53.0s | 2.83m | 4.22m | 1.00y | not reached | not reached | not reached | not reached | not reached | not reached | not reached | at-start | not reached | not reached |
+| parallel-bc16500-fourth-root | at-start | 1.18m | 5.23m | 8.00m | 1.00y | not reached | not reached | not reached | not reached | not reached | not reached | not reached | at-start | not reached | not reached |
 
 - `at-start` means the milestone is already true in the documented fixture.
 - Every candidate starts in a fresh runtime cloned from the same fixture; only the research IP-gain effect differs.
-- Parallel endpoint equality is attributed to the TC3 bottleneck when TC3 remains the longest stage; it is not treated as evidence that the candidates are equivalent.
+- An unfinished run is reported as `policy-stall` with its current objective and state; no astronomical extrapolation is used.
 - Milestone 1-1 and 1-3 are intentionally not compared by this representative study.

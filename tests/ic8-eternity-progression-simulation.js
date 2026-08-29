@@ -9,13 +9,17 @@ const {
   REPRESENTATIVE_FIXTURE,
   applyRepresentativeFixture,
   cloneState,
+  coreBoostActionAvailable,
   createMilestoneTracker,
   createReport,
   createRepresentativeFixture,
   formatMarkdown,
+  generationActionAvailable,
+  infinityResetReady,
   installResearchEffect,
   parallelMultiplierLog10,
   progressSnapshot,
+  progressionObjective,
   realMultiplierLog10,
   runBoundedLoop,
   runPolicyAction,
@@ -56,6 +60,8 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.equal(parallelMultiplierLog10(0, 0.5), 0);
   assert.equal(parallelMultiplierLog10(10 / Math.log10(3), 0.5), 10);
   assert.equal(parallelMultiplierLog10(20 / Math.log10(3), 0.5), 15);
+  assert.equal("maxCoreBoostCount" in POLICIES[0], false);
+  assert.equal("maxGenerationDepthLog10" in POLICIES[0], false);
   assert.deepEqual(MILESTONE_IDS.slice(-4), ["tc4-clear", "ic8-clear", "ip-1.80e308", "eternity-eligibility"]);
 
   const fixture = await createRepresentativeFixture();
@@ -92,7 +98,77 @@ async function runIc8EternityProgressionSimulationTest() {
   });
   assert.equal(actionResult.timeAdvances, 0, "zero-time actions must run before the first production advance");
   assert.ok(actionResult.actionCounts.normalPurchase > 0, "the initial fixed point must buy immediately affordable upgrades");
+  assert.equal(actionResult.status, "policy-stall");
+  assert.equal(actionResult.objective.kind, "ip-threshold");
+  assert.equal(actionResult.diagnostics.elapsedSeconds, 0);
+  assert.equal(actionResult.diagnostics.infinityPointsExact, "100000");
+  assert.equal(actionResult.diagnostics.towerFloor, 0);
   assert.equal(actionState.infinityPointsExact, "100000");
+
+  const objectiveInstance = await loadRuntime(path.resolve(__dirname, "..", "src", "main.js"));
+  applyRepresentativeFixture(objectiveInstance);
+  const objectiveRuntime = objectiveInstance.runtime;
+  let objective = progressionObjective(objectiveRuntime);
+  assert.equal(objective.kind, "ip-threshold");
+  assert.equal(objective.reason, "buy Infinity Upgrade 12-1");
+  objectiveRuntime.syncInfinityPointCachesFromExact(10000000n);
+  assert.equal(objectiveInstance.debug.buyInfinityUpgrade("12-1"), true);
+  objective = progressionObjective(objectiveRuntime);
+  assert.equal(objective.reason, "unlock Infinite Angle");
+  objectiveRuntime.state.infiniteAngleUnlocked = true;
+  objectiveRuntime.state.infinityUpgradeMask = objectiveRuntime.INFINITY_UPGRADES
+    .reduce((mask, upgrade) => mask | (1 << upgrade.bit), 0);
+  objectiveRuntime.syncInfinityPointCachesFromExact(10n ** 50n);
+  objective = progressionObjective(objectiveRuntime);
+  assert.equal(objective.kind, "tower-build");
+  assert.equal(objective.targetFloor, 1);
+  objectiveRuntime.state.towerFloor = 8;
+  objectiveRuntime.state.completedTowerChallenges = 3;
+  objectiveRuntime.state.infinityCount = 599996;
+  objective = progressionObjective(objectiveRuntime);
+  assert.equal(objective.kind, "infinity-count");
+  assert.equal(objective.targetCount, 600000);
+  objectiveRuntime.state.infinityCount = 600000;
+  objective = progressionObjective(objectiveRuntime);
+  assert.equal(objective.kind, "tower-challenge");
+  assert.equal(objective.challenge, 3);
+
+  const rewardInstance = await loadRuntime(path.resolve(__dirname, "..", "src", "main.js"));
+  applyRepresentativeFixture(rewardInstance);
+  rewardInstance.runtime.state.generationScore = 10 ** 10;
+  rewardInstance.runtime.state.generationScoreLog10 = 10;
+  rewardInstance.runtime.state.currentGenerationRunTime = 60;
+  assert.equal(generationActionAvailable(rewardInstance.runtime, POLICIES[0]), true);
+  rewardInstance.runtime.state.currentGenerationRunTime = 0;
+  assert.equal(generationActionAvailable(rewardInstance.runtime, POLICIES[0]), false);
+
+  rewardInstance.runtime.state.scoreLog10 = 100;
+  rewardInstance.runtime.state.score = 10 ** 100;
+  assert.equal(coreBoostActionAvailable(rewardInstance.runtime, POLICIES[0]), true);
+
+  const gainInstance = await loadRuntime(path.resolve(__dirname, "..", "src", "main.js"));
+  applyRepresentativeFixture(gainInstance);
+  gainInstance.runtime.syncInfinityPointCachesFromExact(1000000n);
+  gainInstance.runtime.state.score = Number.MAX_VALUE;
+  gainInstance.runtime.state.scoreLog10 = 258;
+  assert.equal(infinityResetReady(gainInstance.runtime, progressionObjective(gainInstance.runtime), POLICIES[0]), false);
+  gainInstance.runtime.state.scoreLog10 = 10000000;
+  assert.equal(infinityResetReady(gainInstance.runtime, progressionObjective(gainInstance.runtime), POLICIES[0]), true);
+
+  const countFarm = await loadRuntime(path.resolve(__dirname, "..", "src", "main.js"));
+  applyRepresentativeFixture(countFarm);
+  countFarm.runtime.state.infiniteAngleUnlocked = true;
+  countFarm.runtime.state.infinityUpgradeMask = countFarm.runtime.INFINITY_UPGRADES
+    .reduce((mask, upgrade) => mask | (1 << upgrade.bit), 0);
+  countFarm.runtime.state.towerFloor = 8;
+  countFarm.runtime.state.completedTowerChallenges = 3;
+  countFarm.runtime.state.infinityCount = 599996;
+  countFarm.runtime.state.score = Number.MAX_VALUE;
+  countFarm.runtime.state.scoreLog10 = 310;
+  countFarm.runtime.syncInfinityPointCachesFromExact(1n);
+  runPolicyAction(countFarm, POLICIES[0], {});
+  assert.equal(countFarm.runtime.state.infinityCount, 600000, "TC3 preparation must use normal Infinity count gain");
+  assert.equal(countFarm.runtime.state.activeTowerChallenge, 0);
 
   const first = await createReport({
     maxRunSeconds: 0,
@@ -121,6 +197,7 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.equal(first.options.actionSearchIterations, 2);
   assert.equal(first.validation.cadence.canonicalStepNotCalendarScale, true);
   assert.equal(first.validation.convergence.status, "passed");
+  assert.equal(first.validation.sanity.status, "not-applicable");
   first.cases.forEach((entry) => {
     assert.equal(entry.fixtureId, fixture.id);
     assert.equal(entry.representativeMilestone, "1-2");
@@ -129,6 +206,7 @@ async function runIc8EternityProgressionSimulationTest() {
     assert.equal(entry.milestoneTiming["ic8-clear"], "at-start");
     assert.equal(entry.milestoneTiming["break-infinite-cap"], "at-start");
     assert.equal(entry.relativeFirstReachSeconds["tc2-unlock"], null);
+    assert.equal(entry.diagnostics.objective.kind, "ip-threshold");
   });
   assert.deepEqual(first.researchEffects.map(({ id }) => id), CANDIDATES.map(({ id }) => id));
   assert.equal(first.productionPredicates.towerChallengeTargets.find(({ index }) => index === 4).targetLog10, 7777);
@@ -165,6 +243,8 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.match(mappingMarkdown, /ic8-clear/);
   assert.match(mappingMarkdown, /IP \*\*1e5\*\*/);
   assert.match(mappingMarkdown, /no calendar-scale action interval/);
+  assert.match(mappingMarkdown, /Objective policy/);
+  assert.match(mappingMarkdown, /policy-stall/);
   const baselineLine = mappingMarkdown.split("\n")
     .filter((line) => line.startsWith("| timeline-free |"))
     .at(-1);
@@ -186,17 +266,22 @@ async function runIc8EternityProgressionSimulationTest() {
 
   const committed = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "reports", "ic8-eternity-progression.json"), "utf8"));
   assert.equal(committed.issue, 237);
-  assert.equal(committed.schemaVersion, 4);
+  assert.equal(committed.schemaVersion, 5);
   assert.equal(committed.noProductionChanges, true);
   assert.equal(committed.fixture.id, REPRESENTATIVE_FIXTURE.id);
   assert.equal(committed.fixture.state.eternityMilestoneMask, 2);
   assert.equal(committed.fixture.exactInfinityPoints, "100000");
   assert.deepEqual(committed.fixture.notOwnedInfinityUpgradeIds, ["12-1", "13-1", "14-1"]);
   assert.equal(committed.cases.length, 4);
-  committed.cases.forEach((entry) => assert.equal(entry.status, "eligible"));
+  committed.cases.forEach((entry) => {
+    assert.equal(entry.status, "policy-stall");
+    assert.ok(entry.diagnostics.objective.kind);
+    assert.ok(entry.diagnostics.elapsedSeconds > 0);
+  });
   assert.equal(committed.validation.convergence.status, "passed");
   assert.equal(committed.validation.realSlowdown.status, "passed");
-  assert.equal(committed.outcome.status, "measured");
+  assert.equal(committed.validation.sanity.status, "failed");
+  assert.equal(committed.outcome.status, "invalid");
 }
 
 if (require.main === module) {

@@ -12,6 +12,7 @@ const SIM_TIME_SCALE = 1_000_000n;
 const SIM_TIME_SCALE_NUMBER = Number(SIM_TIME_SCALE);
 const MAX_REPORTABLE_NUMBER_SECONDS = 1e15;
 const MIN_INFINITY_COUNT_BEFORE_IC3 = 100;
+const TC3_INFINITY_COUNT_TARGET = 600000;
 const REQUIRED_INFINITY_UPGRADE_IDS_BEFORE_IC7 = Object.freeze(["11-1", "11-2"]);
 const MILESTONE_IDS = Object.freeze([
   "break-infinite-cap",
@@ -21,6 +22,7 @@ const MILESTONE_IDS = Object.freeze([
   "tc1-clear",
   "tc2-unlock",
   "tc2-clear",
+  "infinity-count-600000",
   "tc3-unlock",
   "tc3-clear",
   "tc4-unlock",
@@ -31,16 +33,13 @@ const MILESTONE_IDS = Object.freeze([
 ]);
 const POLICIES = Object.freeze([Object.freeze({
   id: "representative-m1-2",
-  description: "fixed post-IC8 policy; build staged IP reserves, then clear Tower Challenges at their production targets",
-  maxGenerationDepthLog10: 1000,
-  challengeGenerationDepthLog10: 1000,
-  infinityGainLog10Reserve: 0,
+  description: "objective-driven post-IC8 policy; compound IP by gain-aware resets and clear staged Tower Challenges",
   buyInfiniteAngleUpgrades: true,
-  coreBoostFirstUntilCount: 3,
-  maxCoreBoostCount: 6,
-  generationHoldCoreBoostCount: 5,
-  generationHoldAfterGenerationCount: 16,
-  minimumGenerationMultiplierLog10: 0,
+  generationMinimumSeconds: 60,
+  generationMinimumScoreMultiplierRatio: 1.05,
+  generationMinimumCostFactorRatio: 1.01,
+  minimumCoreBoostBenefitLog10: 0.001,
+  heldInfinityResetGainMarginLog10: 0,
 })]);
 const REPRESENTATIVE_INFINITY_UPGRADE_IDS = Object.freeze([
   "1-1", "1-2", "2-1", "3-1", "3-2", "4-1",
@@ -245,8 +244,8 @@ const CANDIDATES = Object.freeze([
   }),
 ]);
 const DEFAULT_OPTIONS = Object.freeze({
-  maxRunSeconds: 1e308,
-  maxStallSeconds: 1e308,
+  maxRunSeconds: 365 * 24 * 60 * 60,
+  maxStallSeconds: 14 * 24 * 60 * 60,
   stepSeconds: 1,
   maxActionsPerFixedPoint: 4096,
   actionSearchIterations: 6,
@@ -366,6 +365,42 @@ function reportState(runtime) {
   };
 }
 
+function policyDiagnostics(runtime, objective = progressionObjective(runtime), elapsedSeconds = null) {
+  return {
+    objective: {
+      kind: objective.kind,
+      reason: objective.reason,
+      targetLog10: objective.targetLog10 === undefined ? null : finiteOrString(objective.targetLog10),
+      targetCount: objective.targetCount ?? null,
+      targetFloor: objective.targetFloor ?? null,
+      challenge: objective.challenge ?? null,
+    },
+    elapsedSeconds: elapsedSeconds === null ? null : timeToReportValue(elapsedSeconds),
+    scoreLog10: finiteOrString(currentScoreLog10(runtime)),
+    generationScoreLog10: finiteOrString(runtime.currentGenerationScoreLog10()),
+    generationScoreMultiplierLog10: finiteOrString(runtime.generationScoreMultiplierEffectLog10()),
+    generationCount: runtime.state.generationCount,
+    infinityPointLog10: finiteOrString(currentIpLog10(runtime)),
+    infinityPointsExact: runtime.currentExactInfinityPoints().toString(),
+    infinityPointGainLog10: finiteOrString(infinityPointGainLog10(runtime)),
+    infinityCount: runtime.state.infinityCount,
+    coreBoostCount: runtime.state.coreBoostCount,
+    coreBoostRequirementLog10: finiteOrString(runtime.coreBoostRequirementLog10?.()),
+    infiniteAngleUnlocked: runtime.state.infiniteAngleUnlocked,
+    infiniteAngleLevels: {
+      speed: runtime.state.infiniteAngleSpeedLevel,
+      vertex: runtime.state.infiniteAngleVertexLevel,
+      gain: runtime.state.infiniteAngleGainLevel,
+    },
+    towerFloor: runtime.state.towerFloor,
+    activeChallenge: runtime.state.activeChallenge,
+    completedChallenges: runtime.state.completedChallenges,
+    activeTowerChallenge: runtime.state.activeTowerChallenge,
+    completedTowerChallenges: runtime.state.completedTowerChallenges,
+    canEternity: runtime.canEternity() === true,
+  };
+}
+
 function milestonePredicates(runtime) {
   const state = runtime.state;
   const ipEndpoint = runtime.currentExactInfinityPoints() >= runtime.MAX_EXACT_INFINITY_POINTS;
@@ -377,6 +412,7 @@ function milestonePredicates(runtime) {
     "tc1-clear": runtime.towerChallengeCompleted(1),
     "tc2-unlock": runtime.towerChallengeUnlocked(2),
     "tc2-clear": runtime.towerChallengeCompleted(2),
+    "infinity-count-600000": state.infinityCount >= TC3_INFINITY_COUNT_TARGET,
     "tc3-unlock": runtime.towerChallengeUnlocked(3),
     "tc3-clear": runtime.towerChallengeCompleted(3),
     "tc4-unlock": runtime.towerChallengeUnlocked(4),
@@ -416,8 +452,12 @@ function createMilestoneTracker(runtime, options = {}) {
     ic8ClearAtSeconds: timeToReportValue(ic8ClearTime),
   };
   let firstObservation = true;
+  const snapshotWithObjective = () => ({
+    ...reportState(runtime),
+    objective: options.objectiveForRuntime ? options.objectiveForRuntime(runtime) : null,
+  });
   const recordEvent = (event, includeState = false) => {
-    if (events.length < MAX_RECORDED_EVENTS) events.push(includeState ? { ...event, state: reportState(runtime) } : event);
+    if (events.length < MAX_RECORDED_EVENTS) events.push(includeState ? { ...event, state: snapshotWithObjective() } : event);
     else droppedEvents += 1;
   };
   const stateChanged = (current, previous) => previous && Object.keys(current).some((key) => {
@@ -452,7 +492,7 @@ function createMilestoneTracker(runtime, options = {}) {
           } else if (id !== "ic8-clear") {
             milestoneTiming[id] = "pre-IC8";
           }
-          const snapshot = reportState(runtime);
+          const snapshot = snapshotWithObjective();
           stateSnapshots.push({
             id,
             absoluteSeconds: firstReachSeconds[id],
@@ -500,7 +540,7 @@ function createMilestoneTracker(runtime, options = {}) {
         relativeFirstReachTimes["ic8-clear"] = 0n;
         relativeFirstReachSeconds["ic8-clear"] = 0;
         milestoneTiming["ic8-clear"] = "post-IC8";
-        const ic8Snapshot = reportState(runtime);
+        const ic8Snapshot = snapshotWithObjective();
         stateSnapshots.push({ id: "ic8-clear", absoluteSeconds: timeToReportValue(elapsedTime), relativeSeconds: 0, snapshot: ic8Snapshot });
         recordEvent({ type: "ic8-clear", timeSeconds: timeToReportValue(elapsedTime), timerResetSeconds: 0 }, true);
         lastProgressTime = elapsedTime;
@@ -578,6 +618,60 @@ function buyInfinityUpgrades(runtime, debug) {
   return purchases;
 }
 
+function addNormalUpgradeLevels(runtime, kind, amount) {
+  if (kind === "vertex" && runtime.state.activeChallenge === 8) runtime.state.ic8VertexUpgradeLevel += amount;
+  else if (kind === "vertex") runtime.state.vertices += amount;
+  else runtime.state[`${kind}Level`] += amount;
+  if (kind === "vertex") runtime.resetVertexProgress();
+}
+
+function buyNormalUpgrades(runtime) {
+  let purchases = 0;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const kind of ["speed", "vertex", "gain"]) {
+      if (!runtime.canBuyNormalUpgrade?.(kind)) continue;
+      const scoreLog10 = currentScoreLog10(runtime);
+      const freePurchaseLimit = scoreLog10 - 12;
+      if (scoreLog10 > 18 && freePurchaseLimit > runtime.upgradeCostLog(kind)) {
+        let low = 0;
+        let high = 1;
+        while (high < 1000000) {
+          addNormalUpgradeLevels(runtime, kind, high);
+          const affordable = runtime.upgradeCostLog(kind) <= freePurchaseLimit;
+          addNormalUpgradeLevels(runtime, kind, -high);
+          if (!affordable) break;
+          low = high;
+          high *= 2;
+        }
+        let left = low;
+        let right = high;
+        while (left + 1 < right) {
+          const middle = Math.floor((left + right) / 2);
+          addNormalUpgradeLevels(runtime, kind, middle);
+          const affordable = runtime.upgradeCostLog(kind) <= freePurchaseLimit;
+          addNormalUpgradeLevels(runtime, kind, -middle);
+          if (affordable) left = middle;
+          else right = middle;
+        }
+        if (left > 0) {
+          addNormalUpgradeLevels(runtime, kind, left);
+          purchases += left;
+          changed = true;
+          continue;
+        }
+      }
+      if (runtime.spendNormalUpgrade(kind)) {
+        addNormalUpgradeLevels(runtime, kind, 1);
+        purchases += 1;
+        changed = true;
+      }
+    }
+  }
+  return purchases;
+}
+
 function hasAffordableInfinityUpgrade(runtime) {
   return runtime.INFINITY_UPGRADES.some((upgrade) => runtime.canBuyInfinityUpgrade(upgrade.id));
 }
@@ -596,102 +690,184 @@ function hasUnownedInfinityUpgradeIds(runtime, ids) {
   });
 }
 
-function progressionTargetLog10(runtime) {
+function log10Add(first, second) {
+  if (first === -Infinity) return second;
+  if (second === -Infinity) return first;
+  const maximum = Math.max(first, second);
+  const difference = Math.abs(first - second);
+  return maximum + Math.log10(1 + 10 ** -difference);
+}
+
+function infinityPointGainLog10(runtime) {
+  return runtime.infinityPointGainLog10?.() ?? runtime.log10Value(runtime.infinityPointGain());
+}
+
+function nextUnownedInfinityUpgrade(runtime) {
+  return runtime.INFINITY_UPGRADES.find((upgrade) => (
+    !runtime.hasInfinityUpgrade(upgrade.id)
+      && runtime.infinityUpgradePrerequisitesMet(upgrade)
+  )) || null;
+}
+
+function nextTowerChallengeIndex(runtime) {
+  for (let index = 1; index <= runtime.TOWER_CHALLENGE_COUNT; index += 1) {
+    if (!runtime.towerChallengeCompleted(index)) return index;
+  }
+  return 0;
+}
+
+function towerBuildLimit(runtime) {
+  const nextChallenge = nextTowerChallengeIndex(runtime);
+  return nextChallenge > 0
+    ? runtime.towerChallengeUnlockFloor(nextChallenge)
+    : 12;
+}
+
+function towerBuildAvailable(runtime) {
+  return runtime.state.activeChallenge === 0
+    && runtime.state.activeTowerChallenge === 0
+    && runtime.state.infiniteAngleUnlocked === true
+    && runtime.state.towerFloor < towerBuildLimit(runtime)
+    && runtime.canBuildTower();
+}
+
+function nextTowerChallengeCanStart(runtime) {
+  const nextChallenge = nextTowerChallengeIndex(runtime);
+  if (nextChallenge <= 0 || !runtime.towerChallengeUnlocked(nextChallenge)) return false;
+  return nextChallenge !== 3 || runtime.state.infinityCount >= TC3_INFINITY_COUNT_TARGET;
+}
+
+function ipThresholdObjective(targetLog10, reason) {
+  return {
+    kind: "ip-threshold",
+    targetLog10,
+    reason,
+  };
+}
+
+function progressionObjective(runtime) {
   if (runtime.state.activeTowerChallenge > 0) {
-    return runtime.towerChallengeTargetLog10(runtime.state.activeTowerChallenge);
+    const index = runtime.state.activeTowerChallenge;
+    return {
+      kind: "tower-challenge",
+      challenge: index,
+      targetLog10: runtime.towerChallengeTargetLog10(index),
+      reason: `clear TC${index}`,
+    };
   }
-  if (runtime.state.activeChallenge > 0) return runtime.INFINITY_REQUIREMENT_LOG10;
-  if (runtime.isChallengeCompleted(8)) return runtime.MAX_TRACKED_LOG10;
-  return runtime.state.infiniteCapBroken
-    ? runtime.INFINITY_REQUIREMENT_LOG10
-    : runtime.BREAK_CAP_REQUIREMENT_LOG10;
-}
+  if (runtime.state.activeChallenge > 0) {
+    return ipThresholdObjective(runtime.INFINITY_REQUIREMENT_LOG10, "clear active Infinity Challenge");
+  }
 
-function infinityGainTargetLog10(runtime, policy) {
+  const nextChallenge = nextTowerChallengeIndex(runtime);
+  if (nextChallenge > 0) {
+    if (!runtime.towerChallengeUnlocked(nextChallenge)) {
+      const nextFloorCostLog10 = runtime.towerNextFloorCostLog10();
+      const nextUpgrade = nextUnownedInfinityUpgrade(runtime);
+      const upgradeCostLog10 = nextUpgrade ? runtime.log10Value(nextUpgrade.cost) : Infinity;
+      const ipObjectives = [];
+      if (!runtime.state.infiniteAngleUnlocked) {
+        ipObjectives.push(ipThresholdObjective(
+          runtime.INFINITE_ANGLE_UNLOCK_COST_LOG10,
+          "unlock Infinite Angle",
+        ));
+      }
+      if (nextUpgrade) ipObjectives.push(ipThresholdObjective(upgradeCostLog10, `buy Infinity Upgrade ${nextUpgrade.id}`));
+      if (towerBuildAvailable(runtime)) {
+        return {
+          kind: "tower-build",
+          targetFloor: runtime.towerNextFloor(),
+          targetLog10: nextFloorCostLog10,
+          reason: `build Tower Floor ${runtime.towerNextFloor()}`,
+        };
+      }
+      ipObjectives.push(ipThresholdObjective(nextFloorCostLog10, `reach Tower Floor ${runtime.towerNextFloor()} cost`));
+      return ipObjectives.reduce((nearest, objective) => (
+        objective.targetLog10 < nearest.targetLog10 ? objective : nearest
+      ));
+    }
+    if (nextChallenge === 3 && runtime.state.infinityCount < TC3_INFINITY_COUNT_TARGET) {
+      return {
+        kind: "infinity-count",
+        targetCount: TC3_INFINITY_COUNT_TARGET,
+        reason: "farm normal Infinity resets before TC3",
+      };
+    }
+    return {
+      kind: "tower-challenge",
+      challenge: nextChallenge,
+      targetLog10: runtime.towerChallengeTargetLog10(nextChallenge),
+      reason: `start and clear TC${nextChallenge}`,
+    };
+  }
+
+  const nextUpgrade = nextUnownedInfinityUpgrade(runtime);
+  if (nextUpgrade) return ipThresholdObjective(runtime.log10Value(nextUpgrade.cost), `buy Infinity Upgrade ${nextUpgrade.id}`);
   const maximumLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
-  let targetLog10 = Math.max(0, policy.infinityGainLog10Reserve);
-  if (!runtime.state.infiniteAngleUnlocked) {
-    targetLog10 = Math.max(targetLog10, runtime.INFINITE_ANGLE_UNLOCK_COST_LOG10 + 3);
-  } else if (runtime.state.towerFloor < 12) {
-    targetLog10 = Math.max(targetLog10, runtime.towerNextFloorCostLog10() + 1);
-  } else {
-    targetLog10 = Math.max(targetLog10, maximumLog10);
-  }
-  return targetLog10;
+  const currentIp = currentIpLog10(runtime);
+  return currentIp >= maximumLog10
+    ? { kind: "eternity", targetLog10: maximumLog10, reason: "satisfy Eternity IP threshold" }
+    : ipThresholdObjective(maximumLog10, "reach final Eternity IP threshold");
 }
 
-function generationMultiplierTargetLog10(runtime, policy) {
-  return Math.max(
-    policy.minimumGenerationMultiplierLog10,
-    infinityGainTargetLog10(runtime, policy) + 20,
-  );
+function infinityResetReady(runtime, objective, policy) {
+  if (runtime.state.activeTowerChallenge > 0 || !runtime.canInfinity() || runtime.state.infinityCount <= 0) return false;
+  const gainLog10 = infinityPointGainLog10(runtime);
+  if (!Number.isFinite(gainLog10)) return false;
+  const heldLog10 = currentIpLog10(runtime);
+  const projectedLog10 = log10Add(heldLog10, gainLog10);
+  const targetReached = Number.isFinite(objective.targetLog10) && projectedLog10 >= objective.targetLog10;
+  const heldGainReached = gainLog10 >= heldLog10 + policy.heldInfinityResetGainMarginLog10;
+  return targetReached || heldGainReached;
+}
+
+function generationRewardSnapshot(runtime) {
+  const currentScoreMultiplierLog10 = runtime.generationScoreMultiplierEffectLog10();
+  const currentCostFactor = runtime.generationCostFactorEffect();
+  const next = runtime.nextGenerationValues();
+  return {
+    next,
+    scoreMultiplierGainLog10: next.scoreMultiplierLog10 - currentScoreMultiplierLog10,
+    costFactorRatio: currentCostFactor > 0 && next.costFactor > 0
+      ? currentCostFactor / next.costFactor
+      : 0,
+  };
+}
+
+function generationActionAvailable(runtime, policy) {
+  if (!runtime.canRunGeneration() || runtime.state.currentGenerationRunTime < policy.generationMinimumSeconds) return false;
+  const reward = generationRewardSnapshot(runtime);
+  return reward.scoreMultiplierGainLog10 >= runtime.log10Value(policy.generationMinimumScoreMultiplierRatio)
+    || reward.costFactorRatio >= policy.generationMinimumCostFactorRatio;
+}
+
+function coreBoostBenefitLog10(runtime) {
+  if (!runtime.canCoreBoost()) return -Infinity;
+  const next = runtime.nextCoreBoostValues();
+  const multiplierGain = runtime.log10Value(next.gainMultiplier)
+    - runtime.log10Value(runtime.coreBoostGainIncreaseMultiplier());
+  const exponentGain = next.gainExponent - runtime.coreBoostGainExponent();
+  return Math.max(multiplierGain, exponentGain);
+}
+
+function coreBoostActionAvailable(runtime, policy, objective = progressionObjective(runtime)) {
+  if (!runtime.canCoreBoost() || objective.kind === "eternity") return false;
+  return coreBoostBenefitLog10(runtime) >= policy.minimumCoreBoostBenefitLog10
+    && !infinityResetReady(runtime, objective, policy);
 }
 
 function runGenerationOrCore(instance, policy, count) {
   const { runtime, debug } = instance;
-  const targetLog10 = progressionTargetLog10(runtime);
-  const currentScore = currentScoreLog10(runtime);
-  const generationRequirement = runtime.generationRequirementLog10();
-  const isIc7 = runtime.state.activeChallenge === 7;
-  if (isIc7) {
-    if (runtime.state.coreBoostCount < 3 && runtime.canCoreBoost()) {
-      debug.runCoreBoost();
-      count("coreBoost");
-      return true;
-    }
-    const generationReadyAt = generationRequirement + 5;
-    if (runtime.canRunGeneration()
-      && runtime.currentGenerationScoreLog10() >= generationReadyAt
-      && currentScore < targetLog10) {
-      debug.runGeneration();
-      count("generationReset");
-      return true;
-    }
-    return false;
-  }
-  const coreRequirement = runtime.coreBoostRequirementLog10();
-  if (runtime.state.coreBoostCount < policy.coreBoostFirstUntilCount) {
-    if (runtime.canCoreBoost() && coreRequirement < targetLog10 - 1) {
-      debug.runCoreBoost();
-      count("coreBoost");
-      return true;
-    }
-    return false;
-  }
-  if (runtime.isChallengeCompleted(8)
-    && runtime.state.activeChallenge === 0
-    && runtime.state.activeTowerChallenge === 0
-    && runtime.generationScoreMultiplierEffectLog10() >= generationMultiplierTargetLog10(runtime, policy)) return false;
-  const holdForCore = runtime.state.coreBoostCount === policy.generationHoldCoreBoostCount
-    && runtime.state.generationCount >= policy.generationHoldAfterGenerationCount;
-  if (holdForCore) {
-    if (runtime.canCoreBoost() && coreRequirement < targetLog10 - 1) {
-      debug.runCoreBoost();
-      count("coreBoost");
-      return true;
-    }
-    return false;
-  }
-  const maxGenerationDepth = runtime.state.activeChallenge > 0 || runtime.state.activeTowerChallenge > 0
-    ? policy.challengeGenerationDepthLog10
-    : policy.maxGenerationDepthLog10;
-  const generationDepth = Math.min(maxGenerationDepth, Math.max(0.1, targetLog10 - generationRequirement - 1));
-  const generationReadyAt = generationRequirement + generationDepth;
-  const nearTarget = !isIc7 && currentScore >= targetLog10 - 5;
-  if (runtime.canRunGeneration()
-    && (runtime.currentGenerationScoreLog10() >= generationReadyAt || nearTarget)
-    && currentScore < targetLog10) {
+  const objective = progressionObjective(runtime);
+  if (runtime.state.activeChallenge > 0 && runtime.canInfinity()) return false;
+  if (runtime.state.activeTowerChallenge === 0 && runtime.state.activeChallenge === 0
+    && infinityResetReady(runtime, objective, policy)) return false;
+  if (generationActionAvailable(runtime, policy)) {
     debug.runGeneration();
     count("generationReset");
     return true;
   }
-  const generationScore = runtime.currentGenerationScoreLog10();
-  if (currentScore >= generationReadyAt - 1
-    && currentScore < targetLog10 - 1
-    && currentScore <= generationScore + 1) return false;
-  if (runtime.state.coreBoostCount < policy.maxCoreBoostCount
-    && runtime.canCoreBoost()
-    && runtime.coreBoostRequirementLog10() < targetLog10 - 1) {
+  if (coreBoostActionAvailable(runtime, policy, objective)) {
     debug.runCoreBoost();
     count("coreBoost");
     return true;
@@ -699,72 +875,12 @@ function runGenerationOrCore(instance, policy, count) {
   return false;
 }
 
-function generationPolicyTargetLog10(runtime, policy) {
-  const targetLog10 = progressionTargetLog10(runtime);
-  const maxGenerationDepth = runtime.state.activeChallenge > 0 || runtime.state.activeTowerChallenge > 0
-    ? policy.challengeGenerationDepthLog10
-    : policy.maxGenerationDepthLog10;
-  return runtime.generationRequirementLog10()
-    + Math.min(maxGenerationDepth, Math.max(0.1, targetLog10 - runtime.generationRequirementLog10() - 1));
-}
-
-function productionActionStillPending(runtime, policy) {
-  if (runtime.state.activeChallenge > 0 || runtime.state.activeTowerChallenge > 0) return false;
-  const targetLog10 = progressionTargetLog10(runtime);
-  if (runtime.state.coreBoostCount < policy.coreBoostFirstUntilCount) {
-    return currentScoreLog10(runtime) < runtime.coreBoostRequirementLog10();
-  }
-  if (runtime.isChallengeCompleted(8)
-    && runtime.state.activeChallenge === 0
-    && runtime.state.activeTowerChallenge === 0
-    && runtime.generationScoreMultiplierEffectLog10() >= generationMultiplierTargetLog10(runtime, policy)) {
-    return runtime.log10Value(runtime.infinityPointGain()) < infinityGainTargetLog10(runtime, policy);
-  }
-  if (runtime.state.coreBoostCount === policy.generationHoldCoreBoostCount
-    && runtime.state.generationCount >= policy.generationHoldAfterGenerationCount) {
-    return currentScoreLog10(runtime) < runtime.coreBoostRequirementLog10();
-  }
-  if (generationOrCoreAvailable(runtime, policy)) return false;
-  return currentScoreLog10(runtime) < targetLog10 - 1
-    && runtime.currentGenerationScoreLog10() < generationPolicyTargetLog10(runtime, policy);
-}
-
 function generationOrCoreAvailable(runtime, policy) {
-  const targetLog10 = progressionTargetLog10(runtime);
-  const currentScore = currentScoreLog10(runtime);
-  const generationRequirement = runtime.generationRequirementLog10();
-  if (runtime.state.activeChallenge === 7) {
-    return (runtime.state.coreBoostCount < 3 && runtime.canCoreBoost())
-      || (runtime.canRunGeneration()
-        && runtime.currentGenerationScoreLog10() >= generationRequirement + 5
-        && currentScore < targetLog10);
-  }
-  const maxGenerationDepth = runtime.state.activeChallenge > 0 || runtime.state.activeTowerChallenge > 0
-    ? policy.challengeGenerationDepthLog10
-    : policy.maxGenerationDepthLog10;
-  const generationReadyAt = generationRequirement
-    + Math.min(maxGenerationDepth, Math.max(0.1, targetLog10 - generationRequirement - 1));
-  const coreRequirement = runtime.coreBoostRequirementLog10();
-  if (runtime.state.coreBoostCount < policy.coreBoostFirstUntilCount) {
-    return runtime.canCoreBoost() && coreRequirement < targetLog10 - 1;
-  }
-  if (runtime.isChallengeCompleted(8)
-    && runtime.state.activeChallenge === 0
-    && runtime.state.activeTowerChallenge === 0
-    && runtime.generationScoreMultiplierEffectLog10() >= generationMultiplierTargetLog10(runtime, policy)) return false;
-  if (runtime.state.coreBoostCount === policy.generationHoldCoreBoostCount
-    && runtime.state.generationCount >= policy.generationHoldAfterGenerationCount) {
-    return runtime.canCoreBoost() && coreRequirement < targetLog10 - 1;
-  }
-  if (runtime.canRunGeneration()
-    && (runtime.currentGenerationScoreLog10() >= generationReadyAt || currentScore >= targetLog10 - 5)
-    && currentScore < targetLog10) return true;
-  if (currentScore >= generationReadyAt - 1
-    && currentScore < targetLog10 - 1
-    && currentScore <= runtime.currentGenerationScoreLog10() + 1) return false;
-  return runtime.state.coreBoostCount < policy.maxCoreBoostCount
-    && runtime.canCoreBoost()
-    && coreRequirement < targetLog10 - 1;
+  const objective = progressionObjective(runtime);
+  if (runtime.state.activeChallenge > 0 && runtime.canInfinity()) return false;
+  if (runtime.state.activeTowerChallenge === 0 && runtime.state.activeChallenge === 0
+    && infinityResetReady(runtime, objective, policy)) return false;
+  return generationActionAvailable(runtime, policy) || coreBoostActionAvailable(runtime, policy, objective);
 }
 
 function hasPolicyAction(instance, policy, includeNormalPurchases = true) {
@@ -778,7 +894,7 @@ function hasPolicyAction(instance, policy, includeNormalPurchases = true) {
     && ["speed", "vertex", "gain"].some((kind) => runtime.canBuyInfiniteAngleUpgrade?.(kind))) return true;
   if (state.activeTowerChallenge === 4
     && ["baseGain", "infinityScoreVertexGain", "freeCoreBoost"].some((kind) => runtime.canBuyTowerChallenge4Upgrade(kind))) return true;
-  if (runtime.canBuildTower()) return true;
+  if (towerBuildAvailable(runtime)) return true;
   if (state.activeTowerChallenge > 0) {
     return runtime.towerChallengeCanComplete() || generationOrCoreAvailable(runtime, policy);
   }
@@ -793,28 +909,18 @@ function hasPolicyAction(instance, policy, includeNormalPurchases = true) {
     const challengeNeedsPostCapUpgrades = nextChallenge === 7
       && state.infiniteCapBroken
       && hasUnownedInfinityUpgradeIds(runtime, REQUIRED_INFINITY_UPGRADE_IDS_BEFORE_IC7);
-    if (nextChallenge <= runtime.INFINITY_CHALLENGE_COUNT
-      && !challengeNeedsBrokenCap
-      && !challengeNeedsInfinityReserve
-      && !challengeNeedsPostCapUpgrades) return true;
+      if (nextChallenge <= runtime.INFINITY_CHALLENGE_COUNT
+        && !challengeNeedsBrokenCap
+        && !challengeNeedsInfinityReserve
+        && !challengeNeedsPostCapUpgrades) return true;
   }
+  if (nextTowerChallengeCanStart(runtime)) return true;
+  if (generationOrCoreAvailable(runtime, policy)) return true;
   const holdingForCap = !state.infiniteCapBroken
     && runtime.completedChallengeCount() >= 6
     && !hasUnownedInfinityUpgrade(runtime)
     && currentScoreLog10(runtime) >= runtime.INFINITY_REQUIREMENT_LOG10;
-  const canRunInfinity = runtime.canInfinity()
-    && state.infinityCount > 0
-    && !hasAffordableInfinityUpgrade(runtime)
-    && !holdingForCap
-    && (hasUnownedInfinityUpgrade(runtime)
-      || runtime.isChallengeCompleted(8)
-      || currentScoreLog10(runtime) >= progressionTargetLog10(runtime) - 1)
-    && runtime.log10Value(runtime.infinityPointGain()) >= infinityGainTargetLog10(runtime, policy);
-  if (generationOrCoreAvailable(runtime, policy)) return true;
-  if (productionActionStillPending(runtime, policy)) return false;
-  const towerAction = [1, 2, 3, 4].some((index) => runtime.towerChallengeUnlocked(index)
-    && !runtime.towerChallengeCompleted(index));
-  return canRunInfinity || towerAction;
+  return !holdingForCap && infinityResetReady(runtime, progressionObjective(runtime), policy);
 }
 
 function runPolicyAction(instance, policy, actionCounts) {
@@ -830,8 +936,9 @@ function runPolicyAction(instance, policy, actionCounts) {
       actionTaken = true;
     }
   }
+  // Numeric safety ceiling only; MAX_TRACKED_LOG10 is never a progression objective.
   const normalPurchases = currentScoreLog10(runtime) < runtime.MAX_TRACKED_LOG10
-    ? debug.buyAllUpgrades({ refresh: false, save: false })
+    ? buyNormalUpgrades(runtime)
     : 0;
   if (normalPurchases > 0) {
     count("normalPurchase", normalPurchases);
@@ -867,7 +974,12 @@ function runPolicyAction(instance, policy, actionCounts) {
     actionTaken = true;
   }
   let towerPurchases = 0;
-  while (debug.buildTower({ refresh: false, save: false })) towerPurchases += 1;
+  const towerLimit = towerBuildLimit(runtime);
+  while (state.infiniteAngleUnlocked === true
+    && state.activeChallenge === 0
+    && state.activeTowerChallenge === 0
+    && state.towerFloor < towerLimit
+    && debug.buildTower({ refresh: false, save: false })) towerPurchases += 1;
   if (towerPurchases > 0) {
     count("towerPurchase", towerPurchases);
     actionTaken = true;
@@ -915,34 +1027,22 @@ function runPolicyAction(instance, policy, actionCounts) {
     }
   }
 
+  if (nextTowerChallengeCanStart(runtime)) {
+    const nextChallenge = nextTowerChallengeIndex(runtime);
+    if (debug.toggleTowerChallenge(nextChallenge)) {
+      count("towerChallengeStart");
+      return true;
+    }
+  }
+
   const generationOrCoreAction = runGenerationOrCore(instance, policy, count);
   if (generationOrCoreAction) return true;
-  if (productionActionStillPending(runtime, policy)) return actionTaken;
 
   const holdingForCap = !state.infiniteCapBroken
     && runtime.completedChallengeCount() >= 6
     && !hasUnownedInfinityUpgrade(runtime)
     && currentScoreLog10(runtime) >= runtime.INFINITY_REQUIREMENT_LOG10;
-  const towerAction = [1, 2, 3, 4].some((index) => runtime.towerChallengeUnlocked(index)
-    && !runtime.towerChallengeCompleted(index));
-  if (towerAction) {
-    for (let index = 1; index <= runtime.TOWER_CHALLENGE_COUNT; index += 1) {
-      if (runtime.towerChallengeUnlocked(index)
-        && !runtime.towerChallengeCompleted(index)
-        && debug.toggleTowerChallenge(index)) {
-        count("towerChallengeStart");
-        return true;
-      }
-    }
-  }
-  if (runtime.canInfinity()
-    && state.infinityCount > 0
-    && !hasAffordableInfinityUpgrade(runtime)
-    && !holdingForCap
-    && (hasUnownedInfinityUpgrade(runtime)
-      || runtime.isChallengeCompleted(8)
-      || currentScoreLog10(runtime) >= progressionTargetLog10(runtime) - 1)
-    && runtime.log10Value(runtime.infinityPointGain()) >= infinityGainTargetLog10(runtime, policy)) {
+  if (!holdingForCap && infinityResetReady(runtime, progressionObjective(runtime), policy)) {
     debug.runInfinity(false);
     count("infinityReset");
     return true;
@@ -1012,6 +1112,7 @@ function runBoundedLoop(instance, policy, maxSeconds, options, effect = null) {
   const { runtime, debug } = instance;
   const tracker = createMilestoneTracker(runtime, {
     ic8ClearAtSeconds: options.ic8ClearAtStart ? 0 : null,
+    objectiveForRuntime: progressionObjective,
   });
   const actionCounts = {};
   let elapsedTime = 0n;
@@ -1086,10 +1187,14 @@ function runBoundedLoop(instance, policy, maxSeconds, options, effect = null) {
   }
   if (fixedPointLimitReached) status = "action-fixed-point-limit";
   else if (status === "horizon" && elapsedTime < horizonTime) status = "stall-no-new-progress";
+  else if (status === "horizon" && elapsedTime >= horizonTime && !runtime.canEternity()) status = "policy-stall";
+  const diagnostics = policyDiagnostics(runtime, progressionObjective(runtime), elapsedTime);
+  diagnostics.horizonSeconds = maxSeconds;
+  diagnostics.status = status;
   const result = {
     status,
     horizonSeconds: maxSeconds,
-    truncatedAtHorizon: status === "horizon",
+    truncatedAtHorizon: status === "horizon" || status === "policy-stall",
     elapsedSeconds: timeToReportValue(elapsedTime),
     effectiveStepSeconds,
     actionStrategy: "immediate-fixed-point-before-and-after-each-production-step",
@@ -1105,6 +1210,8 @@ function runBoundedLoop(instance, policy, maxSeconds, options, effect = null) {
     actionCounts,
     state: cloneState(runtime.state),
     lastState: reportState(runtime),
+    objective: diagnostics.objective,
+    diagnostics,
     peakScoreLog10: finiteOrString(tracker.peakScoreLog10),
     ic8ClearAtSeconds: tracker.clock.ic8ClearAtSeconds,
     productionPredicates: productionPredicateReport(runtime),
@@ -1295,6 +1402,8 @@ async function runCase(fixture, candidate, policy, options) {
     milestoneTiming: result.milestoneTiming,
     stateSnapshots: result.stateSnapshots,
     finalState: result.lastState,
+    objective: result.objective,
+    diagnostics: result.diagnostics,
     droppedEvents: result.droppedEvents,
     predicates,
     researchSummary: runSummary(
@@ -1325,6 +1434,7 @@ function productionPredicateReport(runtime = null) {
       index,
       targetLog10: runtime?.towerChallengeTargetLog10(index) ?? null,
     })),
+    tc3InfinityCountTarget: TC3_INFINITY_COUNT_TARGET,
     eternityRule: "currentExactInfinityPoints() >= MAX_EXACT_INFINITY_POINTS && towerChallenge4CompletedForEternity() === true",
     ic8TimerRule: "representative fixture initialization is IC8 clear = t 0",
     errorHandling: "exact IP stays BigInt in the production runtime; research multipliers are clamped to the production exact-IP ceiling before normal addInfinityPoints()",
@@ -1372,6 +1482,107 @@ async function runConvergenceCheck(fixture, candidate, policy, options, coarseTi
   };
 }
 
+const ROUTE_ORDER = Object.freeze([
+  "ic8-clear",
+  "infinite-angle-unlock",
+  "tower-floor-1",
+  "tc1-unlock",
+  "tc1-clear",
+  "tc2-unlock",
+  "tc2-clear",
+  "infinity-count-600000",
+  "tc3-unlock",
+  "tc3-clear",
+  "tc4-unlock",
+  "tc4-clear",
+  "ip-1.80e308",
+  "eternity-eligibility",
+]);
+const IP_STAGE_MILESTONES = Object.freeze([
+  "infinite-angle-unlock",
+  "tower-floor-1",
+  "tc1-unlock",
+  "tc2-unlock",
+  "tc3-unlock",
+  "tc4-unlock",
+  "ip-1.80e308",
+]);
+
+function milestoneTime(entry, id) {
+  return entry.researchSummary?.relativeTimes?.[id] ?? null;
+}
+
+function compareMilestoneTimes(first, second, ids, comparator) {
+  const compared = [];
+  const failures = [];
+  for (const id of ids) {
+    const firstTime = milestoneTime(first, id);
+    const secondTime = milestoneTime(second, id);
+    if (firstTime === null || secondTime === null) continue;
+    compared.push(id);
+    if (!comparator(timeToNumber(firstTime), timeToNumber(secondTime))) failures.push(id);
+  }
+  return { compared, failures };
+}
+
+function validateSanity(cases, horizonSeconds) {
+  const errors = [];
+  const route = cases.map((entry) => {
+    const reached = ROUTE_ORDER.filter((id) => milestoneTime(entry, id) !== null);
+    let ordered = true;
+    for (let index = 1; index < reached.length; index += 1) {
+      if (milestoneTime(entry, reached[index]) < milestoneTime(entry, reached[index - 1])) ordered = false;
+    }
+    if (!ordered) errors.push(`${entry.candidateId}: route milestones are out of order`);
+    const absurd = reached.filter((id) => timeToNumber(milestoneTime(entry, id)) > horizonSeconds);
+    const horizonBoundary = reached.filter((id) => (
+      id !== "ic8-clear"
+      && timeToNumber(milestoneTime(entry, id)) >= horizonSeconds * 0.99
+    ));
+    if (absurd.length > 0) errors.push(`${entry.candidateId}: major milestone exceeds configured horizon (${absurd.join(", ")})`);
+    if (horizonBoundary.length > 0) errors.push(`${entry.candidateId}: major milestone is horizon-bound (${horizonBoundary.join(", ")})`);
+    return {
+      candidateId: entry.candidateId,
+      reached,
+      ordered,
+      absurdMajorMilestones: absurd,
+      horizonBoundaryMajorMilestones: horizonBoundary,
+    };
+  });
+
+  const baseline = cases.find(({ candidateId }) => candidateId === "timeline-free");
+  const real = cases.find(({ candidateId }) => candidateId === "real-bc16500");
+  const root = cases.find(({ candidateId }) => candidateId === "parallel-bc16500-root");
+  const fourthRoot = cases.find(({ candidateId }) => candidateId === "parallel-bc16500-fourth-root");
+  const realComparison = baseline && real
+    ? compareMilestoneTimes(real, baseline, IP_STAGE_MILESTONES, (candidate, base) => candidate <= base * 1.01)
+    : { compared: [], failures: [] };
+  const rootComparison = root && fourthRoot
+    ? compareMilestoneTimes(root, fourthRoot, ROUTE_ORDER.filter((id) => id !== "ic8-clear"), (candidate, fourth) => candidate <= fourth * 1.01)
+    : { compared: [], failures: [] };
+  const parallelPositiveOnly = cases
+    .filter(({ candidateId }) => candidateId.startsWith("parallel-"))
+    .map((entry) => ({
+      candidateId: entry.candidateId,
+      ...compareMilestoneTimes(entry, baseline, IP_STAGE_MILESTONES, (candidate, base) => candidate <= base * 1.01),
+    }));
+  if (realComparison.failures.length > 0) errors.push(`Real-BC16500 is slower in IP stages: ${realComparison.failures.join(", ")}`);
+  if (rootComparison.failures.length > 0) errors.push(`Parallel root is slower than fourth root: ${rootComparison.failures.join(", ")}`);
+  parallelPositiveOnly.forEach((comparison) => {
+    if (comparison.failures.length > 0) errors.push(`${comparison.candidateId} is slower in positive-only IP stages: ${comparison.failures.join(", ")}`);
+  });
+  const compared = realComparison.compared.length + rootComparison.compared.length
+    + parallelPositiveOnly.reduce((sum, comparison) => sum + comparison.compared.length, 0);
+  return {
+    status: errors.length > 0 ? "failed" : compared > 0 ? "passed" : "not-applicable",
+    errors,
+    route,
+    realIpStages: realComparison,
+    parallelRootVsFourthRoot: rootComparison,
+    parallelPositiveOnlyIpStages: parallelPositiveOnly,
+  };
+}
+
 async function createReport(rawOptions = {}) {
   const options = { ...DEFAULT_OPTIONS, ...rawOptions };
   const candidates = options.parallelPostSoftcapPower === null || options.parallelPostSoftcapPower === undefined
@@ -1387,9 +1598,9 @@ async function createReport(rawOptions = {}) {
   if (options.stepSeconds <= 0) throw new Error("step must be positive");
   const fixture = await createRepresentativeFixture();
   const report = {
-    schemaVersion: 4,
+    schemaVersion: 5,
     issue: ISSUE,
-    title: "Measure the Eternity-1 Milestone 1-2 post-IC8 baseline for Timeline balance",
+    title: "Measure the Eternity-1 Milestone 1-2 post-IC8 baseline with an objective-driven policy",
     researchOnly: true,
     noProductionChanges: true,
     productionRuntime: "src/main.js",
@@ -1402,6 +1613,7 @@ async function createReport(rawOptions = {}) {
       actionSearchIterations: options.actionSearchIterations,
       convergenceCheck: options.convergenceCheck !== false,
       parallelPostSoftcapPower: options.parallelPostSoftcapPower ?? null,
+      objectivePolicy: "ip-threshold → tower-build → tower-challenge → infinity-count → eternity",
     },
     policies: POLICIES,
     researchEffects: candidates,
@@ -1425,6 +1637,16 @@ async function createReport(rawOptions = {}) {
       fixtureCloning: {
         status: "fresh-runtime-per-candidate",
         criterion: "every candidate receives a fresh clone of fixture.state",
+      },
+      objectivePolicy: {
+        status: "implemented",
+        noMaxTrackedScoreObjective: true,
+        tc3InfinityCountTarget: TC3_INFINITY_COUNT_TARGET,
+        actionOrder: "normal/IU/IA/TC4 purchases → bounded Tower build → active challenge completion → challenge starts → reward-aware GR → benefit-aware Core Boost → gain-aware Infinity reset",
+        resetRule: "reach the next IP objective or gain at least the currently held IP; no IP target uses the same gain-aware tie-break",
+        generationRule: "nextGenerationValues() with a meaningful score-multiplier or cost-factor improvement",
+        coreBoostRule: "nextCoreBoostValues() benefit while the current objective still needs production",
+        failureRule: "unfinished human-scale runs return policy-stall diagnostics",
       },
       errors: [],
     },
@@ -1468,6 +1690,8 @@ async function createReport(rawOptions = {}) {
     materiallySlower: realSlower,
     tolerance: 0.01,
   };
+  report.validation.sanity = validateSanity(report.cases, options.maxRunSeconds);
+  report.validation.errors.push(...report.validation.sanity.errors);
   report.outcome = report.validation.errors.length > 0 || realSlower
     ? { status: "invalid", reason: report.validation.errors.join("; ") || "Real-BC16500 finished materially slower than Timeline-free" }
     : successful === report.cases.length
@@ -1511,8 +1735,9 @@ function formatMarkdown(report) {
     `- Representative case: **${fixture.representativeCase}**; fixture initialization is **IC8 clear = t 0**.`,
     `- Fixture: IP **1e5**, Infinity **${fixture.state.infinityCount}**, IA levels **${fixture.state.infiniteAngleSpeedLevel}/${fixture.state.infiniteAngleVertexLevel}/${fixture.state.infiniteAngleGainLevel}**, Tower Floor **${fixture.state.towerFloor}**, Time Flux **${fixture.state.timeFlux}**.`,
     `- Cadence: **${formatSeconds(report.options.requestedStepSeconds)}** production seed; immediate actions are exhausted at a fixed point before and after each advance; no calendar-scale action interval is used.`,
+    `- Objective policy: **${report.options.objectivePolicy}**; TC3 is blocked until exactly **${report.productionPredicates.tc3InfinityCountTarget}** normal Infinity count.`,
     `- Horizon/stall guard: **${formatSeconds(report.options.maxRunSeconds)}** / **${formatSeconds(report.options.maxStallSeconds)}**; action search iterations **${report.options.actionSearchIterations}** after the initial bracket.`,
-    `- Convergence: **${report.validation.convergence.status}**${report.validation.convergence.maxRelativeDifference === undefined ? "" : ` (max relative difference ${report.validation.convergence.maxRelativeDifference})`}.`,
+    `- Convergence: **${report.validation.convergence.status}**${report.validation.convergence.maxRelativeDifference === undefined ? "" : ` (max relative difference ${report.validation.convergence.maxRelativeDifference})`}; sanity guards: **${report.validation.sanity.status}**.`,
     `- Effects: ${report.researchEffects.map((candidate) => `**${candidate.id}**`).join(", ")}`,
     "",
     "## Results",
@@ -1524,6 +1749,19 @@ function formatMarkdown(report) {
     const summary = entry.researchSummary;
     const parallelByMilestone = summary.parallelEffectiveMultiplierLog10ByMilestone;
     lines.push(`| ${entry.candidateId} | ${entry.status}${entry.truncatedAtHorizon ? " (horizon)" : ""} | ${formatSeconds(summary.ic8ToEternitySeconds)} | ${summary.longestStage ? `${summary.longestStage.from} → ${summary.longestStage.to} (${formatSeconds(summary.longestStage.durationSeconds)})` : "not reached"} | ${formatSeconds(summary.shorteningVsBaselineSeconds)} | ${entry.candidateId.startsWith("parallel-") ? formatSeconds(summary.parallelRawMultiplierCapSeconds) : "n/a"} | ${entry.candidateId.startsWith("parallel-") ? `${formatLog10Multiplier(parallelByMilestone["tc4-clear"])} / ${formatLog10Multiplier(summary.parallelEffectiveMultiplierLog10AtEndpoint)}` : "n/a"} | ${summary.collapseRisk} |`);
+  });
+  lines.push(
+    "",
+    "## Final policy diagnostics",
+    "",
+    "| Effect | Status | Objective | Target | Elapsed | IP / gain | Infinity | GR / multiplier | CB | Tower / TC |",
+    "| --- | --- | --- | ---: | ---: | --- | ---: | --- | ---: | --- |",
+  );
+  report.cases.forEach((entry) => {
+    const diagnostics = entry.diagnostics;
+    const objective = diagnostics.objective;
+    const target = objective.targetCount ?? objective.targetLog10 ?? "n/a";
+    lines.push(`| ${entry.candidateId} | ${entry.status} | ${objective.kind} (${objective.reason}) | ${target} | ${formatSeconds(diagnostics.elapsedSeconds)} | ${diagnostics.infinityPointLog10} / ${diagnostics.infinityPointGainLog10} | ${diagnostics.infinityCount} | ${diagnostics.generationCount} / ${diagnostics.generationScoreMultiplierLog10} | ${diagnostics.coreBoostCount} | F${diagnostics.towerFloor} / ${diagnostics.activeTowerChallenge || "-"} (${diagnostics.completedTowerChallenges}) |`);
   });
   lines.push(
     "",
@@ -1549,7 +1787,7 @@ function formatMarkdown(report) {
     "",
     "- `at-start` means the milestone is already true in the documented fixture.",
     "- Every candidate starts in a fresh runtime cloned from the same fixture; only the research IP-gain effect differs.",
-    "- Parallel endpoint equality is attributed to the TC3 bottleneck when TC3 remains the longest stage; it is not treated as evidence that the candidates are equivalent.",
+    "- An unfinished run is reported as `policy-stall` with its current objective and state; no astronomical extrapolation is used.",
     "- Milestone 1-1 and 1-3 are intentionally not compared by this representative study.",
   );
   return `${lines.join("\n")}\n`;
@@ -1576,6 +1814,7 @@ if (require.main === module) {
 
 module.exports = {
   CANDIDATES,
+  coreBoostActionAvailable,
   DEFAULT_OPTIONS,
   MILESTONE_IDS,
   POLICIES,
@@ -1586,12 +1825,15 @@ module.exports = {
   createReport,
   createRepresentativeFixture,
   formatMarkdown,
+  generationActionAvailable,
   hasPolicyAction,
+  infinityResetReady,
   installResearchEffect,
   parallelMultiplierLog10,
   progressSnapshot,
   productionPredicateReport,
   realMultiplierLog10,
+  progressionObjective,
   runBoundedLoop,
   runCase,
   runPolicyAction,
