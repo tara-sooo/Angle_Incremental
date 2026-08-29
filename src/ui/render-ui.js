@@ -224,7 +224,8 @@ function updateUi() {
   if (runtime.offlineProcessing) return;
   const currentCostLogs = runtime.costLogs();
   const unlockedAchievementsNow = runtime.checkAchievements(true);
-  if (unlockedAchievementsNow.length > 0) runtime.saveGame("manual");
+  const discoveredMainTabs = runtime.discoverMainTabs?.() === true;
+  if (unlockedAchievementsNow.length > 0 || discoveredMainTabs) runtime.saveGame("manual");
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
   applyLanguage();
   runtime.updateMainTabVisibility?.();

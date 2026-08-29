@@ -656,6 +656,75 @@ async function testBreakEternityBoundaryAndPersistence() {
   assert.ok(loaded.runtime.currentExactInfinityPoints() > offlineBefore, "the offline update path should continue adding exact IP above the old ceiling");
 }
 
+async function testMainTabDiscoveryLifecycle() {
+  const source = await loadRuntime(candidatePath);
+  const { debug, runtime } = source;
+  const { state } = debug;
+
+  assert.deepEqual(Array.from(state.unlockedMainTabs), [], "a new game should start without progression-tab discoveries");
+  assert.equal(debug.mainTabIsUnlocked("angle"), true, "ANGLE should always be available");
+  assert.equal(debug.mainTabIsUnlocked("statistics"), true, "STAT should always be available");
+  assert.equal(debug.mainTabIsUnlocked("achievements"), true, "ACH should always be available");
+  assert.equal(debug.mainTabIsUnlocked("help"), true, "HELP should always be available");
+  assert.equal(debug.mainTabIsUnlocked("settings"), true, "SET should always be available");
+  assert.equal(debug.mainTabIsUnlocked("infinity"), false, "INF should remain hidden before the first discovery");
+  assert.equal(debug.mainTabIsUnlocked("eternity"), false, "ETR should remain hidden before TC4 unlock");
+
+  state.infinityCount = 1;
+  runtime.updateUi();
+  assert.deepEqual(Array.from(state.unlockedMainTabs), ["infinity"], "the first Infinity should discover INF");
+  state.infinityCount = 0;
+  runtime.updateUi();
+  assert.equal(debug.mainTabIsUnlocked("infinity"), true, "INF should remain unlocked after the current count resets");
+
+  const challengeUpgrade = runtime.infinityUpgradeById("4-1");
+  state.infinityCount = 1;
+  state.infinityUpgradeMask = 1 << challengeUpgrade.bit;
+  runtime.updateUi();
+  assert.equal(debug.mainTabIsUnlocked("challenges"), true, "IU 4-1 should discover CHAL");
+  state.infinityCount = 0;
+  state.infinityUpgradeMask = 0;
+  state.activeChallenge = 0;
+  runtime.updateUi();
+  assert.equal(debug.mainTabIsUnlocked("challenges"), true, "CHAL should remain unlocked after IU 4-1 resets");
+  debug.toggleInfinityChallenge(1);
+  assert.equal(state.activeChallenge, 0, "CHAL page access must not bypass current IU 4-1 entry requirements");
+
+  const tc4 = await loadRuntime(candidatePath);
+  tc4.debug.state.towerFloor = 11;
+  tc4.runtime.updateUi();
+  assert.equal(tc4.debug.mainTabIsUnlocked("eternity"), false, "ETR should remain hidden below the TC4 unlock floor");
+  tc4.debug.state.towerFloor = 12;
+  tc4.runtime.updateUi();
+  assert.deepEqual(Array.from(tc4.debug.state.unlockedMainTabs), ["eternity"], "TC4 unlock should discover ETR before Eternity");
+  tc4.runtime.resetEternityProgression();
+  tc4.runtime.updateUi();
+  assert.deepEqual(Array.from(tc4.debug.state.unlockedMainTabs), ["eternity"], "Eternity resets must not revoke ETR discovery");
+
+  const milestoneFive = await loadRuntime(candidatePath);
+  milestoneFive.debug.state.eternityCount = 20;
+  milestoneFive.debug.state.infinityCount = 0;
+  milestoneFive.debug.state.infinityUpgradeMask = 0;
+  milestoneFive.runtime.updateUi();
+  assert.equal(milestoneFive.debug.mainTabIsUnlocked("automation"), true, "Milestone 5 should discover AUTO");
+  assert.equal(milestoneFive.runtime.normalAutomationUnlocked(), false, "Milestone 5 must not fake IU 1-2 or Milestone 1-1");
+  assert.equal(milestoneFive.runtime.infinityAutomationUnlocked(), false, "Milestone 5 must not fake IU 8-1");
+  assert.equal(milestoneFive.runtime.infinityUpgradeAutomationUnlocked(), true, "Milestone 5 should retain its IU autobuy capability");
+  assert.equal(milestoneFive.runtime.elements.autoBuyInfinityUpgradesToggle.disabled, false, "Milestone 5 IU autobuy control should remain available");
+
+  state.unlockedMainTabs = ["infinity"];
+  state.infinityCount = 1;
+  state.hiddenTabs = ["infinity"];
+  runtime.updateUi();
+  assert.equal(debug.mainTabIsUnlocked("infinity"), true, "hiding a tab must not change its permanent unlock");
+  assert.equal(debug.mainTabIsVisible("infinity"), false, "hiddenTabs should still control navigation visibility");
+  state.infinityCount = 0;
+  runtime.resetEternityProgression();
+  runtime.updateUi();
+  assert.equal(debug.mainTabIsUnlocked("infinity"), true, "resets must not revoke a discovered tab");
+  assert.equal(debug.mainTabIsVisible("infinity"), false, "resets must not override a hidden tab preference");
+}
+
 async function runEternityModuleRuntimeTest() {
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
@@ -667,6 +736,7 @@ async function runEternityModuleRuntimeTest() {
   await testMilestoneNineStartingIp();
   await testBreakEternityBoundaryAndPersistence();
   await testQualifiedLoadAndImportDoNotAutoEternity();
+  await testMainTabDiscoveryLifecycle();
   console.log("Eternity module runtime tests passed");
 }
 

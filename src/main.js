@@ -1796,6 +1796,7 @@ function renderGameToText() {
       timeUnit: runtime.state.timeUnit,
       showTimeFluxQuickBar: runtime.state.showTimeFluxQuickBar,
       hiddenTabs: runtime.normalizeHiddenTabs(runtime.state.hiddenTabs),
+      unlockedMainTabs: runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs),
       activeMainTab,
       activeInfinitySubtab,
       activeChallengeSubtab,

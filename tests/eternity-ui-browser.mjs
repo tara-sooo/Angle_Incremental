@@ -55,11 +55,67 @@ try {
     debug.state.eternityMilestoneMask = 0;
     debug.state.eternityMilestoneChoice = "";
     debug.state.infinityUpgradeMask = 0;
+    debug.state.towerFloor = 0;
     debug.state.completedTowerChallenges = 0;
+    debug.state.hiddenTabs = [];
+    debug.state.unlockedMainTabs = [];
     debug.runtime.syncInfinityPointCachesFromExact(0n);
     debug.runtime.appliedLanguage = "";
     debug.runtime.updateUi();
   });
+
+  const lockedNavigation = await page.evaluate(() => ({
+    infinityHidden: document.querySelector('[data-tab="infinity"]')?.hidden,
+    challengesHidden: document.querySelector('[data-tab="challenges"]')?.hidden,
+    automationHidden: document.querySelector('[data-tab="automation"]')?.hidden,
+    eternityHidden: document.querySelector('[data-tab="eternity"]')?.hidden,
+    statisticsHidden: document.querySelector('[data-tab="statistics"]')?.hidden,
+    achievementsHidden: document.querySelector('[data-tab="achievements"]')?.hidden,
+    helpHidden: document.querySelector('[data-tab="help"]')?.hidden,
+    settingsHidden: document.querySelector('[data-tab="settings"]')?.hidden,
+  }));
+  assert.equal(lockedNavigation.infinityHidden, true, "INF should be hidden on a fresh new game");
+  assert.equal(lockedNavigation.challengesHidden, true, "CHAL should be hidden on a fresh new game");
+  assert.equal(lockedNavigation.automationHidden, true, "AUTO should be hidden on a fresh new game");
+  assert.equal(lockedNavigation.eternityHidden, true, "ETR should be hidden before TC4 unlock");
+  assert.equal(lockedNavigation.statisticsHidden, false, "STAT should be available on a fresh new game");
+  assert.equal(lockedNavigation.achievementsHidden, false, "ACH should be available on a fresh new game");
+  assert.equal(lockedNavigation.helpHidden, false, "HELP should be available on a fresh new game");
+  assert.equal(lockedNavigation.settingsHidden, false, "SET should be available on a fresh new game");
+
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.towerFloor = 12;
+    debug.runtime.updateUi();
+  });
+  assert.equal(
+    await page.evaluate(() => document.querySelector('[data-tab="eternity"]')?.hidden),
+    false,
+    "normal TC4 unlock should reveal ETR before the first Eternity",
+  );
+
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.hiddenTabs = ["eternity"];
+    debug.runtime.updateUi();
+  });
+  const hiddenEternity = await page.evaluate(() => ({
+    hidden: document.querySelector('[data-tab="eternity"]')?.hidden,
+    unlocked: window.__angleDebug.mainTabIsUnlocked("eternity"),
+  }));
+  assert.equal(hiddenEternity.hidden, true, "hiddenTabs should hide a discovered ETR tab");
+  assert.equal(hiddenEternity.unlocked, true, "hiddenTabs must not revoke ETR discovery");
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.hiddenTabs = [];
+    debug.runtime.resetEternityProgression();
+    debug.runtime.updateUi();
+  });
+  assert.equal(
+    await page.evaluate(() => document.querySelector('[data-tab="eternity"]')?.hidden),
+    false,
+    "Eternity resets should preserve ETR discovery and clear only current Tower state",
+  );
   await page.click('[data-tab="eternity"]');
 
   const initial = await page.evaluate(() => ({
@@ -199,7 +255,7 @@ try {
   }));
   assert.equal(milestoneFiveAutomation.toggleDisabled, false, "Milestone 5 should enable the Infinity Upgrade automation toggle");
   assert.equal(milestoneFiveAutomation.toggleChecked, false, "Milestone 5 should leave the Infinity Upgrade automation toggle off");
-  assert.equal(milestoneFiveAutomation.automationTabHidden, true, "Milestone 5 must not change the separate top-level Automation unlock");
+  assert.equal(milestoneFiveAutomation.automationTabHidden, false, "Milestone 5 should keep the permanently discovered Automation tab visible");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;

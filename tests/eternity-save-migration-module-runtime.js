@@ -233,12 +233,85 @@ async function testEternityResetThenSaveLoad() {
   assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 1, "the cap of three earned first-tier slots should leave exactly one acquisition available");
 }
 
+async function testMainTabDiscoveryMigration() {
+  const source = await loadRuntime(candidatePath);
+  const { runtime } = source;
+  const baseSave = runtime.serializeSaveData();
+  const challengeUpgrade = runtime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "4-1");
+  const normalAutomationUpgrade = runtime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "1-2");
+
+  const legacySave = (overrides) => {
+    const save = structuredClone(baseSave);
+    delete save.state.unlockedMainTabs;
+    Object.assign(save.state, overrides);
+    save.savedAt = Date.now();
+    return save;
+  };
+  const loadLegacy = (overrides) => loadRuntime(
+    candidatePath,
+    new Map([[runtime.SAVE_KEY, JSON.stringify(legacySave(overrides))]]),
+  );
+
+  const postEternity = await loadLegacy({ eternityCount: 1, infinityCount: 0, towerFloor: 0 });
+  assert.deepEqual(
+    Array.from(postEternity.debug.state.unlockedMainTabs),
+    ["infinity", "challenges", "automation", "eternity"],
+    "legacy saves with Eternity progress should retain every already-discovered progression tab",
+  );
+
+  const infinity = await loadLegacy({ infinityCount: 1, eternityCount: 0 });
+  assert.deepEqual(Array.from(infinity.debug.state.unlockedMainTabs), ["infinity"], "current Infinity count should migrate INF discovery");
+
+  const challenges = await loadLegacy({
+    infinityCount: 0,
+    eternityCount: 0,
+    infinityUpgradeMask: 1 << challengeUpgrade.bit,
+  });
+  assert.deepEqual(Array.from(challenges.debug.state.unlockedMainTabs), ["challenges"], "IU 4-1 ownership should migrate CHAL discovery");
+
+  const automation = await loadLegacy({
+    infinityCount: 0,
+    eternityCount: 0,
+    infinityUpgradeMask: 1 << normalAutomationUpgrade.bit,
+  });
+  assert.deepEqual(Array.from(automation.debug.state.unlockedMainTabs), ["automation"], "IU 1-2 ownership should migrate AUTO discovery");
+
+  const achievementAutomation = await loadLegacy({
+    infinityCount: 0,
+    eternityCount: 0,
+    achievementMask: 1 << (19 - 1),
+  });
+  assert.deepEqual(Array.from(achievementAutomation.debug.state.unlockedMainTabs), ["automation"], "Achievement 19 should migrate AUTO discovery");
+
+  const eternity = await loadLegacy({ infinityCount: 0, eternityCount: 0, towerFloor: 12 });
+  assert.deepEqual(Array.from(eternity.debug.state.unlockedMainTabs), ["eternity"], "Tower Floor 12 should migrate ETR discovery");
+
+  const normalized = await loadLegacy({
+    infinityCount: 0,
+    eternityCount: 0,
+    towerFloor: 0,
+    unlockedMainTabs: ["eternity", "unknown", "automation", "automation", "settings"],
+    hiddenTabs: ["eternity"],
+  });
+  assert.deepEqual(Array.from(normalized.debug.state.unlockedMainTabs), ["automation", "eternity"], "discovery migration should discard unknown and duplicate tab IDs");
+  assert.equal(normalized.debug.mainTabIsUnlocked("eternity"), true, "normalized ETR discovery should remain authoritative");
+  assert.equal(normalized.debug.mainTabIsVisible("eternity"), false, "migration must preserve hiddenTabs independently of discovery");
+
+  const roundTrip = await loadRuntime(candidatePath);
+  roundTrip.debug.state.unlockedMainTabs = ["infinity", "eternity"];
+  const serialized = roundTrip.runtime.serializeSaveData();
+  assert.deepEqual(Array.from(serialized.state.unlockedMainTabs), ["infinity", "eternity"], "save serialization should preserve normalized discovery history");
+  const reloaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(serialized)]]));
+  assert.deepEqual(Array.from(reloaded.debug.state.unlockedMainTabs), ["infinity", "eternity"], "save/load should preserve discovery history");
+}
+
 async function runEternitySaveMigrationModuleRuntimeTest() {
   await testLegacyDefaults();
   await testInfiniteAngleFreeLevelSaveMigration();
   await testCurrentRoundTripAndSanitization();
   await testSaveCodeImportAndCheckpointRestore();
   await testEternityResetThenSaveLoad();
+  await testMainTabDiscoveryMigration();
   console.log("Eternity save and migration module runtime tests passed");
 }
 

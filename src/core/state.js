@@ -14,9 +14,32 @@ const MAIN_TAB_IDS = Object.freeze([
   "settings",
 ]);
 
+const MAIN_TAB_DISCOVERY_IDS = Object.freeze([
+  "infinity",
+  "challenges",
+  "automation",
+  "eternity",
+]);
+
 function normalizeHiddenTabs(value) {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.filter((tab) => MAIN_TAB_IDS.includes(tab) && tab !== "settings"))];
+}
+
+function normalizeUnlockedMainTabs(value) {
+  const source = new Set(Array.isArray(value) ? value : []);
+  return MAIN_TAB_DISCOVERY_IDS.filter((tab) => source.has(tab));
+}
+
+function markMainTabsUnlocked(tabs) {
+  const current = normalizeUnlockedMainTabs(state.unlockedMainTabs);
+  const next = normalizeUnlockedMainTabs([
+    ...current,
+    ...(Array.isArray(tabs) ? tabs : [tabs]),
+  ]);
+  if (next.length === current.length && next.every((tab, index) => tab === current[index])) return false;
+  state.unlockedMainTabs = next;
+  return true;
 }
 
 const state = {
@@ -130,6 +153,7 @@ const state = {
   topBarMode: "news",
   showTimeFluxQuickBar: true,
   hiddenTabs: [],
+  unlockedMainTabs: [],
   floatingTexts: [],
   lastEarned: 0,
   lastEarnedLog10: -Infinity,
@@ -246,6 +270,7 @@ const SAVE_FIELDS = [
   "topBarMode",
   "showTimeFluxQuickBar",
   "hiddenTabs",
+  "unlockedMainTabs",
   "lastEarned",
   "lastEarnedLog10",
 ];
@@ -256,5 +281,8 @@ function normalizeChoice(value, allowed, fallback) {
 expose("state", () => state);
 expose("SAVE_FIELDS", () => SAVE_FIELDS);
 expose("MAIN_TAB_IDS", () => MAIN_TAB_IDS);
+expose("MAIN_TAB_DISCOVERY_IDS", () => MAIN_TAB_DISCOVERY_IDS);
 expose("normalizeHiddenTabs", () => normalizeHiddenTabs);
+expose("normalizeUnlockedMainTabs", () => normalizeUnlockedMainTabs);
+expose("markMainTabsUnlocked", () => markMainTabsUnlocked);
 expose("normalizeChoice", () => normalizeChoice, (value) => { normalizeChoice = value; });
