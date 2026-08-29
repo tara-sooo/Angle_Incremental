@@ -1077,20 +1077,38 @@ function restoreRuntimeState(runtime, snapshot) {
 function findNextUsefulActionSeconds(instance, policy, elapsedSeconds, remainingSeconds, options, tracker, effect) {
   const { runtime, debug } = instance;
   const snapshot = cloneState(runtime.state);
+  const initialObjective = progressionObjective(runtime);
   const initialEventSearch = elapsedSeconds === 0n;
+  let cachedSeconds = null;
+  let cachedState = null;
   const actionAt = (seconds) => {
-    restoreRuntimeState(runtime, snapshot);
     if (effect) setResearchClock(effect.clock, addTime(elapsedSeconds, seconds), tracker.ic8ClearTime);
-    debug.update(seconds);
-    return hasPolicyAction(instance, policy, false);
+    if (cachedSeconds !== null && seconds >= cachedSeconds) {
+      restoreRuntimeState(runtime, cachedState);
+      debug.update(seconds - cachedSeconds);
+    } else {
+      restoreRuntimeState(runtime, snapshot);
+      debug.update(seconds);
+    }
+    const objectiveAfter = progressionObjective(runtime);
+    const objectiveChanged = ["kind", "reason", "targetLog10", "targetCount", "targetFloor", "challenge"]
+      .some((key) => initialObjective[key] !== objectiveAfter[key]);
+    const useful = objectiveChanged || hasPolicyAction(instance, policy, false);
+    if (cachedSeconds === null || seconds >= cachedSeconds) {
+      cachedSeconds = seconds;
+      cachedState = cloneState(runtime.state);
+    }
+    return useful;
   };
   let low = 0;
   let high = Math.min(remainingSeconds, Math.max(options.stepSeconds, 1));
-  while (high < remainingSeconds && !actionAt(high)) {
+  let highIsUseful = actionAt(high);
+  while (high < remainingSeconds && !highIsUseful) {
     low = high;
     high = Math.min(remainingSeconds, high * 16);
+    highIsUseful = actionAt(high);
   }
-  if (!actionAt(high)) {
+  if (!highIsUseful) {
     restoreRuntimeState(runtime, snapshot);
     return remainingSeconds;
   }

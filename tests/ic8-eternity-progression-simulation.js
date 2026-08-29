@@ -170,6 +170,43 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.equal(countFarm.runtime.state.infinityCount, 600000, "TC3 preparation must use normal Infinity count gain");
   assert.equal(countFarm.runtime.state.activeTowerChallenge, 0);
 
+  const transitionInstance = await loadRuntime(path.resolve(__dirname, "..", "src", "main.js"));
+  applyRepresentativeFixture(transitionInstance);
+  transitionInstance.runtime.updateUi = () => {};
+  transitionInstance.runtime.saveGame = () => true;
+  transitionInstance.runtime.createCheckpoint = () => true;
+  Object.assign(transitionInstance.runtime.state, {
+    infiniteAngleUnlocked: true,
+    towerFloor: 3,
+    activeTowerChallenge: 1,
+    scoreLog10: 720,
+    score: Number.MAX_VALUE,
+    currentGainLog10: 1000,
+    currentGain: Number.MAX_VALUE,
+    currentGenerationRunTime: 0,
+    currentInfinityRunTime: 0,
+    currentInfinityRealTime: 0,
+    activeTowerChallengeTime: 0,
+  });
+  transitionInstance.runtime.syncInfinityPointCachesFromExact(100000n);
+  const transitionResult = runBoundedLoop(
+    transitionInstance,
+    { ...POLICIES[0], generationMinimumSeconds: Infinity, minimumCoreBoostBenefitLog10: Infinity },
+    1,
+    {
+      maxStallSeconds: 1,
+      stepSeconds: 1,
+      maxActionsPerFixedPoint: 4096,
+      actionSearchIterations: 2,
+      ic8ClearAtStart: true,
+    },
+  );
+  assert.ok(
+    transitionResult.relativeFirstReachSeconds["tc1-clear"] !== null
+      && transitionResult.relativeFirstReachSeconds["tc1-clear"] < 1,
+    "objective search must schedule a TC clear when the production step crosses its target",
+  );
+
   const first = await createReport({
     maxRunSeconds: 0,
     maxStallSeconds: 1,
@@ -198,6 +235,7 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.equal(first.validation.cadence.canonicalStepNotCalendarScale, true);
   assert.equal(first.validation.convergence.status, "passed");
   assert.equal(first.validation.sanity.status, "not-applicable");
+  assert.match(first.validation.objectivePolicy.actionOrder, /gain-aware Infinity reset/);
   first.cases.forEach((entry) => {
     assert.equal(entry.fixtureId, fixture.id);
     assert.equal(entry.representativeMilestone, "1-2");
