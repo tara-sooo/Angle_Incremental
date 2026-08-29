@@ -54,6 +54,18 @@ Because this lesson is promoted, future workers must follow the listed authorita
 - Authoritative at: not yet promoted
 - Last verified: 2026-08-24
 
+### EXP-WF-005 — Preserve IDD-managed markers when rewriting PR metadata
+
+- Status: active
+- Scope: IDD PR-body refresh/regeneration; Issue/PR association; D3.5 merge-boundary verification
+- Learned from: Issue #237; PR #240
+- Context: PR #240 initially contained the canonical association marker `<!-- idd-claimed-issue: 237 -->`. A later automated PR-body refresh replaced the body with updated research results but preserved only `Refs #237`, dropping the workflow-owned marker. D3.5 correctly failed closed with `marker-mismatch` and placed the otherwise valid PR on hold.
+- Cause: the PR-body updater treated generated prose as the complete body and did not preserve or deterministically regenerate workflow-owned metadata required by later phases.
+- Reusable lesson: whenever IDD rewrites or regenerates PR metadata, preserve IDD-managed association/claim markers exactly once, or deterministically regenerate them from the active claim. Human-readable references such as `Refs #N` are not substitutes for machine-readable workflow markers. A metadata refresh must not invalidate downstream workflow state that was valid before the refresh.
+- Verification: after every automated PR-body rewrite, inspect the live PR body and verify the required canonical marker appears exactly once, then run/re-run the live Issue/PR association check before entering merge-boundary phases. If association is not `ready: true`, stop before merge and repair the metadata rather than treating implementation or CI as the blocker.
+- Authoritative at: not yet promoted
+- Last verified: 2026-08-29
+
 ## Superseded lessons
 
 None yet.
