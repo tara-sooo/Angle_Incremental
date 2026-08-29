@@ -14,6 +14,7 @@ const {
   createReport,
   formatMarkdown,
   installResearchEffect,
+  parallelLogarithmicMultiplierLog10,
   parallelMultiplierLog10,
   realMultiplierLog10,
 } = require("../scripts/simulate-ic8-eternity-progression.js");
@@ -57,20 +58,44 @@ function testCurve() {
   assert.equal(parallelMultiplierLog10(0, 0.5), 0);
   assert.equal(parallelMultiplierLog10(10 / Math.log10(3), 0.5), 10);
   assert.equal(parallelMultiplierLog10(20 / Math.log10(3), 0.5), 15);
+  assert.equal(parallelLogarithmicMultiplierLog10(10 / Math.log10(3)), 10);
+  assert.equal(parallelLogarithmicMultiplierLog10(20 / Math.log10(3)), 10 + 10 * Math.log10(2));
   const curve = createParallelCurve();
+  const parallelCandidates = CANDIDATES.filter(({ family }) => family === "Parallel-BC16500");
   assert.deepEqual(
     curve.samples.map(({ elapsedSeconds }) => elapsedSeconds),
     [...CURVE_SAMPLE_SECONDS],
   );
   const cap = curve.samples.find(({ elapsedLabel }) => elapsedLabel.includes("raw x1e10"));
   assert.equal(cap.rawMultiplierLog10, 10);
-  assert.equal(cap.candidates["parallel-bc16500-root"].effectiveMultiplierLog10, 10);
-  assert.equal(cap.candidates["parallel-bc16500-fourth-root"].effectiveMultiplierLog10, 10);
+  assert.deepEqual(Object.keys(cap.candidates), parallelCandidates.map(({ id }) => id));
+  parallelCandidates.forEach(({ id }) => {
+    assert.equal(cap.candidates[id].effectiveMultiplierLog10, 10);
+  });
   const hour = curve.samples.find(({ elapsedSeconds }) => elapsedSeconds === 3600);
   assert.ok(
     hour.candidates["parallel-bc16500-root"].effectiveMultiplierLog10
       > hour.candidates["parallel-bc16500-fourth-root"].effectiveMultiplierLog10,
   );
+  assert.ok(
+    hour.candidates["parallel-bc16500-1-32"].effectiveMultiplierLog10
+      > hour.candidates["parallel-bc16500-1-64"].effectiveMultiplierLog10,
+  );
+  const expectedSamples = {
+    30: [10.13, 10.07, 11.56],
+    60: [10.58, 10.29, 14.57],
+    300: [14.16, 12.08, 21.56],
+    600: [18.63, 14.32, 24.57],
+    1800: [36.53, 23.26, 29.34],
+    3600: [63.36, 36.68, 32.35],
+  };
+  Object.entries(expectedSamples).forEach(([elapsedSeconds, values]) => {
+    const sample = curve.samples.find((entry) => entry.elapsedSeconds === Number(elapsedSeconds));
+    ["parallel-bc16500-1-32", "parallel-bc16500-1-64", "parallel-bc16500-logarithmic"]
+      .forEach((id, index) => {
+        assert.ok(Math.abs(sample.candidates[id].effectiveMultiplierLog10 - values[index]) < 0.01, id);
+      });
+  });
 }
 
 async function runIc8EternityProgressionSimulationTest() {
@@ -112,29 +137,34 @@ async function runIc8EternityProgressionSimulationTest() {
   const second = await createReport({ writeReports: false });
   assert.equal(JSON.stringify(first), JSON.stringify(second), "checkpoint output must be deterministic");
   assert.equal(first.issue, 237);
-  assert.equal(first.schemaVersion, 6);
+  assert.equal(first.schemaVersion, 7);
   assert.equal(first.researchOnly, true);
   assert.equal(first.noProductionChanges, true);
   assert.equal(first.studyType, "representative-post-IC8-checkpoint-study");
   assert.equal(first.outcome.status, "measured");
   assert.equal(first.validation.status, "passed");
   assert.equal(first.checkpoints.length, 7);
-  assert.equal(first.cases.length, 28);
+  assert.equal(first.cases.length, 49);
+  assert.deepEqual(first.options.localProbeElapsedSeconds, [...CURVE_SAMPLE_SECONDS]);
   assert.deepEqual(first.researchEffects.map(({ id }) => id), CANDIDATES.map(({ id }) => id));
   assert.equal(first.productionPredicates.towerChallengeTargets[3].targetLog10, 7777);
   assert.equal(first.productionPredicates.tc3RelaxationReferenceCount, 600000);
   assert.match(first.productionPredicates.tc3EntryRule, /no Infinity-count prerequisite/);
   assert.equal(first.excludedEvidence.balanceConclusionEligible, false);
   assert.equal(first.interpretation.leastDisruptiveMeasuredCandidate, "real-bc16500");
-  assert.equal(first.interpretation.scoreGateCollapseCounts.root, 4);
-  assert.equal(first.interpretation.scoreGateCollapseCounts.fourthRoot, 4);
+  assert.equal(first.interpretation.scoreGateCollapseCounts["parallel-bc16500-root"], 4);
+  assert.equal(first.interpretation.scoreGateCollapseCounts["parallel-bc16500-fourth-root"], 4);
+  assert.equal(first.interpretation.scoreGateCollapseCounts["parallel-bc16500-1-32"], 0);
+  assert.equal(first.interpretation.scoreGateCollapseCounts["parallel-bc16500-1-64"], 0);
+  assert.equal(first.interpretation.scoreGateCollapseCounts["parallel-bc16500-logarithmic"], 0);
   assert.equal(first.interpretation.productionDecision, "none");
   first.cases.forEach((entry) => {
     assert.equal(entry.status, "measured");
     assert.equal(entry.initialStateDigest, entry.checkpointStateDigest);
     assert.equal(entry.finalStateDigest, entry.initialStateDigest);
     assert.equal(entry.effectIsolation, true);
-    assert.equal(entry.probes.length, 2);
+    assert.equal(entry.probes.length, CURVE_SAMPLE_SECONDS.length);
+    assert.ok(Object.prototype.hasOwnProperty.call(entry, "firstSampledCollapseOrSkip"));
   });
   const postIc8Root = first.cases.find((entry) => (
     entry.checkpointId === "post-ic8-pre-ia"
@@ -147,6 +177,26 @@ async function runIc8EternityProgressionSimulationTest() {
       && entry.candidateId === "parallel-bc16500-root"
   ));
   assert.equal(tc1Root.collapseRisk, "final-IP-cap-before-score-gate");
+  const postIc8OneThirtySecond = first.cases.find((entry) => (
+    entry.checkpointId === "post-ic8-pre-ia"
+      && entry.candidateId === "parallel-bc16500-1-32"
+  ));
+  assert.equal(postIc8OneThirtySecond.firstSampledCollapseOrSkip.elapsedSeconds, 10 * 60);
+  const postIc8Logarithmic = first.cases.find((entry) => (
+    entry.checkpointId === "post-ic8-pre-ia"
+      && entry.candidateId === "parallel-bc16500-logarithmic"
+  ));
+  assert.equal(postIc8Logarithmic.firstSampledCollapseOrSkip.reason, "candidate-skips-next-IP-gate");
+  assert.equal(postIc8Logarithmic.firstSampledCollapseOrSkip.elapsedSeconds, 60);
+  const postIc8OneSixtyFourth = first.cases.find((entry) => (
+    entry.checkpointId === "post-ic8-pre-ia"
+      && entry.candidateId === "parallel-bc16500-1-64"
+  ));
+  assert.equal(postIc8OneSixtyFourth.firstSampledCollapseOrSkip.elapsedSeconds, 30 * 60);
+  assert.ok(
+    postIc8OneSixtyFourth.firstSampledCollapseOrSkip.elapsedSeconds
+      > postIc8OneThirtySecond.firstSampledCollapseOrSkip.elapsedSeconds,
+  );
 
   const markdown = formatMarkdown(first);
   assert.match(markdown, /checkpoint study/);
@@ -155,19 +205,23 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.match(markdown, /600000/);
   assert.match(markdown, /excluded from balance conclusions/);
   assert.match(markdown, /least disruptive measured reference/);
+  assert.match(markdown, /1\/32/);
+  assert.match(markdown, /First sampled collapse\/skip/);
   const candidateRows = markdown.split("\n").filter((line) => (
     line.startsWith("| ")
+      && CHECKPOINT_DEFINITIONS.some(({ id }) => line.startsWith("| " + id + " |"))
       && CANDIDATES.some(({ id }) => line.includes("| " + id + " |"))
   ));
-  assert.equal(candidateRows.length, 28, "Markdown must contain every JSON case");
+  assert.equal(candidateRows.length, 49, "Markdown must contain every JSON case");
 
   const committed = JSON.parse(fs.readFileSync(REPORT_PATH, "utf8"));
   assert.equal(committed.issue, 237);
-  assert.equal(committed.schemaVersion, 6);
+  assert.equal(committed.schemaVersion, 7);
   assert.equal(committed.validation.status, "passed");
   assert.equal(committed.outcome.status, "measured");
   assert.equal(committed.checkpoints.length, 7);
-  assert.equal(committed.cases.length, 28);
+  assert.equal(committed.cases.length, 49);
+  assert.deepEqual(committed.options.localProbeElapsedSeconds, [...CURVE_SAMPLE_SECONDS]);
   assert.equal(committed.checkpoints.find(({ id }) => id === "tc3-era").consistency.tc3EntryWithout600000, true);
   assert.match(fs.readFileSync(MARKDOWN_PATH, "utf8"), /No production Timeline formula/);
 

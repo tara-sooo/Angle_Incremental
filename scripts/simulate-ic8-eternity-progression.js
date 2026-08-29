@@ -36,7 +36,7 @@ const MILESTONE_IDS = Object.freeze([
 const DEFAULT_OPTIONS = Object.freeze({
   parallelPostSoftcapPower: null,
   probeScoreOffsetLog10: 1,
-  localProbeElapsedSeconds: Object.freeze([0, 60 * 60]),
+  localProbeElapsedSeconds: CURVE_SAMPLE_SECONDS,
   curveSampleSeconds: CURVE_SAMPLE_SECONDS,
   writeReports: true,
 });
@@ -157,18 +157,21 @@ const CANDIDATES = Object.freeze([
     id: "timeline-free",
     family: "Timeline-free",
     formula: "normal runtime.infinityPointGain()",
+    curve: null,
     postSoftcapPower: null,
   }),
   Object.freeze({
     id: "real-bc16500",
     family: "Real-BC16500",
     formula: "normal IP gain × (1 + log10(current IP))",
+    curve: null,
     postSoftcapPower: null,
   }),
   Object.freeze({
     id: "parallel-bc16500-root",
     family: "Parallel-BC16500",
     formula: "normal IP gain × 3^secondsSinceIC8Clear; raw x1e10 softcap; post-softcap power 0.50",
+    curve: "power",
     rawMultiplierCap: 1e10,
     postSoftcapPower: 0.5,
   }),
@@ -176,8 +179,33 @@ const CANDIDATES = Object.freeze([
     id: "parallel-bc16500-fourth-root",
     family: "Parallel-BC16500",
     formula: "normal IP gain × 3^secondsSinceIC8Clear; raw x1e10 softcap; post-softcap power 0.25",
+    curve: "power",
     rawMultiplierCap: 1e10,
     postSoftcapPower: 0.25,
+  }),
+  Object.freeze({
+    id: "parallel-bc16500-1-32",
+    family: "Parallel-BC16500",
+    formula: "normal IP gain × 3^secondsSinceIC8Clear; raw x1e10 softcap; post-softcap power 1/32",
+    curve: "power",
+    rawMultiplierCap: 1e10,
+    postSoftcapPower: 1 / 32,
+  }),
+  Object.freeze({
+    id: "parallel-bc16500-1-64",
+    family: "Parallel-BC16500",
+    formula: "normal IP gain × 3^secondsSinceIC8Clear; raw x1e10 softcap; post-softcap power 1/64",
+    curve: "power",
+    rawMultiplierCap: 1e10,
+    postSoftcapPower: 1 / 64,
+  }),
+  Object.freeze({
+    id: "parallel-bc16500-logarithmic",
+    family: "Parallel-BC16500",
+    formula: "normal IP gain × 3^secondsSinceIC8Clear; raw x1e10 softcap; effectiveLog = 10 + 10 × log10(1 + (rawLog - 10) / 10)",
+    curve: "logarithmic",
+    rawMultiplierCap: 1e10,
+    postSoftcapPower: null,
   }),
 ]);
 
@@ -287,13 +315,13 @@ function parseNumberOption(args, name, fallback, minimum = 0) {
 
 function parseArgs(argv) {
   const args = argv.slice(2);
+  const probeSeconds = args.includes("--probe-seconds")
+    ? [0, parseNumberOption(args, "--probe-seconds", DEFAULT_OPTIONS.localProbeElapsedSeconds.at(-1))]
+    : CURVE_SAMPLE_SECONDS;
   return {
     parallelPostSoftcapPower: parseNumberOption(args, "--parallel-post-power", null),
     probeScoreOffsetLog10: parseNumberOption(args, "--probe-score-offset", DEFAULT_OPTIONS.probeScoreOffsetLog10),
-    localProbeElapsedSeconds: [
-      0,
-      parseNumberOption(args, "--probe-seconds", DEFAULT_OPTIONS.localProbeElapsedSeconds[1]),
-    ],
+    localProbeElapsedSeconds: probeSeconds,
     curveSampleSeconds: CURVE_SAMPLE_SECONDS,
     writeReports: !args.includes("--no-write-reports"),
   };
@@ -682,6 +710,23 @@ function parallelMultiplierLog10(seconds, postSoftcapPower) {
     + (rawLog10 - RAW_PARALLEL_SOFTCAP_LOG10) * postSoftcapPower;
 }
 
+function parallelLogarithmicMultiplierLog10(seconds) {
+  const rawLog10 = parallelRawMultiplierLog10(seconds);
+  if (rawLog10 <= RAW_PARALLEL_SOFTCAP_LOG10) return rawLog10;
+  return RAW_PARALLEL_SOFTCAP_LOG10
+    + 10 * Math.log10(1 + (rawLog10 - RAW_PARALLEL_SOFTCAP_LOG10) / 10);
+}
+
+function parallelCandidateMultiplierLog10(seconds, candidate) {
+  if (candidate.curve === "logarithmic") {
+    return parallelLogarithmicMultiplierLog10(seconds);
+  }
+  if (candidate.curve === "power") {
+    return parallelMultiplierLog10(seconds, candidate.postSoftcapPower);
+  }
+  return 0;
+}
+
 function realMultiplierLog10(ipLog10) {
   if (!Number.isFinite(ipLog10) || ipLog10 <= 0) return 0;
   return Math.log10(1 + ipLog10);
@@ -700,10 +745,10 @@ function installResearchEffect(runtime, candidate, clock) {
     let multiplierLog10 = 0;
     if (candidate.id === "real-bc16500") {
       multiplierLog10 = realMultiplierLog10(currentIpLog10(runtime));
-    } else if (candidate.postSoftcapPower !== null) {
-      multiplierLog10 = parallelMultiplierLog10(
+    } else if (candidate.family === "Parallel-BC16500") {
+      multiplierLog10 = parallelCandidateMultiplierLog10(
         researchElapsedSeconds(clock),
-        candidate.postSoftcapPower,
+        candidate,
       );
     }
     if (!(multiplierLog10 > 0)) return baseGain;
@@ -800,6 +845,34 @@ function checkpointCollapseRisk(checkpoint, candidate, probes) {
   return "next-IP-gate-preserved";
 }
 
+function firstSampledCollapseOrSkip(checkpoint, candidate, probes) {
+  if (checkpoint.predicates.canEternity === true) return null;
+  const gate = checkpoint.nextLocalGate;
+  for (const probe of probes) {
+    if (gate.kind === "score-threshold" && probe.projectedFinalIpCapReached) {
+      return {
+        elapsedSeconds: probe.elapsedSeconds,
+        reason: "final-IP-cap-before-score-gate",
+      };
+    }
+    if (probe.nextGateCovered) {
+      return {
+        elapsedSeconds: probe.elapsedSeconds,
+        reason: candidate.id === "timeline-free"
+          ? "next-IP-gate-covered-by-baseline"
+          : "candidate-skips-next-IP-gate",
+      };
+    }
+    if (probe.projectedFinalIpCapReached) {
+      return {
+        elapsedSeconds: probe.elapsedSeconds,
+        reason: "final-IP-cap-with-gate-uncovered",
+      };
+    }
+  }
+  return null;
+}
+
 function checkpointReportState(runtime) {
   return {
     exactInfinityPoints: runtime.currentExactInfinityPoints().toString(),
@@ -820,13 +893,13 @@ function checkpointReportState(runtime) {
 function candidateSet(options) {
   if (options.parallelPostSoftcapPower === null
     || options.parallelPostSoftcapPower === undefined) return CANDIDATES;
-  return CANDIDATES.map((candidate) => candidate.postSoftcapPower === null
+  return CANDIDATES.map((candidate) => candidate.curve !== "power"
     ? candidate
     : {
       ...candidate,
       postSoftcapPower: options.parallelPostSoftcapPower,
       formula: candidate.formula.replace(
-        /post-softcap power [0-9.]+/,
+        /post-softcap power [0-9./]+/,
         "post-softcap power " + options.parallelPostSoftcapPower,
       ),
     });
@@ -871,6 +944,7 @@ async function runCheckpointCandidate(checkpoint, candidate, options = DEFAULT_O
     nextLocalGate: gate,
     probes,
     collapseRisk: checkpointCollapseRisk(checkpoint, candidate, probes),
+    firstSampledCollapseOrSkip: firstSampledCollapseOrSkip(checkpoint, candidate, probes),
     effectIsolation,
     state: checkpointReportState(instance.runtime),
   };
@@ -895,10 +969,8 @@ function formatSeconds(seconds) {
 }
 
 function createParallelCurve(postSoftcapPower, sampleSeconds = CURVE_SAMPLE_SECONDS) {
-  const powers = {
-    root: postSoftcapPower === undefined || postSoftcapPower === null ? 0.5 : postSoftcapPower,
-    fourthRoot: postSoftcapPower === undefined || postSoftcapPower === null ? 0.25 : postSoftcapPower,
-  };
+  const parallelCandidates = candidateSet({ parallelPostSoftcapPower: postSoftcapPower })
+    .filter(({ family }) => family === "Parallel-BC16500");
   return {
     rawFormula: "3^secondsSinceIC8Clear",
     rawSoftcapLog10: RAW_PARALLEL_SOFTCAP_LOG10,
@@ -912,18 +984,18 @@ function createParallelCurve(postSoftcapPower, sampleSeconds = CURVE_SAMPLE_SECO
           : formatSeconds(elapsedSeconds),
         rawMultiplierLog10,
         rawMultiplier: formatLog10(rawMultiplierLog10),
-        candidates: {
-          "parallel-bc16500-root": {
-            postSoftcapPower: powers.root,
-            effectiveMultiplierLog10: parallelMultiplierLog10(elapsedSeconds, powers.root),
-            effectiveMultiplier: formatLog10(parallelMultiplierLog10(elapsedSeconds, powers.root)),
-          },
-          "parallel-bc16500-fourth-root": {
-            postSoftcapPower: powers.fourthRoot,
-            effectiveMultiplierLog10: parallelMultiplierLog10(elapsedSeconds, powers.fourthRoot),
-            effectiveMultiplier: formatLog10(parallelMultiplierLog10(elapsedSeconds, powers.fourthRoot)),
-          },
-        },
+        candidates: Object.fromEntries(parallelCandidates.map((candidate) => {
+          const effectiveMultiplierLog10 = parallelCandidateMultiplierLog10(
+            elapsedSeconds,
+            candidate,
+          );
+          return [candidate.id, {
+            curve: candidate.curve,
+            postSoftcapPower: candidate.postSoftcapPower,
+            effectiveMultiplierLog10,
+            effectiveMultiplier: formatLog10(effectiveMultiplierLog10),
+          }];
+        })),
       };
     }),
   };
@@ -956,14 +1028,20 @@ function validateCheckpointReport(report) {
     if (entry.finalStateDigest !== entry.initialStateDigest || !entry.effectIsolation) {
       errors.push(entry.checkpointId + "/" + entry.candidateId + " changed persistent state");
     }
+    if (!Object.prototype.hasOwnProperty.call(entry, "firstSampledCollapseOrSkip")) {
+      errors.push(entry.checkpointId + "/" + entry.candidateId + " is missing first sampled risk evidence");
+    }
   });
   report.checkpoints.forEach((checkpoint) => {
     const candidates = grouped.get(checkpoint.id) || [];
     const ids = candidates.map(({ candidateId }) => candidateId);
     if (JSON.stringify(ids) !== JSON.stringify(expectedCandidateIds)) {
-      errors.push(checkpoint.id + " does not have exactly four candidate cases");
+      errors.push(checkpoint.id + " does not have exactly " + expectedCandidateIds.length + " candidate cases");
     }
   });
+  if (report.cases.length !== report.checkpoints.length * expectedCandidateIds.length) {
+    errors.push("checkpoint/candidate case count is incomplete");
+  }
   const rawSoftcapSample = report.parallelCurve.samples.find(
     ({ elapsedSeconds }) => elapsedSeconds === report.parallelCurve.rawSoftcapSeconds,
   );
@@ -974,6 +1052,17 @@ function validateCheckpointReport(report) {
     || !report.parallelCurve.samples.some(({ elapsedSeconds }) => elapsedSeconds === 3600)) {
     errors.push("0s and 1h curve samples are missing");
   }
+  const parallelCandidates = (report.researchEffects || CANDIDATES)
+    .filter(({ family }) => family === "Parallel-BC16500");
+  report.parallelCurve.samples.forEach((sample) => {
+    parallelCandidates.forEach((candidate) => {
+      const actual = sample.candidates[candidate.id];
+      const expected = parallelCandidateMultiplierLog10(sample.elapsedSeconds, candidate);
+      if (!actual || Math.abs(actual.effectiveMultiplierLog10 - expected) > 1e-12) {
+        errors.push(sample.elapsedLabel + "/" + candidate.id + " curve formula mismatch");
+      }
+    });
+  });
   const tc3 = report.checkpoints.find(({ id }) => id === "tc3-era");
   if (!tc3 || tc3.infinityCount !== 10000
     || tc3.nextLocalGate.id !== "tc3"
@@ -987,7 +1076,7 @@ function validateCheckpointReport(report) {
     status: errors.length === 0 ? "passed" : "failed",
     errors,
     checkpointCount: report.checkpoints.length,
-    candidateCountPerCheckpoint: 4,
+    candidateCountPerCheckpoint: expectedCandidateIds.length,
     caseCount: report.cases.length,
     rawSoftcapSample: Boolean(rawSoftcapSample),
     excludedAutonomousRouteEvidence: report.excludedEvidence.balanceConclusionEligible === false,
@@ -999,23 +1088,43 @@ function buildInterpretation(report) {
     nextLocalGate.kind === "score-threshold"
   ));
   const scoreGateIds = new Set(scoreGateCheckpoints.map(({ id }) => id));
+  const parallelCandidates = report.researchEffects.filter(({ family }) => family === "Parallel-BC16500");
   const collapseBeforeScoreGate = (candidateId) => report.cases.filter((entry) => (
     entry.candidateId === candidateId
       && scoreGateIds.has(entry.checkpointId)
       && entry.collapseRisk === "final-IP-cap-before-score-gate"
   )).length;
-  const rootCollapseCount = collapseBeforeScoreGate("parallel-bc16500-root");
-  const fourthRootCollapseCount = collapseBeforeScoreGate("parallel-bc16500-fourth-root");
+  const scoreGateCollapseCounts = Object.fromEntries(
+    parallelCandidates.map(({ id }) => [id, collapseBeforeScoreGate(id)]),
+  );
+  const firstSampledCollapseOrSkipCounts = Object.fromEntries(
+    parallelCandidates.map(({ id }) => [
+      id,
+      report.cases.filter((entry) => (
+        entry.candidateId === id && entry.firstSampledCollapseOrSkip !== null
+      )).length,
+    ]),
+  );
+  const curveSample = (candidateId, elapsedSeconds) => {
+    const sample = report.parallelCurve.samples.find((entry) => entry.elapsedSeconds === elapsedSeconds);
+    return sample ? sample.candidates[candidateId].effectiveMultiplierLog10 : null;
+  };
+  const oneHour = 60 * 60;
+  const tenMinutes = 10 * 60;
   return {
     leastDisruptiveMeasuredCandidate: "real-bc16500",
     realReading: "Real-BC16500 adds a state-dependent gain while preserving the measured IP and score gates at the default local probe horizon.",
-    parallelReading: "Both Parallel powers are much stronger after raw x1e10; the root is stronger than the fourth-root and the default one-hour probes reach the exact IP cap before the remaining TC score gates.",
+    parallelReading: "The new 1/32 and 1/64 power candidates suppress the original root/fourth-root controls substantially. The logarithmic curve is stronger than both new powers at the minute samples through 10m, then grows more slowly; at 1h it is below 1/64 and far below 1/32.",
     scoreGateCollapseCounts: {
-      root: rootCollapseCount,
-      fourthRoot: fourthRootCollapseCount,
+      ...scoreGateCollapseCounts,
       scoreGateCheckpointCount: scoreGateCheckpoints.length,
     },
-    provisionalRange: "Real is the least disruptive reference; fourth-root is the less aggressive Parallel candidate, but neither result selects a production softcap.",
+    firstSampledCollapseOrSkipCounts,
+    parallelCurveComparison: {
+      oneHourLog10: Object.fromEntries(parallelCandidates.map(({ id }) => [id, curveSample(id, oneHour)])),
+      tenMinuteLog10: Object.fromEntries(parallelCandidates.map(({ id }) => [id, curveSample(id, tenMinutes)])),
+    },
+    provisionalRange: "For a later balance decision, carry 1/64 as the slower power comparison and logarithmic as the stronger minute-scale comparison; keep 1/32 as a stronger-boundary control. This evidence does not select a production softcap.",
     productionDecision: "none",
   };
 }
@@ -1031,7 +1140,7 @@ async function createReport(rawOptions = {}) {
   const fixture = await createRepresentativeFixture();
   const checkpointSet = await createCheckpointFixtures();
   const report = {
-    schemaVersion: 6,
+    schemaVersion: 7,
     issue: ISSUE,
     title: "Evaluate first Timeline-node balance from representative post-IC8 checkpoints",
     studyType: "representative-post-IC8-checkpoint-study",
@@ -1093,7 +1202,7 @@ async function createReport(rawOptions = {}) {
   report.outcome = report.validation.status === "passed"
     ? {
       status: "measured",
-      reason: "four isolated Timeline candidates were measured at seven representative checkpoints; no authoritative IC8-to-Eternity duration is claimed",
+      reason: "seven isolated Timeline candidates were measured at seven representative checkpoints; no authoritative IC8-to-Eternity duration is claimed",
     }
     : {
       status: "invalid",
@@ -1103,13 +1212,14 @@ async function createReport(rawOptions = {}) {
 }
 
 function formatMarkdown(report) {
+  const parallelCandidates = report.researchEffects.filter(({ family }) => family === "Parallel-BC16500");
   const lines = [
     "# Issue #" + report.issue + " checkpoint study",
     "",
     "> Research evidence only. No production Timeline formula or gameplay behavior was changed.",
     "",
     "- Outcome: **" + report.outcome.status + "** — " + report.outcome.reason,
-    "- Scope: seven representative post-IC8 checkpoints × four fresh candidate clones; no full autonomous IC8 → Eternity route is required.",
+    "- Scope: seven representative post-IC8 checkpoints × " + report.researchEffects.length + " fresh candidate clones; no full autonomous IC8 → Eternity route is required.",
     "- Fixture: **" + report.fixture.representativeCase + "**; IP **1e5**, Infinity **"
       + report.fixture.state.infinityCount + "**, IU through row 11, no IA, Tower Floor 0, IC8 clear at post-IC8 **t = 0**.",
     "- Parallel raw formula: **" + report.parallelCurve.rawFormula + "**; raw x1e10 is reached at **"
@@ -1117,20 +1227,21 @@ function formatMarkdown(report) {
     "- Local probes are instantaneous production-runtime IP-gain comparisons at Infinity threshold + "
       + report.options.probeScoreOffsetLog10 + " log10 Score and are bounded to the next local gate.",
     "- Reading: **" + report.interpretation.leastDisruptiveMeasuredCandidate
-      + "** is the least disruptive measured reference; Parallel root/fourth-root are stronger but show score-gate collapse risk in the one-hour probes. No production candidate is selected.",
+      + "** is the least disruptive measured reference. " + report.interpretation.parallelReading + " No production candidate is selected.",
+    "- Follow-up range: " + report.interpretation.provisionalRange,
+    "- Power formula after raw x1e10: **effective = 1e10 × (raw / 1e10)^p**, with **p = 1/32** and **p = 1/64**; logarithmic formula: **effectiveLog = 10 + 10 × log10(1 + (rawLog - 10) / 10)**.",
     "- Prior astronomical/one-year autonomous-route output is explicitly **excluded from balance conclusions**.",
     "",
     "## Parallel multiplier curve",
     "",
-    "| Elapsed | Raw multiplier | Root post-softcap | Fourth-root post-softcap |",
-    "| --- | ---: | ---: | ---: |",
+    "| Elapsed | Raw multiplier | " + parallelCandidates.map(({ id }) => id).join(" | ") + " |",
+    "| --- | ---: | " + parallelCandidates.map(() => "---:").join(" | ") + " |",
   ];
   report.parallelCurve.samples.forEach((sample) => {
     lines.push(
       "| " + sample.elapsedLabel
       + " | " + sample.rawMultiplier
-      + " | " + sample.candidates["parallel-bc16500-root"].effectiveMultiplier
-      + " | " + sample.candidates["parallel-bc16500-fourth-root"].effectiveMultiplier
+      + " | " + parallelCandidates.map(({ id }) => sample.candidates[id].effectiveMultiplier).join(" | ")
       + " |",
     );
   });
@@ -1159,12 +1270,16 @@ function formatMarkdown(report) {
     "",
     "## Candidate probes",
     "",
-    "| Checkpoint | Candidate | Next gate | Normal gain | Candidate gain | 1h projected IP | Gate at 1h | Collapse/skip risk |",
-    "| --- | --- | --- | ---: | ---: | ---: | --- | --- |",
+    "| Checkpoint | Candidate | Next gate | Normal gain | Candidate gain | 1h projected IP | Gate at 1h | First sampled collapse/skip | Latest risk |",
+    "| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
   );
   report.cases.forEach((entry) => {
     const first = entry.probes[0];
     const latest = entry.probes.at(-1);
+    const firstRisk = entry.firstSampledCollapseOrSkip
+      ? formatSeconds(entry.firstSampledCollapseOrSkip.elapsedSeconds)
+        + " (" + entry.firstSampledCollapseOrSkip.reason + ")"
+      : "none";
     lines.push(
       "| " + entry.checkpointId
       + " | " + entry.candidateId
@@ -1173,6 +1288,7 @@ function formatMarkdown(report) {
       + " | " + formatLog10(first.candidateGainLog10)
       + " | 10^" + Number(latest.projectedHeldIpLog10).toFixed(2)
       + " | " + latest.gateCoverage
+      + " | " + firstRisk
       + " | " + entry.collapseRisk
       + " |",
     );
@@ -1234,6 +1350,8 @@ module.exports = {
   deriveNextLocalGate,
   formatMarkdown,
   installResearchEffect,
+  parallelCandidateMultiplierLog10,
+  parallelLogarithmicMultiplierLog10,
   parallelMultiplierLog10,
   productionPredicateReport,
   realMultiplierLog10,
