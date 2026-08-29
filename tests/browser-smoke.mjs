@@ -519,14 +519,40 @@ try {
     const original = {
       infinityCount: state.infinityCount,
       infinityUpgradeMask: state.infinityUpgradeMask,
+      eternityCount: state.eternityCount,
+      eternityMilestoneMask: state.eternityMilestoneMask,
+      eternityMilestoneChoice: state.eternityMilestoneChoice,
+      towerFloor: state.towerFloor,
+      activeChallenge: state.activeChallenge,
+      completedChallenges: state.completedChallenges,
+      activeChallengeTime: state.activeChallengeTime,
+      fastestInfinityChallengeTimes: [...state.fastestInfinityChallengeTimes],
+      completedTowerChallenges: state.completedTowerChallenges,
+      achievementMask: state.achievementMask,
+      achievementMaskHigh: state.achievementMaskHigh,
+      fastestInfinityTime: state.fastestInfinityTime,
       hiddenTabs: [...state.hiddenTabs],
+      unlockedMainTabs: [...state.unlockedMainTabs],
       activeMainTab: window.__angleDebug.runtime.activeMainTab,
     };
     state.infinityCount = 0;
     state.infinityUpgradeMask = 0;
+    state.eternityCount = 0;
+    state.eternityMilestoneMask = 0;
+    state.eternityMilestoneChoice = "";
+    state.towerFloor = 0;
+    state.activeChallenge = 0;
+    state.completedChallenges = 0;
+    state.activeChallengeTime = 0;
+    state.fastestInfinityChallengeTimes = Array(8).fill(0);
+    state.completedTowerChallenges = 0;
+    state.achievementMask = 0;
+    state.achievementMaskHigh = 0;
+    state.fastestInfinityTime = 0;
     state.hiddenTabs = [];
+    state.unlockedMainTabs = [];
     switchMainTab("angle");
-    window.advanceTime(0);
+    window.__angleDebug.runtime.updateMainTabVisibility();
     const visibleTabs = () => Array.from(document.querySelectorAll("[data-tab]"))
       .filter((button) => !button.hidden)
       .map((button) => button.dataset.tab);
@@ -559,7 +585,20 @@ try {
     hidden.renderTextTabs = JSON.parse(window.render_game_to_text()).settings.hiddenTabs;
     state.infinityCount = original.infinityCount;
     state.infinityUpgradeMask = original.infinityUpgradeMask;
+    state.eternityCount = original.eternityCount;
+    state.eternityMilestoneMask = original.eternityMilestoneMask;
+    state.eternityMilestoneChoice = original.eternityMilestoneChoice;
+    state.towerFloor = original.towerFloor;
+    state.activeChallenge = original.activeChallenge;
+    state.completedChallenges = original.completedChallenges;
+    state.activeChallengeTime = original.activeChallengeTime;
+    state.fastestInfinityChallengeTimes = original.fastestInfinityChallengeTimes;
+    state.completedTowerChallenges = original.completedTowerChallenges;
+    state.achievementMask = original.achievementMask;
+    state.achievementMaskHigh = original.achievementMaskHigh;
+    state.fastestInfinityTime = original.fastestInfinityTime;
     state.hiddenTabs = original.hiddenTabs;
+    state.unlockedMainTabs = original.unlockedMainTabs;
     switchMainTab(original.activeMainTab);
     window.advanceTime(0);
     window.__angleDebug.saveGame("manual");
@@ -567,13 +606,13 @@ try {
   });
   assert.deepEqual(
     mainTabVisibility.locked.visible,
-    ["angle", "eternity", "statistics", "achievements", "help", "settings"],
+    ["angle", "statistics", "achievements", "help", "settings"],
     "locked progression tabs should be hidden from the default navigation",
   );
   assert.deepEqual(
     mainTabVisibility.locked.hidden,
-    ["infinity", "challenges", "automation"],
-    "Infinity, Challenges, and Automation should be hidden until their existing unlocks are met",
+    ["infinity", "eternity", "challenges", "automation"],
+    "progression tabs should be hidden until their first discovery conditions are met",
   );
   assert.equal(mainTabVisibility.locked.settingsControls.length, 9, "SET should list every main tab in its visibility settings");
   assert.ok(
@@ -582,8 +621,8 @@ try {
   );
   assert.deepEqual(
     mainTabVisibility.unlocked.visible,
-    ["angle", "infinity", "eternity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
-    "newly unlocked tabs should be visible by default",
+    ["angle", "infinity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
+    "newly discovered tabs should be visible by default",
   );
   assert.deepEqual(mainTabVisibility.hidden.hiddenTabs, ["help"], "explicitly hidden tabs should be stored as a minimal list");
   assert.deepEqual(mainTabVisibility.hidden.persistedTabs, ["help"], "hidden tab preferences should persist in the save");
