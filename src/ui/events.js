@@ -232,6 +232,7 @@ function bindEvents() {
   runtime.elements.autoBuySpeedToggle.addEventListener("change", () => applySetting("autoBuySpeed", runtime.elements.autoBuySpeedToggle.checked));
   runtime.elements.autoBuyVertexToggle.addEventListener("change", () => applySetting("autoBuyVertex", runtime.elements.autoBuyVertexToggle.checked));
   runtime.elements.autoBuyGainToggle.addEventListener("change", () => applySetting("autoBuyGain", runtime.elements.autoBuyGainToggle.checked));
+  if (runtime.elements.autoBuyInfinityUpgradesToggle) runtime.elements.autoBuyInfinityUpgradesToggle.addEventListener("change", () => applySetting("autoBuyInfinityUpgrades", runtime.elements.autoBuyInfinityUpgradesToggle.checked));
   if (runtime.elements.autoBuyInfiniteAngleSpeedToggle) runtime.elements.autoBuyInfiniteAngleSpeedToggle.addEventListener("change", () => applySetting("autoBuyInfiniteAngleSpeed", runtime.elements.autoBuyInfiniteAngleSpeedToggle.checked));
   if (runtime.elements.autoBuyInfiniteAngleVertexToggle) runtime.elements.autoBuyInfiniteAngleVertexToggle.addEventListener("change", () => applySetting("autoBuyInfiniteAngleVertex", runtime.elements.autoBuyInfiniteAngleVertexToggle.checked));
   if (runtime.elements.autoBuyInfiniteAngleGainToggle) runtime.elements.autoBuyInfiniteAngleGainToggle.addEventListener("change", () => applySetting("autoBuyInfiniteAngleGain", runtime.elements.autoBuyInfiniteAngleGainToggle.checked));

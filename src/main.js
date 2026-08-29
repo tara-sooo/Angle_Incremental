@@ -698,6 +698,12 @@ function runAutobuyers() {
     allowVertex: runtime.state.autoBuyVertex,
     allowGain: runtime.state.autoBuyGain,
   });
+  if (runtime.state.autoBuyInfinityUpgrades) {
+    runtime.buyAllInfinityUpgrades({
+      refresh: false,
+      save: false,
+    });
+  }
 }
 
 function shouldAutoRunGeneration() {
@@ -1798,10 +1804,12 @@ function renderGameToText() {
     automation: {
       unlocked: runtime.normalAutomationUnlocked?.() || false,
       layerUnlocked: runtime.infinityAutomationUnlocked?.() || false,
+      infinityUpgradeUnlocked: runtime.infinityUpgradeAutomationUnlocked?.() || false,
       enabled: runtime.state.automationEnabled,
       speed: runtime.state.autoBuySpeed,
       vertex: runtime.state.autoBuyVertex,
       gain: runtime.state.autoBuyGain,
+      infinityUpgrades: runtime.state.autoBuyInfinityUpgrades,
       generation: runtime.state.autoRunGeneration,
       generationScoreMultiplierThreshold: runtime.state.autoGenerationScoreMultiplierThreshold,
       generationCostMultiplierThreshold: runtime.state.autoGenerationCostMultiplierThreshold,
@@ -1952,6 +1960,7 @@ window.__angleDebug = {
   maybeForceEternity: runtime.maybeForceEternity,
   selectEternityMilestone: runtime.selectEternityMilestone,
   buyInfinityUpgrade: runtime.buyInfinityUpgrade,
+  buyAllInfinityUpgrades: runtime.buyAllInfinityUpgrades,
   buyAllUpgrades: runtime.buyAllUpgrades,
   generationRewardFor: runtime.generationRewardFor,
   generationScoreMultiplierEffectLog10: runtime.generationScoreMultiplierEffectLog10,

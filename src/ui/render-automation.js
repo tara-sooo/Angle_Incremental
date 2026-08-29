@@ -18,12 +18,16 @@ function updateAutomationUi() {
   const unlocked = runtime.normalAutomationUnlocked?.() || false;
   const generationCoreUnlocked = runtime.isAchievementUnlocked(19);
   const infinityUnlocked = runtime.infinityAutomationUnlocked?.() || false;
+  const infinityUpgradeUnlocked = runtime.infinityUpgradeAutomationUnlocked?.() || false;
   if (!runtime.elements.automationMasterToggle) return;
   runtime.elements.automationLockNote.textContent = unlocked ? runtime.t("infinityUpgradeAvailable") : runtime.t("automationLocked");
   runtime.elements.automationMasterToggle.disabled = !unlocked;
   runtime.elements.autoBuySpeedToggle.disabled = !unlocked;
   runtime.elements.autoBuyVertexToggle.disabled = !unlocked;
   runtime.elements.autoBuyGainToggle.disabled = !unlocked;
+  if (runtime.elements.autoBuyInfinityUpgradesToggle) {
+    runtime.elements.autoBuyInfinityUpgradesToggle.disabled = !infinityUpgradeUnlocked;
+  }
   const milestoneEightUnlocked = runtime.eternityMilestoneActive?.("8") === true;
   [
     runtime.elements.autoBuyInfiniteAngleSpeedToggle,
@@ -49,6 +53,7 @@ function updateAutomationUi() {
   runtime.syncFormControl(runtime.elements.autoBuySpeedToggle, runtime.state.autoBuySpeed);
   runtime.syncFormControl(runtime.elements.autoBuyVertexToggle, runtime.state.autoBuyVertex);
   runtime.syncFormControl(runtime.elements.autoBuyGainToggle, runtime.state.autoBuyGain);
+  if (runtime.elements.autoBuyInfinityUpgradesToggle) runtime.syncFormControl(runtime.elements.autoBuyInfinityUpgradesToggle, runtime.state.autoBuyInfinityUpgrades);
   runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleSpeedToggle, runtime.state.autoBuyInfiniteAngleSpeed);
   runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleVertexToggle, runtime.state.autoBuyInfiniteAngleVertex);
   runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleGainToggle, runtime.state.autoBuyInfiniteAngleGain);

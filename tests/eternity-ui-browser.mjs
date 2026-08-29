@@ -54,6 +54,7 @@ try {
     debug.state.eternityCount = 0;
     debug.state.eternityMilestoneMask = 0;
     debug.state.eternityMilestoneChoice = "";
+    debug.state.infinityUpgradeMask = 0;
     debug.state.completedTowerChallenges = 0;
     debug.runtime.syncInfinityPointCachesFromExact(0n);
     debug.runtime.appliedLanguage = "";
@@ -86,8 +87,10 @@ try {
     autoIaVertexDisabled: document.getElementById("autoBuyInfiniteAngleVertexToggle")?.disabled,
     autoIaGainDisabled: document.getElementById("autoBuyInfiniteAngleGainToggle")?.disabled,
     autoTowerDisabled: document.getElementById("autoBuildTowerToggle")?.disabled,
+    autoInfinityUpgradesDisabled: document.getElementById("autoBuyInfinityUpgradesToggle")?.disabled,
     autoIaSpeedChecked: document.getElementById("autoBuyInfiniteAngleSpeedToggle")?.checked,
     autoTowerChecked: document.getElementById("autoBuildTowerToggle")?.checked,
+    autoInfinityUpgradesChecked: document.getElementById("autoBuyInfinityUpgradesToggle")?.checked,
     button11: document.querySelector('[data-eternity-choice="1-1"]')?.textContent,
     disabled11: document.querySelector('[data-eternity-choice="1-1"]')?.disabled,
     entitlement: document.getElementById("eternityChoiceEntitlement")?.textContent,
@@ -119,8 +122,10 @@ try {
   assert.equal(initial.autoIaVertexDisabled, true, "IA Vertex automation should be unavailable before Milestone 8");
   assert.equal(initial.autoIaGainDisabled, true, "IA Gain automation should be unavailable before Milestone 8");
   assert.equal(initial.autoTowerDisabled, true, "Tower automation should be unavailable before Milestone 8");
+  assert.equal(initial.autoInfinityUpgradesDisabled, true, "Infinity Upgrade automation should be unavailable before Milestone 5");
   assert.equal(initial.autoIaSpeedChecked, false, "IA Speed automation should default off");
   assert.equal(initial.autoTowerChecked, false, "Tower automation should default off");
+  assert.equal(initial.autoInfinityUpgradesChecked, false, "Infinity Upgrade automation should default off");
   assert.equal(initial.button11, "未解放", "first-tier Milestones should not be acquirable before the first Eternity");
   assert.equal(initial.disabled11, true, "first-tier acquisition controls should be disabled before an entitlement exists");
   assert.equal(initial.entitlement, "現在取得できるMilestoneはありません。", "the UI should explain the lack of a current acquisition right");
@@ -180,6 +185,35 @@ try {
   assert.equal(progressed.locked6, "未解放", "Milestone 6 should remain locked at Eternity 5");
   assert.equal(progressed.locked7, "未解放", "Milestone 7 should remain locked at Eternity 5");
   assert.equal(progressed.entitlement, "現在取得可能: 2", "unused first-tier acquisition rights should accumulate and remain visible");
+
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.eternityCount = 20;
+    debug.state.eternityMilestoneMask = 0;
+    debug.runtime.updateUi();
+  });
+  const milestoneFiveAutomation = await page.evaluate(() => ({
+    toggleDisabled: document.getElementById("autoBuyInfinityUpgradesToggle")?.disabled,
+    toggleChecked: document.getElementById("autoBuyInfinityUpgradesToggle")?.checked,
+    automationTabHidden: document.querySelector('[data-tab="automation"]')?.hidden,
+  }));
+  assert.equal(milestoneFiveAutomation.toggleDisabled, false, "Milestone 5 should enable the Infinity Upgrade automation toggle");
+  assert.equal(milestoneFiveAutomation.toggleChecked, false, "Milestone 5 should leave the Infinity Upgrade automation toggle off");
+  assert.equal(milestoneFiveAutomation.automationTabHidden, true, "Milestone 5 must not change the separate top-level Automation unlock");
+
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.eternityMilestoneMask = 1;
+    debug.runtime.updateUi();
+  });
+  await page.click('[data-tab="automation"]');
+  await page.locator("#autoBuyInfinityUpgradesToggle").check();
+  assert.equal(
+    await page.evaluate(() => window.__angleDebug.state.autoBuyInfinityUpgrades),
+    true,
+    "the Infinity Upgrade automation toggle should update the persisted setting",
+  );
+  await page.click('[data-tab="eternity"]');
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;

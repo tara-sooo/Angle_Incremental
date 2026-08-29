@@ -98,7 +98,11 @@ function normalAutomationUnlocked() {
 }
 
 function infinityAutomationUnlocked() {
-  return runtime.hasInfinityUpgrade("8-1") || eternityMilestoneActive("5");
+  return runtime.hasInfinityUpgrade("8-1");
+}
+
+function infinityUpgradeAutomationUnlocked() {
+  return eternityMilestoneActive("5");
 }
 
 function eternityRequirementExact() {
@@ -209,6 +213,7 @@ expose("eternityMilestonePreservesCoreBoostReset", () => eternityMilestonePreser
 expose("eternityMilestoneCoreBoostRequirementLog10", () => eternityMilestoneCoreBoostRequirementLog10);
 expose("normalAutomationUnlocked", () => normalAutomationUnlocked);
 expose("infinityAutomationUnlocked", () => infinityAutomationUnlocked);
+expose("infinityUpgradeAutomationUnlocked", () => infinityUpgradeAutomationUnlocked);
 expose("canEternity", () => canEternity);
 expose("shouldForceEternity", () => shouldForceEternity);
 expose("resetEternityProgression", () => resetEternityProgression);
