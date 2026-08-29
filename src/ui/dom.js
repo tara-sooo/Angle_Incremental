@@ -137,6 +137,7 @@ const elements = {
   autoBuySpeedToggle: document.getElementById("autoBuySpeedToggle"),
   autoBuyVertexToggle: document.getElementById("autoBuyVertexToggle"),
   autoBuyGainToggle: document.getElementById("autoBuyGainToggle"),
+  autoBuyInfinityUpgradesToggle: document.getElementById("autoBuyInfinityUpgradesToggle"),
   autoBuyInfiniteAngleSpeedToggle: document.getElementById("autoBuyInfiniteAngleSpeedToggle"),
   autoBuyInfiniteAngleVertexToggle: document.getElementById("autoBuyInfiniteAngleVertexToggle"),
   autoBuyInfiniteAngleGainToggle: document.getElementById("autoBuyInfiniteAngleGainToggle"),

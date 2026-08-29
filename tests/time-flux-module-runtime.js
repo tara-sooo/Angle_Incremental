@@ -763,7 +763,8 @@ async function runTimeFluxModuleRuntimeTest() {
   const aggregationRuntime = aggregationInstance.runtime;
   const aggregationState = aggregationInstance.debug.state;
   const infinityAutomationUpgrade = aggregationRuntime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "8-1");
-  aggregationState.infinityUpgradeMask = 1 << infinityAutomationUpgrade.bit;
+  aggregationState.eternityCount = 20;
+  aggregationState.infinityUpgradeMask = 0;
   aggregationState.infinityCount = 1;
   aggregationState.bestInfinityCountPerSecond = 2;
   aggregationState.infinityCountRateRemainder = 0.5;
@@ -776,6 +777,11 @@ async function runTimeFluxModuleRuntimeTest() {
   const aggregationOriginalUpdate = aggregationRuntime.update;
   aggregationRuntime.update = () => {};
   try {
+    const milestoneOnlyReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });
+    assert.equal(milestoneOnlyReport.aggregatedInfinityCountGain, 0, "Milestone 5 alone must not enable offline Auto Infinity aggregation");
+    assert.equal(aggregationState.infinityCount, 1, "Milestone 5 alone must not add aggregated Infinity");
+
+    aggregationState.infinityUpgradeMask = 1 << infinityAutomationUpgrade.bit;
     const aggregateReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });
     assert.equal(aggregateReport.normalInfinityCountGain, 0, "the aggregate test should have no normal Infinity gain");
     assert.equal(aggregateReport.aggregatedInfinityCountGain, 20, "aggregation should not double a recorded Achievement 38 count rate");

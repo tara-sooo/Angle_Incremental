@@ -338,15 +338,33 @@ function runInfinity(forced = false) {
   runtime.saveGame("manual");
 }
 
-function buyInfinityUpgrade(id) {
+function buyInfinityUpgrade(id, { refresh = true, save = true } = {}) {
   const upgrade = infinityUpgradeById(id);
   if (!upgrade || !canBuyInfinityUpgrade(id)) return false;
   if (!spendInfinityPoints(runtime.log10Value(upgrade.cost))) return false;
   runtime.state.infinityUpgradeMask |= 1 << upgrade.bit;
   if (id === "10-1") applyStartingCoreBoosts();
-  runtime.updateUi();
-  runtime.saveGame("manual");
+  if (refresh) runtime.updateUi();
+  if (save) runtime.saveGame("manual");
   return true;
+}
+
+function buyAllInfinityUpgrades({ refresh = true, save = true } = {}) {
+  if (runtime.infinityUpgradeAutomationUnlocked?.() !== true) return 0;
+  let purchased = 0;
+  let changed = true;
+  while (changed && purchased < runtime.INFINITY_UPGRADES.length) {
+    changed = false;
+    for (const upgrade of runtime.INFINITY_UPGRADES) {
+      if (buyInfinityUpgrade(upgrade.id, { refresh: false, save: false })) {
+        purchased += 1;
+        changed = true;
+      }
+    }
+  }
+  if (purchased > 0 && refresh) runtime.updateUi();
+  if (purchased > 0 && save) runtime.saveGame("manual");
+  return purchased;
 }
 
 function toggleInfinityChallenge(index = nextChallengeIndex()) {
@@ -415,5 +433,6 @@ expose("infinityCountGain", () => infinityCountGain, (value) => { infinityCountG
 expose("addAggregatedInfinityCount", () => addAggregatedInfinityCount, (value) => { addAggregatedInfinityCount = value; });
 expose("runInfinity", () => runInfinity, (value) => { runInfinity = value; });
 expose("buyInfinityUpgrade", () => buyInfinityUpgrade, (value) => { buyInfinityUpgrade = value; });
+expose("buyAllInfinityUpgrades", () => buyAllInfinityUpgrades, (value) => { buyAllInfinityUpgrades = value; });
 expose("toggleInfinityChallenge", () => toggleInfinityChallenge, (value) => { toggleInfinityChallenge = value; });
 expose("breakInfiniteCap", () => breakInfiniteCap, (value) => { breakInfiniteCap = value; });

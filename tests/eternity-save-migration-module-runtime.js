@@ -15,6 +15,7 @@ function setPersistentFixture(state) {
   state.eternityCount = 12;
   state.eternityMilestoneMask = 5;
   state.eternityMilestoneChoice = "1-2";
+  state.autoBuyInfinityUpgrades = true;
   state.achievementMaskHigh = ACHIEVEMENT_38_TO_41_MASK;
   state.timeFlux = 321;
   state.timeFluxCapacityLevel = 2;
@@ -27,6 +28,7 @@ function assertPersistentFixture(state, runtime, messagePrefix) {
   assert.equal(state.eternityCount, 12, `${messagePrefix}: Eternity count should persist`);
   assert.equal(state.eternityMilestoneMask, 5, `${messagePrefix}: Milestone ownership should persist`);
   assert.equal(state.eternityMilestoneChoice, "1-2", `${messagePrefix}: legacy pending-choice data should remain safely readable`);
+  assert.equal(state.autoBuyInfinityUpgrades, true, `${messagePrefix}: Infinity Upgrade automation should persist`);
   assert.equal(runtime.firstTierMilestoneEntitlementCount(), 1, `${messagePrefix}: entitlement should derive from count and ownership`);
   assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), ["1-2"], `${messagePrefix}: legacy pending-choice data must not consume the remaining entitlement`);
   assert.equal(
@@ -50,6 +52,7 @@ async function testLegacyDefaults() {
   delete legacy.state.eternityMilestoneMask;
   delete legacy.state.eternityMilestoneChoice;
   delete legacy.state.achievementMaskHigh;
+  delete legacy.state.autoBuyInfinityUpgrades;
 
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(legacy)]]));
   assert.equal(loaded.debug.state.eternityCount, 0, "legacy saves should default Eternity count to zero");
@@ -57,6 +60,7 @@ async function testLegacyDefaults() {
   assert.equal(loaded.debug.state.eternityMilestoneChoice, "", "legacy saves should default the retired pending-choice field to empty");
   assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 0, "legacy saves without Eternities must not receive an acquisition entitlement");
   assert.equal(loaded.debug.state.achievementMaskHigh, 0, "legacy saves should default the high achievement mask safely");
+  assert.equal(loaded.debug.state.autoBuyInfinityUpgrades, false, "legacy saves should default Infinity Upgrade automation off");
   assert.equal(loaded.runtime.SAVE_VERSION, 11, "Milestone 1-3 free-level semantics should use save version 11");
 }
 

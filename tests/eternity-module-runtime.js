@@ -75,7 +75,8 @@ async function testMilestoneThresholdsAndEffects() {
   assert.equal(runtime.eternityMilestoneActive("4"), true);
   state.eternityCount = 20;
   assert.equal(runtime.eternityMilestoneActive("5"), true);
-  assert.equal(runtime.infinityAutomationUnlocked(), true, "5 should unlock the existing Infinity automation path");
+  assert.equal(runtime.infinityUpgradeAutomationUnlocked(), true, "5 should unlock Infinity Upgrade automation");
+  assert.equal(runtime.infinityAutomationUnlocked(), false, "5 must not unlock the existing Auto Infinity path");
 
   state.eternityMilestoneMask = 1;
   state.eternityCount = 1;
@@ -96,8 +97,13 @@ async function testMilestoneThresholdsAndEffects() {
   state.activeChallenge = 0;
   state.activeTowerChallenge = 0;
   setScore(state, 309);
-  assert.equal(runtime.runLayerAutomation(), true, "5 should unlock the existing Infinity-layer automation");
-  assert.equal(state.infinityCount, 2, "milestone 5 automation should still use the normal Infinity action");
+  assert.equal(runtime.runLayerAutomation(), false, "5 must not unlock the existing Infinity-layer automation");
+  assert.equal(state.infinityCount, 1, "Milestone 5 must not run Auto Infinity");
+
+  state.infinityUpgradeMask = 1 << 12;
+  assert.equal(runtime.infinityAutomationUnlocked(), true, "IU 8-1 should remain the Auto Infinity unlock");
+  assert.equal(runtime.runLayerAutomation(), true, "IU 8-1 should still unlock the existing Infinity-layer automation");
+  assert.equal(state.infinityCount, 2, "Auto Infinity should still use the normal Infinity action");
 
   state.eternityMilestoneMask = 2;
   state.eternityCount = 2;
@@ -233,6 +239,46 @@ async function testMilestoneThresholdsAndEffects() {
     [1, 1, 1],
     "TC4 must keep each IA track at its normal one-level restriction",
   );
+}
+
+async function testMilestoneFiveInfinityUpgradeAutomation() {
+  const { debug, runtime } = await loadRuntime(candidatePath);
+  const { state } = debug;
+
+  state.eternityCount = 19;
+  state.eternityMilestoneMask = 1;
+  state.automationEnabled = true;
+  state.autoBuyInfinityUpgrades = true;
+  runtime.syncInfinityPointCachesFromExact(2n);
+  assert.equal(runtime.infinityUpgradeAutomationUnlocked(), false, "Milestone 5 must stay locked below Eternity 20");
+  assert.equal(runtime.buyAllInfinityUpgrades({ refresh: false, save: false }), 0, "locked IU automation must not buy upgrades");
+
+  state.eternityCount = 20;
+  state.infinityUpgradeMask = 0;
+  state.autoBuyInfinityUpgrades = false;
+  runtime.syncInfinityPointCachesFromExact(2n);
+  runtime.runAutobuyers();
+  assert.equal(state.infinityUpgradeMask, 0, "the IU autobuyer must stay off by default");
+  assert.equal(runtime.currentExactInfinityPoints(), 2n, "the IU autobuyer must not spend while disabled");
+
+  state.autoBuyInfinityUpgrades = true;
+  state.automationEnabled = false;
+  runtime.runAutobuyers();
+  assert.equal(state.infinityUpgradeMask, 0, "the IU autobuyer must require the normal Automation master switch");
+  assert.equal(runtime.currentExactInfinityPoints(), 2n, "the master switch gate must not spend IP");
+
+  state.automationEnabled = true;
+  runtime.runAutobuyers();
+  assert.equal(state.infinityUpgradeMask, 3, "the IU autobuyer must purchase both affordable root upgrades");
+  assert.equal(runtime.currentExactInfinityPoints(), 0n, "the IU autobuyer must spend the exact purchase costs");
+  assert.equal(runtime.hasInfinityUpgrade("2-1"), false, "the IU autobuyer must not grant unaffordable upgrades for free");
+  assert.equal(runtime.infinityAutomationUnlocked(), false, "M5 purchases must not unlock Auto Infinity");
+
+  state.infinityUpgradeMask = 0;
+  runtime.syncInfinityPointCachesFromExact(14n);
+  assert.equal(runtime.buyAllInfinityUpgrades({ refresh: false, save: false }), 6, "the bulk buyer must follow the canonical prerequisite chain");
+  assert.equal(state.infinityUpgradeMask, (1 << 6) - 1, "the bulk buyer must purchase only the six affordable canonical upgrades");
+  assert.equal(runtime.currentExactInfinityPoints(), 0n, "the canonical bulk buyer must spend each upgrade cost exactly once");
 }
 
 async function testMilestoneSixCompletionState() {
@@ -394,6 +440,7 @@ async function testThresholdAndResetBoundary() {
   state.timeFluxCustomSpeed = 6;
   state.automationEnabled = true;
   state.autoRunInfinity = true;
+  state.autoBuyInfinityUpgrades = true;
   state.autoInfinityPointThresholdLog10 = 77;
   state.autoBuyInfiniteAngleSpeed = true;
   state.autoBuyInfiniteAngleVertex = false;
@@ -439,6 +486,7 @@ async function testThresholdAndResetBoundary() {
   assert.equal(state.timeFluxCustomSpeed, 6, "Eternity must preserve custom Time Flux speed");
   assert.equal(state.automationEnabled, true, "Eternity must preserve automation settings");
   assert.equal(state.autoRunInfinity, true, "Eternity must preserve automation toggles");
+  assert.equal(state.autoBuyInfinityUpgrades, true, "Eternity must preserve Infinity Upgrade automation");
   assert.equal(state.autoInfinityPointThresholdLog10, 77, "Eternity must preserve automation thresholds");
   assert.equal(state.autoBuyInfiniteAngleSpeed, true, "Eternity must preserve IA Speed automation");
   assert.equal(state.autoBuyInfiniteAngleVertex, false, "Eternity must preserve IA Vertex automation");
@@ -601,6 +649,7 @@ async function testBreakEternityBoundaryAndPersistence() {
   loaded.debug.state.activeTowerChallenge = 0;
   loaded.debug.state.scoreLog10 = 7777;
   loaded.debug.state.score = Number.MAX_VALUE;
+  loaded.debug.state.infinityUpgradeMask = 1 << 12;
   loaded.runtime.syncInfinityPointCachesFromExact(cap * 2n);
   const offlineBefore = loaded.runtime.currentExactInfinityPoints();
   loaded.debug.update(1 / 60, true);
@@ -610,6 +659,7 @@ async function testBreakEternityBoundaryAndPersistence() {
 async function runEternityModuleRuntimeTest() {
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
+  await testMilestoneFiveInfinityUpgradeAutomation();
   await testMilestoneSixCompletionState();
   await testMilestoneFreeLevelsAndSaveLoad();
   await testThresholdAndResetBoundary();

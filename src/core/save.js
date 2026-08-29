@@ -760,6 +760,7 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.autoBuySpeed = runtime.sanitizeBoolean(data.autoBuySpeed, true);
   runtime.state.autoBuyVertex = runtime.sanitizeBoolean(data.autoBuyVertex, true);
   runtime.state.autoBuyGain = runtime.sanitizeBoolean(data.autoBuyGain, true);
+  runtime.state.autoBuyInfinityUpgrades = runtime.sanitizeBoolean(data.autoBuyInfinityUpgrades, false);
   runtime.state.autoBuyInfiniteAngleSpeed = runtime.sanitizeBoolean(data.autoBuyInfiniteAngleSpeed, false);
   runtime.state.autoBuyInfiniteAngleVertex = runtime.sanitizeBoolean(data.autoBuyInfiniteAngleVertex, false);
   runtime.state.autoBuyInfiniteAngleGain = runtime.sanitizeBoolean(data.autoBuyInfiniteAngleGain, false);
@@ -1293,6 +1294,7 @@ function resetSave() {
     autoBuySpeed: true,
     autoBuyVertex: true,
     autoBuyGain: true,
+    autoBuyInfinityUpgrades: false,
     autoBuyInfiniteAngleSpeed: false,
     autoBuyInfiniteAngleVertex: false,
     autoBuyInfiniteAngleGain: false,
