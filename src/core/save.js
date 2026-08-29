@@ -599,6 +599,7 @@ function inferUnlockedMainTabs(data) {
     || automationEvidence
   ) discovered.push("automation");
   if (eternityCount > 0 || towerFloor >= tc4UnlockFloor || tc4Progress) discovered.push("eternity");
+  if (eternityCount > 0) discovered.push("timeline");
   runtime.markMainTabsUnlocked(discovered);
 }
 
@@ -663,6 +664,10 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.coreBoostCount = Math.floor(runtime.sanitizeNumber(data.coreBoostCount, 0));
   runtime.state.infinityCount = Math.floor(runtime.sanitizeNumber(data.infinityCount, 0));
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.sanitizeNumber(data.eternityCount, 0)));
+  runtime.state.scoreTfClaims = runtime.normalizeTimelineClaimCount?.(data.scoreTfClaims, 0) ?? 0;
+  runtime.state.ipTfClaims = runtime.normalizeTimelineClaimCount?.(data.ipTfClaims, 0) ?? 0;
+  runtime.state.eternityTfClaims = runtime.normalizeTimelineClaimCount?.(data.eternityTfClaims, 0) ?? 0;
+  runtime.state.timelinePurchasedNodes = runtime.normalizeTimelinePurchasedNodes?.(data.timelinePurchasedNodes) ?? [];
   runtime.state.eternityMilestoneMask = runtime.normalizeEternityMilestoneMask?.(data.eternityMilestoneMask) ?? 0;
   runtime.state.eternityMilestoneChoice = runtime.normalizeEternityMilestoneChoice?.(data.eternityMilestoneChoice) || "";
   const infiniteAngleFreeLevel = runtime.eternityMilestoneActive?.("1-3") === true ? 5 : 0;
@@ -953,6 +958,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
 function serializeSaveData() {
   runtime.normalizeInfinityPointState();
   runtime.normalizeTowerChallenge4State?.();
+  runtime.normalizeTimelineState?.();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
   runtime.state.achievementMaskHigh = ((Number(runtime.state.achievementMaskHigh) || 0) >>> 0);
   runtime.state.unlockedMainTabs = runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs);
@@ -1306,6 +1312,10 @@ function resetSave() {
     coreBoostCount: 0,
     infinityCount: 0,
     eternityCount: 0,
+    scoreTfClaims: 0,
+    ipTfClaims: 0,
+    eternityTfClaims: 0,
+    timelinePurchasedNodes: [],
     eternityMilestoneMask: 0,
     eternityMilestoneChoice: "",
     infinityPoints: 0,

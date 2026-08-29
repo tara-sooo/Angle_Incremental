@@ -178,13 +178,18 @@ function applyEternityMilestoneSixCompletionState() {
   }
 }
 
+function applyEternityRunStartState() {
+  applyEternityMilestoneSixCompletionState();
+  if (eternityMilestoneActive("9")) runtime.syncInfinityPointCachesFromExact(1000n);
+}
+
 function performEternity(options = {}) {
   if (!canEternity()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-eternity", { force: true })) return false;
   resetEternityProgression();
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.state.eternityCount)) + 1;
-  applyEternityMilestoneSixCompletionState();
-  if (eternityMilestoneActive("9")) runtime.syncInfinityPointCachesFromExact(1000n);
+  runtime.markMainTabsUnlocked?.(["timeline"]);
+  applyEternityRunStartState();
   runtime.state.eternityMilestoneChoice = "";
   runtime.checkAchievements(true);
   if (options.update !== false) runtime.updateUi?.();
@@ -217,5 +222,6 @@ expose("infinityUpgradeAutomationUnlocked", () => infinityUpgradeAutomationUnloc
 expose("canEternity", () => canEternity);
 expose("shouldForceEternity", () => shouldForceEternity);
 expose("resetEternityProgression", () => resetEternityProgression);
+expose("applyEternityRunStartState", () => applyEternityRunStartState);
 expose("performEternity", () => performEternity);
 expose("maybeForceEternity", () => maybeForceEternity);

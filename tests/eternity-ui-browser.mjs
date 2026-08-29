@@ -69,6 +69,7 @@ try {
     challengesHidden: document.querySelector('[data-tab="challenges"]')?.hidden,
     automationHidden: document.querySelector('[data-tab="automation"]')?.hidden,
     eternityHidden: document.querySelector('[data-tab="eternity"]')?.hidden,
+    timelineHidden: document.querySelector('[data-tab="timeline"]')?.hidden,
     statisticsHidden: document.querySelector('[data-tab="statistics"]')?.hidden,
     achievementsHidden: document.querySelector('[data-tab="achievements"]')?.hidden,
     helpHidden: document.querySelector('[data-tab="help"]')?.hidden,
@@ -78,6 +79,7 @@ try {
   assert.equal(lockedNavigation.challengesHidden, true, "CHAL should be hidden on a fresh new game");
   assert.equal(lockedNavigation.automationHidden, true, "AUTO should be hidden on a fresh new game");
   assert.equal(lockedNavigation.eternityHidden, true, "ETR should be hidden before TC4 unlock");
+  assert.equal(lockedNavigation.timelineHidden, true, "Timeline should be hidden before the first Eternity");
   assert.equal(lockedNavigation.statisticsHidden, false, "STAT should be available on a fresh new game");
   assert.equal(lockedNavigation.achievementsHidden, false, "ACH should be available on a fresh new game");
   assert.equal(lockedNavigation.helpHidden, false, "HELP should be available on a fresh new game");
@@ -204,6 +206,52 @@ try {
   assert.equal(earned.status, "取得可能", "unowned first-tier Milestones should show as available when entitlement exists");
   assert.equal(earned.button, "取得", "first-tier control should acquire immediately rather than reserve for the next Eternity");
   assert.equal(earned.disabled, false);
+
+  const timelineNavigation = await page.evaluate(() => ({
+    hidden: document.querySelector('[data-tab="timeline"]')?.hidden,
+    unlocked: window.__angleDebug.mainTabIsUnlocked("timeline"),
+  }));
+  assert.equal(timelineNavigation.hidden, false, "the first Eternity should reveal Timeline");
+  assert.equal(timelineNavigation.unlocked, true, "Timeline discovery should use the permanent main-tab state");
+  await page.click('[data-tab="timeline"]');
+  const timelineInitial = await page.evaluate(() => ({
+    active: document.querySelector('[data-panel="timeline"]')?.classList.contains("is-active"),
+    scoreRequirement: document.getElementById("timelineScoreRequirement")?.textContent,
+    ipRequirement: document.getElementById("timelineIpRequirement")?.textContent,
+    eternityRequirement: document.getElementById("timelineEternityRequirement")?.textContent,
+    scoreDisabled: document.getElementById("timelineScoreClaimButton")?.disabled,
+    warning: document.querySelector(".timeline-respec p")?.textContent,
+  }));
+  assert.equal(timelineInitial.active, true, "Timeline should be selectable as a top-level panel");
+  assert.equal(timelineInitial.scoreRequirement, "1.00e20,000 Score", "Timeline should show the exact initial Score requirement");
+  assert.equal(timelineInitial.ipRequirement, "1.00e400 IP", "Timeline should show the exact initial IP requirement");
+  assert.equal(timelineInitial.eternityRequirement, "2", "Timeline should show the exact initial Eternity requirement");
+  assert.equal(timelineInitial.scoreDisabled, true, "an unmet Timeline track should disable its claim control");
+  assert.match(timelineInitial.warning || "", /TF.*Eternity/, "Timeline should explain the respec consequences");
+
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.scoreLog10 = 25000;
+    debug.state.score = Number.MAX_VALUE;
+    debug.runtime.updateUi();
+  });
+  assert.equal(
+    await page.evaluate(() => document.getElementById("timelineScoreClaimButton")?.disabled),
+    false,
+    "a met Score requirement should enable its claim control",
+  );
+  await page.click("#timelineScoreClaimButton");
+  const timelineClaimed = await page.evaluate(() => ({
+    claims: window.__angleDebug.state.scoreTfClaims,
+    earned: document.getElementById("timelineEarnedTf")?.textContent,
+    next: document.getElementById("timelineScoreRequirement")?.textContent,
+    score: window.__angleDebug.state.scoreLog10,
+  }));
+  assert.equal(timelineClaimed.claims, 1, "Timeline claim controls should grant one TF");
+  assert.equal(timelineClaimed.earned, "1 TF", "Timeline should display earned TF");
+  assert.equal(timelineClaimed.next, "1.00e30,000 Score", "the Score requirement should advance after one claim");
+  assert.equal(timelineClaimed.score, 25000, "claiming TF must not consume Score");
+  await page.click('[data-tab="eternity"]');
 
   await page.click('[data-eternity-choice="1-1"]');
   const acquired = await page.evaluate(() => ({
@@ -410,6 +458,8 @@ try {
     effect9: document.querySelector('[data-i18n="eternityMilestone9Effect"]')?.textContent,
     title10: document.querySelector('[data-i18n="eternityMilestone10Name"]')?.textContent,
     effect10: document.querySelector('[data-i18n="eternityMilestone10Effect"]')?.textContent,
+    timelineTitle: document.querySelector('[data-i18n="timeline"]')?.textContent,
+    timelineWarning: document.querySelector('[data-i18n="timelineRespecWarning"]')?.textContent,
     manual: document.getElementById("eternityForcedNote")?.textContent,
   }));
   assert.equal(english.countLabel, "Eternity count", "Eternity UI should switch to English when the shared language state changes");
@@ -424,6 +474,8 @@ try {
   assert.match(english.effect9 || "", /Eternity 108\+.*1000.*Infinity Points/, "Milestone 9 English copy should describe the 1000 IP starting baseline");
   assert.equal(english.title10, "10 Eternity Is Balance", "Milestone 10 should have English copy");
   assert.match(english.effect10 || "", /Eternity 128\+.*Infinity Point cap.*requirement remains unchanged/, "Milestone 10 English copy should describe the uncapped IP range and unchanged requirement");
+  assert.equal(english.timelineTitle, "Timeline", "Timeline should have English copy");
+  assert.match(english.timelineWarning || "", /respec.*node.*TF.*Eternity run/i, "Timeline respec warning should have English copy");
   assert.match(english.manual || "", /manually/, "English copy should explain that Eternity is player-triggered");
   assert.doesNotMatch(english.manual || "", /performed automatically/, "English copy must not describe forced pre-Break Eternity");
 

@@ -255,7 +255,7 @@ async function testMainTabDiscoveryMigration() {
   const postEternity = await loadLegacy({ eternityCount: 1, infinityCount: 0, towerFloor: 0 });
   assert.deepEqual(
     Array.from(postEternity.debug.state.unlockedMainTabs),
-    ["infinity", "challenges", "automation", "eternity"],
+    ["infinity", "challenges", "automation", "eternity", "timeline"],
     "legacy saves with Eternity progress should retain every already-discovered progression tab",
   );
 
