@@ -113,7 +113,7 @@ const elements = {
   timelineEternityRequirement: document.getElementById("timelineEternityRequirement"),
   timelineEternityStatus: document.getElementById("timelineEternityStatus"),
   timelineEternityClaimButton: document.getElementById("timelineEternityClaimButton"),
-  timelineTree: document.querySelector(".timeline-tree"),
+  timelineTree: document.getElementById("timelineNodeGrid")?.parentElement,
   timelineNodeGrid: document.getElementById("timelineNodeGrid"),
   timelineNodeDetail: document.getElementById("timelineNodeDetail"),
   timelineNodeDetailEra: document.getElementById("timelineNodeDetailEra"),
