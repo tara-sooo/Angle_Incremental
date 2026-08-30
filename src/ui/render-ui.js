@@ -236,6 +236,71 @@ function formatTimelineEternityRequirement() {
     : `2^${claims + 1}`;
 }
 
+function localizedTimelineText(value) {
+  if (!value || typeof value !== "object") return "";
+  return value[runtime.state.language] || value.en || value.ja || "";
+}
+
+function timelineNodeStatusText(availability) {
+  switch (availability.reason) {
+    case "owned":
+      return runtime.t("timelineNodePurchased");
+    case "timeline-locked":
+      return runtime.t("timelineNodeLocked");
+    case "missing-prerequisites":
+      return runtime.t("timelineNodeMissingPrerequisites").replace(
+        "{nodes}",
+        availability.missingPrerequisites.join(", "),
+      );
+    case "route-conflict":
+      return runtime.t("timelineNodeAlternativeLocked");
+    case "insufficient-tf":
+      return runtime.t("timelineNodeNotEnoughTf").replace(
+        "{cost}",
+        String(availability.node.costTF),
+      );
+    default:
+      return runtime.t("timelineNodeAvailable");
+  }
+}
+
+function updateTimelineTreeUi() {
+  if (typeof runtime.timelineNodeAvailability !== "function") return;
+  (runtime.elements.timelineNodeCards || []).forEach((card) => {
+    const node = runtime.timelineNode?.(card.dataset.timelineNode);
+    if (!node) return;
+    const availability = runtime.timelineNodeAvailability(node.id);
+    const name = card.querySelector(".timeline-node-name");
+    const description = card.querySelector(".timeline-node-description");
+    const era = card.querySelector(".timeline-node-era");
+    const route = card.querySelector(".timeline-node-route");
+    const cost = card.querySelector(".timeline-node-cost");
+    const prerequisites = card.querySelector(".timeline-node-prerequisites");
+    const status = card.querySelector(".timeline-node-status");
+    const button = card.querySelector(".timeline-node-purchase");
+    if (name) name.textContent = localizedTimelineText(node.name);
+    if (description) description.textContent = localizedTimelineText(node.description);
+    if (era) era.textContent = node.era;
+    if (route) route.textContent = node.route;
+    if (cost) cost.textContent = `${runtime.formatUiNumber(node.costTF)} TF`;
+    if (prerequisites) prerequisites.textContent = node.prerequisites.length > 0
+      ? node.prerequisites.join(", ")
+      : runtime.t("timelineNoPrerequisites");
+    if (status) status.textContent = timelineNodeStatusText(availability);
+    if (button) {
+      button.disabled = !availability.canPurchase;
+      button.textContent = availability.reason === "owned"
+        ? runtime.t("timelineNodePurchased")
+        : runtime.t("timelinePurchase");
+    }
+    card.dataset.state = availability.reason;
+    card.classList.toggle("is-available", availability.canPurchase);
+    card.classList.toggle("is-owned", availability.reason === "owned");
+    card.classList.toggle("is-locked", !availability.canPurchase && availability.reason !== "owned");
+    card.classList.toggle("is-conflict", availability.reason === "route-conflict");
+  });
+}
+
 function updateTimelineUi() {
   if (!runtime.elements.timelineEarnedTf || typeof runtime.timelineEarnedTf !== "function") return;
   runtime.normalizeTimelineState?.();
@@ -294,6 +359,7 @@ function updateTimelineUi() {
   if (runtime.elements.timelineRespecButton) {
     runtime.elements.timelineRespecButton.disabled = runtime.timelineDiscovered?.() !== true;
   }
+  updateTimelineTreeUi();
 }
 
 function updateUi() {

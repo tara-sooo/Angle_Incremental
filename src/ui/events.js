@@ -232,6 +232,8 @@ function bindEvents() {
   runtime.elements.timelineScoreClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("score"));
   runtime.elements.timelineIpClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("ip"));
   runtime.elements.timelineEternityClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("eternity"));
+  runtime.elements.timelineRealBc16500PurchaseButton?.addEventListener("click", () => runtime.purchaseTimelineNode?.("Real-BC16500"));
+  runtime.elements.timelineParallelBc16500PurchaseButton?.addEventListener("click", () => runtime.purchaseTimelineNode?.("Parallel-BC16500"));
   runtime.elements.timelineRespecButton?.addEventListener("click", () => {
     if (typeof window.confirm === "function" && !window.confirm(runtime.t("timelineRespecConfirm"))) return;
     runtime.respecTimeline?.();

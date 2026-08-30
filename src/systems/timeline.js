@@ -1,8 +1,10 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { TIMELINE_NODES } from "../data/timeline-tree.js";
 
 const MAX_TIMELINE_COUNT = Number.MAX_SAFE_INTEGER;
 const MAX_ETERNITY_REQUIREMENT_EXPONENT = 1024;
 const TIMELINE_TRACK_IDS = Object.freeze(["score", "ip", "eternity"]);
+const TIMELINE_NODE_BY_ID = new Map(TIMELINE_NODES.map((node) => [node.id, node]));
 const TIMELINE_TRACKS = Object.freeze({
   score: Object.freeze({
     stateKey: "scoreTfClaims",
@@ -27,6 +29,11 @@ function normalizeTimelineCost(value) {
   return normalizeTimelineClaimCount(value, 0);
 }
 
+function timelineNodeById(value) {
+  const id = typeof value === "string" ? value.trim() : "";
+  return TIMELINE_NODE_BY_ID.get(id) || null;
+}
+
 function normalizeTimelinePurchasedNodes(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
@@ -35,7 +42,17 @@ function normalizeTimelinePurchasedNodes(value) {
     const id = typeof entry.id === "string" ? entry.id.trim() : "";
     if (!id || seen.has(id)) return nodes;
     seen.add(id);
-    nodes.push({ ...entry, id, costTF: normalizeTimelineCost(entry.costTF) });
+    const definition = timelineNodeById(id);
+    const normalized = {
+      ...entry,
+      id,
+      costTF: definition ? definition.costTF : normalizeTimelineCost(entry.costTF),
+    };
+    if (definition) {
+      normalized.era = definition.era;
+      normalized.route = definition.route;
+    }
+    nodes.push(normalized);
     return nodes;
   }, []);
 }
@@ -115,6 +132,91 @@ function timelineAvailableTf() {
   return Math.max(0, timelineEarnedTf() - timelineSpentTf());
 }
 
+function timelineNodes() {
+  return TIMELINE_NODES;
+}
+
+function timelineNode(nodeId) {
+  return timelineNodeById(nodeId);
+}
+
+function resolveTimelineNode(nodeOrId) {
+  if (typeof nodeOrId === "string") return timelineNodeById(nodeOrId);
+  return nodeOrId && typeof nodeOrId === "object" && typeof nodeOrId.id === "string"
+    ? nodeOrId
+    : null;
+}
+
+function timelineNodeIsPurchased(node) {
+  return runtime.state.timelinePurchasedNodes.some((purchased) => purchased.id === node.id);
+}
+
+function timelineNodeMissingPrerequisites(node) {
+  const ownedIds = new Set(runtime.state.timelinePurchasedNodes.map((purchased) => purchased.id));
+  const prerequisites = Array.isArray(node.prerequisites) ? node.prerequisites : [];
+  return prerequisites.filter((id) => !ownedIds.has(id));
+}
+
+function timelineNodeHasRouteConflict(node) {
+  normalizeTimelineState();
+  if (node.route !== "Real" && node.route !== "Parallel") return false;
+  return runtime.state.timelinePurchasedNodes.some((purchased) => (
+    purchased.id !== node.id
+    && purchased.era === node.era
+    && (purchased.route === "Real" || purchased.route === "Parallel")
+    && purchased.route !== node.route
+  ));
+}
+
+function timelineNodeAvailability(nodeOrId) {
+  const node = resolveTimelineNode(nodeOrId);
+  if (!node) {
+    return {
+      node: null,
+      canPurchase: false,
+      state: "unknown",
+      reason: "unknown-node",
+      missingPrerequisites: [],
+    };
+  }
+  normalizeTimelineState();
+  if (!timelineDiscovered()) {
+    return { node, canPurchase: false, state: "locked", reason: "timeline-locked", missingPrerequisites: [] };
+  }
+  if (timelineNodeIsPurchased(node)) {
+    return { node, canPurchase: false, state: "purchased", reason: "owned", missingPrerequisites: [] };
+  }
+  const missingPrerequisites = timelineNodeMissingPrerequisites(node);
+  if (missingPrerequisites.length > 0) {
+    return { node, canPurchase: false, state: "locked", reason: "missing-prerequisites", missingPrerequisites };
+  }
+  if (timelineNodeHasRouteConflict(node)) {
+    return { node, canPurchase: false, state: "locked", reason: "route-conflict", missingPrerequisites: [] };
+  }
+  const costTF = normalizeTimelineCost(node.costTF);
+  if (timelineAvailableTf() < costTF) {
+    return { node, canPurchase: false, state: "locked", reason: "insufficient-tf", missingPrerequisites: [] };
+  }
+  return { node, canPurchase: true, state: "available", reason: "available", missingPrerequisites: [] };
+}
+
+function canPurchaseTimelineNode(nodeId) {
+  return timelineNodeAvailability(nodeId).canPurchase;
+}
+
+function purchaseTimelineNode(nodeId, options = {}) {
+  const availability = timelineNodeAvailability(nodeId);
+  if (!availability.canPurchase) return false;
+  const { node } = availability;
+  runtime.state.timelinePurchasedNodes = normalizeTimelinePurchasedNodes([
+    ...runtime.state.timelinePurchasedNodes,
+    { id: node.id, era: node.era, route: node.route, costTF: normalizeTimelineCost(node.costTF) },
+  ]);
+  if (options.update !== false) runtime.updateUi?.();
+  if (options.save !== false) runtime.saveGame?.("manual");
+  return true;
+}
+
 function canClaimTimelineTf(trackId) {
   return Boolean(TIMELINE_TRACKS[trackId]) && timelineRequirementMet(trackId);
 }
@@ -167,6 +269,14 @@ expose("timelineRequirementMet", () => timelineRequirementMet);
 expose("timelineEarnedTf", () => timelineEarnedTf);
 expose("timelineSpentTf", () => timelineSpentTf);
 expose("timelineAvailableTf", () => timelineAvailableTf);
+expose("TIMELINE_NODES", () => TIMELINE_NODES);
+expose("timelineNodes", () => timelineNodes);
+expose("timelineNode", () => timelineNode);
+expose("timelineNodeIsPurchased", () => timelineNodeIsPurchased);
+expose("timelineNodeHasRouteConflict", () => timelineNodeHasRouteConflict);
+expose("timelineNodeAvailability", () => timelineNodeAvailability);
+expose("canPurchaseTimelineNode", () => canPurchaseTimelineNode);
+expose("purchaseTimelineNode", () => purchaseTimelineNode);
 expose("canClaimTimelineTf", () => canClaimTimelineTf);
 expose("claimTimelineTf", () => claimTimelineTf);
 expose("claimScoreTf", () => claimScoreTf);

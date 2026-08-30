@@ -64,6 +64,75 @@ async function testManualTracks() {
   assert.equal(runtime.timelineEarnedTf(), 5, "earned TF should derive from the three claim counters");
 }
 
+async function testTimelineTreePurchases() {
+  const locked = await loadRuntime(candidatePath);
+  locked.debug.state.scoreTfClaims = 1;
+  assert.equal(locked.runtime.timelineNodeAvailability("Real-BC16500").reason, "timeline-locked");
+  assert.equal(locked.runtime.canPurchaseTimelineNode("Real-BC16500"), false, "Timeline nodes must stay locked before discovery");
+
+  const { debug, runtime } = await loadRuntime(candidatePath);
+  const { state } = debug;
+  state.eternityCount = 1;
+  state.scoreTfClaims = 1;
+  runtime.updateUi();
+  assert.deepEqual(
+    Array.from(runtime.timelineNodes(), (node) => node.id),
+    ["Real-BC16500", "Parallel-BC16500"],
+    "the first era should expose exactly the two canonical route nodes",
+  );
+  assert.deepEqual(
+    Array.from(runtime.timelineNodes(), (node) => [node.era, node.route, node.costTF, Array.from(node.prerequisites)]),
+    [
+      ["BC16500", "Real", 1, []],
+      ["BC16500", "Parallel", 1, []],
+    ],
+    "first-era definitions should carry independent route metadata and one-TF costs",
+  );
+  assert.equal(runtime.timelineAvailableTf(), 1);
+  assert.equal(runtime.canPurchaseTimelineNode("Real-BC16500"), true);
+  assert.equal(runtime.canPurchaseTimelineNode("Parallel-BC16500"), true, "either route should be purchasable before a route is selected");
+  assert.equal(runtime.purchaseTimelineNode("Real-BC16500", { save: false, update: false }), true);
+  assert.equal(state.timelinePurchasedNodes.length, 1);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(state.timelinePurchasedNodes[0])),
+    { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
+    "purchases should store the canonical node metadata",
+  );
+  assert.equal(runtime.timelineEarnedTf(), 1, "purchasing must not reduce earned TF");
+  assert.equal(runtime.timelineSpentTf(), 1);
+  assert.equal(runtime.timelineAvailableTf(), 0, "purchasing should spend only available TF");
+  assert.equal(runtime.purchaseTimelineNode("Real-BC16500", { save: false, update: false }), false, "duplicate purchases must be rejected");
+  assert.equal(runtime.timelineNodeAvailability("Parallel-BC16500").reason, "route-conflict");
+  assert.equal(runtime.purchaseTimelineNode("Parallel-BC16500", { save: false, update: false }), false, "the same-era alternative route must be locked");
+  assert.equal(state.scoreTfClaims, 1, "node purchases must not change claim history");
+
+  const missingPrerequisite = runtime.timelineNodeAvailability({
+    id: "future-node",
+    era: "BC14000",
+    route: "Parallel",
+    costTF: 1,
+    prerequisites: ["future-prerequisite"],
+  });
+  assert.equal(missingPrerequisite.reason, "missing-prerequisites", "prerequisite checks should be generic for later nodes");
+  assert.equal(
+    runtime.timelineNodeHasRouteConflict({ id: "future-parallel", era: "BC14000", route: "Parallel" }),
+    false,
+    "a later era may independently choose the opposite route",
+  );
+
+  assert.equal(runtime.respecTimeline({ save: false, update: false }), true);
+  assert.equal(runtime.timelineAvailableTf(), 1, "respec should restore the spent TF through derived accounting");
+  assert.equal(runtime.purchaseTimelineNode("Parallel-BC16500", { save: false, update: false }), true, "the other route should be available after respec");
+  assert.equal(runtime.timelineNodeAvailability("Real-BC16500").reason, "route-conflict", "exclusivity should work in the reverse direction");
+
+  const serialized = runtime.serializeSaveData();
+  const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(serialized)]]));
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.debug.state.timelinePurchasedNodes)), [
+    { id: "Parallel-BC16500", era: "BC16500", route: "Parallel", costTF: 1 },
+  ], "save/load should preserve the canonical purchased node");
+  assert.equal(loaded.runtime.timelineAvailableTf(), 0);
+}
+
 async function testResetPersistenceAndRespec() {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
@@ -72,24 +141,24 @@ async function testResetPersistenceAndRespec() {
   state.ipTfClaims = 1;
   state.eternityTfClaims = 3;
   state.timelinePurchasedNodes = [
-    { id: "future-node", era: "future", route: "Real", costTF: 2 },
+    { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
   ];
   state.eternityMilestoneMask = 5;
   state.totalPlayTime = 321;
   markEternityReady(runtime, state);
 
-  assert.equal(runtime.timelineAvailableTf(), 4, "available TF should subtract canonical node costs");
+  assert.equal(runtime.timelineAvailableTf(), 5, "available TF should subtract canonical node costs");
   assert.equal(debug.performEternity({ save: false, update: false }), true, "ordinary Eternity should remain executable");
   assert.equal(state.eternityCount, 13);
   assert.equal(state.timelinePurchasedNodes.length, 1, "ordinary Eternity must preserve the Timeline build");
-  assert.equal(state.timelinePurchasedNodes[0].id, "future-node");
-  assert.equal(state.timelinePurchasedNodes[0].costTF, 2);
+  assert.equal(state.timelinePurchasedNodes[0].id, "Real-BC16500");
+  assert.equal(state.timelinePurchasedNodes[0].costTF, 1);
   assert.deepEqual(
     [state.scoreTfClaims, state.ipTfClaims, state.eternityTfClaims],
     [2, 1, 3],
     "ordinary Eternity must preserve all TF claim counters",
   );
-  assert.equal(runtime.timelineAvailableTf(), 4, "ordinary Eternity must preserve unused TF");
+  assert.equal(runtime.timelineAvailableTf(), 5, "ordinary Eternity must preserve unused TF");
   assert.equal(state.eternityMilestoneMask, 5, "resets must preserve permanent Milestones");
   assert.equal(state.totalPlayTime, 321, "resets must preserve permanent statistics");
 
@@ -152,6 +221,7 @@ async function testSaveCompatibility() {
 
 async function runTimelineModuleRuntimeTest() {
   await testManualTracks();
+  await testTimelineTreePurchases();
   await testResetPersistenceAndRespec();
   await testSaveCompatibility();
   console.log("Timeline module runtime tests passed");

@@ -1796,6 +1796,20 @@ function renderGameToText() {
         ip: runtime.canClaimTimelineTf("ip"),
         eternity: runtime.canClaimTimelineTf("eternity"),
       },
+      nodes: runtime.timelineNodes().map((node) => {
+        const availability = runtime.timelineNodeAvailability(node.id);
+        return {
+          id: node.id,
+          era: node.era,
+          route: node.route,
+          costTF: node.costTF,
+          prerequisites: node.prerequisites,
+          name: node.name?.[runtime.state.language] || node.name?.en || node.name?.ja || "",
+          canPurchase: availability.canPurchase,
+          state: availability.state,
+          reason: availability.reason,
+        };
+      }),
       purchasedNodes: runtime.state.timelinePurchasedNodes,
     },
     achievements: {
@@ -1990,6 +2004,10 @@ window.__angleDebug = {
   timelineEarnedTf: runtime.timelineEarnedTf,
   timelineAvailableTf: runtime.timelineAvailableTf,
   timelineSpentTf: runtime.timelineSpentTf,
+  timelineNodes: runtime.timelineNodes,
+  timelineNodeAvailability: runtime.timelineNodeAvailability,
+  canPurchaseTimelineNode: runtime.canPurchaseTimelineNode,
+  purchaseTimelineNode: runtime.purchaseTimelineNode,
   respecTimeline: runtime.respecTimeline,
   maybeForceEternity: runtime.maybeForceEternity,
   selectEternityMilestone: runtime.selectEternityMilestone,
