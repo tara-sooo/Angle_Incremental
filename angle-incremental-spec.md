@@ -237,6 +237,7 @@ Infinity実行時、Infinity未満の進行をリセットする。
 | Infinity Angle | 解放状態とIA通常強化レベルを保持 |
 | Infinity Score | 0 |
 | Infinity run time | ゲーム時間・実時間ともに0 |
+
 Infinity回数、IP、IU、ICクリア状況、Break Infinite Cap、実績、設定、統計履歴は保持する。
 
 ### 7.3 スコアソフトキャップ
@@ -476,6 +477,7 @@ CB要求量log10 = log10(1.00e20) * (CB要求量実効指数 ^ Core Boost回数)
 ## 13. 実績
 
 実績は41個あり、すべてのリセットを超えて保持される。
+
 ```text
 実績倍率 = 1.01 ^ 達成済み実績数
 ```
