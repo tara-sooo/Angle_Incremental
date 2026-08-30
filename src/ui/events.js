@@ -116,9 +116,7 @@ function switchMainTab(tab) {
 }
 
 function switchEternitySubtab(tab) {
-  const nextTab = tab === "timeline" && runtime.timelineDiscovered?.() === true
-    ? "timeline"
-    : "milestone";
+  const nextTab = tab === "timeline" ? "timeline" : "milestone";
   runtime.activeEternitySubtab = nextTab;
   (runtime.elements.eternitySubtabs || []).forEach((button) => {
     const active = button.dataset.eternityTab === nextTab;
