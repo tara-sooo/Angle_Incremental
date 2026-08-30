@@ -1,11 +1,13 @@
 {
   "scripts": {
     "check:runtime-order": "node scripts/check-runtime-esm-loader-order.js",
-    "check:syntax": "node --check regression-tests-esm.js && node --check tests/version-consistency.mjs && node --check scripts/idd-issue-association.mjs && node --check scripts/local-performance-gate.mjs && node --check tests/local-performance-gate.mjs && node --check tests/browser-harness.mjs && node --check tests/performance-smoke.mjs && node --check tests/render-regression.mjs && node --check tests/offline-stress.mjs && node --check tests/validation-layer-policy.mjs && find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check",
+    "check:syntax": "node --check regression-tests-esm.js && node --check tests/version-consistency.mjs && node --check scripts/idd-issue-association.mjs && node --check scripts/local-performance-gate.mjs && node --check tests/local-performance-gate.mjs && node --check tests/browser-harness.mjs && node --check tests/browser-smoke.mjs && node --check tests/browser-feature-regression.mjs && node --check tests/eternity-ui-browser.mjs && node --check tests/eternity-release-e2e.mjs && node --check tests/performance-smoke.mjs && node --check tests/render-regression.mjs && node --check tests/offline-stress.mjs && node --check tests/validation-layer-policy.mjs && find src scripts tests -name '*.js' -print0 | xargs -0 -n1 node --check",
     "check:version": "node tests/version-consistency.mjs",
     "check:idd-policy": "node tests/idd-no-advisory-policy.mjs && node tests/idd-experience-policy.mjs && node tests/validation-layer-policy.mjs",
     "test:regression": "node --experimental-vm-modules regression-tests-esm.js",
-    "test:browser": "node tests/browser-smoke.mjs && node tests/eternity-ui-browser.mjs && node tests/eternity-release-e2e.mjs && npm run test:render-regression",
+    "test:browser-smoke": "node tests/browser-smoke.mjs",
+    "test:browser-features": "node tests/browser-feature-regression.mjs && node tests/eternity-ui-browser.mjs && node tests/eternity-release-e2e.mjs",
+    "test:browser": "npm run test:browser-smoke && npm run test:browser-features && npm run test:render-regression",
     "test:render-regression": "node tests/render-regression.mjs",
     "test:eternity-ui": "node tests/eternity-ui-browser.mjs",
     "test:eternity-release-e2e": "node tests/eternity-release-e2e.mjs",

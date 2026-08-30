@@ -1,51 +1,13 @@
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const contentTypes = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-};
 const ACHIEVEMENT_38_TO_41_MASK = [38, 39, 40, 41]
   .reduce((mask, id) => mask | (1 << (id - 32)), 0);
+import { openGamePage, startGameTest } from "./browser-harness.mjs";
 
-function resolveRequestPath(requestUrl) {
-  const parsed = new URL(requestUrl, "http://127.0.0.1");
-  const requested = decodeURIComponent(parsed.pathname === "/" ? "/index.html" : parsed.pathname);
-  const relative = path.normalize(requested.replace(/^\/+/, ""));
-  if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
-  return path.join(root, relative);
-}
-
-const server = createServer(async (request, response) => {
-  const filePath = resolveRequestPath(request.url || "/");
-  if (!filePath) {
-    response.writeHead(403).end();
-    return;
-  }
-  try {
-    const metadata = await stat(filePath);
-    if (!metadata.isFile()) throw new Error("not a file");
-    response.writeHead(200, { "content-type": contentTypes[path.extname(filePath)] || "application/octet-stream" });
-    response.end(await readFile(filePath));
-  } catch {
-    response.writeHead(404).end();
-  }
+const gameTest = await startGameTest();
+const { context, page } = await openGamePage(gameTest.browser, gameTest.origin, {
+  viewport: { width: 1280, height: 900 },
 });
-
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-const address = server.address();
-if (!address || typeof address === "string") throw new Error("failed to bind Eternity release E2E server");
-
-const browser = await chromium.launch({ headless: true, args: ["--use-gl=disabled"] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-const url = `http://127.0.0.1:${address.port}/`;
+const url = `${gameTest.origin}/`;
 
 async function waitForGame() {
   await page.evaluate(() => window.__angleDebug.ready);
@@ -145,7 +107,6 @@ async function performQualifiedEternityThroughUi() {
 }
 
 try {
-  await page.goto(url, { waitUntil: "networkidle" });
   await waitForGame();
 
   await page.evaluate(() => {
@@ -372,6 +333,6 @@ try {
 
   console.log("Eternity release E2E passed");
 } finally {
-  await browser.close();
-  await new Promise((resolve) => server.close(resolve));
+  await context.close();
+  await gameTest.close();
 }

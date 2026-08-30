@@ -18,6 +18,21 @@ const researchScripts = [
 const researchSteps = researchScripts.map((name) => `npm run ${name}`);
 const routineSteps = packageJson.scripts.validate.split(" && ");
 const fullSteps = packageJson.scripts["validate:full"].split(" && ");
+assert.equal(packageJson.scripts["test:browser-smoke"], "node tests/browser-smoke.mjs", "browser smoke must have an explicit routine command");
+assert.deepEqual(
+  packageJson.scripts["test:browser-features"].split(" && "),
+  [
+    "node tests/browser-feature-regression.mjs",
+    "node tests/eternity-ui-browser.mjs",
+    "node tests/eternity-release-e2e.mjs",
+  ],
+  "browser feature coverage must stay in its focused command",
+);
+assert.deepEqual(
+  packageJson.scripts["test:browser"].split(" && "),
+  ["npm run test:browser-smoke", "npm run test:browser-features", "npm run test:render-regression"],
+  "the aggregate browser command must preserve smoke, feature, and render layers",
+);
 
 assert.deepEqual(packageJson.scripts["validate:research"].split(" && "), researchSteps, "research validation must retain the named research checks");
 for (const step of researchSteps) {
@@ -29,6 +44,8 @@ assert.equal(packageJson.scripts["test:performance:local"], "node scripts/local-
 assert.deepEqual(fullSteps, ["npm run validate", "npm run test:performance", "npm run test:offline-stress", "npm run validate:research"], "full validation must compose the named layers");
 assert.match(policy, /npm run validate:research/);
 assert.match(policy, /npm run validate:full/);
+assert.match(policy, /test:browser-smoke/);
+assert.match(policy, /test:browser-features/);
 
 const jobBlock = (name) => {
   const match = workflow.match(new RegExp(`\\n  ${name}:\\n([\\s\\S]*?)(?=\\n  [a-z0-9-]+:\\n|$)`));

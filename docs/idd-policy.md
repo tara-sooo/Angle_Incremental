@@ -78,6 +78,8 @@ IDDの標準ラベルは`roadmap`、`status:blocked-by-human`、`status:needs-de
 
 `npm run validate`はruntime順序、構文、version consistency、IDD policy、ESM回帰、browser smoke、決定論的なローカル性能classifierを実行します。routine層ではwall-clockのcandidate-vs-baseline測定（`npm run test:performance:local`）を自動実行しません。この比較が必要な性能IssueやHosted CI調査では、明示的にコマンドを実行します。TC4などの研究シミュレータはroutine層には含めません。IDDのfix-validate／pre-push／post-fixは、引き続きこのroutine層を使用します。
 
+Routine内の検証責務は次の通りです。core runtimeは`test:regression`とmodule-runtime tests、短い重要経路のブラウザ確認は`test:browser-smoke`、詳細なUI／機能シナリオは`test:browser-features`、描画差分は`test:render-regression`が所有します。smokeは詳細シナリオを重複して持たず、モーダル・panel・canvas・設定・save/loadなどの実際に表示されたDOMを確認します。EternityのUI／release E2Eはfeature層に残し、research、Hosted performance、offline stressはroutineから分離します。
+
 ### Explicit research validation
 
 `npm run validate:research`は、既存のTC4 balance/research simulator checkと、Issue #217のIC8-to-Eternity progression simulator checkを同じ順序で実行します。研究シミュレータ本体・その出力・研究専用fixtureを変更するIssue、production helperの意味を研究シミュレータが意図的に再現していて互換性確認が必要なIssue、研究レポートを受入れ証拠に使うIssue、またはIssue本文がresearch suiteを明示するIssueでは、このコマンドを必須検証として実行し、結果をPRの証拠に含めます。無関係なgameplay/UI/docs/maintenance変更は、研究層を実行する必要はありません。
