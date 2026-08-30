@@ -791,6 +791,7 @@ function update(dt, allowOffline = false) {
   runtime.state.totalPlayTime += dt;
   runtime.state.currentInfinityRunTime += dt;
   runtime.state.currentGenerationRunTime += dt;
+  runtime.advanceTimelineRunTime?.(dt);
   runtime.updateChallengeTimers(dt);
   runtime.updateInfiniteAngle(dt);
 
@@ -930,6 +931,7 @@ function offlineProgressNumericallySafe(seconds) {
   if (!Number.isFinite(runtime.state.totalPlayTime + seconds)) return false;
   if (!Number.isFinite(runtime.state.currentInfinityRunTime + seconds)) return false;
   if (!Number.isFinite(runtime.state.currentGenerationRunTime + seconds)) return false;
+  if (!Number.isFinite(runtime.state.timelineParallelSecondsSinceIc8Clear + seconds)) return false;
 
   const lapDuration = runtime.lapDuration();
   const vertices = runtime.effectiveVertexCount();
@@ -1781,6 +1783,10 @@ function renderGameToText() {
       earnedTf: runtime.timelineEarnedTf(),
       availableTf: runtime.timelineAvailableTf(),
       spentTf: runtime.timelineSpentTf(),
+      parallelSecondsSinceIc8Clear: runtime.timelineParallelSecondsSinceIc8Clear(),
+      parallelRawLog10: runtime.timelineParallelRawLog10(),
+      parallelEffectiveLog10: runtime.timelineParallelEffectiveLog10(),
+      ipGainMultiplierLog10: runtime.timelineIpGainMultiplierLog10(),
       claims: {
         score: runtime.timelineTrackClaimCount("score"),
         ip: runtime.timelineTrackClaimCount("ip"),
@@ -2004,6 +2010,11 @@ window.__angleDebug = {
   timelineEarnedTf: runtime.timelineEarnedTf,
   timelineAvailableTf: runtime.timelineAvailableTf,
   timelineSpentTf: runtime.timelineSpentTf,
+  timelineParallelSecondsSinceIc8Clear: runtime.timelineParallelSecondsSinceIc8Clear,
+  timelineParallelRawLog10: runtime.timelineParallelRawLog10,
+  timelineParallelEffectiveLog10: runtime.timelineParallelEffectiveLog10,
+  timelineIpGainMultiplierLog10: runtime.timelineIpGainMultiplierLog10,
+  advanceTimelineRunTime: runtime.advanceTimelineRunTime,
   timelineNodes: runtime.timelineNodes,
   timelineNodeAvailability: runtime.timelineNodeAvailability,
   canPurchaseTimelineNode: runtime.canPurchaseTimelineNode,

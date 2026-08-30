@@ -264,6 +264,22 @@ function timelineNodeStatusText(availability) {
   }
 }
 
+function timelineNodeCurrentEffectText(node, availability) {
+  if (availability.reason !== "owned") return runtime.t("timelineNodeInactive");
+  if (node.id === "Real-BC16500") {
+    return runtime.t("timelineRealCurrentEffect")
+      .replace("{multiplier}", formatMultiplierLog(runtime.timelineIpGainMultiplierLog10?.() ?? 0));
+  }
+  if (node.id === "Parallel-BC16500") {
+    const effectiveLog10 = runtime.timelineParallelEffectiveLog10?.() ?? 0;
+    return runtime.t("timelineParallelCurrentEffect")
+      .replace("{multiplier}", formatMultiplierLog(effectiveLog10))
+      .replace("{time}", runtime.formatLongDuration(runtime.timelineParallelSecondsSinceIc8Clear?.() ?? 0))
+      .replace("{effectiveLog}", effectiveLog10.toFixed(4));
+  }
+  return runtime.t("timelineNodeInactive");
+}
+
 function updateTimelineTreeUi() {
   if (typeof runtime.timelineNodeAvailability !== "function") return;
   (runtime.elements.timelineNodeCards || []).forEach((card) => {
@@ -274,6 +290,7 @@ function updateTimelineTreeUi() {
     const description = card.querySelector(".timeline-node-description");
     const era = card.querySelector(".timeline-node-era");
     const route = card.querySelector(".timeline-node-route");
+    const currentEffect = card.querySelector(".timeline-node-current-effect");
     const cost = card.querySelector(".timeline-node-cost");
     const prerequisites = card.querySelector(".timeline-node-prerequisites");
     const status = card.querySelector(".timeline-node-status");
@@ -287,6 +304,7 @@ function updateTimelineTreeUi() {
       ? node.prerequisites.join(", ")
       : runtime.t("timelineNoPrerequisites");
     if (status) status.textContent = timelineNodeStatusText(availability);
+    if (currentEffect) currentEffect.textContent = timelineNodeCurrentEffectText(node, availability);
     if (button) {
       button.disabled = !availability.canPurchase;
       button.textContent = availability.reason === "owned"

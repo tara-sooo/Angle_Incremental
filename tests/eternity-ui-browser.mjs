@@ -226,6 +226,10 @@ try {
     realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
     parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
     realStatus: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-status')?.textContent,
+    realDescription: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
+    parallelDescription: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-description')?.textContent,
+    realCurrentEffect: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-current-effect')?.textContent,
+    parallelCurrentEffect: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-current-effect')?.textContent,
     warning: document.querySelector(".timeline-respec p")?.textContent,
   }));
   assert.equal(timelineInitial.active, true, "Timeline should be selectable as a top-level panel");
@@ -239,6 +243,10 @@ try {
   assert.equal(timelineInitial.realButtonDisabled, true, "a node without available TF should be disabled");
   assert.equal(timelineInitial.parallelButtonDisabled, true, "both route purchases should wait for available TF");
   assert.match(timelineInitial.realStatus || "", /TF不足/);
+  assert.match(timelineInitial.realDescription || "", /IP獲得量.*log10/);
+  assert.match(timelineInitial.parallelDescription || "", /IC8.*毎秒.*1e10/);
+  assert.match(timelineInitial.realCurrentEffect || "", /未購入/);
+  assert.match(timelineInitial.parallelCurrentEffect || "", /未購入/);
   assert.match(timelineInitial.warning || "", /TF.*Eternity/, "Timeline should explain the respec consequences");
 
   await page.evaluate(() => {
@@ -261,6 +269,7 @@ try {
     realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
     parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
     realDescription: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
+    realCurrentEffect: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-current-effect')?.textContent,
   }));
   assert.equal(timelineClaimed.claims, 1, "Timeline claim controls should grant one TF");
   assert.equal(timelineClaimed.earned, "1 TF", "Timeline should display earned TF");
@@ -268,7 +277,8 @@ try {
   assert.equal(timelineClaimed.score, 25000, "claiming TF must not consume Score");
   assert.equal(timelineClaimed.realButtonDisabled, false, "one available TF should make the Real node purchasable");
   assert.equal(timelineClaimed.parallelButtonDisabled, false, "one available TF should make the Parallel node purchasable");
-  assert.match(timelineClaimed.realDescription || "", /効果.*後続/);
+  assert.match(timelineClaimed.realDescription || "", /IP獲得量.*log10/);
+  assert.match(timelineClaimed.realCurrentEffect || "", /未購入/);
 
   await page.click("#timelineRealBc16500PurchaseButton");
   const realPurchased = await page.evaluate(() => ({
@@ -276,6 +286,7 @@ try {
     available: document.getElementById("timelineAvailableTf")?.textContent,
     realStatus: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-status')?.textContent,
     parallelStatus: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-status')?.textContent,
+    realCurrentEffect: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-current-effect')?.textContent,
     realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
     parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
   }));
@@ -285,6 +296,7 @@ try {
   assert.equal(realPurchased.realStatus, "購入済み");
   assert.equal(realPurchased.realButtonDisabled, true);
   assert.equal(realPurchased.parallelButtonDisabled, true, "the same-era alternative should be disabled");
+  assert.match(realPurchased.realCurrentEffect || "", /現在のIP倍率/);
   assert.match(realPurchased.parallelStatus || "", /同じ時代.*ロック/);
 
   assert.equal(
@@ -513,6 +525,9 @@ try {
     timelineTree: document.querySelector('[data-i18n="timelineTree"]')?.textContent,
     realNodeName: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-name')?.textContent,
     parallelNodeName: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-name')?.textContent,
+    realDescription: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
+    parallelDescription: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-description')?.textContent,
+    realCurrentEffect: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-current-effect')?.textContent,
     timelineWarning: document.querySelector('[data-i18n="timelineRespecWarning"]')?.textContent,
     manual: document.getElementById("eternityForcedNote")?.textContent,
   }));
@@ -532,6 +547,9 @@ try {
   assert.equal(english.timelineTree, "Timeline Tree", "Timeline Tree should have English copy");
   assert.equal(english.realNodeName, "Inert Stone Tools", "Real node should have English copy");
   assert.equal(english.parallelNodeName, "Endless Ice Age", "Parallel node should have English copy");
+  assert.match(english.realDescription || "", /Infinity Point gain.*log10/);
+  assert.match(english.parallelDescription || "", /IC8.*×3.*1e10.*logarithmically/i);
+  assert.match(english.realCurrentEffect || "", /Inactive/);
   assert.match(english.timelineWarning || "", /respec.*node.*TF.*Eternity run/i, "Timeline respec warning should have English copy");
   assert.match(english.manual || "", /manually/, "English copy should explain that Eternity is player-triggered");
   assert.doesNotMatch(english.manual || "", /performed automatically/, "English copy must not describe forced pre-Break Eternity");

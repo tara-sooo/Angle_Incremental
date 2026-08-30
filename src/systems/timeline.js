@@ -5,6 +5,7 @@ const MAX_TIMELINE_COUNT = Number.MAX_SAFE_INTEGER;
 const MAX_ETERNITY_REQUIREMENT_EXPONENT = 1024;
 const TIMELINE_TRACK_IDS = Object.freeze(["score", "ip", "eternity"]);
 const TIMELINE_NODE_BY_ID = new Map(TIMELINE_NODES.map((node) => [node.id, node]));
+const PARALLEL_RAW_SOFTCAP_LOG10 = 10;
 const TIMELINE_TRACKS = Object.freeze({
   score: Object.freeze({
     stateKey: "scoreTfClaims",
@@ -27,6 +28,12 @@ function normalizeTimelineClaimCount(value, fallback = 0) {
 
 function normalizeTimelineCost(value) {
   return normalizeTimelineClaimCount(value, 0);
+}
+
+function normalizeTimelineSeconds(value, fallback = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.min(Number.MAX_SAFE_INTEGER, parsed);
 }
 
 function timelineNodeById(value) {
@@ -62,6 +69,9 @@ function normalizeTimelineState() {
   runtime.state.ipTfClaims = normalizeTimelineClaimCount(runtime.state.ipTfClaims);
   runtime.state.eternityTfClaims = normalizeTimelineClaimCount(runtime.state.eternityTfClaims);
   runtime.state.timelinePurchasedNodes = normalizeTimelinePurchasedNodes(runtime.state.timelinePurchasedNodes);
+  runtime.state.timelineParallelSecondsSinceIc8Clear = normalizeTimelineSeconds(
+    runtime.state.timelineParallelSecondsSinceIc8Clear,
+  );
 }
 
 function normalizedEternityCount() {
@@ -138,6 +148,67 @@ function timelineNodes() {
 
 function timelineNode(nodeId) {
   return timelineNodeById(nodeId);
+}
+
+function timelineNodeIsPurchasedById(nodeId) {
+  const node = timelineNodeById(nodeId);
+  return node ? timelineNodeIsPurchased(node) : false;
+}
+
+function timelineRealOwned() {
+  normalizeTimelineState();
+  return timelineNodeIsPurchasedById("Real-BC16500");
+}
+
+function timelineParallelOwned() {
+  normalizeTimelineState();
+  return timelineNodeIsPurchasedById("Parallel-BC16500");
+}
+
+function timelineParallelSecondsSinceIc8Clear() {
+  normalizeTimelineState();
+  return runtime.state.timelineParallelSecondsSinceIc8Clear;
+}
+
+function timelineParallelRawLog10(seconds = timelineParallelSecondsSinceIc8Clear()) {
+  return normalizeTimelineSeconds(seconds) * Math.log10(3);
+}
+
+function timelineParallelEffectiveLog10(seconds = timelineParallelSecondsSinceIc8Clear()) {
+  const rawLog10 = timelineParallelRawLog10(seconds);
+  if (rawLog10 <= PARALLEL_RAW_SOFTCAP_LOG10) return rawLog10;
+  return PARALLEL_RAW_SOFTCAP_LOG10
+    + 10 * Math.log10(1 + (rawLog10 - PARALLEL_RAW_SOFTCAP_LOG10) / 10);
+}
+
+function timelineIpGainMultiplierLog10() {
+  if (timelineRealOwned()) {
+    const currentIpLog10 = runtime.currentInfinityPointsLog10?.() ?? -Infinity;
+    return Number.isFinite(currentIpLog10) && currentIpLog10 > 0
+      ? Math.log10(1 + currentIpLog10)
+      : 0;
+  }
+  return timelineParallelOwned() && runtime.isChallengeCompleted?.(8) === true
+    ? timelineParallelEffectiveLog10()
+    : 0;
+}
+
+function advanceTimelineRunTime(dt) {
+  if (runtime.isChallengeCompleted?.(8) !== true) return;
+  const delta = normalizeTimelineSeconds(dt, 0);
+  if (delta <= 0) return;
+  runtime.state.timelineParallelSecondsSinceIc8Clear = Math.min(
+    Number.MAX_SAFE_INTEGER,
+    timelineParallelSecondsSinceIc8Clear() + delta,
+  );
+}
+
+function markTimelineIc8Clear() {
+  runtime.state.timelineParallelSecondsSinceIc8Clear = 0;
+}
+
+function resetTimelineRun() {
+  runtime.state.timelineParallelSecondsSinceIc8Clear = 0;
 }
 
 function resolveTimelineNode(nodeOrId) {
@@ -258,6 +329,7 @@ function respecTimeline(options = {}) {
 
 expose("TIMELINE_TRACK_IDS", () => TIMELINE_TRACK_IDS);
 expose("normalizeTimelineClaimCount", () => normalizeTimelineClaimCount);
+expose("normalizeTimelineSeconds", () => normalizeTimelineSeconds);
 expose("normalizeTimelinePurchasedNodes", () => normalizeTimelinePurchasedNodes);
 expose("normalizeTimelineState", () => normalizeTimelineState);
 expose("timelineDiscovered", () => timelineDiscovered);
@@ -273,6 +345,16 @@ expose("TIMELINE_NODES", () => TIMELINE_NODES);
 expose("timelineNodes", () => timelineNodes);
 expose("timelineNode", () => timelineNode);
 expose("timelineNodeIsPurchased", () => timelineNodeIsPurchased);
+expose("timelineNodeIsPurchasedById", () => timelineNodeIsPurchasedById);
+expose("timelineRealOwned", () => timelineRealOwned);
+expose("timelineParallelOwned", () => timelineParallelOwned);
+expose("timelineParallelSecondsSinceIc8Clear", () => timelineParallelSecondsSinceIc8Clear);
+expose("timelineParallelRawLog10", () => timelineParallelRawLog10);
+expose("timelineParallelEffectiveLog10", () => timelineParallelEffectiveLog10);
+expose("timelineIpGainMultiplierLog10", () => timelineIpGainMultiplierLog10);
+expose("advanceTimelineRunTime", () => advanceTimelineRunTime);
+expose("markTimelineIc8Clear", () => markTimelineIc8Clear);
+expose("resetTimelineRun", () => resetTimelineRun);
 expose("timelineNodeHasRouteConflict", () => timelineNodeHasRouteConflict);
 expose("timelineNodeAvailability", () => timelineNodeAvailability);
 expose("canPurchaseTimelineNode", () => canPurchaseTimelineNode);

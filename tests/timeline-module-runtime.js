@@ -219,11 +219,159 @@ async function testSaveCompatibility() {
   assert.equal(migrated.debug.mainTabIsUnlocked("timeline"), true, "existing post-Eternity saves should discover Timeline");
 }
 
+function assertClose(actual, expected, tolerance, message) {
+  assert.ok(Math.abs(actual - expected) <= tolerance, `${message}: expected ${expected}, got ${actual}`);
+}
+
+async function testTimelineEffectsAndTimer() {
+  const source = await loadRuntime(candidatePath);
+  const { debug, runtime } = source;
+  const { state } = debug;
+  runtime.updateUi = () => {};
+  runtime.saveGame = () => true;
+  runtime.createCheckpoint = () => true;
+  state.eternityCount = 1;
+  state.infinityCount = 1;
+  state.scoreLog10 = 310;
+  state.score = Number.MAX_VALUE;
+  state.timelinePurchasedNodes = [];
+  runtime.syncInfinityPointCachesFromExact(100n);
+
+  assert.equal(runtime.timelineIpGainMultiplierLog10(), 0, "unowned Timeline nodes must not affect IP gain");
+  assert.equal(runtime.infinityPointGain(), 3, "the unmodified balance IP gain should remain canonical");
+
+  state.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+  assertClose(
+    runtime.timelineIpGainMultiplierLog10(),
+    Math.log10(3),
+    1e-12,
+    "Real should use 1 + log10(current IP)",
+  );
+  assert.equal(runtime.infinityPointGain(), 9, "Real should multiply the canonical IP gain");
+
+  state.timelinePurchasedNodes = [{ id: "Parallel-BC16500", era: "BC16500", route: "Parallel", costTF: 1 }];
+  assertClose(
+    runtime.timelineParallelEffectiveLog10(0),
+    0,
+    1e-12,
+    "Parallel should be inactive before the IC8 boundary advances",
+  );
+  const softcapSeconds = 10 / Math.log10(3);
+  assertClose(
+    runtime.timelineParallelRawLog10(softcapSeconds),
+    10,
+    1e-12,
+    "Parallel softcap should begin at raw log10 10",
+  );
+  assertClose(
+    runtime.timelineParallelEffectiveLog10(softcapSeconds),
+    10,
+    1e-12,
+    "Parallel logarithmic softcap should be continuous",
+  );
+  assertClose(runtime.timelineParallelEffectiveLog10(60), 10 + 10 * Math.log10(1 + (60 * Math.log10(3) - 10) / 10), 1e-12, "Parallel minute curve");
+  assertClose(runtime.timelineParallelEffectiveLog10(3600), 32.3493, 0.001, "Parallel hour anchor");
+  assertClose(runtime.timelineParallelEffectiveLog10(86400), 46.1514, 0.001, "Parallel day anchor");
+  assertClose(runtime.timelineParallelEffectiveLog10(604800), 54.6024, 0.001, "Parallel week anchor");
+
+  state.completedChallenges = 1 << 7;
+  state.timelineParallelSecondsSinceIc8Clear = 0;
+  state.scoreLog10 = -Infinity;
+  state.score = 0;
+  debug.update(2);
+  assert.equal(state.timelineParallelSecondsSinceIc8Clear, 2, "the normal update path should advance the post-IC8 timer once");
+
+  state.timelineParallelSecondsSinceIc8Clear = 12;
+  state.activeChallenge = 8;
+  state.activeChallengeTime = 4;
+  state.completedChallenges = 0;
+  state.scoreLog10 = 310;
+  state.score = Number.MAX_VALUE;
+  debug.runInfinity(false);
+  assert.equal(state.timelineParallelSecondsSinceIc8Clear, 0, "a genuine IC8 completion should reset the timer boundary");
+
+  state.completedChallenges = 1 << 7;
+  state.timelineParallelSecondsSinceIc8Clear = 42;
+  state.activeChallenge = 0;
+  state.scoreLog10 = 310;
+  state.score = Number.MAX_VALUE;
+  debug.runInfinity(false);
+  assert.equal(state.timelineParallelSecondsSinceIc8Clear, 42, "ordinary Infinity must preserve the run-local timer");
+
+  state.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+  state.eternityCount = 127;
+  state.infinityCount = 1;
+  state.scoreLog10 = 310;
+  state.score = Number.MAX_VALUE;
+  runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS - 1n);
+  debug.runInfinity(false);
+  assert.equal(runtime.currentExactInfinityPoints(), runtime.MAX_EXACT_INFINITY_POINTS, "Timeline gain must respect the pre-Break IP cap");
+
+  state.eternityCount = 128;
+  state.infinityCount = 1;
+  state.scoreLog10 = 310;
+  state.score = Number.MAX_VALUE;
+  runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
+  debug.runInfinity(false);
+  assert.ok(runtime.currentExactInfinityPoints() > runtime.MAX_EXACT_INFINITY_POINTS, "Timeline gain must remain exact above the Break Eternity cap");
+
+  state.timelineParallelSecondsSinceIc8Clear = 5;
+  state.completedChallenges = 1 << 7;
+  state.offlineTickCount = 1;
+  state.scoreLog10 = -Infinity;
+  state.score = 0;
+  const offlineReport = await debug.processOfflineElapsed(60, "timeline-test", { clockSource: "server" });
+  assert.equal(offlineReport.simulatedSeconds, 60, "offline processing should simulate the trusted interval");
+  assertClose(state.timelineParallelSecondsSinceIc8Clear, 65, 1e-9, "offline elapsed time should advance the timer exactly once");
+
+  const serialized = runtime.serializeSaveData();
+  assertClose(serialized.state.timelineParallelSecondsSinceIc8Clear, 65, 1e-9, "the timer should be serialized");
+  serialized.savedAt = Date.now();
+  serialized.state.offlineProgressEnabled = false;
+  const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(serialized)]]));
+  assertClose(loaded.debug.state.timelineParallelSecondsSinceIc8Clear, 65, 1e-9, "the timer should survive save/load");
+}
+
+async function testTimelineResetSemantics() {
+  const source = await loadRuntime(candidatePath);
+  const { debug, runtime } = source;
+  const { state } = debug;
+  runtime.updateUi = () => {};
+  runtime.saveGame = () => true;
+  runtime.createCheckpoint = () => true;
+  state.eternityCount = 1;
+  state.timelinePurchasedNodes = [{ id: "Parallel-BC16500", era: "BC16500", route: "Parallel", costTF: 1 }];
+  state.timelineParallelSecondsSinceIc8Clear = 99;
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "ordinary Eternity should reset the run timer");
+  assert.equal(state.timelineParallelSecondsSinceIc8Clear, 0);
+  assert.equal(state.timelinePurchasedNodes[0].id, "Parallel-BC16500", "ordinary Eternity should preserve the selected node");
+
+  state.eternityCount = 26;
+  state.timelineParallelSecondsSinceIc8Clear = 99;
+  const challengeTimes = state.fastestInfinityChallengeTimes.map((value) => value);
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "Milestone 6 boundary Eternity should execute");
+  assert.equal(state.eternityCount, 27);
+  assert.equal(state.timelineParallelSecondsSinceIc8Clear, 0, "Milestone 6 should start its new run at timer zero");
+  assert.equal(state.completedChallenges, (1 << runtime.INFINITY_CHALLENGE_COUNT) - 1);
+  assert.equal(state.fastestInfinityChallengeTimes.every((value, index) => value === challengeTimes[index]), true, "Milestone 6 must not replay IC8 completion");
+  debug.update(1);
+  assert.equal(state.timelineParallelSecondsSinceIc8Clear, 1, "Milestone 6 should advance from its completed starting state");
+
+  state.timelineParallelSecondsSinceIc8Clear = 20;
+  assert.equal(debug.respecTimeline({ save: false, update: false }), true, "Timeline respec should restart the current run");
+  assert.equal(state.timelineParallelSecondsSinceIc8Clear, 0, "Timeline respec should discard the old timer");
+  assert.equal(state.timelinePurchasedNodes.length, 0, "Timeline respec should remove the selected node");
+}
+
 async function runTimelineModuleRuntimeTest() {
   await testManualTracks();
   await testTimelineTreePurchases();
   await testResetPersistenceAndRespec();
   await testSaveCompatibility();
+  await testTimelineEffectsAndTimer();
+  await testTimelineResetSemantics();
   console.log("Timeline module runtime tests passed");
 }
 
