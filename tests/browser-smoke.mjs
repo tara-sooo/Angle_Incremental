@@ -830,7 +830,7 @@ try {
     switchMainTab("infinity");
     switchInfinitySubtab("upgrades");
     state.fastestInfinityChallengeTimes = [12.5, 0, 0, 0, 0, 0, 0, 0];
-    state.fastestTowerChallengeTimes = [27, 0, 0, 0];
+    state.fastestTowerChallengeTimes = [27, 0, 0, 14];
     window.advanceTime(0);
     const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
     const centerDelta = (tierSelector) => {
@@ -876,6 +876,7 @@ try {
       towerRows: document.querySelectorAll("#fastestTowerChallengeTimes li").length,
       infinityFirst: document.querySelector("#fastestInfinityChallengeTimes li")?.textContent?.trim() ?? "",
       towerFirst: document.querySelector("#fastestTowerChallengeTimes li")?.textContent?.trim() ?? "",
+      towerFourth: document.querySelector("#fastestTowerChallengeTimes li:nth-child(4)")?.textContent?.trim() ?? "",
       eternityPanelActive,
       eternityFirst,
       eternityLabels,
@@ -894,6 +895,7 @@ try {
   assert.equal(desktopUiChanges.towerRows, 4, "all Tower Challenges should have statistics rows");
   assert.match(desktopUiChanges.infinityFirst, /IC1.*12秒/);
   assert.match(desktopUiChanges.towerFirst, /TC1.*27秒/);
+  assert.match(desktopUiChanges.towerFourth, /^TC4 既存品の代替:/, "Japanese Statistics should use the canonical TC4 title");
   assert.equal(desktopUiChanges.eternityPanelActive, true, "Statistics Eternity Records subtab should activate");
   assert.match(desktopUiChanges.eternityLabels.current, /現在のEternity周回/);
   assert.match(desktopUiChanges.eternityLabels.fastest, /最速Eternity/);
@@ -910,6 +912,9 @@ try {
       current: document.querySelector('[data-i18n="currentEternityRun"]')?.textContent?.trim() ?? "",
       history: document.querySelector('[data-i18n="lastEternityRunsLabel"]')?.textContent?.trim() ?? "",
     };
+    switchStatisticsSubtab("challenges");
+    runtime.updateUi();
+    result.towerFourth = document.querySelector("#fastestTowerChallengeTimes li:nth-child(4)")?.textContent?.trim() ?? "";
     state.language = originalLanguage;
     runtime.updateUi();
     return result;
@@ -917,6 +922,7 @@ try {
   assert.equal(englishEternityStatistics.tab, "Eternity Records", "the ETR Statistics tab should translate to English");
   assert.equal(englishEternityStatistics.current, "Current Eternity run (game time)", "the ETR game-time label should translate to English");
   assert.equal(englishEternityStatistics.history, "Last 10 Eternity runs", "the ETR history label should translate to English");
+  assert.match(englishEternityStatistics.towerFourth, /^TC4 Substitute for Existing Products:/, "English Statistics should use the canonical TC4 title");
   assert.ok(desktopUiChanges.tier12CenterDelta !== null && desktopUiChanges.tier12CenterDelta < 1, "IU 12-1 should be centered");
   assert.ok(desktopUiChanges.tier13CenterDelta !== null && desktopUiChanges.tier13CenterDelta < 1, "IU 13-1 should be centered");
   assert.ok(desktopUiChanges.tier14CenterDelta !== null && desktopUiChanges.tier14CenterDelta < 1, "IU 14-1 should be centered");
@@ -957,6 +963,7 @@ try {
       towerChallengeTarget: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-target")?.textContent?.trim() ?? "",
       towerChallenge2Target: document.querySelector('#towerChallengeList [data-tower-challenge="2"] .challenge-target')?.textContent?.trim() ?? "",
       towerChallenge3Name: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-name')?.textContent?.trim() ?? "",
+      towerChallenge4Name: document.querySelector('#towerChallengeList [data-tower-challenge="4"] .challenge-name')?.textContent?.trim() ?? "",
       towerChallenge3Target: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-target')?.textContent?.trim() ?? "",
       towerChallenge3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
       towerChallenge4Target: document.querySelector('#towerChallengeList [data-tower-challenge="4"] .challenge-target')?.textContent?.trim() ?? "",
@@ -976,6 +983,7 @@ try {
   assert.match(towerInitial.towerChallengeTarget, /1\.00e1,000/);
   assert.match(towerInitial.towerChallenge2Target, /1\.00e3,000/);
   assert.match(towerInitial.towerChallenge3Name, /TC3/);
+  assert.equal(towerInitial.towerChallenge4Name, "TC4 既存品の代替", "the Japanese Challenges screen should use the canonical TC4 title");
   assert.match(towerInitial.towerChallenge3Target, /1\.00e5,000/);
   assert.match(towerInitial.towerChallenge3Restriction, /\^0\.001/);
   assert.match(towerInitial.towerChallenge3Restriction, /\^0\.100/);
@@ -1130,6 +1138,7 @@ try {
       tc1Base: document.querySelector('[data-i18n="towerChallenge1ScorePowerBase"]')?.textContent?.trim() ?? "",
       tc2Effective: document.querySelector('[data-i18n="coreBoostGrowthPower"]')?.textContent?.trim() ?? "",
       tc3Name: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-name')?.textContent?.trim() ?? "",
+      tc4Name: document.querySelector('#towerChallengeList [data-tower-challenge="4"] .challenge-name')?.textContent?.trim() ?? "",
       tc3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
     };
     Object.assign(state, original);
@@ -1146,6 +1155,7 @@ try {
   assert.equal(towerRewardDisplay.englishLabels.tc1Base, "TC1 base exponent", "TC1 exponent labels should be translated to English");
   assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth (effective)", "TC2 exponent labels should be translated to English");
   assert.match(towerRewardDisplay.englishLabels.tc3Name, /Age When Infinity Was a Concept/, "TC3 name should be translated to English");
+  assert.equal(towerRewardDisplay.englishLabels.tc4Name, "TC4 Substitute for Existing Products", "the English Challenges screen should use the canonical TC4 title");
   assert.match(towerRewardDisplay.englishLabels.tc3Restriction, /Score gain starts/, "TC3 restriction should be translated to English");
 
   const eternityNormalUpgradeDisplay = await page.evaluate(() => {
