@@ -237,7 +237,6 @@ Infinity実行時、Infinity未満の進行をリセットする。
 | Infinity Angle | 解放状態とIA通常強化レベルを保持 |
 | Infinity Score | 0 |
 | Infinity run time | ゲーム時間・実時間ともに0 |
-
 Infinity回数、IP、IU、ICクリア状況、Break Infinite Cap、実績、設定、統計履歴は保持する。
 
 ### 7.3 スコアソフトキャップ
@@ -477,7 +476,6 @@ CB要求量log10 = log10(1.00e20) * (CB要求量実効指数 ^ Core Boost回数)
 ## 13. 実績
 
 実績は41個あり、すべてのリセットを超えて保持される。
-
 ```text
 実績倍率 = 1.01 ^ 達成済み実績数
 ```
@@ -546,7 +544,7 @@ first-tierの1-1〜1-3はEternity回数1から候補になり、1回のEternity�
 | 2 真の倹約家 | Eternity 5 | IC7をクリア済みの状態で開始する。 |
 | 3 完璧な世代間継承 | Eternity 8 | GenerationとCore Boost実行時の下位リセットを抑止し、実行・正の効果は維持する。 |
 | 4 効率的なウラン235の探し方 | Eternity 12 | Core Boost要求量のlog10を`×0.9`する。 |
-| 5 自動植林 | Eternity 20 | Infinity自動化を解放する。 |
+| 5 自動植林 | Eternity 20 | Infinity Upgradeの自動購入を解放する。 |
 
 ## 15. 自動化と統計
 
@@ -558,7 +556,7 @@ Settingsの「オフライン進行」で、離席中の進行を有効／無効
 
 ゲームはサーバー時刻を取得でき、保存データにも `serverSavedAt` がある場合、両者の差を離席時間として扱い、固定の7日上限を設けず全量を処理する。サーバー時刻を取得できない場合や、旧セーブに `serverSavedAt` がない場合は `savedAt` とローカル時刻へフォールバックし、離席報酬を最大7日間に制限する。時計の逆行、保存時刻との不整合、数値として扱えない経過時間を検出した場合は報酬を付与しない。オフライン進行レポートには、離席時間、実効処理時間、設定・要求・処理ティック数、実計算時間、通常Infinity増加、集約Infinity増加、合計Infinity増加、現在IPを表示する。
 
-通常のInfinity周回では、Infinity回数の増加量とオンライン周回時間からInfinity回数/秒を計算し、最高値を `bestInfinityCountPerSecond` に保存する。チャレンジ中の周回は記録対象外とする。オフライン復帰開始時点で自動化全体、Infinity自動化、最小IPしきい値が有効で、IU8-1またはEternity Milestone 5によってInfinity自動化が解放されており、チャレンジ中でない場合は、保存済み最高速度を使って不足分のInfinity回数を直接集約する。集約では通常シミュレーション分を二重加算せず、小数部分は `infinityCountRateRemainder` に繰り越す。集約はInfinityポイント、履歴、周回リセットを発生させない。
+通常のInfinity周回では、Infinity回数の増加量とオンライン周回時間からInfinity回数/秒を計算し、最高値を `bestInfinityCountPerSecond` に保存する。チャレンジ中の周回は記録対象外とする。オフライン復帰開始時点で自動化全体、Infinity自動化、最小IPしきい値が有効で、IU8-1によってInfinity自動化が解放されており、チャレンジ中でない場合は、保存済み最高速度を使って不足分のInfinity回数を直接集約する。集約では通常シミュレーション分を二重加算せず、小数部分は `infinityCountRateRemainder` に繰り越す。集約はInfinityポイント、履歴、周回リセットを発生させない。
 
 ### Time Flux（休止中）
 
@@ -573,7 +571,8 @@ Time Fluxのゲーム内効果とUIは一時的に削除している。オンラ
 | IU 1-2 または Eternity Milestone 1-1 | 通常強化の自動購入。全体オン/オフと3種個別オン/オフを持つ。 |
 | IU 4-1 | IC自動完了。 |
 | 実績19 | Generation自動実行とCore Boost自動実行。 |
-| IU 8-1 または Eternity Milestone 5 | Infinity自動実行。 |
+| Eternity Milestone 5 | Infinity Upgradeの自動購入。 |
+| IU 8-1 | Infinity自動実行。 |
 
 通常強化の自動購入は0.1秒ごとに実行される。Generation自動実行は、スコア倍率増加、コスト倍率改善、最小経過秒数のしきい値を持つ。Infinity自動実行はIP獲得量しきい値を持ち、しきい値はlog10で保存する。UIでは現在の数値表記設定に応じた数値または指数表記を入力できる。Infinity Pointの支払可能上限を超えるしきい値は保存・表示できるが、自動実行条件は満たさない。
 新規状態のGeneration自動実行しきい値は、スコア倍率増加`2.0`倍、コスト倍率改善`1.0`倍、最小経過秒数`0`秒とする。既存セーブに保存された設定値は保持する。
