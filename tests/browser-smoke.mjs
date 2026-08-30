@@ -634,10 +634,9 @@ try {
     const nav = document.querySelector(".main-tabs");
     const strip = document.querySelector(".main-tab-scroll");
     const settings = document.querySelector('[data-tab="settings"]');
-    const navRect = nav?.getBoundingClientRect();
-    const settingsRect = settings?.getBoundingClientRect();
     const visibleButtons = Array.from(document.querySelectorAll("[data-tab]")).filter((button) => !button.hidden);
-    const tops = visibleButtons.map((button) => button.getBoundingClientRect().top);
+    const rects = visibleButtons.map((button) => button.getBoundingClientRect());
+    const sortedRects = [...rects].sort((a, b) => a.left - b.left);
     return {
       navDisplay: nav ? getComputedStyle(nav).display : "",
       navFlexWrap: nav ? getComputedStyle(nav).flexWrap : "",
@@ -648,52 +647,97 @@ try {
       navScrollHeight: nav?.scrollHeight ?? 0,
       stripClientWidth: strip?.clientWidth ?? 0,
       stripScrollWidth: strip?.scrollWidth ?? 0,
-      rows: tops.length > 0 ? Math.max(...tops) - Math.min(...tops) : Infinity,
-      nonSettingsInStrip: visibleButtons.filter((button) => button.dataset.tab !== "settings")
-        .every((button) => button.parentElement === strip),
-      settingsPinned: Boolean(navRect && settingsRect && settings.parentElement === nav
-        && settingsRect.left >= navRect.left - 1
-        && settingsRect.right <= navRect.right + 1),
+      rows: rects.length > 0 ? Math.max(...rects.map((rect) => rect.top)) - Math.min(...rects.map((rect) => rect.top)) : Infinity,
+      allVisibleInStrip: visibleButtons.every((button) => button.parentElement === strip),
+      settingsInScrollHost: settings?.parentElement === strip,
+      hasTabOverlap: sortedRects.some((rect, index) => sortedRects[index + 1] && rect.right > sortedRects[index + 1].left + 0.5),
+      hasTabContentOverflow: visibleButtons.some((button) => button.scrollWidth > button.clientWidth + 1),
     };
   });
   const layoutOriginal = await page.evaluate(() => ({
     infinityCount: window.__angleDebug.state.infinityCount,
     infinityUpgradeMask: window.__angleDebug.state.infinityUpgradeMask,
+    eternityCount: window.__angleDebug.state.eternityCount,
     hiddenTabs: [...window.__angleDebug.state.hiddenTabs],
+    unlockedMainTabs: [...window.__angleDebug.state.unlockedMainTabs],
     activeMainTab: window.__angleDebug.runtime.activeMainTab,
+    language: window.__angleDebug.state.language,
   }));
   await page.evaluate(() => {
     const { state } = window.__angleDebug;
     state.infinityCount = 1;
     state.infinityUpgradeMask = (1 << 1) | (1 << 5);
+    state.eternityCount = 1;
     state.hiddenTabs = [];
     window.__angleDebug.switchMainTab("angle");
     window.advanceTime(0);
   });
   await page.setViewportSize({ width: 1280, height: 800 });
   const desktopTabBar = await measureMainTabBar(page);
+  await page.setViewportSize({ width: 821, height: 900 });
+  const breakpointWideTabBar = await measureMainTabBar(page);
+  await page.setViewportSize({ width: 820, height: 900 });
+  const breakpointCompactTabBar = await measureMainTabBar(page);
   await page.setViewportSize({ width: 768, height: 900 });
   const tabletTabBar = await measureMainTabBar(page);
+  await page.evaluate(() => {
+    window.__angleDebug.state.language = "ja";
+    window.advanceTime(0);
+  });
+  const compactJapaneseTabBar = await measureMainTabBar(page);
+  await page.evaluate(() => {
+    window.__angleDebug.state.language = "en";
+    window.advanceTime(0);
+  });
+  const compactEnglishTabBar = await measureMainTabBar(page);
+  const endSettings = await page.evaluate(() => {
+    const strip = document.querySelector(".main-tab-scroll");
+    const settings = document.querySelector('[data-tab="settings"]');
+    if (!strip || !settings) return { reachedEnd: false, fullyVisible: false };
+    strip.scrollLeft = strip.scrollWidth;
+    const stripRect = strip.getBoundingClientRect();
+    const settingsRect = settings.getBoundingClientRect();
+    return {
+      reachedEnd: strip.scrollLeft >= strip.scrollWidth - strip.clientWidth - 1,
+      fullyVisible: settingsRect.left >= stripRect.left - 1 && settingsRect.right <= stripRect.right + 1,
+      inScrollHost: settings.parentElement === strip,
+    };
+  });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.evaluate((original) => {
     const { state } = window.__angleDebug;
     state.infinityCount = original.infinityCount;
     state.infinityUpgradeMask = original.infinityUpgradeMask;
+    state.eternityCount = original.eternityCount;
     state.hiddenTabs = original.hiddenTabs;
+    state.unlockedMainTabs = original.unlockedMainTabs;
+    state.language = original.language;
     window.__angleDebug.switchMainTab(original.activeMainTab);
     window.advanceTime(0);
   }, layoutOriginal);
-  for (const [viewportName, layout] of [["desktop", desktopTabBar], ["tablet", tabletTabBar]]) {
+  for (const [viewportName, layout] of [
+    ["desktop", desktopTabBar],
+    ["breakpoint-wide", breakpointWideTabBar],
+    ["breakpoint-compact", breakpointCompactTabBar],
+    ["tablet", tabletTabBar],
+    ["compact-Japanese", compactJapaneseTabBar],
+    ["compact-English", compactEnglishTabBar],
+  ]) {
     assert.equal(layout.navDisplay, "flex", `${viewportName} navigation should use a compact flex bar`);
     assert.equal(layout.navFlexWrap, "nowrap", `${viewportName} navigation should never wrap`);
-    assert.equal(layout.stripDisplay, "flex", `${viewportName} non-SET navigation should use a flex strip`);
-    assert.equal(layout.stripFlexWrap, "nowrap", `${viewportName} non-SET navigation should never wrap`);
+    assert.equal(layout.stripDisplay, "flex", `${viewportName} navigation should use a flex strip`);
+    assert.equal(layout.stripFlexWrap, "nowrap", `${viewportName} navigation should never wrap`);
     assert.ok(layout.rows < 1, `${viewportName} tabs should share one row`);
     assert.ok(layout.navScrollHeight <= layout.navClientHeight + 1, `${viewportName} navigation should not grow vertically for overflow`);
-    assert.equal(layout.nonSettingsInStrip, true, `${viewportName} non-SET tabs should stay inside the scrolling strip`);
-    assert.equal(layout.settingsPinned, true, `${viewportName} SET should remain reachable outside the scrolling strip`);
+    assert.equal(layout.allVisibleInStrip, true, `${viewportName} visible tabs should share the scrolling strip`);
+    assert.equal(layout.settingsInScrollHost, true, `${viewportName} SET should stay inside the scrolling strip`);
+    assert.equal(layout.hasTabOverlap, false, `${viewportName} tabs should not overlap horizontally`);
+    assert.equal(layout.hasTabContentOverflow, false, `${viewportName} tabs should retain intrinsic content widths`);
   }
-  assert.ok(tabletTabBar.stripScrollWidth > tabletTabBar.stripClientWidth, "tablet overflow should remain horizontal inside the non-SET strip");
+  assert.ok(tabletTabBar.stripScrollWidth > tabletTabBar.stripClientWidth, "tablet overflow should remain horizontal inside the shared strip");
+  assert.equal(endSettings.reachedEnd, true, "SET should be reachable at the end of the shared scrolling strip");
+  assert.equal(endSettings.fullyVisible, true, "SET should be fully visible at the end of the shared scrolling strip");
+  assert.equal(endSettings.inScrollHost, true, "SET should remain in the shared scrolling strip at its end");
 
   const headerOriginal = await page.evaluate(() => ({
     infinityCount: window.__angleDebug.state.infinityCount,
@@ -1995,10 +2039,18 @@ try {
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
     await mobilePage.locator("#updateModalClose").click();
 
+    const mobileLayoutOriginal = await mobilePage.evaluate(() => ({
+      infinityCount: window.__angleDebug.state.infinityCount,
+      infinityUpgradeMask: window.__angleDebug.state.infinityUpgradeMask,
+      eternityCount: window.__angleDebug.state.eternityCount,
+      hiddenTabs: [...window.__angleDebug.state.hiddenTabs],
+      activeMainTab: window.__angleDebug.runtime.activeMainTab,
+    }));
     await mobilePage.evaluate(() => {
       const { state } = window.__angleDebug;
       state.infinityCount = 1;
       state.infinityUpgradeMask = (1 << 1) | (1 << 5);
+      state.eternityCount = 1;
       state.hiddenTabs = [];
       window.__angleDebug.switchMainTab("angle");
       window.advanceTime(0);
@@ -2006,19 +2058,37 @@ try {
     const mobileTabBar = await measureMainTabBar(mobilePage);
     assert.equal(mobileTabBar.navDisplay, "flex", "mobile navigation should use a compact flex bar");
     assert.equal(mobileTabBar.navFlexWrap, "nowrap", "mobile navigation should never wrap");
-    assert.equal(mobileTabBar.stripFlexWrap, "nowrap", "mobile non-SET navigation should never wrap");
+    assert.equal(mobileTabBar.stripFlexWrap, "nowrap", "mobile navigation should never wrap");
     assert.ok(mobileTabBar.rows < 1, "mobile tabs should share one row");
     assert.ok(mobileTabBar.navScrollHeight <= mobileTabBar.navClientHeight + 1, "mobile navigation should remain one row when it overflows");
     assert.ok(mobileTabBar.stripScrollWidth > mobileTabBar.stripClientWidth, "mobile tabs should scroll horizontally when needed");
-    assert.equal(mobileTabBar.nonSettingsInStrip, true, "mobile non-SET tabs should stay inside the scrolling strip");
-    assert.equal(mobileTabBar.settingsPinned, true, "mobile SET should remain reachable while other tabs scroll");
-    await mobilePage.evaluate(() => {
-      const { state } = window.__angleDebug;
-      state.infinityCount = 0;
-      state.infinityUpgradeMask = 0;
-      state.hiddenTabs = [];
-      window.advanceTime(0);
+    assert.equal(mobileTabBar.allVisibleInStrip, true, "mobile visible tabs should share the scrolling strip");
+    assert.equal(mobileTabBar.settingsInScrollHost, true, "mobile SET should stay inside the scrolling strip");
+    assert.equal(mobileTabBar.hasTabOverlap, false, "mobile tabs should not overlap horizontally");
+    assert.equal(mobileTabBar.hasTabContentOverflow, false, "mobile tabs should retain intrinsic content widths");
+    const mobileEndSettings = await mobilePage.evaluate(() => {
+      const strip = document.querySelector(".main-tab-scroll");
+      const settings = document.querySelector('[data-tab="settings"]');
+      if (!strip || !settings) return { fullyVisible: false, inScrollHost: false };
+      strip.scrollLeft = strip.scrollWidth;
+      const stripRect = strip.getBoundingClientRect();
+      const settingsRect = settings.getBoundingClientRect();
+      return {
+        fullyVisible: settingsRect.left >= stripRect.left - 1 && settingsRect.right <= stripRect.right + 1,
+        inScrollHost: settings.parentElement === strip,
+      };
     });
+    assert.equal(mobileEndSettings.fullyVisible, true, "mobile SET should be fully visible after scrolling to the row end");
+    assert.equal(mobileEndSettings.inScrollHost, true, "mobile SET should remain in the shared scrolling strip at its end");
+    await mobilePage.evaluate((original) => {
+      const { state } = window.__angleDebug;
+      state.infinityCount = original.infinityCount;
+      state.infinityUpgradeMask = original.infinityUpgradeMask;
+      state.eternityCount = original.eternityCount;
+      state.hiddenTabs = original.hiddenTabs;
+      window.__angleDebug.switchMainTab(original.activeMainTab);
+      window.advanceTime(0);
+    }, mobileLayoutOriginal);
 
     await mobilePage.locator('[data-tab="settings"]').click();
     const mobileOfflineSetting = await mobilePage.evaluate(() => ({
