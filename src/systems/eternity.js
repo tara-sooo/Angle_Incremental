@@ -164,6 +164,7 @@ function resetEternityProgression() {
     ic8VertexDecayElapsed: 0,
     currentInfinityRunHadGeneration: false,
     currentInfinityRunHadCoreBoost: false,
+    timelineParallelSecondsSinceIc8Clear: 0,
     lastEarned: 0,
     lastEarnedLog10: -Infinity,
   });

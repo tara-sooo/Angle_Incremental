@@ -10,8 +10,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "Inert Stone Tools",
     }),
     description: Object.freeze({
-      ja: "Realルート。ゲーム効果は後続の効果リーフで実装されるため、現在は選択のみです。",
-      en: "Real route. Its gameplay effect is reserved for a later effect leaf; this node is currently selection-only.",
+      ja: "Realルート。IP獲得量を「1 + log10(現在IP)」倍します。現在IPが0のときの倍率は1です。",
+      en: "Real route. Multiplies Infinity Point gain by 1 + log10(current IP); at 0 IP the multiplier is 1.",
     }),
   }),
   Object.freeze({
@@ -25,8 +25,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "Endless Ice Age",
     }),
     description: Object.freeze({
-      ja: "Parallelルート。ゲーム効果は後続の効果リーフで実装されるため、現在は選択のみです。",
-      en: "Parallel route. Its gameplay effect is reserved for a later effect leaf; this node is currently selection-only.",
+      ja: "Parallelルート。IC8クリア後は毎秒×3。raw×1e10まではそのまま、以降は対数ソフトキャップで伸びます。オフライン時間も加算されます。",
+      en: "Parallel route. After IC8, it grows by ×3 per second; raw ×1e10 is the softcap boundary, then growth is logarithmically reduced. Offline time counts.",
     }),
   }),
 ]);

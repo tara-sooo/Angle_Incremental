@@ -37,6 +37,7 @@ function installBalanceProfile() {
   runtime.preGenerationCostScalingLog10 = runtime.balancePreGenerationCostScalingLog10;
   runtime.canBuyNormalUpgrade = runtime.balanceCanBuyNormalUpgrade;
   runtime.infinityPointGain = runtime.balanceInfinityPointGain;
+  runtime.infinityPointGainLog10 = runtime.balanceInfinityPointGainLog10;
   runtime.costLog10 = runtime.balanceCostLog10;
   runtime.rawLapSpeedLog10 = runtime.balanceRawLapSpeedLog10;
   runtime.generationScorePower = runtime.balanceGenerationScorePower;

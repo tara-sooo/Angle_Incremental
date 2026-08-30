@@ -890,6 +890,14 @@ canvas {
   line-height: 1.5;
 }
 
+.timeline-node-current-effect {
+  min-height: 2.8em;
+  margin: 8px 0 0;
+  color: var(--gold);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .timeline-node-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

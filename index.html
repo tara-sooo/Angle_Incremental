@@ -498,7 +498,7 @@
                 <span id="timelineTreeHeading" data-i18n="timelineTree">Timeline Tree</span>
               </div>
               <p class="timeline-tree-hint" data-i18n="timelineTreeHint">
-                These nodes select a route only. Gameplay effects are added by a later leaf.
+                BC16500ノードは購入後に実効果を発揮します。Parallelの時間はIC8クリア後から進み、オフライン時間も加算されます。
               </p>
               <div class="timeline-node-grid">
                 <article class="timeline-node" data-timeline-node="Real-BC16500">
@@ -509,7 +509,8 @@
                     </div>
                     <span class="timeline-node-route timeline-node-route-real">Real</span>
                   </div>
-                  <p class="timeline-node-description">Realルート。ゲーム効果は後続の効果リーフで実装されるため、現在は選択のみです。</p>
+                  <p class="timeline-node-description">Realルート。IP獲得量を「1 + log10(現在IP)」倍します。現在IPが0のときの倍率は1です。</p>
+                  <p class="timeline-node-current-effect">未購入（効果なし）</p>
                   <dl class="timeline-node-meta">
                     <div>
                       <dt data-i18n="timelineNodeCost">コスト</dt>
@@ -533,7 +534,8 @@
                     </div>
                     <span class="timeline-node-route timeline-node-route-parallel">Parallel</span>
                   </div>
-                  <p class="timeline-node-description">Parallelルート。ゲーム効果は後続の効果リーフで実装されるため、現在は選択のみです。</p>
+                  <p class="timeline-node-description">Parallelルート。IC8クリア後は毎秒×3。raw×1e10まではそのまま、以降は対数ソフトキャップで伸びます。オフライン時間も加算されます。</p>
+                  <p class="timeline-node-current-effect">未購入（効果なし）</p>
                   <dl class="timeline-node-meta">
                     <div>
                       <dt data-i18n="timelineNodeCost">コスト</dt>

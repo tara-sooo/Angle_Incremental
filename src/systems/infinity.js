@@ -127,6 +127,14 @@ function addInfinityPoints(amount) {
   runtime.syncInfinityPointCachesFromExact(current + added);
 }
 
+function addInfinityPointsLog10(amountLog10) {
+  const normalizedLog10 = runtime.sanitizeLog10(amountLog10, -Infinity);
+  if (normalizedLog10 === -Infinity) return;
+  const current = runtime.currentExactInfinityPoints();
+  const added = runtime.exactInfinityPointsFromLog10(normalizedLog10);
+  if (added > 0n) runtime.syncInfinityPointCachesFromExact(current + added);
+}
+
 function spendInfinityPoints(costLog10) {
   if (!canSpendInfinityPoints(costLog10)) return false;
   const current = runtime.currentExactInfinityPoints();
@@ -283,6 +291,8 @@ function runInfinity(forced = false) {
 
   const scoreLogBeforeReset = runtime.currentScoreLog10();
   const completedChallenge = runtime.state.activeChallenge;
+  const completedChallengeWasAlreadyComplete = completedChallenge > 0
+    && isChallengeCompleted(completedChallenge);
   const completedChallengeTime = runtime.state.activeChallengeTime;
   const completedTowerChallenge = runtime.towerChallengeCanComplete()
     ? runtime.state.activeTowerChallenge
@@ -306,6 +316,7 @@ function runInfinity(forced = false) {
   if (completedChallenge > 0) {
     recordInfinityChallengeTime(completedChallenge, completedChallengeTime);
     runtime.state.completedChallenges |= 1 << (completedChallenge - 1);
+    if (completedChallenge === 8 && !completedChallengeWasAlreadyComplete) runtime.markTimelineIc8Clear?.();
     runtime.state.activeChallenge = 0;
     runtime.state.activeChallengeTime = 0;
     runtime.checkAchievements(true);
@@ -318,9 +329,14 @@ function runInfinity(forced = false) {
   }
 
   const gained = runtime.infinityPointGain();
+  const canonicalBalanceGain = runtime.infinityPointGain === runtime.balanceInfinityPointGain;
   const countGain = infinityCountGain();
   runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + countGain);
-  addInfinityPoints(gained);
+  if (canonicalBalanceGain && runtime.balanceInfinityPointGainRawLog10) {
+    addInfinityPointsLog10(runtime.balanceInfinityPointGainRawLog10());
+  } else {
+    addInfinityPoints(gained);
+  }
   recordInfinityRun(
     scoreLogBeforeReset,
     gained,
@@ -422,6 +438,7 @@ expose("infinityPointGain", () => infinityPointGain, (value) => { infinityPointG
 expose("infinityPointGainLog10", () => infinityPointGainLog10, (value) => { infinityPointGainLog10 = value; });
 expose("canSpendInfinityPoints", () => canSpendInfinityPoints, (value) => { canSpendInfinityPoints = value; });
 expose("addInfinityPoints", () => addInfinityPoints, (value) => { addInfinityPoints = value; });
+expose("addInfinityPointsLog10", () => addInfinityPointsLog10, (value) => { addInfinityPointsLog10 = value; });
 expose("spendInfinityPoints", () => spendInfinityPoints, (value) => { spendInfinityPoints = value; });
 expose("canBreakInfiniteCap", () => canBreakInfiniteCap, (value) => { canBreakInfiniteCap = value; });
 expose("updateChallengeTimers", () => updateChallengeTimers, (value) => { updateChallengeTimers = value; });

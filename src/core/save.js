@@ -668,6 +668,9 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.ipTfClaims = runtime.normalizeTimelineClaimCount?.(data.ipTfClaims, 0) ?? 0;
   runtime.state.eternityTfClaims = runtime.normalizeTimelineClaimCount?.(data.eternityTfClaims, 0) ?? 0;
   runtime.state.timelinePurchasedNodes = runtime.normalizeTimelinePurchasedNodes?.(data.timelinePurchasedNodes) ?? [];
+  runtime.state.timelineParallelSecondsSinceIc8Clear = runtime.normalizeTimelineSeconds?.(
+    data.timelineParallelSecondsSinceIc8Clear,
+  ) ?? 0;
   runtime.state.eternityMilestoneMask = runtime.normalizeEternityMilestoneMask?.(data.eternityMilestoneMask) ?? 0;
   runtime.state.eternityMilestoneChoice = runtime.normalizeEternityMilestoneChoice?.(data.eternityMilestoneChoice) || "";
   const infiniteAngleFreeLevel = runtime.eternityMilestoneActive?.("1-3") === true ? 5 : 0;
@@ -1316,6 +1319,7 @@ function resetSave() {
     ipTfClaims: 0,
     eternityTfClaims: 0,
     timelinePurchasedNodes: [],
+    timelineParallelSecondsSinceIc8Clear: 0,
     eternityMilestoneMask: 0,
     eternityMilestoneChoice: "",
     infinityPoints: 0,
