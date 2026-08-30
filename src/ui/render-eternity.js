@@ -268,7 +268,12 @@ function updateEternityUi() {
   if (countValue) countValue.textContent = runtime.formatUiNumber(count);
   setRequirementState(eternityRoot.querySelector("#eternityTc4Requirement"), tc4Met);
   setRequirementState(eternityRoot.querySelector("#eternityIpRequirement"), ipMet);
-  if (currentIp) currentIp.textContent = `${runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10())} IP`;
+  if (currentIp) {
+    currentIp.textContent = `${runtime.formatHeldUiLogNumber(
+      runtime.currentInfinityPointsLog10(),
+      runtime.state.infinityPointsExact,
+    )} IP`;
+  }
   if (requirementState) {
     requirementState.textContent = runtime.t(ready ? "eternityRequirementReady" : "eternityRequirementWaiting");
     requirementState.classList.toggle("is-met", ready);

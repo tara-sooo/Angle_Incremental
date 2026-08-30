@@ -140,12 +140,18 @@ function combineLog10(a, b) {
   return clampLog10(high + Math.log10(1 + 10 ** (low - high)));
 }
 
-function formatNumber(value) {
+function formatNumber(value, truncate = false) {
   if (value === Infinity) return formatLogNumber(Infinity);
   if (!Number.isFinite(value)) return "0";
-  if (value < 1000) return value.toFixed(value < 10 ? 2 : 0).replace(/\.00$/, "");
-  if (value < 1000000) return Math.round(value).toLocaleString("en-US");
-  if (value >= 1e18) return value.toExponential(2).replace("e+", "e");
+  if (value < 1000) {
+    const decimals = value < 10 ? 2 : 0;
+    const displayValue = truncate ? Math.floor(value * (10 ** decimals)) / (10 ** decimals) : value;
+    return displayValue.toFixed(decimals).replace(/\.00$/, "");
+  }
+  if (value < 1000000) return (truncate ? Math.floor(value) : Math.round(value)).toLocaleString("en-US");
+  if (value >= 1e18) return truncate
+    ? formatScientificLog(log10Value(value), true)
+    : value.toExponential(2).replace("e+", "e");
   const units = ["M", "B", "T", "Qa", "Qi", "Sx"];
   let scaled = value / 1000000;
   let unitIndex = 0;
@@ -153,40 +159,66 @@ function formatNumber(value) {
     scaled /= 1000;
     unitIndex += 1;
   }
-  return `${scaled.toFixed(scaled >= 100 ? 1 : 2)}${units[unitIndex]}`;
+  const decimals = scaled >= 100 ? 1 : 2;
+  const displayValue = truncate ? Math.floor(scaled * (10 ** decimals)) / (10 ** decimals) : scaled;
+  return `${displayValue.toFixed(decimals)}${units[unitIndex]}`;
 }
 
-function formatUiNumber(value) {
-  if (runtime.state.numberFormat === "compact" || value <= 0 || !Number.isFinite(value)) return formatNumber(value);
+function formatUiNumber(value, truncate = false) {
+  if (runtime.state.numberFormat === "compact" || value <= 0 || !Number.isFinite(value)) return formatNumber(value, truncate);
   const valueLog = log10Value(value);
-  if (runtime.state.numberFormat === "scientific") return formatScientificLog(valueLog);
-  if (runtime.state.numberFormat === "detailed" && valueLog < 3) return formatNumber(value);
-  return formatLogNumber(valueLog);
+  if (runtime.state.numberFormat === "scientific") return formatScientificLog(valueLog, truncate);
+  if (runtime.state.numberFormat === "detailed" && valueLog < 3) return formatNumber(value, truncate);
+  return formatLogNumber(valueLog, false, truncate);
 }
 
-function formatUiLogNumber(log10Value) {
+function formatUiLogNumber(log10Value, truncate = false) {
   if (log10Value === -Infinity) return "0";
-  if (!Number.isFinite(log10Value)) return formatLogNumber(log10Value);
-  if (log10Value < 18) return formatUiNumber(10 ** log10Value);
-  return formatLogNumber(log10Value);
+  if (!Number.isFinite(log10Value)) return formatLogNumber(log10Value, false, truncate);
+  if (log10Value < 18) return formatUiNumber(10 ** log10Value, truncate);
+  return formatLogNumber(log10Value, false, truncate);
 }
 
-function formatLogNumber(log10Value, capSuffix = false) {
+function formatScientificMantissa(log10Value, truncate = false) {
+  let exponent = Math.floor(log10Value);
+  let mantissa = 10 ** (log10Value - exponent);
+  if (mantissa >= 10) {
+    exponent += 1;
+    mantissa /= 10;
+  }
+  const displayMantissa = truncate ? Math.floor(mantissa * 100) / 100 : mantissa;
+  const mantissaText = displayMantissa.toFixed(2);
+  if (mantissaText === "10.00") {
+    return { mantissa: "1.00", exponent: exponent + 1 };
+  }
+  return { mantissa: mantissaText, exponent };
+}
+
+function formatLogNumber(log10Value, capSuffix = false, truncate = false) {
   log10Value = clampLog10(log10Value);
   if (log10Value === -Infinity) return "0";
-  if (log10Value < 18) return formatNumber(10 ** log10Value);
-  const exponent = Math.floor(log10Value);
-  const mantissa = 10 ** (log10Value - exponent);
+  if (log10Value < 18) return formatNumber(10 ** log10Value, truncate);
+  const { mantissa, exponent } = formatScientificMantissa(log10Value, truncate);
   const suffix = capSuffix ? runtime.t("capSuffix") : "";
-  return `${mantissa.toFixed(2)}e${exponent.toLocaleString("en-US")}${suffix}`;
+  return `${mantissa}e${exponent.toLocaleString("en-US")}${suffix}`;
 }
 
-function formatScientificLog(log10Value) {
+function formatScientificLog(log10Value, truncate = false) {
   if (!Number.isFinite(log10Value)) return log10Value === -Infinity ? "0" : "∞";
-  if (log10Value < 3) return formatNumber(10 ** log10Value);
-  const exponent = Math.floor(log10Value);
-  const mantissa = 10 ** (log10Value - exponent);
-  return `${mantissa.toFixed(2)}e${exponent.toLocaleString("en-US")}`;
+  if (log10Value < 3) return formatNumber(10 ** log10Value, truncate);
+  const { mantissa, exponent } = formatScientificMantissa(log10Value, truncate);
+  return `${mantissa}e${exponent.toLocaleString("en-US")}`;
+}
+
+function formatExactHeldScientific(exactValue) {
+  if (typeof exactValue !== "string" && typeof exactValue !== "bigint") return null;
+  const digits = String(exactValue).trim().replace(/^0+/, "");
+  if (!/^\d+$/.test(digits) || digits.length <= 18) return null;
+  return `${digits[0]}.${digits.slice(1, 3).padEnd(2, "0")}e${(digits.length - 1).toLocaleString("en-US")}`;
+}
+
+function formatHeldUiLogNumber(log10Value, exactValue = null) {
+  return formatExactHeldScientific(exactValue) || formatUiLogNumber(log10Value, true);
 }
 
 function formatPowerOfTen(log10Value) {
@@ -248,6 +280,7 @@ expose("combineLog10", () => combineLog10, (value) => { combineLog10 = value; })
 expose("formatNumber", () => formatNumber, (value) => { formatNumber = value; });
 expose("formatUiNumber", () => formatUiNumber, (value) => { formatUiNumber = value; });
 expose("formatUiLogNumber", () => formatUiLogNumber, (value) => { formatUiLogNumber = value; });
+expose("formatHeldUiLogNumber", () => formatHeldUiLogNumber, (value) => { formatHeldUiLogNumber = value; });
 expose("formatLogNumber", () => formatLogNumber, (value) => { formatLogNumber = value; });
 expose("formatScientificLog", () => formatScientificLog, (value) => { formatScientificLog = value; });
 expose("formatPowerOfTen", () => formatPowerOfTen, (value) => { formatPowerOfTen = value; });

@@ -45,7 +45,10 @@ function updateOfflineReportUi() {
     0,
     report.infinityCountAfter - report.infinityCountBefore,
   )}`;
-  elements.offlineReportIp.textContent = runtime.formatUiLogNumber(report.infinityPointsAfterLog10);
+  elements.offlineReportIp.textContent = runtime.formatHeldUiLogNumber(
+    report.infinityPointsAfterLog10,
+    runtime.state.infinityPointsExact,
+  );
   elements.offlineReportNote.textContent = report.clockAnomaly
     ? runtime.t("offlineReportClockAnomaly")
     : report.clockSource === "local-fallback"

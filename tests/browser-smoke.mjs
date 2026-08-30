@@ -410,6 +410,69 @@ try {
   assert.equal(generationPreview.scientific, "1.00e9", "the previous GR score should respect scientific formatting");
   assert.equal(generationPreview.compact, "1.00B", "the previous GR score should respect compact formatting");
 
+  const heldResourceThreshold = await page.evaluate(() => {
+    const { state, runtime, switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+    const originalRuntime = {
+      activeInfinitySubtab: runtime.activeInfinitySubtab,
+      activeMainTab: runtime.activeMainTab,
+    };
+    const originalState = {
+      achievementMask: state.achievementMask,
+      achievementMaskHigh: state.achievementMaskHigh,
+      activeTowerChallenge: state.activeTowerChallenge,
+      completedTowerChallenges: state.completedTowerChallenges,
+      infinityCount: state.infinityCount,
+      infinityPoints: state.infinityPoints,
+      infinityPointsExact: state.infinityPointsExact,
+      infinityPointsLog10: state.infinityPointsLog10,
+      numberFormat: state.numberFormat,
+      towerFloor: state.towerFloor,
+      unlockedMainTabs: [...state.unlockedMainTabs],
+    };
+    state.activeTowerChallenge = 0;
+    state.completedTowerChallenges = 0;
+    state.infinityCount = 1;
+    state.numberFormat = "scientific";
+    state.towerFloor = 0;
+    state.unlockedMainTabs = ["infinity"];
+    switchMainTab("infinity");
+    switchInfinitySubtab("tower");
+
+    const readThresholdUi = () => ({
+      heldIp: document.querySelector("#infinityPoints")?.textContent?.trim() ?? "",
+      renderedHeldIp: JSON.parse(window.render_game_to_text()).infinity.points,
+      towerCost: document.querySelector("#towerNextCost")?.textContent?.trim() ?? "",
+      towerButtonDisabled: document.querySelector("#towerBuildButton")?.disabled ?? true,
+      canBuildTower: runtime.canBuildTower(),
+    });
+
+    runtime.syncInfinityPointCachesFromExact(10n ** 50n - 1n);
+    runtime.updateUi();
+    const below = readThresholdUi();
+    runtime.syncInfinityPointCachesFromExact(10n ** 50n);
+    runtime.updateUi();
+    const exact = readThresholdUi();
+
+    Object.assign(state, originalState);
+    runtime.activeMainTab = originalRuntime.activeMainTab;
+    runtime.activeInfinitySubtab = originalRuntime.activeInfinitySubtab;
+    switchMainTab(originalRuntime.activeMainTab);
+    switchInfinitySubtab(originalRuntime.activeInfinitySubtab);
+    runtime.updateUi();
+    return { below, exact };
+  });
+  assert.equal(heldResourceThreshold.below.heldIp, "9.99e49", "held IP should stay below the Tower threshold before 1e50");
+  assert.equal(heldResourceThreshold.below.renderedHeldIp, "9.99e49", "debug resource text should use truthful held-IP formatting");
+  assert.equal(heldResourceThreshold.below.towerCost, "1.00e50 IP", "Tower cost should remain an authoritative rounded threshold");
+  assert.equal(heldResourceThreshold.below.canBuildTower, false, "Tower should remain unavailable below its exact IP cost");
+  assert.equal(heldResourceThreshold.below.towerButtonDisabled, true, "Tower button should remain disabled below its exact IP cost");
+  assert.equal(heldResourceThreshold.exact.heldIp, "1.00e50", "held IP should reach e50 at the exact Tower threshold");
+  assert.equal(heldResourceThreshold.exact.renderedHeldIp, "1.00e50", "debug resource text should show the exact e50 boundary");
+  assert.equal(heldResourceThreshold.exact.canBuildTower, true, "Tower should become available at its exact IP cost");
+  assert.equal(heldResourceThreshold.exact.towerButtonDisabled, false, "Tower button should enable at its exact IP cost");
+  assert.doesNotMatch(heldResourceThreshold.below.heldIp, /10\.00e/);
+  assert.doesNotMatch(heldResourceThreshold.exact.heldIp, /10\.00e/);
+
   const vertexGainDisplay = await page.evaluate(() => {
     const { state } = window.__angleDebug;
     const original = {
