@@ -88,8 +88,11 @@ function updateTopBar() {
   if (mode === "resources") {
     if (label) label.textContent = runtime.t("topBarResources");
     const score = runtime.scoreDisplay();
-    const ip = runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10());
-    const ia = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
+    const ip = runtime.formatHeldUiLogNumber(
+      runtime.currentInfinityPointsLog10(),
+      runtime.state.infinityPointsExact,
+    );
+    const ia = runtime.formatHeldUiLogNumber(runtime.currentInfiniteScoreLog10());
     runtime.elements.newsTickerText.textContent = `Score ${score} / IP ${ip} / IA ${ia}`;
     return;
   }

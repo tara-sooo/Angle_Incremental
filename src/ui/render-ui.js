@@ -124,7 +124,7 @@ function recoveryStateSummary(entry) {
   );
   return [
     `${runtime.t("recoveryInfinity")}: ${runtime.formatUiNumber(state.infinityCount || 0)}`,
-    `${runtime.t("recoveryIp")}: ${runtime.formatUiLogNumber(infinityPointsLog10)}`,
+    `${runtime.t("recoveryIp")}: ${runtime.formatHeldUiLogNumber(infinityPointsLog10, state.infinityPointsExact)}`,
     `${runtime.t("recoveryChallenges")}: ${countBits(state.completedChallenges)}/${runtime.INFINITY_CHALLENGE_COUNT}`,
     `${runtime.t("recoveryAchievements")}: ${countAchievementBits(state)}/${runtime.ACHIEVEMENT_COUNT}`,
     `${runtime.t("recoveryIa")}: ${state.infiniteAngleUnlocked ? runtime.t("recoveryUnlocked") : runtime.t("recoveryLocked")}`,
@@ -570,9 +570,12 @@ function updateUi() {
   runtime.elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";
   runtime.elements.infinityTabBadge.classList.toggle("is-visible", infinityReady);
   runtime.elements.infinityUnlockNote.hidden = infinityUnlocked;
-  runtime.elements.infinityPoints.textContent = runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10());
-  runtime.elements.infiniteScore.textContent = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
-  runtime.elements.infiniteScorePanel.textContent = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
+  runtime.elements.infinityPoints.textContent = runtime.formatHeldUiLogNumber(
+    runtime.currentInfinityPointsLog10(),
+    runtime.state.infinityPointsExact,
+  );
+  runtime.elements.infiniteScore.textContent = runtime.formatHeldUiLogNumber(runtime.currentInfiniteScoreLog10());
+  runtime.elements.infiniteScorePanel.textContent = runtime.formatHeldUiLogNumber(runtime.currentInfiniteScoreLog10());
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   runtime.elements.infiniteAngleBoost.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);

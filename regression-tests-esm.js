@@ -5,6 +5,7 @@ const failureReportPath = path.join(__dirname, "regression-failure.txt");
 async function main() {
   await require("./tests/runtime-invariants-module-runtime.js").runRuntimeInvariantTests();
   await require("./tests/vertex-gain-display-module-runtime.js").runVertexGainDisplayModuleRuntimeTest();
+  await require("./tests/held-resource-display-module-runtime.js").runHeldResourceDisplayModuleRuntimeTest();
   await require("./tests/ic7-price-cap-module-runtime.js").runIc7PriceCapModuleRuntimeTest();
   await require("./tests/achievements-v2-module-runtime.js").runAchievementV2ModuleRuntimeTest();
   await require("./tests/numeric-stability-module-runtime.js").runNumericStabilityModuleRuntimeTest();
