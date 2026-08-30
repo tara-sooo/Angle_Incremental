@@ -104,7 +104,7 @@ const TOWER_CHALLENGES = Object.freeze([
     index: 4,
     unlockFloor: 12,
     targetLog10: TC4_COMPLETION_TARGET_LOG10,
-    name: { ja: "TC4", en: "TC4" },
+    name: { ja: "TC4 既存品の代替", en: "TC4 Substitute for Existing Products" },
     restriction: {
       ja: "通常強化とIA強化はレベル1を超えて購入できず、TC4専用強化で1e7777 Scoreを目指す",
       en: "Normal and Infinite Angle upgrades stop at level 1; use the TC4 upgrades to reach 1e7777 Score.",

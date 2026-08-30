@@ -27,6 +27,33 @@ async function runTowerModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    runtime.state.language = "ja";
+    assert.deepEqual(
+      [1, 2, 3, 4].map((index) => runtime.towerChallengeName(index)),
+      [
+        "TC1 親友より知り合い",
+        "TC2 核家族世帯撲滅委員会",
+        "TC3 「『無限』が概念である時代はとうに越した」",
+        "TC4 既存品の代替",
+      ],
+      "Japanese Tower Challenge names should come from the canonical definitions",
+    );
+    runtime.state.language = "en";
+    assert.deepEqual(
+      [1, 2, 3, 4].map((index) => runtime.towerChallengeName(index)),
+      [
+        "TC1 Better Acquaintances Than Friends",
+        "TC2 Nuclear Family Eradication Committee",
+        "TC3 The Age When Infinity Was a Concept Is Long Gone",
+        "TC4 Substitute for Existing Products",
+      ],
+      "English Tower Challenge names should come from the canonical definitions",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
     debug.state.towerFloor = 12;
     debug.state.activeTowerChallenge = 4;
