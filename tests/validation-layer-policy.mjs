@@ -47,6 +47,8 @@ assert.equal(directRunCount(performanceJob, "npm run test:performance"), 1, "per
 assert.equal(directRunCount(performanceJob, "npm run test:offline-stress"), 0, "performance job must not own offline stress");
 assert.equal(directRunCount(offlineStressJob, "npm run test:offline-stress"), 1, "offline-stress job must own offline stress");
 assert.equal(directRunCount(offlineStressJob, "npm run test:performance"), 0, "offline-stress job must not own hosted performance timing");
+assert.match(performanceJob, /npx playwright install chromium/);
+assert.match(offlineStressJob, /npx playwright install chromium/);
 assert.doesNotMatch(workflow, /^\s+needs:/m, "hosted jobs must remain independently runnable");
 assert.doesNotMatch(workflow, /continue-on-error:\s*true/, "hosted gates must not become advisory");
 assert.match(regressionJob, /name: regression-diagnostics/);

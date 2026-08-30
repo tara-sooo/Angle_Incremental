@@ -58,6 +58,9 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm ci
+      - name: Install Chromium for performance smoke test
+        timeout-minutes: 5
+        run: npx playwright install chromium
       - name: Run hosted performance smoke test
         run: npm run test:performance
       - name: Upload performance diagnostics
@@ -77,6 +80,9 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm ci
+      - name: Install Chromium for offline stress test
+        timeout-minutes: 5
+        run: npx playwright install chromium
       - name: Run offline stress test
         run: npm run test:offline-stress
       - name: Upload offline stress diagnostics
