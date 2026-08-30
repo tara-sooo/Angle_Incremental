@@ -800,6 +800,145 @@ canvas {
   margin: 12px 0 0;
 }
 
+.timeline-tree {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgba(10, 18, 34, 0.52);
+}
+
+.timeline-tree > .panel-heading {
+  margin: -12px -12px 0;
+}
+
+.timeline-tree-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.timeline-node-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.timeline-node {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgba(10, 18, 34, 0.68);
+}
+
+.timeline-node.is-available {
+  border-color: rgba(104, 211, 145, 0.58);
+}
+
+.timeline-node.is-owned {
+  border-color: rgba(242, 184, 75, 0.72);
+  background: rgba(112, 80, 28, 0.2);
+}
+
+.timeline-node.is-conflict {
+  border-color: rgba(255, 166, 89, 0.5);
+}
+
+.timeline-node-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.timeline-node-era {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.timeline-node-name {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.timeline-node-route {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border: 1px solid var(--line-strong);
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.timeline-node-route-parallel {
+  color: var(--accent-strong);
+}
+
+.timeline-node-description {
+  min-height: 3.2em;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.timeline-node-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.timeline-node-meta > div {
+  min-width: 0;
+  padding: 7px;
+  border: 1px solid var(--line);
+}
+
+.timeline-node-meta dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.timeline-node-meta dd {
+  margin: 3px 0 0;
+  color: var(--gold);
+  font-size: 0.8rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.timeline-node-status {
+  min-height: 2.8em;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.timeline-node.is-available .timeline-node-status {
+  color: var(--green);
+}
+
+.timeline-node.is-owned .timeline-node-status {
+  color: var(--gold);
+}
+
+.timeline-node-purchase {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
 .timeline-track {
   min-width: 0;
   padding: 12px;
@@ -2194,6 +2333,7 @@ canvas {
   .tower-metrics,
   .timeline-summary,
   .timeline-claim-grid,
+  .timeline-node-grid,
   .settings-grid,
   .statistics-grid,
   .challenge-time-grid,
@@ -2208,6 +2348,10 @@ canvas {
 
   .timeline-respec-button {
     width: 100%;
+  }
+
+  .timeline-node-meta {
+    grid-template-columns: 1fr;
   }
 
   .infinite-angle-panel .infinite-angle-playfield-wrap,

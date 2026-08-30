@@ -220,6 +220,12 @@ try {
     ipRequirement: document.getElementById("timelineIpRequirement")?.textContent,
     eternityRequirement: document.getElementById("timelineEternityRequirement")?.textContent,
     scoreDisabled: document.getElementById("timelineScoreClaimButton")?.disabled,
+    treeNodeCount: document.querySelectorAll(".timeline-node").length,
+    realRoute: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-route')?.textContent,
+    parallelRoute: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-route')?.textContent,
+    realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
+    parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
+    realStatus: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-status')?.textContent,
     warning: document.querySelector(".timeline-respec p")?.textContent,
   }));
   assert.equal(timelineInitial.active, true, "Timeline should be selectable as a top-level panel");
@@ -227,6 +233,12 @@ try {
   assert.equal(timelineInitial.ipRequirement, "1.00e400 IP", "Timeline should show the exact initial IP requirement");
   assert.equal(timelineInitial.eternityRequirement, "2", "Timeline should show the exact initial Eternity requirement");
   assert.equal(timelineInitial.scoreDisabled, true, "an unmet Timeline track should disable its claim control");
+  assert.equal(timelineInitial.treeNodeCount, 2, "Timeline should show both first-era route alternatives");
+  assert.equal(timelineInitial.realRoute, "Real");
+  assert.equal(timelineInitial.parallelRoute, "Parallel");
+  assert.equal(timelineInitial.realButtonDisabled, true, "a node without available TF should be disabled");
+  assert.equal(timelineInitial.parallelButtonDisabled, true, "both route purchases should wait for available TF");
+  assert.match(timelineInitial.realStatus || "", /TF不足/);
   assert.match(timelineInitial.warning || "", /TF.*Eternity/, "Timeline should explain the respec consequences");
 
   await page.evaluate(() => {
@@ -246,11 +258,50 @@ try {
     earned: document.getElementById("timelineEarnedTf")?.textContent,
     next: document.getElementById("timelineScoreRequirement")?.textContent,
     score: window.__angleDebug.state.scoreLog10,
+    realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
+    parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
+    realDescription: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
   }));
   assert.equal(timelineClaimed.claims, 1, "Timeline claim controls should grant one TF");
   assert.equal(timelineClaimed.earned, "1 TF", "Timeline should display earned TF");
   assert.equal(timelineClaimed.next, "1.00e30,000 Score", "the Score requirement should advance after one claim");
   assert.equal(timelineClaimed.score, 25000, "claiming TF must not consume Score");
+  assert.equal(timelineClaimed.realButtonDisabled, false, "one available TF should make the Real node purchasable");
+  assert.equal(timelineClaimed.parallelButtonDisabled, false, "one available TF should make the Parallel node purchasable");
+  assert.match(timelineClaimed.realDescription || "", /効果.*後続/);
+
+  await page.click("#timelineRealBc16500PurchaseButton");
+  const realPurchased = await page.evaluate(() => ({
+    purchased: window.__angleDebug.state.timelinePurchasedNodes,
+    available: document.getElementById("timelineAvailableTf")?.textContent,
+    realStatus: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-status')?.textContent,
+    parallelStatus: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-status')?.textContent,
+    realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
+    parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
+  }));
+  assert.equal(realPurchased.purchased.length, 1, "a Timeline purchase should record one node");
+  assert.equal(realPurchased.purchased[0].id, "Real-BC16500");
+  assert.equal(realPurchased.available, "0 TF", "the purchased node should consume available TF");
+  assert.equal(realPurchased.realStatus, "購入済み");
+  assert.equal(realPurchased.realButtonDisabled, true);
+  assert.equal(realPurchased.parallelButtonDisabled, true, "the same-era alternative should be disabled");
+  assert.match(realPurchased.parallelStatus || "", /同じ時代.*ロック/);
+
+  assert.equal(
+    await page.evaluate(() => window.__angleDebug.respecTimeline({ save: false })),
+    true,
+    "Timeline respec should be able to change the selected route",
+  );
+  const afterTimelineRespec = await page.evaluate(() => ({
+    purchased: window.__angleDebug.state.timelinePurchasedNodes.length,
+    available: document.getElementById("timelineAvailableTf")?.textContent,
+    realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
+    parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
+  }));
+  assert.equal(afterTimelineRespec.purchased, 0);
+  assert.equal(afterTimelineRespec.available, "1 TF", "respec should return the node cost to available TF");
+  assert.equal(afterTimelineRespec.realButtonDisabled, false);
+  assert.equal(afterTimelineRespec.parallelButtonDisabled, false);
   await page.click('[data-tab="eternity"]');
 
   await page.click('[data-eternity-choice="1-1"]');
@@ -459,6 +510,9 @@ try {
     title10: document.querySelector('[data-i18n="eternityMilestone10Name"]')?.textContent,
     effect10: document.querySelector('[data-i18n="eternityMilestone10Effect"]')?.textContent,
     timelineTitle: document.querySelector('[data-i18n="timeline"]')?.textContent,
+    timelineTree: document.querySelector('[data-i18n="timelineTree"]')?.textContent,
+    realNodeName: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-name')?.textContent,
+    parallelNodeName: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-name')?.textContent,
     timelineWarning: document.querySelector('[data-i18n="timelineRespecWarning"]')?.textContent,
     manual: document.getElementById("eternityForcedNote")?.textContent,
   }));
@@ -475,11 +529,23 @@ try {
   assert.equal(english.title10, "10 Eternity Is Balance", "Milestone 10 should have English copy");
   assert.match(english.effect10 || "", /Eternity 128\+.*Infinity Point cap.*requirement remains unchanged/, "Milestone 10 English copy should describe the uncapped IP range and unchanged requirement");
   assert.equal(english.timelineTitle, "Timeline", "Timeline should have English copy");
+  assert.equal(english.timelineTree, "Timeline Tree", "Timeline Tree should have English copy");
+  assert.equal(english.realNodeName, "Inert Stone Tools", "Real node should have English copy");
+  assert.equal(english.parallelNodeName, "Endless Ice Age", "Parallel node should have English copy");
   assert.match(english.timelineWarning || "", /respec.*node.*TF.*Eternity run/i, "Timeline respec warning should have English copy");
   assert.match(english.manual || "", /manually/, "English copy should explain that Eternity is player-triggered");
   assert.doesNotMatch(english.manual || "", /performed automatically/, "English copy must not describe forced pre-Break Eternity");
 
   await page.setViewportSize({ width: 412, height: 915 });
+  await page.click('[data-tab="timeline"]');
+  const timelineMobile = await page.evaluate(() => ({
+    visible: document.querySelector('[data-panel="timeline"]')?.classList.contains("is-active"),
+    gridWidth: document.querySelector(".timeline-node-grid")?.getBoundingClientRect().width || 0,
+    nodeWidth: document.querySelector(".timeline-node")?.getBoundingClientRect().width || 0,
+  }));
+  assert.equal(timelineMobile.visible, true, "Timeline should remain usable at a mobile viewport");
+  assert.ok(timelineMobile.gridWidth > 0 && timelineMobile.nodeWidth > 0, "Timeline node cards should keep a visible mobile layout");
+  await page.click('[data-tab="eternity"]');
   const mobile = await page.evaluate(() => ({
     visible: document.querySelector('[data-panel="eternity"]')?.classList.contains("is-active"),
     width: document.querySelector('[data-panel="eternity"]')?.getBoundingClientRect().width || 0,

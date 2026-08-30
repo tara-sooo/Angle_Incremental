@@ -493,6 +493,64 @@
                 </button>
               </article>
             </div>
+            <section class="timeline-tree" aria-labelledby="timelineTreeHeading">
+              <div class="panel-heading">
+                <span id="timelineTreeHeading" data-i18n="timelineTree">Timeline Tree</span>
+              </div>
+              <p class="timeline-tree-hint" data-i18n="timelineTreeHint">
+                These nodes select a route only. Gameplay effects are added by a later leaf.
+              </p>
+              <div class="timeline-node-grid">
+                <article class="timeline-node" data-timeline-node="Real-BC16500">
+                  <div class="timeline-node-heading">
+                    <div>
+                      <p class="timeline-node-era">BC16500</p>
+                      <h3 class="timeline-node-name">惰性の打製石器</h3>
+                    </div>
+                    <span class="timeline-node-route timeline-node-route-real">Real</span>
+                  </div>
+                  <p class="timeline-node-description">Realルート。ゲーム効果は後続の効果リーフで実装されるため、現在は選択のみです。</p>
+                  <dl class="timeline-node-meta">
+                    <div>
+                      <dt data-i18n="timelineNodeCost">コスト</dt>
+                      <dd class="timeline-node-cost">1 TF</dd>
+                    </div>
+                    <div>
+                      <dt data-i18n="timelineNodePrerequisites">前提</dt>
+                      <dd class="timeline-node-prerequisites">なし</dd>
+                    </div>
+                  </dl>
+                  <p class="timeline-node-status" aria-live="polite">購入可能</p>
+                  <button id="timelineRealBc16500PurchaseButton" class="timeline-node-purchase upgrade-button" type="button" data-timeline-node-purchase="Real-BC16500" disabled>
+                    ノードを購入
+                  </button>
+                </article>
+                <article class="timeline-node" data-timeline-node="Parallel-BC16500">
+                  <div class="timeline-node-heading">
+                    <div>
+                      <p class="timeline-node-era">BC16500</p>
+                      <h3 class="timeline-node-name">終わらない氷河期</h3>
+                    </div>
+                    <span class="timeline-node-route timeline-node-route-parallel">Parallel</span>
+                  </div>
+                  <p class="timeline-node-description">Parallelルート。ゲーム効果は後続の効果リーフで実装されるため、現在は選択のみです。</p>
+                  <dl class="timeline-node-meta">
+                    <div>
+                      <dt data-i18n="timelineNodeCost">コスト</dt>
+                      <dd class="timeline-node-cost">1 TF</dd>
+                    </div>
+                    <div>
+                      <dt data-i18n="timelineNodePrerequisites">前提</dt>
+                      <dd class="timeline-node-prerequisites">なし</dd>
+                    </div>
+                  </dl>
+                  <p class="timeline-node-status" aria-live="polite">購入可能</p>
+                  <button id="timelineParallelBc16500PurchaseButton" class="timeline-node-purchase upgrade-button" type="button" data-timeline-node-purchase="Parallel-BC16500" disabled>
+                    ノードを購入
+                  </button>
+                </article>
+              </div>
+            </section>
             <section class="timeline-build">
               <div class="panel-heading">
                 <span data-i18n="timelineBuild">Timeline build</span>
