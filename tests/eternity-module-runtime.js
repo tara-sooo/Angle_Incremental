@@ -181,15 +181,6 @@ async function testMilestoneThresholdsAndEffects() {
   assert.ok(Math.abs(runtime.effectiveGainLevel() - 147.62815625) < 1e-12, "1-2 must add its bonus after TC3 Gain scaling");
   assert.equal(runtime.effectiveVertexCount(), 150, "1-2 must add its bonus after TC3 Vertex scaling");
 
-  state.eternityMilestoneMask = 0;
-  state.eternityCount = 5;
-  setScore(state, 10);
-  state.speedLevel = 1;
-  const scoreBeforeIc7Reward = state.scoreLog10;
-  assert.equal(runtime.isChallengeCompleted(7), false, "milestone 2 must not mark the raw IC7 completion bit");
-  assert.equal(runtime.spendNormalUpgrade("speed"), true, "milestone 2 must provide the IC7 score-spend reward");
-  assert.equal(state.scoreLog10, scoreBeforeIc7Reward, "milestone 2 must not spend score for a normal upgrade");
-
   state.eternityCount = 8;
   setScore(state, 20);
   state.generationScoreLog10 = 10;
@@ -306,6 +297,52 @@ async function testMilestoneThresholdsAndEffects() {
   );
 }
 
+async function testMilestoneTwoCompletionState() {
+  const { debug, runtime } = await loadRuntime(candidatePath);
+  const { state } = debug;
+  const challengeTimes = [1, 2, 3, 4, 5, 6, 100, 8];
+
+  state.eternityCount = 4;
+  state.completedChallenges = 0;
+  state.activeChallenge = 7;
+  state.activeChallengeTime = 12;
+  state.fastestInfinityChallengeTimes = [...challengeTimes];
+  runtime.applyEternityRunStartState();
+  assert.equal(state.completedChallenges, 0, "Milestone 2 must not activate below Eternity 5");
+  assert.equal(state.activeChallenge, 7, "below-threshold state must not clear an active IC");
+  assert.equal(state.activeChallengeTime, 12, "below-threshold state must not change IC timing");
+
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "the fifth Eternity should execute normally");
+  assert.equal(state.eternityCount, 5, "the successful transition should reach the Milestone 2 threshold");
+  assert.equal(state.completedChallenges, 1 << (7 - 1), "Milestone 2 should directly set the IC7 completion bit");
+  assert.equal(runtime.isChallengeCompleted(7), true, "the normal IC completion predicate should see Milestone 2");
+  assert.equal(state.activeChallenge, 0, "Eternity reset should leave no active IC");
+  assert.equal(state.activeChallengeTime, 0, "Eternity reset should clear the current IC timer");
+  assert.deepEqual(state.fastestInfinityChallengeTimes, challengeTimes, "Milestone 2 must not fabricate or rewrite IC clear times");
+  assert.equal(runtime.eternityMilestoneIc7RewardActive, undefined, "the obsolete reward-only predicate must be removed");
+
+  setScore(state, 10);
+  state.speedLevel = 0;
+  const scoreBeforeIc7Reward = state.scoreLog10;
+  assert.equal(runtime.spendNormalUpgrade("speed"), true, "completed IC7 should provide the normal no-Score-spend reward");
+  assert.equal(state.scoreLog10, scoreBeforeIc7Reward, "completed IC7 should not spend Score for a normal upgrade");
+  state.scoreLog10 = -Infinity;
+  state.score = 0;
+  assert.equal(runtime.spendNormalUpgrade("speed"), false, "completed IC7 must still require an affordable upgrade");
+
+  state.completedChallenges = 0;
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "a later pre-Milestone 6 Eternity should execute normally");
+  assert.equal(state.eternityCount, 6, "the later Eternity should increment normally");
+  assert.equal(state.completedChallenges, 1 << (7 - 1), "later resets should restore the direct IC7 completion state");
+
+  state.completedChallenges = 0;
+  assert.equal(debug.respecTimeline({ save: false, update: false }), true, "Timeline respec should reuse the Eternity start-state path");
+  assert.equal(state.eternityCount, 6, "Timeline respec must preserve the current Eternity count");
+  assert.equal(state.completedChallenges, 1 << (7 - 1), "Timeline respec should restore the direct IC7 completion state");
+}
+
 async function testMilestoneFiveInfinityUpgradeAutomation() {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
@@ -361,7 +398,7 @@ async function testMilestoneSixCompletionState() {
   markEternityReady(runtime, state);
   assert.equal(debug.performEternity({ save: false, update: false }), true, "Eternity 26 should still execute normally");
   assert.equal(state.eternityCount, 26, "the pre-Milestone 6 Eternity should increment normally");
-  assert.equal(state.completedChallenges, 0, "Eternity 26 should leave Infinity Challenges incomplete");
+  assert.equal(state.completedChallenges, 1 << (7 - 1), "Eternity 26 should restore only the Milestone 2 IC7 completion state");
   assert.equal(state.activeChallenge, 0, "Eternity should clear an active Infinity Challenge");
   assert.deepEqual(state.fastestInfinityChallengeTimes, challengeTimes, "Milestone 6 must not replay or rewrite IC clear times");
 
@@ -526,7 +563,7 @@ async function testThresholdAndResetBoundary() {
   assert.equal(state.infiniteScoreLog10, -Infinity, "Eternity must reset Infinite Score");
   assert.equal(state.infiniteAngleUnlocked, false, "Eternity must reset Infinite Angle unlock");
   assert.equal(state.towerFloor, 0, "Eternity must reset Tower floor");
-  assert.equal(state.completedChallenges, 0, "Eternity must reset Infinity Challenges");
+  assert.equal(state.completedChallenges, 1 << (7 - 1), "Eternity must restore IC7 once Milestone 2 is active");
   assert.equal(state.completedTowerChallenges, 0, "Eternity must reset TC completion including TC4");
   assert.equal(state.tc4BaseGainLevel, 0, "Eternity must reset TC4 local upgrade levels");
   assert.equal(state.tc4FreeCoreBoostPriceStep, 0, "Eternity must reset TC4 local price steps");
@@ -794,6 +831,7 @@ async function runEternityModuleRuntimeTest() {
   await testEternityRunStatistics();
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
+  await testMilestoneTwoCompletionState();
   await testMilestoneFiveInfinityUpgradeAutomation();
   await testMilestoneSixCompletionState();
   await testMilestoneFreeLevelsAndSaveLoad();

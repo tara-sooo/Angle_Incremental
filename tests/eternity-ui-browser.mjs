@@ -340,6 +340,7 @@ try {
     owned11: document.querySelector('[data-eternity-milestone="1-1"] .eternity-milestone-status')?.textContent,
     disabled11: document.querySelector('[data-eternity-choice="1-1"]')?.disabled,
     active2: document.querySelector('[data-eternity-milestone="2"] .eternity-milestone-status')?.textContent,
+    effect2: document.querySelector('[data-eternity-milestone="2"] .eternity-milestone-effect')?.textContent,
     locked3: document.querySelector('[data-eternity-milestone="3"] .eternity-milestone-status')?.textContent,
     locked6: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-status')?.textContent,
     locked7: document.querySelector('[data-eternity-milestone="7"] .eternity-milestone-status')?.textContent,
@@ -348,6 +349,7 @@ try {
   assert.equal(progressed.owned11, "取得済み", "owned first-tier Milestones should be represented as owned");
   assert.equal(progressed.disabled11, true, "owned first-tier Milestones should no longer be selectable");
   assert.equal(progressed.active2, "有効", "count-based Milestone 2 should show active at Eternity 5");
+  assert.equal(progressed.effect2, "IC7をクリア済みの状態で開始する", "Milestone 2 should describe the direct IC7 completion state");
   assert.equal(progressed.locked3, "未解放", "later count-based Milestones should remain locked below their threshold");
   assert.equal(progressed.locked6, "未解放", "Milestone 6 should remain locked at Eternity 5");
   assert.equal(progressed.locked7, "未解放", "Milestone 7 should remain locked at Eternity 5");
@@ -513,6 +515,7 @@ try {
     title11: document.querySelector('[data-i18n="eternityMilestone11Name"]')?.textContent,
     title6: document.querySelector('[data-i18n="eternityMilestone6Name"]')?.textContent,
     effect6: document.querySelector('[data-i18n="eternityMilestone6Effect"]')?.textContent,
+    effect2: document.querySelector('[data-i18n="eternityMilestone2Effect"]')?.textContent,
     title7: document.querySelector('[data-i18n="eternityMilestone7Name"]')?.textContent,
     effect7: document.querySelector('[data-i18n="eternityMilestone7Effect"]')?.textContent,
     title8: document.querySelector('[data-i18n="eternityMilestone8Name"]')?.textContent,
@@ -534,6 +537,7 @@ try {
   assert.equal(english.countLabel, "Eternity count", "Eternity UI should switch to English when the shared language state changes");
   assert.equal(english.title11, "1-1 Spirit of QoL", "Milestone names should have English copy");
   assert.equal(english.title6, "6 Finite Infinity Challenges", "Milestone 6 should have English copy");
+  assert.equal(english.effect2, "Start each Eternity run with IC7 completed", "Milestone 2 English copy should describe the direct IC7 completion state");
   assert.match(english.effect6 || "", /Eternity 27\+.*IC1.*IC8.*completed/, "Milestone 6 English copy should describe the completed IC state");
   assert.equal(english.title7, "7 One-Point Challenges", "Milestone 7 should have English copy");
   assert.match(english.effect7 || "", /Eternity 44\+.*Tower Challenge.*completed.*normal unlock floor/, "Milestone 7 English copy should describe the normal unlock completion state");

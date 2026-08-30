@@ -77,10 +77,6 @@ function eternityMilestoneNormalUpgradeBonusLevel() {
   return eternityMilestoneActive("1-2") ? normalizedEternityCount() * 10 : 0;
 }
 
-function eternityMilestoneIc7RewardActive() {
-  return eternityMilestoneActive("2");
-}
-
 function eternityMilestonePreservesGenerationReset() {
   return eternityMilestoneActive("3");
 }
@@ -193,14 +189,17 @@ function resetEternityProgression() {
   runtime.normalizeTowerChallenge4State?.();
 }
 
-function applyEternityMilestoneSixCompletionState() {
+function applyEternityMilestoneCompletionState() {
+  if (eternityMilestoneActive("2")) {
+    runtime.state.completedChallenges |= 1 << (7 - 1);
+  }
   if (eternityMilestoneActive("6")) {
     runtime.state.completedChallenges = (1 << runtime.INFINITY_CHALLENGE_COUNT) - 1;
   }
 }
 
 function applyEternityRunStartState() {
-  applyEternityMilestoneSixCompletionState();
+  applyEternityMilestoneCompletionState();
   if (eternityMilestoneActive("9")) runtime.syncInfinityPointCachesFromExact(1000n);
 }
 
@@ -234,7 +233,6 @@ expose("availableEternityMilestoneChoices", () => availableEternityMilestoneChoi
 expose("acquireEternityMilestone", () => acquireEternityMilestone);
 expose("selectEternityMilestone", () => selectEternityMilestone);
 expose("eternityMilestoneNormalUpgradeBonusLevel", () => eternityMilestoneNormalUpgradeBonusLevel);
-expose("eternityMilestoneIc7RewardActive", () => eternityMilestoneIc7RewardActive);
 expose("eternityMilestonePreservesGenerationReset", () => eternityMilestonePreservesGenerationReset);
 expose("eternityMilestonePreservesCoreBoostReset", () => eternityMilestonePreservesCoreBoostReset);
 expose("eternityMilestoneCoreBoostRequirementLog10", () => eternityMilestoneCoreBoostRequirementLog10);

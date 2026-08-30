@@ -506,7 +506,7 @@ function canBuyNormalUpgrade(kind) {
 
 function spendNormalUpgrade(kind) {
   if (!runtime.towerChallenge4AllowsNormalUpgrade(kind) || !canBuyNormalUpgrade(kind)) return false;
-  if (runtime.isChallengeCompleted(7) || runtime.eternityMilestoneIc7RewardActive?.()) return true;
+  if (runtime.isChallengeCompleted(7)) return true;
   return spendLog(upgradeCostLog(kind));
 }
 
