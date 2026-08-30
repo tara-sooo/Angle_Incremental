@@ -248,8 +248,15 @@ function bindEvents() {
   runtime.elements.timelineScoreClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("score"));
   runtime.elements.timelineIpClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("ip"));
   runtime.elements.timelineEternityClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("eternity"));
-  runtime.elements.timelineRealBc16500PurchaseButton?.addEventListener("click", () => runtime.purchaseTimelineNode?.("Real-BC16500"));
-  runtime.elements.timelineParallelBc16500PurchaseButton?.addEventListener("click", () => runtime.purchaseTimelineNode?.("Parallel-BC16500"));
+  runtime.elements.timelineTree?.addEventListener("click", (event) => {
+    const nodeButton = event.target?.closest?.(".timeline-node[data-timeline-node]");
+    if (!nodeButton || !runtime.elements.timelineTree.contains(nodeButton)) return;
+    runtime.selectTimelineNode?.(nodeButton.dataset.timelineNode);
+  });
+  runtime.elements.timelineNodePurchaseButton?.addEventListener("click", () => {
+    const nodeId = runtime.elements.timelineNodePurchaseButton.dataset.timelineNodePurchase;
+    if (nodeId) runtime.purchaseTimelineNode?.(nodeId);
+  });
   runtime.elements.timelineRespecButton?.addEventListener("click", () => {
     if (typeof window.confirm === "function" && !window.confirm(runtime.t("timelineRespecConfirm"))) return;
     runtime.respecTimeline?.();

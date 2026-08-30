@@ -8,6 +8,7 @@ let renderedRecoveryNumberFormat = "";
 let renderedLoadRecoveryMode = false;
 let renderedSaveConflictMode = false;
 let renderedSaveConflictCheckpointReady = false;
+let selectedTimelineNodeId = "";
 
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
@@ -280,43 +281,161 @@ function timelineNodeCurrentEffectText(node, availability) {
   return runtime.t("timelineNodeInactive");
 }
 
+function timelineNodeRouteClass(route) {
+  return route === "Parallel" ? "timeline-node-route-parallel" : "timeline-node-route-real";
+}
+
+function createTimelineNodeCard(node) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "timeline-node";
+  card.dataset.timelineNode = node.id;
+  card.dataset.route = node.route || "";
+  card.setAttribute("aria-controls", "timelineNodeDetail");
+
+  const heading = document.createElement("span");
+  heading.className = "timeline-node-heading";
+  const identity = document.createElement("span");
+  identity.className = "timeline-node-identity";
+  const era = document.createElement("span");
+  era.className = "timeline-node-era";
+  const name = document.createElement("strong");
+  name.className = "timeline-node-name";
+  const route = document.createElement("span");
+  route.className = `timeline-node-route ${timelineNodeRouteClass(node.route)}`;
+  identity.append(era, name);
+  heading.append(identity, route);
+
+  const meta = document.createElement("span");
+  meta.className = "timeline-node-compact-meta";
+  const cost = document.createElement("span");
+  cost.className = "timeline-node-cost";
+  const status = document.createElement("span");
+  status.className = "timeline-node-status";
+  meta.append(cost, status);
+  card.append(heading, meta);
+  return card;
+}
+
+function renderTimelineNodeTree(nodes) {
+  const host = runtime.elements.timelineNodeGrid;
+  if (!host) return;
+  const signature = nodes.map((node) => `${node.id}:${node.era}:${node.route}`).join("|");
+  if (host.dataset.timelineSignature !== signature) {
+    clearElement(host);
+    const eras = new Map();
+    nodes.forEach((node) => {
+      if (!eras.has(node.era)) eras.set(node.era, []);
+      eras.get(node.era).push(node);
+    });
+    eras.forEach((eraNodes, era) => {
+      const eraSection = document.createElement("section");
+      eraSection.className = "timeline-era";
+      eraSection.dataset.timelineEra = era;
+      const eraHeading = document.createElement("h3");
+      eraHeading.className = "timeline-era-heading";
+      eraHeading.textContent = era;
+      const grid = document.createElement("div");
+      grid.className = "timeline-node-grid";
+      eraNodes
+        .slice()
+        .sort((left, right) => (left.route === "Parallel" ? 1 : 0) - (right.route === "Parallel" ? 1 : 0))
+        .forEach((node) => grid.append(createTimelineNodeCard(node)));
+      eraSection.append(eraHeading, grid);
+      host.append(eraSection);
+    });
+    host.dataset.timelineSignature = signature;
+  }
+  runtime.elements.timelineNodeCards = Array.from(host.querySelectorAll(".timeline-node"));
+}
+
+function updateTimelineNodeCard(card, node, availability) {
+  const name = card.querySelector(".timeline-node-name");
+  const era = card.querySelector(".timeline-node-era");
+  const route = card.querySelector(".timeline-node-route");
+  const cost = card.querySelector(".timeline-node-cost");
+  const status = card.querySelector(".timeline-node-status");
+  const selected = node.id === selectedTimelineNodeId;
+  if (name) name.textContent = localizedTimelineText(node.name);
+  if (era) era.textContent = node.era;
+  if (route) {
+    route.textContent = node.route;
+    route.classList.toggle("timeline-node-route-real", node.route === "Real");
+    route.classList.toggle("timeline-node-route-parallel", node.route === "Parallel");
+  }
+  if (cost) cost.textContent = `${runtime.t("timelineNodeCost")}: ${runtime.formatUiNumber(node.costTF)} TF`;
+  if (status) status.textContent = timelineNodeStatusText(availability);
+  card.dataset.state = availability.reason;
+  card.dataset.route = node.route || "";
+  card.classList.toggle("is-available", availability.canPurchase);
+  card.classList.toggle("is-owned", availability.reason === "owned");
+  card.classList.toggle("is-locked", !availability.canPurchase && availability.reason !== "owned");
+  card.classList.toggle("is-conflict", availability.reason === "route-conflict");
+  card.classList.toggle("is-selected", selected);
+  card.setAttribute("aria-pressed", String(selected));
+  card.setAttribute("aria-label", `${localizedTimelineText(node.name)}, ${node.era}, ${node.route}, ${timelineNodeStatusText(availability)}`);
+}
+
+function updateTimelineNodeDetail(node, availability) {
+  const detail = runtime.elements.timelineNodeDetail;
+  if (!detail) return;
+  if (!node) {
+    detail.hidden = true;
+    return;
+  }
+  detail.hidden = false;
+  detail.dataset.timelineNode = node.id;
+  detail.dataset.state = availability.reason;
+  detail.classList.toggle("is-available", availability.canPurchase);
+  detail.classList.toggle("is-owned", availability.reason === "owned");
+  detail.classList.toggle("is-locked", !availability.canPurchase && availability.reason !== "owned");
+  detail.classList.toggle("is-conflict", availability.reason === "route-conflict");
+  const prerequisites = Array.isArray(node.prerequisites) ? node.prerequisites : [];
+  if (runtime.elements.timelineNodeDetailHeading) runtime.elements.timelineNodeDetailHeading.textContent = localizedTimelineText(node.name);
+  if (runtime.elements.timelineNodeDetailEra) runtime.elements.timelineNodeDetailEra.textContent = node.era;
+  if (runtime.elements.timelineNodeDetailRoute) {
+    runtime.elements.timelineNodeDetailRoute.textContent = node.route;
+    runtime.elements.timelineNodeDetailRoute.classList.toggle("timeline-node-route-real", node.route === "Real");
+    runtime.elements.timelineNodeDetailRoute.classList.toggle("timeline-node-route-parallel", node.route === "Parallel");
+  }
+  if (runtime.elements.timelineNodeDetailDescription) runtime.elements.timelineNodeDetailDescription.textContent = localizedTimelineText(node.description);
+  if (runtime.elements.timelineNodeDetailCurrentEffect) runtime.elements.timelineNodeDetailCurrentEffect.textContent = timelineNodeCurrentEffectText(node, availability);
+  if (runtime.elements.timelineNodeDetailCost) runtime.elements.timelineNodeDetailCost.textContent = `${runtime.formatUiNumber(node.costTF)} TF`;
+  if (runtime.elements.timelineNodeDetailPrerequisites) runtime.elements.timelineNodeDetailPrerequisites.textContent = prerequisites.length > 0
+    ? prerequisites.join(", ")
+    : runtime.t("timelineNoPrerequisites");
+  if (runtime.elements.timelineNodeDetailStatus) runtime.elements.timelineNodeDetailStatus.textContent = timelineNodeStatusText(availability);
+  if (runtime.elements.timelineNodePurchaseButton) {
+    runtime.elements.timelineNodePurchaseButton.dataset.timelineNodePurchase = node.id;
+    runtime.elements.timelineNodePurchaseButton.disabled = !availability.canPurchase;
+    runtime.elements.timelineNodePurchaseButton.textContent = availability.reason === "owned"
+      ? runtime.t("timelineNodePurchased")
+      : runtime.t("timelinePurchase");
+  }
+}
+
+function selectTimelineNode(nodeId) {
+  const node = runtime.timelineNode?.(nodeId);
+  if (!node) return false;
+  selectedTimelineNodeId = node.id;
+  updateTimelineTreeUi();
+  return true;
+}
+
 function updateTimelineTreeUi() {
-  if (typeof runtime.timelineNodeAvailability !== "function") return;
-  (runtime.elements.timelineNodeCards || []).forEach((card) => {
+  if (typeof runtime.timelineNodeAvailability !== "function" || typeof runtime.timelineNodes !== "function") return;
+  const nodes = runtime.timelineNodes();
+  renderTimelineNodeTree(nodes);
+  if (!nodes.some((node) => node.id === selectedTimelineNodeId)) selectedTimelineNodeId = nodes[0]?.id || "";
+  const selectedNode = runtime.timelineNode?.(selectedTimelineNodeId);
+  runtime.elements.timelineNodeCards.forEach((card) => {
     const node = runtime.timelineNode?.(card.dataset.timelineNode);
-    if (!node) return;
-    const availability = runtime.timelineNodeAvailability(node.id);
-    const name = card.querySelector(".timeline-node-name");
-    const description = card.querySelector(".timeline-node-description");
-    const era = card.querySelector(".timeline-node-era");
-    const route = card.querySelector(".timeline-node-route");
-    const currentEffect = card.querySelector(".timeline-node-current-effect");
-    const cost = card.querySelector(".timeline-node-cost");
-    const prerequisites = card.querySelector(".timeline-node-prerequisites");
-    const status = card.querySelector(".timeline-node-status");
-    const button = card.querySelector(".timeline-node-purchase");
-    if (name) name.textContent = localizedTimelineText(node.name);
-    if (description) description.textContent = localizedTimelineText(node.description);
-    if (era) era.textContent = node.era;
-    if (route) route.textContent = node.route;
-    if (cost) cost.textContent = `${runtime.formatUiNumber(node.costTF)} TF`;
-    if (prerequisites) prerequisites.textContent = node.prerequisites.length > 0
-      ? node.prerequisites.join(", ")
-      : runtime.t("timelineNoPrerequisites");
-    if (status) status.textContent = timelineNodeStatusText(availability);
-    if (currentEffect) currentEffect.textContent = timelineNodeCurrentEffectText(node, availability);
-    if (button) {
-      button.disabled = !availability.canPurchase;
-      button.textContent = availability.reason === "owned"
-        ? runtime.t("timelineNodePurchased")
-        : runtime.t("timelinePurchase");
-    }
-    card.dataset.state = availability.reason;
-    card.classList.toggle("is-available", availability.canPurchase);
-    card.classList.toggle("is-owned", availability.reason === "owned");
-    card.classList.toggle("is-locked", !availability.canPurchase && availability.reason !== "owned");
-    card.classList.toggle("is-conflict", availability.reason === "route-conflict");
+    if (node) updateTimelineNodeCard(card, node, runtime.timelineNodeAvailability(node.id));
   });
+  updateTimelineNodeDetail(
+    selectedNode,
+    selectedNode ? runtime.timelineNodeAvailability(selectedNode.id) : null,
+  );
 }
 
 function updateTimelineUi() {
@@ -640,6 +759,7 @@ expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
 expose("formatVertexGainIncrease", () => formatVertexGainIncrease, (value) => { formatVertexGainIncrease = value; });
 expose("updateTimelineUi", () => updateTimelineUi);
+expose("selectTimelineNode", () => selectTimelineNode);
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });
 expose("setSaveStatus", () => setSaveStatus, (value) => { setSaveStatus = value; });
 expose("gainExpressionConfig", () => gainExpressionConfig, (value) => { gainExpressionConfig = value; });
