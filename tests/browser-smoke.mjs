@@ -155,7 +155,7 @@ async function runSmoke() {
       assert.equal(await mobilePage.page.locator('[data-panel="settings"]').isVisible(), true, "Settings should remain visible on mobile");
       const mobileTabBar = await mobilePage.page.evaluate(() => {
         const strip = document.querySelector(".main-tab-scroll");
-        const visibleTabs = Array.from(document.querySelectorAll("[data-tab]"));
+        const visibleTabs = Array.from(document.querySelectorAll("[data-tab]")).filter((button) => button.getClientRects().length > 0);
         const rects = visibleTabs.map((button) => button.getBoundingClientRect());
         return {
           stripScrollWidth: strip?.scrollWidth ?? 0,
