@@ -76,7 +76,7 @@ IDDの標準ラベルは`roadmap`、`status:blocked-by-human`、`status:needs-de
 
 ### Routine production validation
 
-`npm run validate`はruntime順序、構文、version consistency、IDD policy、ESM回帰、browser smoke、ローカル性能ゲートを実行します。TC4などの研究シミュレータはroutine層には含めません。IDDのfix-validate／pre-push／post-fixは、引き続きこのroutine層を使用します。
+`npm run validate`はruntime順序、構文、version consistency、IDD policy、ESM回帰、browser smoke、決定論的なローカル性能classifierを実行します。routine層ではwall-clockのcandidate-vs-baseline測定（`npm run test:performance:local`）を自動実行しません。この比較が必要な性能IssueやHosted CI調査では、明示的にコマンドを実行します。TC4などの研究シミュレータはroutine層には含めません。IDDのfix-validate／pre-push／post-fixは、引き続きこのroutine層を使用します。
 
 ### Explicit research validation
 
@@ -86,7 +86,7 @@ IDDの標準ラベルは`roadmap`、`status:blocked-by-human`、`status:needs-de
 
 `npm run validate:full`はroutine validation、Hosted CI向けの絶対性能テスト（`npm run test:performance`）、offline stress（`npm run test:offline-stress`）、research validationを順に実行する明示的な広範囲aggregateです。routine `validate`を重く戻すための別名ではありません。
 
-Hosted regression workflowは、production correctness、local classifier、絶対性能、offline stressを独立したステップとして実行し、性能予算を緩和しません。`npm run test:performance`の絶対予算とoffline/work-budget検証はHosted CIを権威とします。TC4/research evidenceが必要なIssueでは、上記のresearch層またはfull層を追加で実行します。
+Hosted regression workflowは、production correctness/local classifier、絶対性能、offline stressを独立したhard-gate jobとして実行し、性能予算を緩和しません。各jobは責務ごとの診断artifactを保持します。`npm run test:performance`の絶対予算とoffline/work-budget検証はHosted CIを権威とします。TC4/research evidenceが必要なIssueでは、上記のresearch層またはfull層を追加で実行します。
 
 ### Local and hosted performance boundary
 
