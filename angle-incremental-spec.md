@@ -543,7 +543,7 @@ first-tierの1-1〜1-3はEternity回数1から候補になり、1回のEternity�
 | 1-1 QoLの精神 | Eternity 1、first-tier選択 | Infinity以前の通常強化自動購入を最初から利用可能にする。 |
 | 1-2 高みの見物 | Eternity 1、first-tier選択 | 通常強化の実効レベルへ`Eternity回数 × 10`を加える。TC3報酬がある場合はTC3倍率適用後に加算する。 |
 | 1-3 2つの盾 | Eternity 1、first-tier選択 | IAのSpeed・Vertex・Gainに無料レベルをそれぞれ+5付与する。実効レベルと効果計算に反映し、強化価格と購入レベルには影響しない。 |
-| 2 真の倹約家 | Eternity 5 | IC7の通常強化無消費効果を有効にする。IC7クリア状態そのものは立てない。 |
+| 2 真の倹約家 | Eternity 5 | IC7をクリア済みの状態で開始する。 |
 | 3 完璧な世代間継承 | Eternity 8 | GenerationとCore Boost実行時の下位リセットを抑止し、実行・正の効果は維持する。 |
 | 4 効率的なウラン235の探し方 | Eternity 12 | Core Boost要求量のlog10を`×0.9`する。 |
 | 5 自動植林 | Eternity 20 | Infinity自動化を解放する。 |

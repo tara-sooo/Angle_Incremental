@@ -319,12 +319,14 @@ try {
   await openEternityThroughUi();
   await page.click("#eternityPerformButton");
   const thresholdState = await page.evaluate(() => ({
+    completedIc7: (window.__angleDebug.state.completedChallenges & (1 << 6)) !== 0,
     count: window.__angleDebug.state.eternityCount,
     mask: window.__angleDebug.state.eternityMilestoneMask,
     entitlement: window.__angleDebug.runtime.firstTierMilestoneEntitlementCount(),
     milestone2: window.__angleDebug.runtime.eternityMilestoneActive("2"),
   }));
   assert.equal(thresholdState.count, 5, "the threshold fixture should advance to Eternity count 5 through the manual transition");
+  assert.equal(thresholdState.completedIc7, true, "the fifth Eternity should start with IC7 completed");
   assert.equal(thresholdState.mask, 3, "the threshold Eternity should not auto-acquire the remaining first-tier Milestone");
   assert.equal(thresholdState.entitlement, 1, "the unused third first-tier acquisition should remain available");
   assert.equal(thresholdState.milestone2, true, "Milestone 2 should activate at Eternity count 5");
