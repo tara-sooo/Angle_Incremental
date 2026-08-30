@@ -6,7 +6,6 @@ const MAIN_TAB_IDS = Object.freeze([
   "angle",
   "infinity",
   "eternity",
-  "timeline",
   "challenges",
   "automation",
   "statistics",
@@ -20,6 +19,7 @@ const MAIN_TAB_DISCOVERY_IDS = Object.freeze([
   "challenges",
   "automation",
   "eternity",
+  // Legacy Timeline discovery remains part of the save schema for nested access.
   "timeline",
 ]);
 
@@ -30,6 +30,7 @@ function normalizeHiddenTabs(value) {
 
 function normalizeUnlockedMainTabs(value) {
   const source = new Set(Array.isArray(value) ? value : []);
+  if (source.has("timeline")) source.add("eternity");
   return MAIN_TAB_DISCOVERY_IDS.filter((tab) => source.has(tab));
 }
 

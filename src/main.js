@@ -34,6 +34,7 @@ let japaneseFontReady = false;
 let normalAutobuyElapsed = 0;
 let uiUpdateElapsed = 0;
 let activeMainTab = "angle";
+let activeEternitySubtab = "milestone";
 let activeInfinitySubtab = "upgrades";
 let activeChallengeSubtab = "ic";
 let activeStatisticsSubtab = "overview";
@@ -1845,6 +1846,7 @@ function renderGameToText() {
       hiddenTabs: runtime.normalizeHiddenTabs(runtime.state.hiddenTabs),
       unlockedMainTabs: runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs),
       activeMainTab,
+      activeEternitySubtab,
       activeInfinitySubtab,
       activeChallengeSubtab,
       activeStatisticsSubtab,
@@ -1911,6 +1913,7 @@ async function initializeGame() {
   runtime.createAchievementRows();
   await runtime.loadGame();
   runtime.switchMainTab(activeMainTab);
+  runtime.switchEternitySubtab(activeEternitySubtab);
   runtime.switchInfinitySubtab(activeInfinitySubtab);
   runtime.switchChallengeSubtab(activeChallengeSubtab);
   runtime.switchStatisticsSubtab(activeStatisticsSubtab);
@@ -1939,6 +1942,7 @@ expose("japaneseFontReady", () => japaneseFontReady, (value) => { japaneseFontRe
 expose("normalAutobuyElapsed", () => normalAutobuyElapsed, (value) => { normalAutobuyElapsed = value; });
 expose("uiUpdateElapsed", () => uiUpdateElapsed, (value) => { uiUpdateElapsed = value; });
 expose("activeMainTab", () => activeMainTab, (value) => { activeMainTab = value; });
+expose("activeEternitySubtab", () => activeEternitySubtab, (value) => { activeEternitySubtab = value; });
 expose("activeInfinitySubtab", () => activeInfinitySubtab, (value) => { activeInfinitySubtab = value; });
 expose("activeChallengeSubtab", () => activeChallengeSubtab, (value) => { activeChallengeSubtab = value; });
 expose("activeStatisticsSubtab", () => activeStatisticsSubtab, (value) => { activeStatisticsSubtab = value; });
@@ -2045,6 +2049,7 @@ window.__angleDebug = {
   breakInfiniteCap: runtime.breakInfiniteCap,
   checkAchievements: runtime.checkAchievements,
   switchMainTab: runtime.switchMainTab,
+  switchEternitySubtab: runtime.switchEternitySubtab,
   mainTabIsUnlocked: runtime.mainTabIsUnlocked,
   mainTabIsVisible: runtime.mainTabIsVisible,
   setMainTabVisibility: runtime.setMainTabVisibility,
