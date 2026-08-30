@@ -149,6 +149,19 @@
   opacity: 0.55;
 }
 
+.eternity-subtabs.is-timeline-locked {
+  grid-template-columns: 1fr;
+}
+
+.eternity-subpanels,
+.eternity-subpanel {
+  min-width: 0;
+}
+
+.eternity-subpanel[hidden] {
+  display: none;
+}
+
 .eternity-choice-panel {
   padding: 10px 12px;
 }

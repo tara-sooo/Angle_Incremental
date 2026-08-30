@@ -1094,7 +1094,8 @@ canvas {
 }
 
 .challenge-subtabs,
-.statistics-subtabs {
+.statistics-subtabs,
+.eternity-subtabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
@@ -1107,7 +1108,8 @@ canvas {
 }
 
 .challenge-subtab,
-.statistics-subtab {
+.statistics-subtab,
+.eternity-subtab {
   min-height: 38px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1122,7 +1124,8 @@ canvas {
 }
 
 .challenge-subtab span,
-.statistics-subtab span {
+.statistics-subtab span,
+.eternity-subtab span {
   display: grid;
   place-items: center;
   width: 34px;
@@ -1134,7 +1137,8 @@ canvas {
 }
 
 .challenge-subtab strong,
-.statistics-subtab strong {
+.statistics-subtab strong,
+.eternity-subtab strong {
   color: inherit;
   font-size: 0.82rem;
   text-align: left;
@@ -1147,15 +1151,17 @@ canvas {
   filter: brightness(1.14);
 }
 
-.challenge-subtab.is-active {
+.challenge-subtab.is-active,
+.eternity-subtab.is-active {
   color: white;
   border-color: var(--line-strong);
   filter: brightness(1.14);
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .challenge-subtab:hover,
-  .statistics-subtab:hover {
+.challenge-subtab:hover,
+.statistics-subtab:hover,
+.eternity-subtab:hover {
     color: white;
     border-color: var(--line-strong);
     filter: brightness(1.14);
@@ -1163,7 +1169,8 @@ canvas {
 }
 
 .challenge-subtab.is-active,
-.statistics-subtab.is-active {
+.statistics-subtab.is-active,
+.eternity-subtab.is-active {
   background: linear-gradient(180deg, #4f6fb8, #253f82);
   box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
 }
@@ -2494,7 +2501,8 @@ canvas {
   }
 
   .challenge-subtabs,
-  .statistics-subtabs {
+  .statistics-subtabs,
+  .eternity-subtabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
     margin-bottom: 4px;
@@ -2506,7 +2514,8 @@ canvas {
   }
 
   .challenge-subtab,
-  .statistics-subtab {
+  .statistics-subtab,
+  .eternity-subtab {
     min-height: 30px;
     display: flex;
     justify-content: center;
@@ -2515,7 +2524,8 @@ canvas {
   }
 
   .challenge-subtab span,
-  .statistics-subtab span {
+  .statistics-subtab span,
+  .eternity-subtab span {
     width: auto;
     height: auto;
     min-width: 32px;
@@ -2524,7 +2534,8 @@ canvas {
   }
 
   .challenge-subtab strong,
-  .statistics-subtab strong {
+  .statistics-subtab strong,
+  .eternity-subtab strong {
     position: absolute;
     width: 1px;
     height: 1px;

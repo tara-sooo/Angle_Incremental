@@ -9,7 +9,6 @@ const MAIN_TAB_UNLOCKS = Object.freeze({
   angle: () => true,
   infinity: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("infinity"),
   eternity: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("eternity"),
-  timeline: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("timeline"),
   challenges: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("challenges"),
   automation: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("automation"),
   statistics: () => true,
@@ -114,6 +113,23 @@ function switchMainTab(tab) {
   });
   runtime.resizeCanvas();
   runtime.resizeInfiniteAngleCanvas();
+}
+
+function switchEternitySubtab(tab) {
+  const nextTab = tab === "timeline" && runtime.timelineDiscovered?.() === true
+    ? "timeline"
+    : "milestone";
+  runtime.activeEternitySubtab = nextTab;
+  (runtime.elements.eternitySubtabs || []).forEach((button) => {
+    const active = button.dataset.eternityTab === nextTab;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  (runtime.elements.eternitySubpanels || []).forEach((panel) => {
+    const active = panel.dataset.eternityPanel === nextTab;
+    panel.classList.toggle("is-active", active);
+    panel.hidden = !active;
+  });
 }
 
 function switchInfinitySubtab(tab) {
@@ -254,6 +270,9 @@ function bindEvents() {
   runtime.elements.mainTabs.forEach((button) => {
     button.addEventListener("click", () => switchMainTab(button.dataset.tab));
   });
+  runtime.elements.eternitySubtabs?.forEach((button) => {
+    button.addEventListener("click", () => switchEternitySubtab(button.dataset.eternityTab));
+  });
   runtime.elements.infinitySubtabs.forEach((button) => {
     button.addEventListener("click", () => switchInfinitySubtab(button.dataset.infinityTab));
   });
@@ -345,6 +364,7 @@ function bindEvents() {
   });
 }
 expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
+expose("switchEternitySubtab", () => switchEternitySubtab, (value) => { switchEternitySubtab = value; });
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
 expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
 expose("switchStatisticsSubtab", () => switchStatisticsSubtab, (value) => { switchStatisticsSubtab = value; });

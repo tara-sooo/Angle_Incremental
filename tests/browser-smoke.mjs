@@ -508,7 +508,7 @@ try {
   });
   assert.deepEqual(
     tabStructure.mainTabs,
-    ["angle", "infinity", "eternity", "timeline", "challenges", "automation", "statistics", "achievements", "help", "settings"],
+    ["angle", "infinity", "eternity", "challenges", "automation", "statistics", "achievements", "help", "settings"],
     "main tabs should omit the dormant Time Flux tab while retaining Eternity",
   );
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
@@ -611,10 +611,10 @@ try {
   );
   assert.deepEqual(
     mainTabVisibility.locked.hidden,
-    ["infinity", "eternity", "timeline", "challenges", "automation"],
+    ["infinity", "eternity", "challenges", "automation"],
     "progression tabs should be hidden until their first discovery conditions are met",
   );
-  assert.equal(mainTabVisibility.locked.settingsControls.length, 10, "SET should list every main tab in its visibility settings");
+  assert.equal(mainTabVisibility.locked.settingsControls.length, 9, "SET should list every active main tab in its visibility settings");
   assert.ok(
     mainTabVisibility.locked.settingsControls.filter((control) => control.disabled && !control.checked).map((control) => control.tab).includes("infinity"),
     "locked tabs should be unavailable in the visibility settings until unlocked",
@@ -710,7 +710,7 @@ try {
     window.advanceTime(0);
   });
   const measurePageHeaders = () => page.evaluate(() => {
-    const panelNames = ["angle", "infinity", "eternity", "timeline", "challenges", "automation", "statistics", "achievements", "help", "settings"];
+    const panelNames = ["angle", "infinity", "eternity", "challenges", "automation", "statistics", "achievements", "help", "settings"];
     const { switchMainTab } = window.__angleDebug;
     return panelNames.map((panelName) => {
       switchMainTab(panelName);
@@ -1988,7 +1988,7 @@ try {
       canvasWidth: document.querySelector("#gameCanvas")?.getBoundingClientRect().width ?? 0,
     }));
     assert.equal(mobileStartup.updateTitle, `${EXPECTED_ASSET_VERSION} アップデート`, "mobile startup should use the release version");
-    assert.equal(mobileStartup.tabCount, 10, "mobile startup should expose the active main tabs");
+    assert.equal(mobileStartup.tabCount, 9, "mobile startup should expose the active main tabs");
     assert.equal(mobileStartup.timeFluxTab, false, "mobile startup should omit the dormant Time Flux tab");
     assert.equal(mobileStartup.timeFluxPanel, false, "mobile startup should omit the dormant Time Flux panel");
     assert.equal(mobileStartup.timeFluxQuickBar, false, "mobile startup should omit the dormant Time Flux quick bar");

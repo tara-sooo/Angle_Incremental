@@ -226,7 +226,39 @@ async function testSaveCompatibility() {
     "existing post-Eternity saves must not receive retroactive TF claims",
   );
   assert.equal(migrated.debug.state.timelinePurchasedNodes.length, 0);
-  assert.equal(migrated.debug.mainTabIsUnlocked("timeline"), true, "existing post-Eternity saves should discover Timeline");
+  assert.equal(migrated.runtime.timelineDiscovered(), true, "existing post-Eternity saves should discover Timeline");
+  assert.equal(migrated.debug.mainTabIsUnlocked("eternity"), true, "existing post-Eternity saves should keep Eternity discovered");
+  assert.equal(migrated.debug.mainTabIsUnlocked("timeline"), false, "Timeline should no longer be treated as a top-level tab");
+
+  const legacyTimelineOnly = structuredClone(serialized);
+  legacyTimelineOnly.state.eternityCount = 0;
+  legacyTimelineOnly.state.infinityCount = 0;
+  legacyTimelineOnly.state.towerFloor = 0;
+  legacyTimelineOnly.state.completedTowerChallenges = 0;
+  legacyTimelineOnly.state.unlockedMainTabs = ["timeline"];
+  legacyTimelineOnly.state.hiddenTabs = ["timeline"];
+  const migratedLegacyTimeline = await loadRuntime(
+    candidatePath,
+    new Map([[runtime.SAVE_KEY, JSON.stringify(legacyTimelineOnly)]]),
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(migratedLegacyTimeline.debug.state.unlockedMainTabs)),
+    ["eternity", "timeline"],
+    "legacy Timeline discovery should imply nested Eternity access",
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(migratedLegacyTimeline.debug.state.hiddenTabs)),
+    [],
+    "legacy Timeline hidden-tab preferences should be discarded",
+  );
+  assert.equal(migratedLegacyTimeline.runtime.timelineDiscovered(), true);
+  assert.equal(migratedLegacyTimeline.debug.mainTabIsUnlocked("eternity"), true);
+  assert.equal(migratedLegacyTimeline.debug.mainTabIsUnlocked("timeline"), false);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(migratedLegacyTimeline.runtime.serializeSaveData().state.hiddenTabs)),
+    [],
+    "serialized settings should not resurrect a top-level Timeline preference",
+  );
 }
 
 function assertClose(actual, expected, tolerance, message) {

@@ -69,7 +69,9 @@ try {
     challengesHidden: document.querySelector('[data-tab="challenges"]')?.hidden,
     automationHidden: document.querySelector('[data-tab="automation"]')?.hidden,
     eternityHidden: document.querySelector('[data-tab="eternity"]')?.hidden,
-    timelineHidden: document.querySelector('[data-tab="timeline"]')?.hidden,
+    timelineMainTabPresent: document.querySelector('[data-tab="timeline"]') !== null,
+    timelineSubtabHidden: document.querySelector('[data-eternity-tab="timeline"]')?.hidden,
+    timelineSubtabDisabled: document.querySelector('[data-eternity-tab="timeline"]')?.disabled,
     statisticsHidden: document.querySelector('[data-tab="statistics"]')?.hidden,
     achievementsHidden: document.querySelector('[data-tab="achievements"]')?.hidden,
     helpHidden: document.querySelector('[data-tab="help"]')?.hidden,
@@ -79,7 +81,9 @@ try {
   assert.equal(lockedNavigation.challengesHidden, true, "CHAL should be hidden on a fresh new game");
   assert.equal(lockedNavigation.automationHidden, true, "AUTO should be hidden on a fresh new game");
   assert.equal(lockedNavigation.eternityHidden, true, "ETR should be hidden before TC4 unlock");
-  assert.equal(lockedNavigation.timelineHidden, true, "Timeline should be hidden before the first Eternity");
+  assert.equal(lockedNavigation.timelineMainTabPresent, false, "Timeline should no longer be a top-level tab");
+  assert.equal(lockedNavigation.timelineSubtabHidden, true, "Timeline subtab should be hidden before the first Eternity");
+  assert.equal(lockedNavigation.timelineSubtabDisabled, true, "Timeline subtab should be disabled before the first Eternity");
   assert.equal(lockedNavigation.statisticsHidden, false, "STAT should be available on a fresh new game");
   assert.equal(lockedNavigation.achievementsHidden, false, "ACH should be available on a fresh new game");
   assert.equal(lockedNavigation.helpHidden, false, "HELP should be available on a fresh new game");
@@ -123,6 +127,12 @@ try {
   const initial = await page.evaluate(() => ({
     tabActive: document.querySelector('[data-tab="eternity"]')?.classList.contains("is-active"),
     panelActive: document.querySelector('[data-panel="eternity"]')?.classList.contains("is-active"),
+    subtabCodes: Array.from(document.querySelectorAll(".eternity-subtab span"), (node) => node.textContent),
+    milestoneSubpanelActive: document.querySelector('[data-eternity-panel="milestone"]')?.classList.contains("is-active"),
+    timelineSubpanelActive: document.querySelector('[data-eternity-panel="timeline"]')?.classList.contains("is-active"),
+    timelineSubtabHidden: document.querySelector('[data-eternity-tab="timeline"]')?.hidden,
+    timelineSubtabDisabled: document.querySelector('[data-eternity-tab="timeline"]')?.disabled,
+    timelineMainPanelPresent: document.querySelector('[data-panel="timeline"]') !== null,
     legacyInfinityTab: document.querySelector('[data-infinity-tab="eternity"]') !== null,
     infinitySubtabCount: document.querySelectorAll(".infinity-subtab").length,
     count: document.getElementById("eternityCountValue")?.textContent,
@@ -158,6 +168,12 @@ try {
   }));
   assert.equal(initial.tabActive, true, "Eternity should be selectable as a top-level main tab");
   assert.equal(initial.panelActive, true, "Eternity top-level panel should become active through main navigation");
+  assert.deepEqual(initial.subtabCodes, ["MS", "TL"], "Eternity should expose Milestone and Timeline subtabs");
+  assert.equal(initial.milestoneSubpanelActive, true, "Milestone should be the default Eternity subtab");
+  assert.equal(initial.timelineSubpanelActive, false, "Timeline should not be active before discovery");
+  assert.equal(initial.timelineSubtabHidden, true, "Timeline subtab should stay hidden before discovery");
+  assert.equal(initial.timelineSubtabDisabled, true, "Timeline subtab should stay disabled before discovery");
+  assert.equal(initial.timelineMainPanelPresent, false, "Timeline should be nested instead of a main panel");
   assert.equal(initial.legacyInfinityTab, false, "Infinity must not contain an Eternity subtab");
   assert.equal(initial.infinitySubtabCount, 3, "Infinity navigation should remain Upgrades / Infinite Angle / Tower");
   assert.equal(initial.count, "0", "Eternity count should be visible");
@@ -208,14 +224,23 @@ try {
   assert.equal(earned.disabled, false);
 
   const timelineNavigation = await page.evaluate(() => ({
-    hidden: document.querySelector('[data-tab="timeline"]')?.hidden,
+    mainTabPresent: document.querySelector('[data-tab="timeline"]') !== null,
+    hidden: document.querySelector('[data-eternity-tab="timeline"]')?.hidden,
+    disabled: document.querySelector('[data-eternity-tab="timeline"]')?.disabled,
+    discovered: window.__angleDebug.runtime.timelineDiscovered(),
     unlocked: window.__angleDebug.mainTabIsUnlocked("timeline"),
   }));
-  assert.equal(timelineNavigation.hidden, false, "the first Eternity should reveal Timeline");
-  assert.equal(timelineNavigation.unlocked, true, "Timeline discovery should use the permanent main-tab state");
-  await page.click('[data-tab="timeline"]');
+  assert.equal(timelineNavigation.mainTabPresent, false, "Timeline should remain absent from top-level navigation");
+  assert.equal(timelineNavigation.hidden, false, "the first Eternity should reveal the Timeline subtab");
+  assert.equal(timelineNavigation.disabled, false, "the discovered Timeline subtab should be enabled");
+  assert.equal(timelineNavigation.discovered, true, "Timeline discovery should persist independently of its nested navigation");
+  assert.equal(timelineNavigation.unlocked, false, "Timeline should not be treated as a top-level main tab");
+  await page.click('[data-eternity-tab="timeline"]');
   const timelineInitial = await page.evaluate(() => ({
-    active: document.querySelector('[data-panel="timeline"]')?.classList.contains("is-active"),
+    active: document.querySelector('[data-eternity-panel="timeline"]')?.classList.contains("is-active"),
+    milestoneInactive: !document.querySelector('[data-eternity-panel="milestone"]')?.classList.contains("is-active"),
+    eternityPanelActive: document.querySelector('[data-panel="eternity"]')?.classList.contains("is-active"),
+    mainPanelPresent: document.querySelector('[data-panel="timeline"]') !== null,
     scoreRequirement: document.getElementById("timelineScoreRequirement")?.textContent,
     ipRequirement: document.getElementById("timelineIpRequirement")?.textContent,
     eternityRequirement: document.getElementById("timelineEternityRequirement")?.textContent,
@@ -232,7 +257,10 @@ try {
     parallelCurrentEffect: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-current-effect')?.textContent,
     warning: document.querySelector(".timeline-respec p")?.textContent,
   }));
-  assert.equal(timelineInitial.active, true, "Timeline should be selectable as a top-level panel");
+  assert.equal(timelineInitial.active, true, "Timeline should be selectable as an Eternity subpanel");
+  assert.equal(timelineInitial.milestoneInactive, true, "Timeline selection should hide the Milestone subpanel");
+  assert.equal(timelineInitial.eternityPanelActive, true, "Timeline selection should keep the Eternity main panel active");
+  assert.equal(timelineInitial.mainPanelPresent, false, "Timeline should not be addressable as a main panel");
   assert.equal(timelineInitial.scoreRequirement, "1.00e20,000 Score", "Timeline should show the exact initial Score requirement");
   assert.equal(timelineInitial.ipRequirement, "1.00e400 IP", "Timeline should show the exact initial IP requirement");
   assert.equal(timelineInitial.eternityRequirement, "2", "Timeline should show the exact initial Eternity requirement");
@@ -315,6 +343,7 @@ try {
   assert.equal(afterTimelineRespec.realButtonDisabled, false);
   assert.equal(afterTimelineRespec.parallelButtonDisabled, false);
   await page.click('[data-tab="eternity"]');
+  await page.click('[data-eternity-tab="milestone"]');
 
   await page.click('[data-eternity-choice="1-1"]');
   const acquired = await page.evaluate(() => ({
@@ -559,15 +588,21 @@ try {
   assert.doesNotMatch(english.manual || "", /performed automatically/, "English copy must not describe forced pre-Break Eternity");
 
   await page.setViewportSize({ width: 412, height: 915 });
-  await page.click('[data-tab="timeline"]');
+  await page.click('[data-eternity-tab="timeline"]');
   const timelineMobile = await page.evaluate(() => ({
-    visible: document.querySelector('[data-panel="timeline"]')?.classList.contains("is-active"),
+    visible: document.querySelector('[data-eternity-panel="timeline"]')?.classList.contains("is-active"),
     gridWidth: document.querySelector(".timeline-node-grid")?.getBoundingClientRect().width || 0,
     nodeWidth: document.querySelector(".timeline-node")?.getBoundingClientRect().width || 0,
+    subtabCodes: Array.from(document.querySelectorAll(".eternity-subtab span"), (node) => node.textContent),
+    subtabNavWidth: document.querySelector(".eternity-subtabs")?.scrollWidth || 0,
+    subtabClientWidth: document.querySelector(".eternity-subtabs")?.clientWidth || 0,
   }));
   assert.equal(timelineMobile.visible, true, "Timeline should remain usable at a mobile viewport");
+  assert.deepEqual(timelineMobile.subtabCodes, ["MS", "TL"], "mobile Eternity subtabs should expose compact codes");
+  assert.ok(timelineMobile.subtabNavWidth <= timelineMobile.subtabClientWidth, "mobile Eternity subtabs should fit without horizontal overflow");
   assert.ok(timelineMobile.gridWidth > 0 && timelineMobile.nodeWidth > 0, "Timeline node cards should keep a visible mobile layout");
   await page.click('[data-tab="eternity"]');
+  await page.click('[data-eternity-tab="milestone"]');
   const mobile = await page.evaluate(() => ({
     visible: document.querySelector('[data-panel="eternity"]')?.classList.contains("is-active"),
     width: document.querySelector('[data-panel="eternity"]')?.getBoundingClientRect().width || 0,

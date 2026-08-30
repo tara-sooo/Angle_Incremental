@@ -125,19 +125,45 @@ function installEternityUi() {
             <p id="eternityForcedNote" class="eternity-forced-note" data-i18n="eternityForcedNotice"></p>
             <button id="eternityPerformButton" class="eternity-perform-button" type="button" data-eternity-action="perform"></button>
           </div>
-          <section class="eternity-choice-panel" aria-label="First-tier Eternity Milestone choice">
-            <h2 data-i18n="eternityFirstTierChoice"></h2>
-            <p class="eternity-choice-hint" data-i18n="eternityFirstTierHint"></p>
-            <p id="eternityChoiceEntitlement" class="eternity-choice-entitlement"></p>
-            <p id="eternityChoiceAllOwned" class="eternity-choice-all-owned" data-i18n="eternityChoiceAllOwned" hidden></p>
-          </section>
-          <h2 class="eternity-milestones-heading" data-i18n="eternityMilestones"></h2>
-          <section class="eternity-milestone-grid" aria-label="Eternity Milestones">
-            ${MILESTONES.map(milestoneMarkup).join("")}
-          </section>
+          <nav class="eternity-subtabs is-timeline-locked" aria-label="Eternity sub tabs">
+            <button class="eternity-subtab is-active" type="button" data-eternity-tab="milestone" aria-controls="eternityMilestoneSubpanel" aria-selected="true">
+              <span>MS</span>
+              <strong data-i18n="eternityMilestoneTab">Milestone</strong>
+            </button>
+            <button class="eternity-subtab" type="button" data-eternity-tab="timeline" aria-controls="eternityTimelineSubpanel" aria-selected="false" disabled>
+              <span>TL</span>
+              <strong data-i18n="timelineTab">Timeline</strong>
+            </button>
+          </nav>
+          <div class="eternity-subpanels">
+            <section id="eternityMilestoneSubpanel" class="eternity-subpanel is-active" data-eternity-panel="milestone">
+              <section class="eternity-choice-panel" aria-label="First-tier Eternity Milestone choice">
+                <h2 data-i18n="eternityFirstTierChoice"></h2>
+                <p class="eternity-choice-hint" data-i18n="eternityFirstTierHint"></p>
+                <p id="eternityChoiceEntitlement" class="eternity-choice-entitlement"></p>
+                <p id="eternityChoiceAllOwned" class="eternity-choice-all-owned" data-i18n="eternityChoiceAllOwned" hidden></p>
+              </section>
+              <h2 class="eternity-milestones-heading" data-i18n="eternityMilestones"></h2>
+              <section class="eternity-milestone-grid" aria-label="Eternity Milestones">
+                ${MILESTONES.map(milestoneMarkup).join("")}
+              </section>
+            </section>
+          </div>
         </div>
       </section>`;
     mainPanels.append(eternityRoot);
+  }
+
+  const timelinePanel = mainPanels.querySelector('[data-panel="timeline"]');
+  const eternitySubpanels = eternityRoot.querySelector(".eternity-subpanels");
+  if (timelinePanel && eternitySubpanels) {
+    timelinePanel.classList.remove("main-panel");
+    timelinePanel.classList.add("eternity-subpanel");
+    timelinePanel.removeAttribute("data-panel");
+    timelinePanel.dataset.eternityPanel = "timeline";
+    timelinePanel.id = "eternityTimelineSubpanel";
+    timelinePanel.hidden = true;
+    eternitySubpanels.append(timelinePanel);
   }
 
   const existingMainTabs = Array.from(document.querySelectorAll(".main-tab"));
@@ -147,6 +173,8 @@ function installEternityUi() {
   }
   runtime.elements.mainTabs = existingMainTabs;
   runtime.elements.mainPanels = Array.from(document.querySelectorAll(".main-panel"));
+  runtime.elements.eternitySubtabs = Array.from(eternityRoot.querySelectorAll(".eternity-subtab"));
+  runtime.elements.eternitySubpanels = Array.from(eternityRoot.querySelectorAll(".eternity-subpanel"));
   runtime.elements.infinitySubtabs = Array.from(document.querySelectorAll(".infinity-subtab"));
   runtime.elements.infinitySubpanels = Array.from(document.querySelectorAll(".infinity-subpanel"));
   runtime.elements.i18nNodes = Array.from(document.querySelectorAll("[data-i18n]"));
@@ -223,6 +251,7 @@ function updateEternityUi() {
   const tc4Met = runtime.towerChallenge4CompletedForEternity?.() === true;
   const ipMet = runtime.eternityIpThresholdMet?.() === true;
   const ready = runtime.canEternity?.() === true;
+  const timelineDiscovered = runtime.timelineDiscovered?.() === true;
   const entitlementCount = Math.max(0, Math.floor(Number(runtime.firstTierMilestoneEntitlementCount?.()) || 0));
   const availableChoices = new Set(runtime.availableEternityMilestoneChoices?.() || []);
 
@@ -249,6 +278,16 @@ function updateEternityUi() {
   if (performButton) {
     performButton.disabled = !ready;
     performButton.textContent = runtime.t(ready ? "eternityPerform" : "eternityPerformUnavailable");
+  }
+  const eternitySubtabs = eternityRoot.querySelector(".eternity-subtabs");
+  const timelineSubtab = eternityRoot.querySelector('[data-eternity-tab="timeline"]');
+  eternitySubtabs?.classList.toggle("is-timeline-locked", !timelineDiscovered);
+  if (timelineSubtab) {
+    timelineSubtab.hidden = !timelineDiscovered;
+    timelineSubtab.disabled = !timelineDiscovered;
+  }
+  if (!timelineDiscovered && runtime.activeEternitySubtab === "timeline") {
+    runtime.switchEternitySubtab?.("milestone");
   }
   if (entitlement) {
     entitlement.textContent = entitlementCount > 0
