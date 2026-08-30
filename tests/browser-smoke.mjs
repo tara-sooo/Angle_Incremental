@@ -513,7 +513,7 @@ try {
   );
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
   assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
-  assert.deepEqual(tabStructure.statisticsTabs, ["overview", "challenges"], "Statistics subtabs should be ordered Overview, Challenge Records");
+  assert.deepEqual(tabStructure.statisticsTabs, ["overview", "challenges", "eternity"], "Statistics subtabs should be ordered Overview, Challenge Records, Eternity Records");
   const mainTabVisibility = await page.evaluate(async () => {
     const { state, switchMainTab, setMainTabVisibility, loadGame } = window.__angleDebug;
     const original = {
@@ -826,7 +826,7 @@ try {
   ], "the desktop English achievement definitions should be exact");
   assert.ok(achievementUi.listWidth > 0, "the desktop achievement list should have a visible layout");
   const desktopUiChanges = await page.evaluate(() => {
-    const { state, switchMainTab, switchInfinitySubtab, switchStatisticsSubtab } = window.__angleDebug;
+    const { state, runtime, switchMainTab, switchInfinitySubtab, switchStatisticsSubtab } = window.__angleDebug;
     switchMainTab("infinity");
     switchInfinitySubtab("upgrades");
     state.fastestInfinityChallengeTimes = [12.5, 0, 0, 0, 0, 0, 0, 0];
@@ -845,6 +845,28 @@ try {
     document.querySelector('[data-infinity-panel="upgrades"] [data-upgrade="14-1"]')?.click();
     window.advanceTime(0);
     switchMainTab("statistics");
+    const originalEternityStats = {
+      currentEternityRunTime: state.currentEternityRunTime,
+      currentEternityRealTime: state.currentEternityRealTime,
+      fastestEternityTime: state.fastestEternityTime,
+      fastestEternityRealTime: state.fastestEternityRealTime,
+      lastEternityRuns: state.lastEternityRuns,
+    };
+    state.currentEternityRunTime = 12;
+    state.currentEternityRealTime = 9;
+    state.fastestEternityTime = 8;
+    state.fastestEternityRealTime = 7;
+    state.lastEternityRuns = [{ time: 12, realTime: 9, infinityCount: 3 }];
+    switchStatisticsSubtab("eternity");
+    runtime.updateUi();
+    const eternityPanelActive = document.querySelector('[data-statistics-panel="eternity"]')?.classList.contains("is-active") ?? false;
+    const eternityFirst = document.querySelector("#lastEternityRuns li")?.textContent?.trim() ?? "";
+    const eternityLabels = {
+      current: document.querySelector('[data-i18n="currentEternityRun"]')?.textContent?.trim() ?? "",
+      fastest: document.querySelector('[data-i18n="fastestEternity"]')?.textContent?.trim() ?? "",
+    };
+    Object.assign(state, originalEternityStats);
+    runtime.updateUi();
     switchStatisticsSubtab("challenges");
     window.advanceTime(0);
     return {
@@ -854,6 +876,9 @@ try {
       towerRows: document.querySelectorAll("#fastestTowerChallengeTimes li").length,
       infinityFirst: document.querySelector("#fastestInfinityChallengeTimes li")?.textContent?.trim() ?? "",
       towerFirst: document.querySelector("#fastestTowerChallengeTimes li")?.textContent?.trim() ?? "",
+      eternityPanelActive,
+      eternityFirst,
+      eternityLabels,
       tier12CenterDelta,
       tier13CenterDelta,
       tier14CenterDelta,
@@ -869,6 +894,29 @@ try {
   assert.equal(desktopUiChanges.towerRows, 4, "all Tower Challenges should have statistics rows");
   assert.match(desktopUiChanges.infinityFirst, /IC1.*12秒/);
   assert.match(desktopUiChanges.towerFirst, /TC1.*27秒/);
+  assert.equal(desktopUiChanges.eternityPanelActive, true, "Statistics Eternity Records subtab should activate");
+  assert.match(desktopUiChanges.eternityLabels.current, /現在のEternity周回/);
+  assert.match(desktopUiChanges.eternityLabels.fastest, /最速Eternity/);
+  assert.match(desktopUiChanges.eternityFirst, /ゲーム時間.*12秒.*実時間.*9秒.*Infinity回数.*3/);
+  const englishEternityStatistics = await page.evaluate(() => {
+    const { state, runtime, switchMainTab, switchStatisticsSubtab } = window.__angleDebug;
+    const originalLanguage = state.language;
+    state.language = "en";
+    switchMainTab("statistics");
+    switchStatisticsSubtab("eternity");
+    runtime.updateUi();
+    const result = {
+      tab: document.querySelector('[data-i18n="statisticsEternityRecords"]')?.textContent?.trim() ?? "",
+      current: document.querySelector('[data-i18n="currentEternityRun"]')?.textContent?.trim() ?? "",
+      history: document.querySelector('[data-i18n="lastEternityRunsLabel"]')?.textContent?.trim() ?? "",
+    };
+    state.language = originalLanguage;
+    runtime.updateUi();
+    return result;
+  });
+  assert.equal(englishEternityStatistics.tab, "Eternity Records", "the ETR Statistics tab should translate to English");
+  assert.equal(englishEternityStatistics.current, "Current Eternity run (game time)", "the ETR game-time label should translate to English");
+  assert.equal(englishEternityStatistics.history, "Last 10 Eternity runs", "the ETR history label should translate to English");
   assert.ok(desktopUiChanges.tier12CenterDelta !== null && desktopUiChanges.tier12CenterDelta < 1, "IU 12-1 should be centered");
   assert.ok(desktopUiChanges.tier13CenterDelta !== null && desktopUiChanges.tier13CenterDelta < 1, "IU 13-1 should be centered");
   assert.ok(desktopUiChanges.tier14CenterDelta !== null && desktopUiChanges.tier14CenterDelta < 1, "IU 14-1 should be centered");
@@ -2052,6 +2100,15 @@ try {
     assert.equal(mobileStatistics.panelActive, true, "the Statistics tab should activate on mobile");
     assert.ok(mobileStatistics.totalRealPlayTimeWidth > 0, "mobile statistics should show total real play time");
     assert.ok(mobileStatistics.currentInfinityRealTimeWidth > 0, "mobile statistics should show current real Infinity time");
+    await mobilePage.locator('[data-statistics-tab="eternity"]').click();
+    const mobileEternityStatistics = await mobilePage.evaluate(() => ({
+      panelActive: document.querySelector('[data-statistics-panel="eternity"]')?.classList.contains("is-active") ?? false,
+      currentTimeWidth: document.querySelector("#currentEternityRunTime")?.getBoundingClientRect().width ?? 0,
+      historyWidth: document.querySelector("#lastEternityRuns")?.getBoundingClientRect().width ?? 0,
+    }));
+    assert.equal(mobileEternityStatistics.panelActive, true, "mobile Statistics should activate the ETR subtab");
+    assert.ok(mobileEternityStatistics.currentTimeWidth > 0, "mobile ETR statistics should show current game time");
+    assert.ok(mobileEternityStatistics.historyWidth > 0, "mobile ETR statistics should show run history");
 
     const mobileUpgradeCenters = await mobilePage.evaluate(() => {
       const { switchMainTab, switchInfinitySubtab } = window.__angleDebug;

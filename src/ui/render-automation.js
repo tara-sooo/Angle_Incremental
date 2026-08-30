@@ -1,6 +1,7 @@
 import { runtime, expose } from "../runtime/shared.js";
 
 let lastInfinityRunListSignature = null;
+let lastEternityRunListSignature = null;
 let lastChallengeTimeSignature = null;
 
 function formatInfinityRunTime(value) {
@@ -12,6 +13,10 @@ function formatInfinityRunTime(value) {
 function infinityRunRecordText(record, index) {
   const challenge = record.challenge > 0 ? ` IC${record.challenge}` : "";
   return `#${index + 1}${challenge} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.formatPowerOfTen(record.scoreLog10)} / +${runtime.formatUiNumber(record.ipGain)} IP`;
+}
+
+function eternityRunRecordText(record, index) {
+  return `#${index + 1} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.t("eternityInfinityCountShort")} ${runtime.formatUiNumber(record.infinityCount)}`;
 }
 
 function updateAutomationUi() {
@@ -82,6 +87,16 @@ function infinityRunListSignature() {
   ].join("|");
 }
 
+function eternityRunListSignature() {
+  const records = runtime.state.lastEternityRuns;
+  return [
+    runtime.state.language,
+    runtime.state.numberFormat,
+    runtime.state.timeUnit,
+    records.map((record) => `${record.time}:${record.realTime}:${record.infinityCount}`).join(";"),
+  ].join("|");
+}
+
 function challengeTimeSignature() {
   return [
     runtime.state.language,
@@ -130,7 +145,31 @@ function updateStatisticsUi() {
   runtime.elements.fastestInfinityRealTime.textContent = runtime.state.fastestInfinityRealTime > 0
     ? runtime.formatLongDuration(runtime.state.fastestInfinityRealTime)
     : runtime.t("noInfinityRuns");
+  runtime.elements.currentEternityRunTime.textContent = runtime.formatLongDuration(runtime.state.currentEternityRunTime);
+  runtime.elements.currentEternityRealTime.textContent = runtime.formatLongDuration(runtime.state.currentEternityRealTime);
+  runtime.elements.fastestEternityTime.textContent = runtime.state.fastestEternityTime > 0
+    ? runtime.formatLongDuration(runtime.state.fastestEternityTime)
+    : runtime.t("noEternityRuns");
+  runtime.elements.fastestEternityRealTime.textContent = runtime.state.fastestEternityRealTime > 0
+    ? runtime.formatLongDuration(runtime.state.fastestEternityRealTime)
+    : runtime.t("noEternityRuns");
   updateChallengeTimeLists();
+  const eternitySignature = eternityRunListSignature();
+  if (eternitySignature !== lastEternityRunListSignature) {
+    lastEternityRunListSignature = eternitySignature;
+    runtime.elements.lastEternityRuns.innerHTML = "";
+    if (runtime.state.lastEternityRuns.length === 0) {
+      const row = document.createElement("li");
+      row.textContent = runtime.t("noEternityRuns");
+      runtime.elements.lastEternityRuns.append(row);
+    } else {
+      runtime.state.lastEternityRuns.forEach((record, index) => {
+        const row = document.createElement("li");
+        row.textContent = eternityRunRecordText(record, index);
+        runtime.elements.lastEternityRuns.append(row);
+      });
+    }
+  }
   const signature = infinityRunListSignature();
   if (signature === lastInfinityRunListSignature) return;
   lastInfinityRunListSignature = signature;
@@ -150,4 +189,5 @@ function updateStatisticsUi() {
 
 expose("updateAutomationUi", () => updateAutomationUi);
 expose("infinityRunRecordText", () => infinityRunRecordText);
+expose("eternityRunRecordText", () => eternityRunRecordText);
 expose("updateStatisticsUi", () => updateStatisticsUi);

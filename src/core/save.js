@@ -810,6 +810,11 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.fastestInfinityTime = runtime.sanitizeNumber(data.fastestInfinityTime, 0);
   runtime.state.fastestInfinityRealTime = runtime.sanitizeNumber(data.fastestInfinityRealTime, 0);
   runtime.state.lastInfinityRuns = runtime.sanitizeInfinityRunRecords(data.lastInfinityRuns);
+  runtime.state.currentEternityRunTime = runtime.sanitizeNumber(data.currentEternityRunTime, 0);
+  runtime.state.currentEternityRealTime = runtime.sanitizeNumber(data.currentEternityRealTime, 0);
+  runtime.state.fastestEternityTime = runtime.sanitizeNumber(data.fastestEternityTime, 0);
+  runtime.state.fastestEternityRealTime = runtime.sanitizeNumber(data.fastestEternityRealTime, 0);
+  runtime.state.lastEternityRuns = runtime.sanitizeEternityRunRecords(data.lastEternityRuns);
   runtime.state.bestInfinityCountPerSecond = Math.max(
     0,
     runtime.sanitizeNumber(data.bestInfinityCountPerSecond, 0),
@@ -1365,6 +1370,11 @@ function resetSave() {
     fastestInfinityTime: 0,
     fastestInfinityRealTime: 0,
     lastInfinityRuns: [],
+    currentEternityRunTime: 0,
+    currentEternityRealTime: 0,
+    fastestEternityTime: 0,
+    fastestEternityRealTime: 0,
+    lastEternityRuns: [],
     bestInfinityCountPerSecond: 0,
     infinityCountRateRemainder: 0,
     offlineProgressEnabled: true,

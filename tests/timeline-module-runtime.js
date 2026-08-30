@@ -161,6 +161,11 @@ async function testResetPersistenceAndRespec() {
   assert.equal(runtime.timelineAvailableTf(), 5, "ordinary Eternity must preserve unused TF");
   assert.equal(state.eternityMilestoneMask, 5, "resets must preserve permanent Milestones");
   assert.equal(state.totalPlayTime, 321, "resets must preserve permanent statistics");
+  state.currentEternityRunTime = 17;
+  state.currentEternityRealTime = 19;
+  state.fastestEternityTime = 3;
+  state.fastestEternityRealTime = 4;
+  state.lastEternityRuns = [{ time: 17, realTime: 19, infinityCount: 12 }];
 
   assert.equal(debug.respecTimeline({ save: false, update: false }), true, "Timeline respec should restart the current run");
   assert.equal(state.eternityCount, 13, "respec must not change Eternity count");
@@ -173,6 +178,11 @@ async function testResetPersistenceAndRespec() {
   assert.equal(runtime.timelineAvailableTf(), 6, "respec should refund all spent TF through derivation");
   assert.equal(state.scoreLog10, -Infinity, "respec should restart the current lower-layer run");
   assert.equal(state.infinityPointsExact, "0", "respec must not refund or preserve current IP");
+  assert.equal(state.currentEternityRunTime, 0, "Timeline respec should reset current Eternity game time");
+  assert.equal(state.currentEternityRealTime, 0, "Timeline respec should reset current Eternity real time");
+  assert.equal(state.fastestEternityTime, 3, "Timeline respec should preserve the fastest Eternity game time");
+  assert.equal(state.fastestEternityRealTime, 4, "Timeline respec should preserve the fastest Eternity real time");
+  assert.deepEqual(JSON.parse(JSON.stringify(state.lastEternityRuns)), [{ time: 17, realTime: 19, infinityCount: 12 }], "Timeline respec should preserve Eternity history");
   assert.equal(debug.respecTimeline({ save: false, update: false }), true, "repeated respec should remain safe");
   assert.equal(runtime.timelineAvailableTf(), 6, "repeated respec must not duplicate or lose TF");
 

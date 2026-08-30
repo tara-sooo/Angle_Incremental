@@ -1102,6 +1102,10 @@ canvas {
   padding: 5px;
 }
 
+.statistics-subtabs {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .challenge-subtab,
 .statistics-subtab {
   min-height: 38px;
@@ -2495,6 +2499,10 @@ canvas {
     gap: 4px;
     margin-bottom: 4px;
     padding: 4px;
+  }
+
+  .statistics-subtabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .challenge-subtab,
