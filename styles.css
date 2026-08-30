@@ -202,6 +202,10 @@ button {
   transition: transform 120ms ease, filter 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
+.main-tab[hidden] {
+  display: none;
+}
+
 .main-tab.is-active {
   color: white;
   border-color: var(--line-strong);

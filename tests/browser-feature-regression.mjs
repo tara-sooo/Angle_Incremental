@@ -14,6 +14,86 @@ try {
   }));
   trackPage(page, "main", errors, httpFailures);
   await page.evaluate(() => window.__angleDebug.runtime.closeUpdateModal?.());
+  await page.evaluate(() => {
+    const panel = document.querySelector("#offlineReportPanel");
+    if (panel && !panel.hidden) document.querySelector("#offlineReportClose")?.click();
+  });
+  await page.locator('[data-tab="settings"]').click();
+  const helpVisibilityToggle = page.locator('#tabVisibilityList input[data-main-tab-visibility="help"]');
+  const settingsVisibilityToggle = page.locator('#tabVisibilityList input[data-main-tab-visibility="settings"]');
+  const helpTab = page.locator('[data-tab="help"]');
+  const settingsTab = page.locator('[data-tab="settings"]');
+  assert.equal(await helpVisibilityToggle.isChecked(), true, "HELP should start enabled in Settings");
+  assert.equal(await settingsVisibilityToggle.isDisabled(), true, "SET should not be hideable");
+  assert.equal(await settingsTab.isVisible(), true, "SET should remain visible");
+  await helpVisibilityToggle.uncheck();
+  assert.equal(await helpVisibilityToggle.isChecked(), false, "unchecking HELP should update the real checkbox");
+  const hiddenHelp = await page.evaluate(() => {
+    const help = document.querySelector('[data-tab="help"]');
+    const visibleTabs = Array.from(document.querySelectorAll(".main-tab"))
+      .filter((button) => button.getClientRects().length > 0)
+      .map((button) => button.dataset.tab);
+    const saved = JSON.parse(localStorage.getItem("angle-incremental-save") || "null");
+    return {
+      hidden: help?.hidden ?? false,
+      display: help ? getComputedStyle(help).display : "",
+      rectCount: help?.getClientRects().length ?? 0,
+      visibleTabs,
+      stateHiddenTabs: [...window.__angleDebug.state.hiddenTabs],
+      savedHiddenTabs: saved?.state?.hiddenTabs ?? [],
+    };
+  });
+  assert.equal(hiddenHelp.hidden, true, "HELP should receive the hidden attribute");
+  assert.equal(hiddenHelp.display, "none", "hidden HELP should be removed by CSS");
+  assert.equal(hiddenHelp.rectCount, 0, "hidden HELP should have no rendered client rect");
+  assert.equal(await helpTab.isVisible(), false, "hidden HELP should not be visible to Playwright");
+  assert.equal(hiddenHelp.visibleTabs.includes("help"), false, "hidden HELP should leave the rendered navigation order");
+  assert.deepEqual(hiddenHelp.stateHiddenTabs, ["help"], "hiddenTabs should track the Settings change");
+  assert.deepEqual(hiddenHelp.savedHiddenTabs, ["help"], "hiddenTabs should be saved immediately");
+  assert.equal(await settingsTab.isVisible(), true, "SET should remain visible after hiding HELP");
+  assert.equal(await settingsVisibilityToggle.isDisabled(), true, "SET should remain disabled in the visibility list");
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
+  await page.evaluate(() => window.__angleDebug.ready);
+  await page.evaluate(() => {
+    const panel = document.querySelector("#offlineReportPanel");
+    if (panel && !panel.hidden) document.querySelector("#offlineReportClose")?.click();
+  });
+  await page.locator('[data-tab="settings"]').click();
+  const reloadedHelpVisibilityToggle = page.locator('#tabVisibilityList input[data-main-tab-visibility="help"]');
+  assert.equal(await reloadedHelpVisibilityToggle.isChecked(), false, "HELP should remain unchecked after reload");
+  assert.equal(await page.locator('[data-tab="help"]').isVisible(), false, "HELP should remain hidden after reload");
+  const reloadedHiddenHelp = await page.evaluate(() => {
+    const help = document.querySelector('[data-tab="help"]');
+    return {
+      hidden: help?.hidden ?? false,
+      display: help ? getComputedStyle(help).display : "",
+      stateHiddenTabs: [...window.__angleDebug.state.hiddenTabs],
+    };
+  });
+  assert.equal(reloadedHiddenHelp.hidden, true, "reload should restore HELP's hidden attribute");
+  assert.equal(reloadedHiddenHelp.display, "none", "reload should restore HELP's rendered absence");
+  assert.deepEqual(reloadedHiddenHelp.stateHiddenTabs, ["help"], "reload should restore hiddenTabs");
+  await reloadedHelpVisibilityToggle.check();
+  assert.equal(await reloadedHelpVisibilityToggle.isChecked(), true, "re-checking HELP should update the real checkbox");
+  assert.equal(await page.locator('[data-tab="help"]').isVisible(), true, "re-checking HELP should render the tab again");
+  const restoredHelp = await page.evaluate(() => {
+    const help = document.querySelector('[data-tab="help"]');
+    return {
+      hidden: help?.hidden ?? true,
+      display: help ? getComputedStyle(help).display : "",
+      rectCount: help?.getClientRects().length ?? 0,
+      stateHiddenTabs: [...window.__angleDebug.state.hiddenTabs],
+    };
+  });
+  assert.equal(restoredHelp.hidden, false, "re-checking HELP should clear its hidden attribute");
+  assert.notEqual(restoredHelp.display, "none", "re-checking HELP should restore its display style");
+  assert.ok(restoredHelp.rectCount > 0, "re-checking HELP should restore a rendered client rect");
+  assert.deepEqual(restoredHelp.stateHiddenTabs, [], "re-checking HELP should clear hiddenTabs");
+  assert.equal(await page.locator('[data-tab="settings"]').isVisible(), true, "SET should remain visible after restoring HELP");
+  assert.equal(await page.locator('#tabVisibilityList input[data-main-tab-visibility="settings"]').isDisabled(), true, "SET should remain unhideable");
+
   const desktopButtonInteraction = await page.evaluate(() => {
     const selectors = ["[data-tab=angle]", "#speedUpgrade"];
     return selectors.map((selector) => {
