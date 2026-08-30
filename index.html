@@ -495,58 +495,33 @@
               <p class="timeline-tree-hint" data-i18n="timelineTreeHint">
                 BC16500ノードは購入後に実効果を発揮します。Parallelの時間はIC8クリア後から進み、オフライン時間も加算されます。
               </p>
-              <div class="timeline-node-grid">
-                <article class="timeline-node" data-timeline-node="Real-BC16500">
-                  <div class="timeline-node-heading">
-                    <div>
-                      <p class="timeline-node-era">BC16500</p>
-                      <h3 class="timeline-node-name">惰性の打製石器</h3>
-                    </div>
-                    <span class="timeline-node-route timeline-node-route-real">Real</span>
+              <div id="timelineNodeGrid" class="timeline-eras"></div>
+              <section id="timelineNodeDetail" class="timeline-node-detail" aria-labelledby="timelineNodeDetailHeading" aria-live="polite">
+                <div class="timeline-node-detail-label" data-i18n="timelineNodeDetail">Selected node</div>
+                <div class="timeline-node-heading">
+                  <div>
+                    <p id="timelineNodeDetailEra" class="timeline-node-era"></p>
+                    <h3 id="timelineNodeDetailHeading" class="timeline-node-name"></h3>
                   </div>
-                  <p class="timeline-node-description">Realルート。IP獲得量を「1 + log10(現在IP)」倍します。現在IPが0のときの倍率は1です。</p>
-                  <p class="timeline-node-current-effect">未購入（効果なし）</p>
-                  <dl class="timeline-node-meta">
-                    <div>
-                      <dt data-i18n="timelineNodeCost">コスト</dt>
-                      <dd class="timeline-node-cost">1 TF</dd>
-                    </div>
-                    <div>
-                      <dt data-i18n="timelineNodePrerequisites">前提</dt>
-                      <dd class="timeline-node-prerequisites">なし</dd>
-                    </div>
-                  </dl>
-                  <p class="timeline-node-status" aria-live="polite">購入可能</p>
-                  <button id="timelineRealBc16500PurchaseButton" class="timeline-node-purchase upgrade-button" type="button" data-timeline-node-purchase="Real-BC16500" disabled>
-                    ノードを購入
-                  </button>
-                </article>
-                <article class="timeline-node" data-timeline-node="Parallel-BC16500">
-                  <div class="timeline-node-heading">
-                    <div>
-                      <p class="timeline-node-era">BC16500</p>
-                      <h3 class="timeline-node-name">終わらない氷河期</h3>
-                    </div>
-                    <span class="timeline-node-route timeline-node-route-parallel">Parallel</span>
+                  <span id="timelineNodeDetailRoute" class="timeline-node-route"></span>
+                </div>
+                <p id="timelineNodeDetailDescription" class="timeline-node-description"></p>
+                <p id="timelineNodeDetailCurrentEffect" class="timeline-node-current-effect"></p>
+                <dl class="timeline-node-meta">
+                  <div>
+                    <dt data-i18n="timelineNodeCost">Cost</dt>
+                    <dd id="timelineNodeDetailCost" class="timeline-node-cost"></dd>
                   </div>
-                  <p class="timeline-node-description">Parallelルート。IC8クリア後は毎秒×3。raw×1e10まではそのまま、以降は対数ソフトキャップで伸びます。オフライン時間も加算されます。</p>
-                  <p class="timeline-node-current-effect">未購入（効果なし）</p>
-                  <dl class="timeline-node-meta">
-                    <div>
-                      <dt data-i18n="timelineNodeCost">コスト</dt>
-                      <dd class="timeline-node-cost">1 TF</dd>
-                    </div>
-                    <div>
-                      <dt data-i18n="timelineNodePrerequisites">前提</dt>
-                      <dd class="timeline-node-prerequisites">なし</dd>
-                    </div>
-                  </dl>
-                  <p class="timeline-node-status" aria-live="polite">購入可能</p>
-                  <button id="timelineParallelBc16500PurchaseButton" class="timeline-node-purchase upgrade-button" type="button" data-timeline-node-purchase="Parallel-BC16500" disabled>
-                    ノードを購入
-                  </button>
-                </article>
-              </div>
+                  <div>
+                    <dt data-i18n="timelineNodePrerequisites">Prerequisites</dt>
+                    <dd id="timelineNodeDetailPrerequisites" class="timeline-node-prerequisites"></dd>
+                  </div>
+                </dl>
+                <p id="timelineNodeDetailStatus" class="timeline-node-status"></p>
+                <button id="timelineNodePurchaseButton" class="timeline-node-purchase upgrade-button" type="button" data-timeline-node-purchase disabled>
+                  Purchase node
+                </button>
+              </section>
             </section>
             <section class="timeline-build">
               <div class="panel-heading">

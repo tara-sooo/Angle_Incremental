@@ -246,15 +246,18 @@ try {
     eternityRequirement: document.getElementById("timelineEternityRequirement")?.textContent,
     scoreDisabled: document.getElementById("timelineScoreClaimButton")?.disabled,
     treeNodeCount: document.querySelectorAll(".timeline-node").length,
+    eraCount: document.querySelectorAll(".timeline-era").length,
+    eraLabel: document.querySelector(".timeline-era-heading")?.textContent,
     realRoute: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-route')?.textContent,
     parallelRoute: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-route')?.textContent,
-    realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
-    parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
+    selectedNode: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
+    detailName: document.getElementById("timelineNodeDetailHeading")?.textContent,
+    detailButtonDisabled: document.getElementById("timelineNodePurchaseButton")?.disabled,
+    detailPurchaseNode: document.getElementById("timelineNodePurchaseButton")?.dataset.timelineNodePurchase,
     realStatus: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-status')?.textContent,
-    realDescription: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
-    parallelDescription: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-description')?.textContent,
-    realCurrentEffect: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-current-effect')?.textContent,
-    parallelCurrentEffect: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-current-effect')?.textContent,
+    detailDescription: document.getElementById("timelineNodeDetailDescription")?.textContent,
+    detailCurrentEffect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
+    cardDescription: document.querySelector('.timeline-node[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
     warning: document.querySelector(".timeline-respec p")?.textContent,
   }));
   assert.equal(timelineInitial.active, true, "Timeline should be selectable as an Eternity subpanel");
@@ -266,16 +269,32 @@ try {
   assert.equal(timelineInitial.eternityRequirement, "2", "Timeline should show the exact initial Eternity requirement");
   assert.equal(timelineInitial.scoreDisabled, true, "an unmet Timeline track should disable its claim control");
   assert.equal(timelineInitial.treeNodeCount, 2, "Timeline should show both first-era route alternatives");
+  assert.equal(timelineInitial.eraCount, 1, "the first era should render as one branching group");
+  assert.equal(timelineInitial.eraLabel, "BC16500", "the tree should label the visible era");
   assert.equal(timelineInitial.realRoute, "Real");
   assert.equal(timelineInitial.parallelRoute, "Parallel");
-  assert.equal(timelineInitial.realButtonDisabled, true, "a node without available TF should be disabled");
-  assert.equal(timelineInitial.parallelButtonDisabled, true, "both route purchases should wait for available TF");
+  assert.equal(timelineInitial.selectedNode, "Real-BC16500", "Timeline should focus the first node by default");
+  assert.equal(timelineInitial.detailName, "惰性の打製石器", "the focused detail should show the selected node");
+  assert.equal(timelineInitial.detailPurchaseNode, "Real-BC16500");
+  assert.equal(timelineInitial.detailButtonDisabled, true, "a node without available TF should be disabled");
   assert.match(timelineInitial.realStatus || "", /TF不足/);
-  assert.match(timelineInitial.realDescription || "", /IP獲得量.*log10/);
-  assert.match(timelineInitial.parallelDescription || "", /IC8.*毎秒.*1e10/);
-  assert.match(timelineInitial.realCurrentEffect || "", /未購入/);
-  assert.match(timelineInitial.parallelCurrentEffect || "", /未購入/);
+  assert.match(timelineInitial.detailDescription || "", /IP獲得量.*log10/);
+  assert.match(timelineInitial.detailCurrentEffect || "", /未購入/);
+  assert.equal(timelineInitial.cardDescription, undefined, "compact nodes should not expand long descriptions");
   assert.match(timelineInitial.warning || "", /TF.*Eternity/, "Timeline should explain the respec consequences");
+
+  await page.click('[data-timeline-node="Parallel-BC16500"]');
+  const selectedParallel = await page.evaluate(() => ({
+    selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
+    detailName: document.getElementById("timelineNodeDetailHeading")?.textContent,
+    detailDescription: document.getElementById("timelineNodeDetailDescription")?.textContent,
+    purchaseNode: document.getElementById("timelineNodePurchaseButton")?.dataset.timelineNodePurchase,
+  }));
+  assert.equal(selectedParallel.selected, "Parallel-BC16500", "clicking a node should move the focused detail");
+  assert.equal(selectedParallel.detailName, "終わらない氷河期");
+  assert.match(selectedParallel.detailDescription || "", /IC8.*毎秒.*1e10/);
+  assert.equal(selectedParallel.purchaseNode, "Parallel-BC16500");
+  await page.click('[data-timeline-node="Real-BC16500"]');
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -294,36 +313,38 @@ try {
     earned: document.getElementById("timelineEarnedTf")?.textContent,
     next: document.getElementById("timelineScoreRequirement")?.textContent,
     score: window.__angleDebug.state.scoreLog10,
-    realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
-    parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
-    realDescription: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
-    realCurrentEffect: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-current-effect')?.textContent,
+    detailButtonDisabled: document.getElementById("timelineNodePurchaseButton")?.disabled,
+    detailPurchaseNode: document.getElementById("timelineNodePurchaseButton")?.dataset.timelineNodePurchase,
+    detailDescription: document.getElementById("timelineNodeDetailDescription")?.textContent,
+    detailCurrentEffect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
   }));
   assert.equal(timelineClaimed.claims, 1, "Timeline claim controls should grant one TF");
   assert.equal(timelineClaimed.earned, "1 TF", "Timeline should display earned TF");
   assert.equal(timelineClaimed.next, "1.00e30,000 Score", "the Score requirement should advance after one claim");
   assert.equal(timelineClaimed.score, 25000, "claiming TF must not consume Score");
-  assert.equal(timelineClaimed.realButtonDisabled, false, "one available TF should make the Real node purchasable");
-  assert.equal(timelineClaimed.parallelButtonDisabled, false, "one available TF should make the Parallel node purchasable");
-  assert.match(timelineClaimed.realDescription || "", /IP獲得量.*log10/);
-  assert.match(timelineClaimed.realCurrentEffect || "", /未購入/);
+  assert.equal(timelineClaimed.detailButtonDisabled, false, "one available TF should make the selected node purchasable");
+  assert.equal(timelineClaimed.detailPurchaseNode, "Real-BC16500");
+  assert.match(timelineClaimed.detailDescription || "", /IP獲得量.*log10/);
+  assert.match(timelineClaimed.detailCurrentEffect || "", /未購入/);
 
-  await page.click("#timelineRealBc16500PurchaseButton");
+  await page.click("#timelineNodePurchaseButton");
   const realPurchased = await page.evaluate(() => ({
     purchased: window.__angleDebug.state.timelinePurchasedNodes,
     available: document.getElementById("timelineAvailableTf")?.textContent,
     realStatus: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-status')?.textContent,
     parallelStatus: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-status')?.textContent,
-    realCurrentEffect: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-current-effect')?.textContent,
-    realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
-    parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
+    realState: document.querySelector('[data-timeline-node="Real-BC16500"]')?.dataset.state,
+    parallelState: document.querySelector('[data-timeline-node="Parallel-BC16500"]')?.dataset.state,
+    realCurrentEffect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
+    purchaseDisabled: document.getElementById("timelineNodePurchaseButton")?.disabled,
   }));
   assert.equal(realPurchased.purchased.length, 1, "a Timeline purchase should record one node");
   assert.equal(realPurchased.purchased[0].id, "Real-BC16500");
   assert.equal(realPurchased.available, "0 TF", "the purchased node should consume available TF");
   assert.equal(realPurchased.realStatus, "購入済み");
-  assert.equal(realPurchased.realButtonDisabled, true);
-  assert.equal(realPurchased.parallelButtonDisabled, true, "the same-era alternative should be disabled");
+  assert.equal(realPurchased.realState, "owned");
+  assert.equal(realPurchased.parallelState, "route-conflict", "the same-era alternative should be disabled");
+  assert.equal(realPurchased.purchaseDisabled, true);
   assert.match(realPurchased.realCurrentEffect || "", /現在のIP倍率/);
   assert.match(realPurchased.parallelStatus || "", /同じ時代.*ロック/);
 
@@ -335,13 +356,15 @@ try {
   const afterTimelineRespec = await page.evaluate(() => ({
     purchased: window.__angleDebug.state.timelinePurchasedNodes.length,
     available: document.getElementById("timelineAvailableTf")?.textContent,
-    realButtonDisabled: document.getElementById("timelineRealBc16500PurchaseButton")?.disabled,
-    parallelButtonDisabled: document.getElementById("timelineParallelBc16500PurchaseButton")?.disabled,
+    realState: document.querySelector('[data-timeline-node="Real-BC16500"]')?.dataset.state,
+    parallelState: document.querySelector('[data-timeline-node="Parallel-BC16500"]')?.dataset.state,
+    purchaseDisabled: document.getElementById("timelineNodePurchaseButton")?.disabled,
   }));
   assert.equal(afterTimelineRespec.purchased, 0);
   assert.equal(afterTimelineRespec.available, "1 TF", "respec should return the node cost to available TF");
-  assert.equal(afterTimelineRespec.realButtonDisabled, false);
-  assert.equal(afterTimelineRespec.parallelButtonDisabled, false);
+  assert.equal(afterTimelineRespec.realState, "available");
+  assert.equal(afterTimelineRespec.parallelState, "available");
+  assert.equal(afterTimelineRespec.purchaseDisabled, false);
   await page.click('[data-tab="eternity"]');
   await page.click('[data-eternity-tab="milestone"]');
 
@@ -557,9 +580,10 @@ try {
     timelineTree: document.querySelector('[data-i18n="timelineTree"]')?.textContent,
     realNodeName: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-name')?.textContent,
     parallelNodeName: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-name')?.textContent,
-    realDescription: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
-    parallelDescription: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-description')?.textContent,
-    realCurrentEffect: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-current-effect')?.textContent,
+    detailLabel: document.querySelector('[data-i18n="timelineNodeDetail"]')?.textContent,
+    detailName: document.getElementById("timelineNodeDetailHeading")?.textContent,
+    detailDescription: document.getElementById("timelineNodeDetailDescription")?.textContent,
+    detailCurrentEffect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
     timelineWarning: document.querySelector('[data-i18n="timelineRespecWarning"]')?.textContent,
     manual: document.getElementById("eternityForcedNote")?.textContent,
   }));
@@ -580,9 +604,10 @@ try {
   assert.equal(english.timelineTree, "Timeline Tree", "Timeline Tree should have English copy");
   assert.equal(english.realNodeName, "Inert Stone Tools", "Real node should have English copy");
   assert.equal(english.parallelNodeName, "Endless Ice Age", "Parallel node should have English copy");
-  assert.match(english.realDescription || "", /Infinity Point gain.*log10/);
-  assert.match(english.parallelDescription || "", /IC8.*×3.*1e10.*logarithmically/i);
-  assert.match(english.realCurrentEffect || "", /Inactive/);
+  assert.equal(english.detailLabel, "Selected node");
+  assert.equal(english.detailName, "Inert Stone Tools");
+  assert.match(english.detailDescription || "", /Infinity Point gain.*log10/);
+  assert.match(english.detailCurrentEffect || "", /Inactive/);
   assert.match(english.timelineWarning || "", /respec.*node.*TF.*Eternity run/i, "Timeline respec warning should have English copy");
   assert.match(english.manual || "", /manually/, "English copy should explain that Eternity is player-triggered");
   assert.doesNotMatch(english.manual || "", /performed automatically/, "English copy must not describe forced pre-Break Eternity");
@@ -593,6 +618,9 @@ try {
     visible: document.querySelector('[data-eternity-panel="timeline"]')?.classList.contains("is-active"),
     gridWidth: document.querySelector(".timeline-node-grid")?.getBoundingClientRect().width || 0,
     nodeWidth: document.querySelector(".timeline-node")?.getBoundingClientRect().width || 0,
+    detailWidth: document.getElementById("timelineNodeDetail")?.getBoundingClientRect().width || 0,
+    gridColumns: getComputedStyle(document.querySelector(".timeline-node-grid")).gridTemplateColumns,
+    branchRouteOrder: Array.from(document.querySelectorAll(".timeline-node"), (node) => node.dataset.route),
     subtabCodes: Array.from(document.querySelectorAll(".eternity-subtab span"), (node) => node.textContent),
     subtabNavWidth: document.querySelector(".eternity-subtabs")?.scrollWidth || 0,
     subtabClientWidth: document.querySelector(".eternity-subtabs")?.clientWidth || 0,
@@ -600,7 +628,12 @@ try {
   assert.equal(timelineMobile.visible, true, "Timeline should remain usable at a mobile viewport");
   assert.deepEqual(timelineMobile.subtabCodes, ["MS", "TL"], "mobile Eternity subtabs should expose compact codes");
   assert.ok(timelineMobile.subtabNavWidth <= timelineMobile.subtabClientWidth, "mobile Eternity subtabs should fit without horizontal overflow");
-  assert.ok(timelineMobile.gridWidth > 0 && timelineMobile.nodeWidth > 0, "Timeline node cards should keep a visible mobile layout");
+  assert.equal(timelineMobile.gridColumns.trim().split(/\s+/).length, 1, "Timeline nodes should stack at a narrow viewport");
+  assert.deepEqual(timelineMobile.branchRouteOrder, ["Real", "Parallel"], "Timeline should preserve route order on mobile");
+  assert.ok(
+    timelineMobile.gridWidth > 0 && timelineMobile.nodeWidth > 0 && timelineMobile.detailWidth > 0,
+    "Timeline nodes and focused detail should keep a visible mobile layout",
+  );
   await page.click('[data-tab="eternity"]');
   await page.click('[data-eternity-tab="milestone"]');
   const mobile = await page.evaluate(() => ({
