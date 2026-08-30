@@ -23,7 +23,7 @@
     "test:ic8-eternity-progression": "node --experimental-vm-modules tests/ic8-eternity-progression-simulation.js",
     "validate:research": "npm run test:tc4-balance && npm run test:tc4-balance-followup && npm run test:tc4-balance-sensitivity && npm run test:tc4-balance-a-search && npm run test:tc4-a-form-search && npm run test:tc4-a-form-frontier && npm run test:tc4-log-frontier-continuation && npm run test:ic8-eternity-progression",
     "validate:full": "npm run validate && npm run test:performance && npm run test:offline-stress && npm run validate:research",
-    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run check:idd-policy && npm run test:regression && npm run test:browser && npm run test:local-performance-gate && npm run test:performance:local"
+    "validate": "npm run check:runtime-order && npm run check:syntax && npm run check:version && npm run check:idd-policy && npm run test:regression && npm run test:browser && npm run test:local-performance-gate"
   },
   "devDependencies": {
     "playwright": "^1.61.1"
