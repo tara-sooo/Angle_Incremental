@@ -31,10 +31,10 @@ jobs:
         run: npm run check:idd-policy
       - name: Run ESM regression suite
         run: npm run test:regression
-      - name: Install Chromium for browser smoke test
+      - name: Install Chromium for browser validation
         timeout-minutes: 5
         run: npx playwright install chromium
-      - name: Run browser ESM smoke test
+      - name: Run browser smoke and feature tests
         run: npm run test:browser
       - name: Test local performance gate classifier
         run: npm run test:local-performance-gate

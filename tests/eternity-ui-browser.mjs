@@ -1,52 +1,12 @@
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { openGamePage, startGameTest } from "./browser-harness.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const contentTypes = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-};
-
-function resolveRequestPath(requestUrl) {
-  const parsed = new URL(requestUrl, "http://127.0.0.1");
-  const requested = decodeURIComponent(parsed.pathname === "/" ? "/index.html" : parsed.pathname);
-  const relative = path.normalize(requested.replace(/^\/+/, ""));
-  if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
-  return path.join(root, relative);
-}
-
-const server = createServer(async (request, response) => {
-  const filePath = resolveRequestPath(request.url || "/");
-  if (!filePath) {
-    response.writeHead(403).end();
-    return;
-  }
-  try {
-    const metadata = await stat(filePath);
-    if (!metadata.isFile()) throw new Error("not a file");
-    response.writeHead(200, { "content-type": contentTypes[path.extname(filePath)] || "application/octet-stream" });
-    response.end(await readFile(filePath));
-  } catch {
-    response.writeHead(404).end();
-  }
+const gameTest = await startGameTest();
+const { context, page } = await openGamePage(gameTest.browser, gameTest.origin, {
+  viewport: { width: 1280, height: 900 },
 });
 
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-const address = server.address();
-if (!address || typeof address === "string") throw new Error("failed to bind Eternity UI test server");
-
-const browser = await chromium.launch({ headless: true, args: ["--use-gl=disabled"] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-
 try {
-  await page.goto(`http://127.0.0.1:${address.port}/`, { waitUntil: "networkidle" });
-  await page.evaluate(() => window.__angleDebug.ready);
   await page.evaluate(() => {
     const debug = window.__angleDebug;
     debug.runtime.closeUpdateModal?.();
@@ -647,6 +607,6 @@ try {
 
   console.log("Eternity UI browser test passed");
 } finally {
-  await browser.close();
-  await new Promise((resolve) => server.close(resolve));
+  await context.close();
+  await gameTest.close();
 }

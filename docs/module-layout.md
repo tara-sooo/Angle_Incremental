@@ -56,5 +56,6 @@ This preserves the original runtime's live mutable bindings and reset behavior w
 - `tests/runtime-harness-esm.js` loads the canonical module runtime in a VM with a deterministic DOM and storage surface.
 - `tests/runtime-invariants-module-runtime.js` checks numerical boundaries, challenge rules, automation, save-code integrity, and diagnostic hooks against that runtime.
 - Feature-focused module-runtime tests cover normal upgrades, Generation, Core Boost, IU5-2/IU6-2, IC6–IC8, high-speed vertex processing, existing local saves, and bidirectional save-code import.
-- `tests/browser-smoke.mjs` serves the static application locally in CI, launches Chromium, and verifies ESM startup plus the runtime diagnostic surface.
-- GitHub Actions runs syntax checks, the ESM regression suite, and the browser smoke test.
+- `tests/browser-harness.mjs` owns the shared static server and Chromium setup. `tests/browser-smoke.mjs` keeps the short startup/save/visibility smoke path, while `tests/browser-feature-regression.mjs` and the focused Eternity browser tests cover detailed feature behavior.
+- `npm run test:browser-smoke` runs only the fast critical-path smoke test; `npm run test:browser-features` runs feature-specific browser coverage; `npm run test:render-regression` remains the visual snapshot layer.
+- GitHub Actions runs syntax checks, the ESM regression suite, the browser validation aggregate, and the separate hosted performance/offline jobs.

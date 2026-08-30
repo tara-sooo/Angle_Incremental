@@ -52,13 +52,54 @@ export async function startGameTest() {
   };
 }
 
-export async function openGamePage(browser, origin, { viewport, deviceScaleFactor }) {
-  const context = await browser.newContext({ viewport, deviceScaleFactor });
+export async function stubExternalFonts(target) {
+  await target.route("https://fonts.googleapis.com/**", (route) => route.fulfill({
+    status: 200,
+    contentType: "text/css",
+    body: "",
+  }));
+  await target.route("https://fonts.gstatic.com/**", (route) => route.fulfill({
+    status: 200,
+    contentType: "font/woff2",
+    body: "",
+  }));
+}
+
+export function trackPage(page, scope, errors, httpFailures) {
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  page.on("response", (response) => {
+    if (response.status() >= 400) httpFailures.push({ scope, type: "response", status: response.status(), url: response.url() });
+  });
+  page.on("requestfailed", (request) => {
+    httpFailures.push({
+      scope,
+      type: "requestfailed",
+      status: 0,
+      url: request.url(),
+      error: request.failure()?.errorText ?? "unknown",
+    });
+  });
+}
+
+export async function openGamePage(browser, origin, {
+  viewport,
+  deviceScaleFactor,
+  hasTouch = false,
+  isMobile = false,
+  seenVersion = expectedAppVersion,
+  stubFonts = false,
+  freezeAnimationFrame = true,
+}) {
+  const context = await browser.newContext({ viewport, deviceScaleFactor, hasTouch, isMobile });
+  if (stubFonts) await stubExternalFonts(context);
   const page = await context.newPage();
-  await page.addInitScript(({ appVersion }) => {
-    window.requestAnimationFrame = () => 0;
-    localStorage.setItem("angle-incremental-seen-version", appVersion);
-  }, { appVersion: expectedAppVersion });
+  await page.addInitScript(({ appVersion, freezeAnimationFrame: shouldFreezeAnimationFrame }) => {
+    if (shouldFreezeAnimationFrame) window.requestAnimationFrame = () => 0;
+    if (appVersion) localStorage.setItem("angle-incremental-seen-version", appVersion);
+  }, { appVersion: seenVersion, freezeAnimationFrame });
   await page.goto(`${origin}/index.html`, { waitUntil: "networkidle" });
   await page.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
   await page.evaluate(() => window.__angleDebug.ready);
