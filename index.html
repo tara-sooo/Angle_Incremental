@@ -701,6 +701,10 @@
               <span>CHAL</span>
               <strong data-i18n="statisticsChallenges">チャレンジ記録</strong>
             </button>
+            <button class="statistics-subtab" type="button" data-statistics-tab="eternity" aria-selected="false">
+              <span>ETR</span>
+              <strong data-i18n="statisticsEternityRecords">Eternity記録</strong>
+            </button>
           </nav>
           <div class="statistics-subpanels">
             <section class="statistics-subpanel is-active" data-statistics-panel="overview">
@@ -746,6 +750,30 @@
                   <ol id="fastestTowerChallengeTimes"></ol>
                 </section>
               </div>
+            </section>
+            <section class="statistics-subpanel" data-statistics-panel="eternity">
+              <section class="statistics-grid">
+                <div class="settings-card stat-card">
+                  <span data-i18n="currentEternityRun">現在のEternity周回（ゲーム時間）</span>
+                  <strong id="currentEternityRunTime">0秒</strong>
+                </div>
+                <div class="settings-card stat-card">
+                  <span data-i18n="currentEternityRealTime">現在のEternity周回（実プレイ時間）</span>
+                  <strong id="currentEternityRealTime">0秒</strong>
+                </div>
+                <div class="settings-card stat-card">
+                  <span data-i18n="fastestEternity">最速Eternity（ゲーム時間）</span>
+                  <strong id="fastestEternityTime">記録なし</strong>
+                </div>
+                <div class="settings-card stat-card">
+                  <span data-i18n="fastestEternityRealTime">最速Eternity（実プレイ時間）</span>
+                  <strong id="fastestEternityRealTime">記録なし</strong>
+                </div>
+                <section class="settings-card run-history">
+                  <h2 data-i18n="lastEternityRunsLabel">過去10回のEternity</h2>
+                  <ol id="lastEternityRuns"></ol>
+                </section>
+              </section>
             </section>
           </div>
         </section>

@@ -122,6 +122,24 @@ function shouldForceEternity() {
   return false;
 }
 
+function recordEternityRun() {
+  const elapsed = runtime.sanitizeNumber(runtime.state.currentEternityRunTime, 0);
+  const realElapsed = runtime.sanitizeNumber(runtime.state.currentEternityRealTime, 0);
+  const record = {
+    time: elapsed > 0 ? Math.max(elapsed, runtime.MIN_RECORDED_INFINITY_SECONDS) : 0,
+    realTime: realElapsed > 0 ? Math.max(realElapsed, runtime.MIN_RECORDED_INFINITY_SECONDS) : 0,
+    infinityCount: Math.max(0, Math.floor(runtime.sanitizeNumber(runtime.state.infinityCount, 0))),
+  };
+  runtime.state.lastEternityRuns.unshift(record);
+  runtime.state.lastEternityRuns = runtime.state.lastEternityRuns.slice(0, 10);
+  if (record.time > 0 && (runtime.state.fastestEternityTime <= 0 || record.time < runtime.state.fastestEternityTime)) {
+    runtime.state.fastestEternityTime = record.time;
+  }
+  if (record.realTime > 0 && (runtime.state.fastestEternityRealTime <= 0 || record.realTime < runtime.state.fastestEternityRealTime)) {
+    runtime.state.fastestEternityRealTime = record.realTime;
+  }
+}
+
 function resetEternityProgression() {
   const resetBelowInfinity = runtime.balanceResetBelowInfinity || runtime.resetBelowInfinity;
   resetBelowInfinity();
@@ -159,6 +177,8 @@ function resetEternityProgression() {
     infiniteCapBroken: false,
     currentInfinityRunTime: 0,
     currentInfinityRealTime: 0,
+    currentEternityRunTime: 0,
+    currentEternityRealTime: 0,
     bestInfinityCountPerSecond: 0,
     infinityCountRateRemainder: 0,
     ic8VertexDecayElapsed: 0,
@@ -187,6 +207,7 @@ function applyEternityRunStartState() {
 function performEternity(options = {}) {
   if (!canEternity()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-eternity", { force: true })) return false;
+  recordEternityRun();
   resetEternityProgression();
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.state.eternityCount)) + 1;
   runtime.markMainTabsUnlocked?.(["timeline"]);
@@ -222,6 +243,7 @@ expose("infinityAutomationUnlocked", () => infinityAutomationUnlocked);
 expose("infinityUpgradeAutomationUnlocked", () => infinityUpgradeAutomationUnlocked);
 expose("canEternity", () => canEternity);
 expose("shouldForceEternity", () => shouldForceEternity);
+expose("recordEternityRun", () => recordEternityRun, (value) => { recordEternityRun = value; });
 expose("resetEternityProgression", () => resetEternityProgression);
 expose("applyEternityRunStartState", () => applyEternityRunStartState);
 expose("performEternity", () => performEternity);

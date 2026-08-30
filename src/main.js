@@ -790,6 +790,7 @@ function update(dt, allowOffline = false) {
   if (offlineProcessing && !allowOffline) return;
   runtime.state.totalPlayTime += dt;
   runtime.state.currentInfinityRunTime += dt;
+  runtime.state.currentEternityRunTime += dt;
   runtime.state.currentGenerationRunTime += dt;
   runtime.advanceTimelineRunTime?.(dt);
   runtime.updateChallengeTimers(dt);
@@ -867,6 +868,7 @@ function advanceOnlineTime(realSeconds) {
   if (realDt <= 0) return 0;
   runtime.state.totalRealPlayTime += realDt;
   runtime.state.currentInfinityRealTime += realDt;
+  runtime.state.currentEternityRealTime += realDt;
   const gameSeconds = realDt;
 
   runSimulationBatch(() => {
@@ -930,6 +932,7 @@ function offlineProgressNumericallySafe(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return false;
   if (!Number.isFinite(runtime.state.totalPlayTime + seconds)) return false;
   if (!Number.isFinite(runtime.state.currentInfinityRunTime + seconds)) return false;
+  if (!Number.isFinite(runtime.state.currentEternityRunTime + seconds)) return false;
   if (!Number.isFinite(runtime.state.currentGenerationRunTime + seconds)) return false;
   if (!Number.isFinite(runtime.state.timelineParallelSecondsSinceIc8Clear + seconds)) return false;
 
@@ -1877,6 +1880,13 @@ function renderGameToText() {
       fastestInfinityChallengeTimes: runtime.state.fastestInfinityChallengeTimes,
       fastestTowerChallengeTimes: runtime.state.fastestTowerChallengeTimes,
       lastInfinityRuns: runtime.state.lastInfinityRuns,
+      currentEternityRunTime: Number(runtime.state.currentEternityRunTime.toFixed(1)),
+      currentEternityRealTime: Number(runtime.state.currentEternityRealTime.toFixed(1)),
+      fastestEternityTime: runtime.state.fastestEternityTime > 0 ? Number(runtime.state.fastestEternityTime.toFixed(1)) : null,
+      fastestEternityRealTime: runtime.state.fastestEternityRealTime > 0
+        ? Number(runtime.state.fastestEternityRealTime.toFixed(1))
+        : null,
+      lastEternityRuns: runtime.state.lastEternityRuns,
     },
     timeFlux: {
       dormant: true,

@@ -101,6 +101,15 @@ function sanitizeInfinityRunRecords(value) {
   }));
 }
 
+function sanitizeEternityRunRecords(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 10).map((record) => ({
+    time: sanitizeNumber(record && record.time, 0),
+    realTime: sanitizeNumber(record && record.realTime, null),
+    infinityCount: Math.max(0, Math.floor(sanitizeNumber(record && record.infinityCount, 0))),
+  }));
+}
+
 function valueFromLog10(log) {
   log = clampLog10(log);
   if (log === -Infinity) return 0;
@@ -231,6 +240,7 @@ expose("hydrateLog10", () => hydrateLog10, (value) => { hydrateLog10 = value; })
 expose("hydrateLogResource", () => hydrateLogResource, (value) => { hydrateLogResource = value; });
 expose("sanitizeBoolean", () => sanitizeBoolean, (value) => { sanitizeBoolean = value; });
 expose("sanitizeInfinityRunRecords", () => sanitizeInfinityRunRecords, (value) => { sanitizeInfinityRunRecords = value; });
+expose("sanitizeEternityRunRecords", () => sanitizeEternityRunRecords, (value) => { sanitizeEternityRunRecords = value; });
 expose("valueFromLog10", () => valueFromLog10, (value) => { valueFromLog10 = value; });
 expose("subtractLog10", () => subtractLog10, (value) => { subtractLog10 = value; });
 expose("log10Value", () => log10Value, (value) => { log10Value = value; });

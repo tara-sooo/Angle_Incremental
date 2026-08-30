@@ -53,6 +53,12 @@ async function testLegacyDefaults() {
   delete legacy.state.eternityMilestoneChoice;
   delete legacy.state.achievementMaskHigh;
   delete legacy.state.autoBuyInfinityUpgrades;
+  delete legacy.state.currentEternityRunTime;
+  delete legacy.state.currentEternityRealTime;
+  delete legacy.state.fastestEternityTime;
+  delete legacy.state.fastestEternityRealTime;
+  delete legacy.state.lastEternityRuns;
+  legacy.state.offlineProgressEnabled = false;
 
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(legacy)]]));
   assert.equal(loaded.debug.state.eternityCount, 0, "legacy saves should default Eternity count to zero");
@@ -61,6 +67,11 @@ async function testLegacyDefaults() {
   assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 0, "legacy saves without Eternities must not receive an acquisition entitlement");
   assert.equal(loaded.debug.state.achievementMaskHigh, 0, "legacy saves should default the high achievement mask safely");
   assert.equal(loaded.debug.state.autoBuyInfinityUpgrades, false, "legacy saves should default Infinity Upgrade automation off");
+  assert.equal(loaded.debug.state.currentEternityRunTime, 0, "legacy saves should default current Eternity game time to zero");
+  assert.equal(loaded.debug.state.currentEternityRealTime, 0, "legacy saves should default current Eternity real time to zero");
+  assert.equal(loaded.debug.state.fastestEternityTime, 0, "legacy saves should default fastest Eternity game time to zero");
+  assert.equal(loaded.debug.state.fastestEternityRealTime, 0, "legacy saves should default fastest Eternity real time to zero");
+  assert.deepEqual(Array.from(loaded.debug.state.lastEternityRuns), [], "legacy saves should not derive Eternity history from the count");
   assert.equal(loaded.runtime.SAVE_VERSION, 11, "Milestone 1-3 free-level semantics should use save version 11");
 }
 
@@ -115,6 +126,12 @@ async function testCurrentRoundTripAndSanitization() {
   debug.state.completedTowerChallenges = 0;
   debug.state.tc4BaseGainLevel = 4;
   debug.state.tc4BaseGainPriceStep = 5;
+  debug.state.currentEternityRunTime = 12.5;
+  debug.state.currentEternityRealTime = 8.25;
+  debug.state.fastestEternityTime = 3.25;
+  debug.state.fastestEternityRealTime = 4.5;
+  debug.state.lastEternityRuns = [{ time: 12.5, realTime: 8.25, infinityCount: 6 }];
+  debug.state.offlineProgressEnabled = false;
 
   const serialized = runtime.serializeSaveData();
   serialized.savedAt = Date.now();
@@ -125,6 +142,28 @@ async function testCurrentRoundTripAndSanitization() {
   assert.equal(loaded.debug.state.completedTowerChallenges, 0, "ordinary save/load must not invent TC completion during an active TC4 run");
   assert.equal(loaded.debug.state.tc4BaseGainLevel, 4, "ordinary save/load should round-trip TC4 local state inside an active TC4 run");
   assert.equal(loaded.debug.state.tc4BaseGainPriceStep, 5, "ordinary save/load should round-trip TC4 price state inside an active TC4 run");
+  assert.equal(loaded.debug.state.currentEternityRunTime, 12.5, "ordinary save/load should round-trip current Eternity game time");
+  assert.equal(loaded.debug.state.currentEternityRealTime, 8.25, "ordinary save/load should round-trip current Eternity real time");
+  assert.equal(loaded.debug.state.fastestEternityTime, 3.25, "ordinary save/load should round-trip fastest Eternity game time");
+  assert.equal(loaded.debug.state.fastestEternityRealTime, 4.5, "ordinary save/load should round-trip fastest Eternity real time");
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.debug.state.lastEternityRuns)), [{ time: 12.5, realTime: 8.25, infinityCount: 6 }], "ordinary save/load should round-trip Eternity history");
+
+  const malformed = structuredClone(serialized);
+  malformed.state.currentEternityRunTime = "not-a-number";
+  malformed.state.currentEternityRealTime = -1;
+  malformed.state.fastestEternityTime = "NaN";
+  malformed.state.fastestEternityRealTime = Infinity;
+  malformed.state.lastEternityRuns = [
+    { time: "bad", realTime: "bad", infinityCount: "4.9" },
+    ...Array.from({ length: 11 }, (_, index) => ({ time: index + 1, realTime: index + 1, infinityCount: index + 1 })),
+  ];
+  const sanitized = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(malformed)]]));
+  assert.equal(sanitized.debug.state.currentEternityRunTime, 0, "invalid current Eternity game time should fall back to zero");
+  assert.equal(sanitized.debug.state.currentEternityRealTime, 0, "invalid current Eternity real time should fall back to zero");
+  assert.equal(sanitized.debug.state.fastestEternityTime, 0, "invalid fastest Eternity game time should fall back to zero");
+  assert.equal(sanitized.debug.state.fastestEternityRealTime, 0, "invalid fastest Eternity real time should fall back to zero");
+  assert.equal(sanitized.debug.state.lastEternityRuns.length, 10, "invalid Eternity history should remain capped at ten records");
+  assert.deepEqual(JSON.parse(JSON.stringify(sanitized.debug.state.lastEternityRuns[0])), { time: 0, realTime: null, infinityCount: 4 }, "invalid Eternity record fields should use the Infinity-compatible defaults");
 
   loaded.runtime.applySaveData({
     eternityMilestoneMask: 255,

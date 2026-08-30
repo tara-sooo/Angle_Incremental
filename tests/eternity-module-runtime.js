@@ -14,6 +14,71 @@ function setScore(state, log10) {
   state.score = log10 <= 308 ? 10 ** log10 : Number.MAX_VALUE;
 }
 
+async function testEternityRunStatistics() {
+  const timerInstance = await loadRuntime(candidatePath);
+  const { debug: timerDebug } = timerInstance;
+  const timerState = timerDebug.state;
+  timerDebug.update(5, true);
+  assert.equal(timerState.currentEternityRunTime, 5, "game time should advance during an offline-capable update");
+  assert.equal(timerState.currentEternityRealTime, 0, "offline-capable updates must not advance Eternity real time");
+  timerDebug.advanceOnlineTime(2);
+  assert.ok(Math.abs(timerState.currentEternityRunTime - 7) < 1e-9, "online time should advance Eternity game time");
+  assert.ok(Math.abs(timerState.currentEternityRealTime - 2) < 1e-9, "online time should advance Eternity real time");
+  timerState.offlineTickCount = 1;
+  const offlineReport = await timerDebug.processOfflineElapsed(60, "eternity-statistics-test", { clockSource: "server" });
+  assert.equal(offlineReport.simulatedSeconds, 60, "offline processing should simulate the trusted interval");
+  assert.ok(Math.abs(timerState.currentEternityRunTime - 67) < 1e-9, "offline progress should advance Eternity game time");
+  assert.ok(Math.abs(timerState.currentEternityRealTime - 2) < 1e-9, "offline progress must not advance Eternity real time");
+
+  const { debug, runtime } = await loadRuntime(candidatePath);
+  const { state } = debug;
+  state.currentEternityRunTime = 7;
+  state.currentEternityRealTime = 2;
+  state.infinityCount = 1;
+  setScore(state, 7777);
+  debug.runInfinity(false);
+  assert.equal(state.currentEternityRunTime, 7, "ordinary Infinity must preserve Eternity game time");
+  assert.equal(state.currentEternityRealTime, 2, "ordinary Infinity must preserve Eternity real time");
+
+  state.currentEternityRunTime = 12.5;
+  state.currentEternityRealTime = 8.25;
+  state.infinityCount = 6;
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true, "a successful Eternity should record its run");
+  assert.deepEqual(JSON.parse(JSON.stringify(state.lastEternityRuns[0])), { time: 12.5, realTime: 8.25, infinityCount: 6 });
+  assert.equal(state.currentEternityRunTime, 0, "successful Eternity should reset current game time");
+  assert.equal(state.currentEternityRealTime, 0, "successful Eternity should reset current real time");
+  assert.equal(state.fastestEternityTime, 12.5);
+  assert.equal(state.fastestEternityRealTime, 8.25);
+
+  state.currentEternityRunTime = 3.25;
+  state.currentEternityRealTime = 4.5;
+  state.infinityCount = 2;
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.deepEqual(JSON.parse(JSON.stringify(state.lastEternityRuns.slice(0, 2))), [
+    { time: 3.25, realTime: 4.5, infinityCount: 2 },
+    { time: 12.5, realTime: 8.25, infinityCount: 6 },
+  ], "Eternity history should be newest first and preserve the pre-reset Infinity count");
+  assert.equal(state.fastestEternityTime, 3.25);
+  assert.equal(state.fastestEternityRealTime, 4.5);
+
+  for (let index = 0; index < 10; index += 1) {
+    state.currentEternityRunTime = 100 + index;
+    state.currentEternityRealTime = 100 + index;
+    state.infinityCount = index;
+    runtime.recordEternityRun();
+  }
+  assert.equal(state.lastEternityRuns.length, 10, "Eternity history should retain at most ten records");
+  assert.equal(state.lastEternityRuns[0].infinityCount, 9, "the newest Eternity record should remain first");
+  assert.equal(state.lastEternityRuns.at(-1).infinityCount, 0, "the oldest retained Eternity record should be the tenth newest");
+  state.currentEternityRunTime = 0;
+  state.currentEternityRealTime = 0;
+  runtime.recordEternityRun();
+  assert.equal(state.lastEternityRuns[0].time, 0, "zero-time Eternity records should remain zero");
+  assert.equal(state.fastestEternityTime, 3.25, "zero-time records must not replace the fastest record");
+}
+
 async function testMilestoneChoiceLifecycle() {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
@@ -726,6 +791,7 @@ async function testMainTabDiscoveryLifecycle() {
 }
 
 async function runEternityModuleRuntimeTest() {
+  await testEternityRunStatistics();
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
   await testMilestoneFiveInfinityUpgradeAutomation();
