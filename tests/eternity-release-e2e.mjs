@@ -313,12 +313,13 @@ try {
   const english = await page.evaluate(() => ({
     missingKeys: Array.from(document.querySelectorAll('[data-panel="eternity"] [data-i18n]'))
       .filter((element) => !element.textContent.trim()).map((element) => element.dataset.i18n),
+    compactRequirement: document.querySelector('[data-i18n="eternityRequirementCompact"]')?.textContent || "",
     manual: document.getElementById("eternityForcedNote")?.textContent || "",
     panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
   }));
   assert.deepEqual(english.missingKeys, [], "English Eternity release UI should not contain missing/placeholder i18n strings");
-  assert.match(english.manual, /manually/, "English release copy should explain manual Eternity");
-  assert.doesNotMatch(english.manual, /performed automatically/, "English release copy must not describe forced Eternity");
+  assert.equal(english.compactRequirement, "TC4 clear + 1.80e308 IP", "English release UI should keep one compact Eternity requirement");
+  assert.equal(english.manual, "", "English release UI should remove the repeated manual-execution warning");
   assert.equal(english.panelText.includes("Eternity Point"), false, "English release UI must not introduce an Eternity Point surface");
 
   await page.evaluate(() => {

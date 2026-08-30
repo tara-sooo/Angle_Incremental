@@ -1443,6 +1443,45 @@ try {
     "normal Auto Infinity should complete the active IC",
   );
 
+  const desktopAutomationDensity = await page.evaluate(() => ({
+    cardCount: document.querySelectorAll('[data-panel="automation"] .settings-card').length,
+    denseSectionCount: document.querySelectorAll('[data-panel="automation"] .dense-section').length,
+    rowCount: document.querySelectorAll('[data-panel="automation"] .setting-row').length,
+    dividerCount: document.querySelectorAll('[data-panel="automation"] .dense-divider').length,
+    headingCount: document.querySelectorAll('[data-panel="automation"] .dense-section-heading').length,
+    minimumRowHeight: Math.min(...Array.from(document.querySelectorAll('[data-panel="automation"] .setting-row'), (row) => row.getBoundingClientRect().height)),
+  }));
+  assert.equal(desktopAutomationDensity.cardCount, 0, "Automation should not wrap simple controls in cards");
+  assert.equal(desktopAutomationDensity.denseSectionCount, 1, "Automation should use one shared dense section");
+  assert.equal(desktopAutomationDensity.rowCount, 16, "Automation should retain every control row");
+  assert.equal(desktopAutomationDensity.dividerCount, 2, "Automation should group controls with dividers");
+  assert.equal(desktopAutomationDensity.headingCount, 3, "Automation should expose grouped section headings");
+  assert.ok(desktopAutomationDensity.minimumRowHeight >= 44, "Automation rows should retain touch-safe height");
+
+  await page.locator('[data-tab="settings"]').click();
+  const desktopSettingsDensity = await page.evaluate(() => ({
+    cardCount: document.querySelectorAll('[data-panel="settings"] .settings-card').length,
+    denseSectionCount: document.querySelectorAll('[data-panel="settings"] .dense-section').length,
+    headingCount: document.querySelectorAll('[data-panel="settings"] .dense-section-heading').length,
+    dividerCount: document.querySelectorAll('[data-panel="settings"] .dense-divider').length,
+    rowCount: document.querySelectorAll('[data-panel="settings"] .settings-options .setting-row').length,
+  }));
+  assert.equal(desktopSettingsDensity.cardCount, 0, "ordinary Settings controls should not use cards");
+  assert.equal(desktopSettingsDensity.denseSectionCount, 2, "Settings should use section surfaces for options and tabs");
+  assert.equal(desktopSettingsDensity.headingCount, 4, "Settings should expose display, progress, interface, and tab headings");
+  assert.equal(desktopSettingsDensity.dividerCount, 2, "Settings should separate option groups with dividers");
+  assert.equal(desktopSettingsDensity.rowCount, 9, "Settings should retain every setting row");
+
+  await page.locator('[data-tab="statistics"]').click();
+  const desktopStatisticsDensity = await page.evaluate(() => ({
+    cardCount: document.querySelectorAll('[data-panel="statistics"] .settings-card').length,
+    statRows: document.querySelectorAll('[data-statistics-panel="overview"] .dense-row').length,
+    historySections: document.querySelectorAll('[data-panel="statistics"] .run-history.dense-section').length,
+  }));
+  assert.equal(desktopStatisticsDensity.cardCount, 0, "ordinary Statistics values should not use cards");
+  assert.equal(desktopStatisticsDensity.statRows, 6, "Statistics should retain all overview values as dense rows");
+  assert.equal(desktopStatisticsDensity.historySections, 2, "Statistics history should remain grouped sections");
+
   await page.locator('[data-tab="challenges"]').click();
   const firstChallengeRestriction = await page.locator("#challengeList .challenge-restriction").first().textContent();
   assert.match(firstChallengeRestriction ?? "", /基礎獲得式/, "the IC formula restriction should be visible");
@@ -1702,6 +1741,45 @@ try {
     assert.equal(mobileEternityStatistics.panelActive, true, "mobile Statistics should activate the ETR subtab");
     assert.ok(mobileEternityStatistics.currentTimeWidth > 0, "mobile ETR statistics should show current game time");
     assert.ok(mobileEternityStatistics.historyWidth > 0, "mobile ETR statistics should show run history");
+
+    const mobileStatisticsDensity = await mobilePage.evaluate(() => ({
+      cardCount: document.querySelectorAll('[data-panel="statistics"] .settings-card').length,
+      statRows: document.querySelectorAll('[data-statistics-panel="eternity"] .dense-row').length,
+      rowHeights: Array.from(document.querySelectorAll('[data-statistics-panel="eternity"] .dense-row'), (row) => row.getBoundingClientRect().height),
+      rowOverflow: Array.from(document.querySelectorAll('[data-statistics-panel="eternity"] .dense-row')).some((row) => row.scrollWidth > row.clientWidth + 1),
+    }));
+    assert.equal(mobileStatisticsDensity.cardCount, 0, "mobile Statistics should avoid per-value cards");
+    assert.equal(mobileStatisticsDensity.statRows, 4, "mobile Eternity Statistics should keep four dense value rows");
+    assert.ok(mobileStatisticsDensity.rowHeights.every((height) => height >= 44), "mobile Statistics rows should remain touch-safe");
+    assert.equal(mobileStatisticsDensity.rowOverflow, false, "mobile Statistics rows should keep labels and values readable");
+
+    await mobilePage.locator('[data-tab="automation"]').click();
+    const mobileAutomationDensity = await mobilePage.evaluate(() => ({
+      panelActive: document.querySelector('[data-panel="automation"]')?.classList.contains("is-active") ?? false,
+      cardCount: document.querySelectorAll('[data-panel="automation"] .settings-card').length,
+      rowCount: document.querySelectorAll('[data-panel="automation"] .setting-row').length,
+      rowHeights: Array.from(document.querySelectorAll('[data-panel="automation"] .setting-row'), (row) => row.getBoundingClientRect().height),
+      rowOverflow: Array.from(document.querySelectorAll('[data-panel="automation"] .setting-row')).some((row) => row.scrollWidth > row.clientWidth + 1),
+    }));
+    assert.equal(mobileAutomationDensity.panelActive, true, "the mobile Automation tab should activate");
+    assert.equal(mobileAutomationDensity.cardCount, 0, "mobile Automation should avoid a large settings card");
+    assert.equal(mobileAutomationDensity.rowCount, 16, "mobile Automation should keep every control row");
+    assert.ok(mobileAutomationDensity.rowHeights.every((height) => height >= 44), "mobile Automation rows should remain touch-safe");
+    assert.equal(mobileAutomationDensity.rowOverflow, false, "mobile Automation rows should keep controls within the viewport");
+
+    await mobilePage.locator('[data-tab="settings"]').click();
+    const mobileSettingsDensity = await mobilePage.evaluate(() => ({
+      panelActive: document.querySelector('[data-panel="settings"]')?.classList.contains("is-active") ?? false,
+      cardCount: document.querySelectorAll('[data-panel="settings"] .settings-card').length,
+      optionSectionWidth: document.querySelector('[data-panel="settings"] .settings-options')?.getBoundingClientRect().width ?? 0,
+      rowHeights: Array.from(document.querySelectorAll('[data-panel="settings"] .settings-options .setting-row'), (row) => row.getBoundingClientRect().height),
+      rowOverflow: Array.from(document.querySelectorAll('[data-panel="settings"] .settings-options .setting-row')).some((row) => row.scrollWidth > row.clientWidth + 1),
+    }));
+    assert.equal(mobileSettingsDensity.panelActive, true, "the mobile Settings tab should activate");
+    assert.equal(mobileSettingsDensity.cardCount, 0, "mobile Settings options should avoid per-section cards");
+    assert.ok(mobileSettingsDensity.optionSectionWidth > 0, "mobile Settings should keep its option section visible");
+    assert.ok(mobileSettingsDensity.rowHeights.every((height) => height >= 44), "mobile Settings rows should remain touch-safe");
+    assert.equal(mobileSettingsDensity.rowOverflow, false, "mobile Settings rows should keep controls within the viewport");
 
     const mobileUpgradeCenters = await mobilePage.evaluate(() => {
       const { switchMainTab, switchInfinitySubtab } = window.__angleDebug;

@@ -42,8 +42,8 @@ try {
   assert.equal(lockedNavigation.automationHidden, true, "AUTO should be hidden on a fresh new game");
   assert.equal(lockedNavigation.eternityHidden, true, "ETR should be hidden before TC4 unlock");
   assert.equal(lockedNavigation.timelineMainTabPresent, false, "Timeline should no longer be a top-level tab");
-  assert.equal(lockedNavigation.timelineSubtabHidden, true, "Timeline subtab should be hidden before the first Eternity");
-  assert.equal(lockedNavigation.timelineSubtabDisabled, true, "Timeline subtab should be disabled before the first Eternity");
+  assert.equal(lockedNavigation.timelineSubtabHidden, false, "Timeline subtab should not carry a navigation-level lock");
+  assert.equal(lockedNavigation.timelineSubtabDisabled, false, "Timeline subtab should stay selectable when the Eternity page is available");
   assert.equal(lockedNavigation.statisticsHidden, false, "STAT should be available on a fresh new game");
   assert.equal(lockedNavigation.achievementsHidden, false, "ACH should be available on a fresh new game");
   assert.equal(lockedNavigation.helpHidden, false, "HELP should be available on a fresh new game");
@@ -95,9 +95,14 @@ try {
     timelineMainPanelPresent: document.querySelector('[data-panel="timeline"]') !== null,
     legacyInfinityTab: document.querySelector('[data-infinity-tab="eternity"]') !== null,
     infinitySubtabCount: document.querySelectorAll(".infinity-subtab").length,
-    count: document.getElementById("eternityCountValue")?.textContent,
-    tc4: document.getElementById("eternityTc4Requirement")?.textContent,
-    ip: document.getElementById("eternityIpRequirement")?.textContent,
+    compactRequirement: document.querySelector('[data-i18n="eternityRequirementCompact"]')?.textContent,
+    compactRequirementCount: document.querySelectorAll('[data-i18n="eternityRequirementCompact"]').length,
+    currentIp: document.getElementById("eternityCurrentIp")?.textContent,
+    legacyCount: document.getElementById("eternityCountValue"),
+    legacyTc4: document.getElementById("eternityTc4Requirement"),
+    legacyIp: document.getElementById("eternityIpRequirement"),
+    legacyReady: document.getElementById("eternityRequirementState"),
+    legacyWarning: document.getElementById("eternityForcedNote"),
     title11: document.querySelector('[data-eternity-milestone="1-1"] [data-i18n="eternityMilestone11Name"]')?.textContent,
     title6: document.querySelector('[data-eternity-milestone="6"] [data-i18n="eternityMilestone6Name"]')?.textContent,
     status6: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-status')?.textContent,
@@ -131,14 +136,19 @@ try {
   assert.deepEqual(initial.subtabCodes, ["MS", "TL"], "Eternity should expose Milestone and Timeline subtabs");
   assert.equal(initial.milestoneSubpanelActive, true, "Milestone should be the default Eternity subtab");
   assert.equal(initial.timelineSubpanelActive, false, "Timeline should not be active before discovery");
-  assert.equal(initial.timelineSubtabHidden, true, "Timeline subtab should stay hidden before discovery");
-  assert.equal(initial.timelineSubtabDisabled, true, "Timeline subtab should stay disabled before discovery");
+  assert.equal(initial.timelineSubtabHidden, false, "Timeline subtab should stay visible before discovery");
+  assert.equal(initial.timelineSubtabDisabled, false, "Timeline subtab should stay enabled before discovery");
   assert.equal(initial.timelineMainPanelPresent, false, "Timeline should be nested instead of a main panel");
   assert.equal(initial.legacyInfinityTab, false, "Infinity must not contain an Eternity subtab");
   assert.equal(initial.infinitySubtabCount, 3, "Infinity navigation should remain Upgrades / Infinite Angle / Tower");
-  assert.equal(initial.count, "0", "Eternity count should be visible");
-  assert.equal(initial.tc4, "未達成", "TC4 requirement should show its current state");
-  assert.equal(initial.ip, "未達成", "IP requirement should show its current state");
+  assert.equal(initial.compactRequirement, "TC4クリア + 1.80e308 IP", "Eternity should show one compact requirement summary");
+  assert.equal(initial.compactRequirementCount, 1, "Eternity should not duplicate its compact requirement");
+  assert.equal(initial.currentIp, "0 IP", "Eternity should keep current IP visible");
+  assert.equal(initial.legacyCount, null, "Eternity should remove the duplicate body count");
+  assert.equal(initial.legacyTc4, null, "Eternity should remove the separate TC4 status row");
+  assert.equal(initial.legacyIp, null, "Eternity should remove the separate IP status row");
+  assert.equal(initial.legacyReady, null, "Eternity should remove the separate readiness row");
+  assert.equal(initial.legacyWarning, null, "Eternity should remove the repeated manual-execution warning");
   assert.equal(initial.title11, "1-1 QoLの精神", "Japanese Milestone copy should render");
   assert.equal(initial.title6, "6 有限回の無限チャレンジを0に", "Milestone 6 Japanese copy should render");
   assert.equal(initial.status6, "未解放", "Milestone 6 should remain locked before Eternity 27");
@@ -166,6 +176,23 @@ try {
   assert.equal(initial.perform, "Eternity条件未達成", "manual Eternity action should expose its unavailable state");
   assert.equal(initial.performDisabled, true, "manual Eternity action should be disabled before the full requirement is met");
   assert.equal(initial.panelText.includes("Eternity Point"), false, "Eternity UI must not introduce an Eternity Point surface");
+
+  await page.click('[data-eternity-tab="timeline"]');
+  const beforeDiscovery = await page.evaluate(() => ({
+    active: document.querySelector('[data-eternity-panel="timeline"]')?.classList.contains("is-active"),
+    discovered: window.__angleDebug.runtime.timelineDiscovered(),
+    scoreClaimDisabled: document.getElementById("timelineScoreClaimButton")?.disabled,
+    nodeState: document.querySelector('[data-timeline-node="Real-BC16500"]')?.dataset.state,
+    nodePurchaseDisabled: document.getElementById("timelineNodePurchaseButton")?.disabled,
+    respecDisabled: document.getElementById("timelineRespecButton")?.disabled,
+  }));
+  assert.equal(beforeDiscovery.active, true, "Timeline should be browsable before the first Eternity");
+  assert.equal(beforeDiscovery.discovered, false, "pre-discovery Timeline browsing must not change progression state");
+  assert.equal(beforeDiscovery.scoreClaimDisabled, true, "pre-discovery Timeline claims must remain gated");
+  assert.equal(beforeDiscovery.nodeState, "timeline-locked", "pre-discovery Timeline nodes must remain locked");
+  assert.equal(beforeDiscovery.nodePurchaseDisabled, true, "pre-discovery Timeline purchases must remain gated");
+  assert.equal(beforeDiscovery.respecDisabled, true, "pre-discovery Timeline Respec must remain gated");
+  await page.click('[data-eternity-tab="milestone"]');
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -523,7 +550,6 @@ try {
     debug.runtime.updateUi();
   });
   const english = await page.evaluate(() => ({
-    countLabel: document.querySelector('[data-i18n="eternityCountLabel"]')?.textContent,
     title11: document.querySelector('[data-i18n="eternityMilestone11Name"]')?.textContent,
     title6: document.querySelector('[data-i18n="eternityMilestone6Name"]')?.textContent,
     effect6: document.querySelector('[data-i18n="eternityMilestone6Effect"]')?.textContent,
@@ -545,9 +571,10 @@ try {
     detailDescription: document.getElementById("timelineNodeDetailDescription")?.textContent,
     detailCurrentEffect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
     timelineWarning: document.querySelector('[data-i18n="timelineRespecWarning"]')?.textContent,
-    manual: document.getElementById("eternityForcedNote")?.textContent,
+    compactRequirement: document.querySelector('[data-i18n="eternityRequirementCompact"]')?.textContent,
+    manual: document.getElementById("eternityForcedNote")?.textContent || "",
   }));
-  assert.equal(english.countLabel, "Eternity count", "Eternity UI should switch to English when the shared language state changes");
+  assert.equal(english.compactRequirement, "TC4 clear + 1.80e308 IP", "Eternity requirement should switch to English");
   assert.equal(english.title11, "1-1 Spirit of QoL", "Milestone names should have English copy");
   assert.equal(english.title6, "6 Finite Infinity Challenges", "Milestone 6 should have English copy");
   assert.equal(english.effect2, "Start each Eternity run with IC7 completed", "Milestone 2 English copy should describe the direct IC7 completion state");
@@ -569,8 +596,7 @@ try {
   assert.match(english.detailDescription || "", /Infinity Point gain.*log10/);
   assert.match(english.detailCurrentEffect || "", /Inactive/);
   assert.match(english.timelineWarning || "", /respec.*node.*TF.*Eternity run/i, "Timeline respec warning should have English copy");
-  assert.match(english.manual || "", /manually/, "English copy should explain that Eternity is player-triggered");
-  assert.doesNotMatch(english.manual || "", /performed automatically/, "English copy must not describe forced pre-Break Eternity");
+  assert.equal(english.manual, "", "Eternity should not show the repeated manual-execution warning");
 
   await page.setViewportSize({ width: 412, height: 915 });
   await page.click('[data-eternity-tab="timeline"]');

@@ -99,38 +99,22 @@ function installEternityUi() {
           <strong id="eternityHeadingCount">Eternity 0</strong>
         </div>
         <div class="eternity-panel">
-          <section class="eternity-overview" aria-label="Eternity status">
-            <div>
-              <span data-i18n="eternityCountLabel"></span>
-              <strong id="eternityCountValue">0</strong>
-            </div>
-            <div>
-              <span data-i18n="eternityRequirementTc4"></span>
-              <strong id="eternityTc4Requirement" class="eternity-requirement-status"></strong>
-            </div>
-            <div>
-              <span data-i18n="eternityRequirementIp"></span>
-              <strong id="eternityIpRequirement" class="eternity-requirement-status"></strong>
-            </div>
+          <div class="eternity-summary dense-summary" aria-label="Eternity status">
+            <p class="eternity-requirement" data-i18n="eternityRequirementCompact"></p>
             <div>
               <span data-i18n="eternityCurrentIp"></span>
               <strong id="eternityCurrentIp">0 IP</strong>
             </div>
-            <div>
-              <span data-i18n="eternityRequirement"></span>
-              <strong id="eternityRequirementState"></strong>
-            </div>
-          </section>
-          <div class="eternity-action-row">
-            <p id="eternityForcedNote" class="eternity-forced-note" data-i18n="eternityForcedNotice"></p>
+          </div>
+          <div class="eternity-action-row dense-action-row">
             <button id="eternityPerformButton" class="eternity-perform-button" type="button" data-eternity-action="perform"></button>
           </div>
-          <nav class="eternity-subtabs is-timeline-locked" aria-label="Eternity sub tabs">
+          <nav class="eternity-subtabs" aria-label="Eternity sub tabs">
             <button class="eternity-subtab is-active" type="button" data-eternity-tab="milestone" aria-controls="eternityMilestoneSubpanel" aria-selected="true">
               <span>MS</span>
               <strong data-i18n="eternityMilestoneTab">Milestone</strong>
             </button>
-            <button class="eternity-subtab" type="button" data-eternity-tab="timeline" aria-controls="eternityTimelineSubpanel" aria-selected="false" disabled>
+            <button class="eternity-subtab" type="button" data-eternity-tab="timeline" aria-controls="eternityTimelineSubpanel" aria-selected="false">
               <span>TL</span>
               <strong data-i18n="timelineTab">Timeline</strong>
             </button>
@@ -199,13 +183,6 @@ function installEternityUi() {
   return eternityRoot;
 }
 
-function setRequirementState(element, met) {
-  if (!element) return;
-  element.textContent = runtime.t(met ? "eternityRequirementMet" : "eternityRequirementMissing");
-  element.classList.toggle("is-met", met);
-  element.classList.toggle("is-missing", !met);
-}
-
 function updateMilestoneCard(milestone, availableChoices) {
   const card = eternityRoot?.querySelector(`[data-eternity-milestone="${milestone.id}"]`);
   if (!card) return;
@@ -248,51 +225,31 @@ function updateMilestoneCard(milestone, availableChoices) {
 function updateEternityUi() {
   if (!installEternityUi()) return;
   const count = Math.max(0, Math.floor(Number(runtime.state.eternityCount) || 0));
-  const tc4Met = runtime.towerChallenge4CompletedForEternity?.() === true;
-  const ipMet = runtime.eternityIpThresholdMet?.() === true;
   const ready = runtime.canEternity?.() === true;
-  const timelineDiscovered = runtime.timelineDiscovered?.() === true;
   const entitlementCount = Math.max(0, Math.floor(Number(runtime.firstTierMilestoneEntitlementCount?.()) || 0));
   const availableChoices = new Set(runtime.availableEternityMilestoneChoices?.() || []);
 
   const headingCount = eternityRoot.querySelector("#eternityHeadingCount");
-  const countValue = eternityRoot.querySelector("#eternityCountValue");
   const currentIp = eternityRoot.querySelector("#eternityCurrentIp");
-  const requirementState = eternityRoot.querySelector("#eternityRequirementState");
-  const forcedNote = eternityRoot.querySelector("#eternityForcedNote");
   const performButton = eternityRoot.querySelector("#eternityPerformButton");
   const entitlement = eternityRoot.querySelector("#eternityChoiceEntitlement");
   const allOwned = eternityRoot.querySelector("#eternityChoiceAllOwned");
 
   if (headingCount) headingCount.textContent = `Eternity ${runtime.formatUiNumber(count)}`;
-  if (countValue) countValue.textContent = runtime.formatUiNumber(count);
-  setRequirementState(eternityRoot.querySelector("#eternityTc4Requirement"), tc4Met);
-  setRequirementState(eternityRoot.querySelector("#eternityIpRequirement"), ipMet);
   if (currentIp) {
     currentIp.textContent = `${runtime.formatHeldUiLogNumber(
       runtime.currentInfinityPointsLog10(),
       runtime.state.infinityPointsExact,
     )} IP`;
   }
-  if (requirementState) {
-    requirementState.textContent = runtime.t(ready ? "eternityRequirementReady" : "eternityRequirementWaiting");
-    requirementState.classList.toggle("is-met", ready);
-    requirementState.classList.toggle("is-missing", !ready);
-  }
-  forcedNote?.classList.toggle("is-ready", ready);
   if (performButton) {
     performButton.disabled = !ready;
     performButton.textContent = runtime.t(ready ? "eternityPerform" : "eternityPerformUnavailable");
   }
-  const eternitySubtabs = eternityRoot.querySelector(".eternity-subtabs");
   const timelineSubtab = eternityRoot.querySelector('[data-eternity-tab="timeline"]');
-  eternitySubtabs?.classList.toggle("is-timeline-locked", !timelineDiscovered);
   if (timelineSubtab) {
-    timelineSubtab.hidden = !timelineDiscovered;
-    timelineSubtab.disabled = !timelineDiscovered;
-  }
-  if (!timelineDiscovered && runtime.activeEternitySubtab === "timeline") {
-    runtime.switchEternitySubtab?.("milestone");
+    timelineSubtab.hidden = false;
+    timelineSubtab.disabled = false;
   }
   if (entitlement) {
     entitlement.textContent = entitlementCount > 0

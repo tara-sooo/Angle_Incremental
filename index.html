@@ -585,8 +585,9 @@
             </div>
             <div class="unlock-note" id="automationLockNote">IU 1-2で解放</div>
           </header>
-          <div class="settings-grid">
-            <section class="settings-card">
+          <div class="settings-grid dense-grid">
+            <section class="dense-section automation-settings">
+              <h2 class="dense-section-heading" data-i18n="automationPurchaseSection">購入</h2>
               <div class="setting-row">
                 <label for="automationMasterToggle" data-i18n="automationMaster">自動購入</label>
                 <input id="automationMasterToggle" type="checkbox" />
@@ -607,6 +608,8 @@
                 <label for="autoBuyInfinityUpgradesToggle" data-i18n="autoBuyInfinityUpgrades">Infinity Upgrade 自動購入</label>
                 <input id="autoBuyInfinityUpgradesToggle" type="checkbox" />
               </div>
+              <hr class="dense-divider" />
+              <h2 class="dense-section-heading" data-i18n="automationExtendedSection">IA / Tower</h2>
               <div class="setting-row">
                 <label for="autoBuyInfiniteAngleSpeedToggle" data-i18n="autoBuyInfiniteAngleSpeed">IA Speed 自動購入</label>
                 <input id="autoBuyInfiniteAngleSpeedToggle" type="checkbox" />
@@ -623,6 +626,8 @@
                 <label for="autoBuildTowerToggle" data-i18n="autoBuildTower">Tower自動建設</label>
                 <input id="autoBuildTowerToggle" type="checkbox" />
               </div>
+              <hr class="dense-divider" />
+              <h2 class="dense-section-heading" data-i18n="automationResetSection">リセット自動化</h2>
               <div class="setting-row">
                 <label for="autoRunGenerationToggle" data-i18n="autoRunGeneration">GR自動実行</label>
                 <input id="autoRunGenerationToggle" type="checkbox" />
@@ -679,31 +684,31 @@
           <div class="statistics-subpanels">
             <section class="statistics-subpanel is-active" data-statistics-panel="overview">
               <section class="statistics-grid">
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="currentInfinityRun">現在のInfinity周回</span>
                   <strong id="currentInfinityRunTime">0秒</strong>
                 </div>
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="currentInfinityRealTime">現在のInfinity周回（実プレイ時間）</span>
                   <strong id="currentInfinityRealTime">0秒</strong>
                 </div>
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="totalPlayTimeLabel">総プレイ時間</span>
                   <strong id="totalPlayTime">0秒</strong>
                 </div>
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="totalRealPlayTimeLabel">総実プレイ時間</span>
                   <strong id="totalRealPlayTime">0秒</strong>
                 </div>
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="fastestInfinity">最速Infinity</span>
                   <strong id="fastestInfinityTime">記録なし</strong>
                 </div>
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="fastestInfinityRealTime">最速Infinity（実プレイ時間）</span>
                   <strong id="fastestInfinityRealTime">記録なし</strong>
                 </div>
-                <section class="settings-card run-history">
+                <section class="dense-section run-history">
                   <h2 data-i18n="lastInfinityRunsLabel">過去10回のInfinity</h2>
                   <ol id="lastInfinityRuns"></ol>
                 </section>
@@ -711,11 +716,11 @@
             </section>
             <section class="statistics-subpanel" data-statistics-panel="challenges">
               <div class="challenge-time-grid">
-                <section class="settings-card challenge-time-group">
+                <section class="dense-section challenge-time-group">
                   <h2 data-i18n="fastestInfinityChallengesLabel">Infinity Challenge最速クリア</h2>
                   <ol id="fastestInfinityChallengeTimes"></ol>
                 </section>
-                <section class="settings-card challenge-time-group">
+                <section class="dense-section challenge-time-group">
                   <h2 data-i18n="fastestTowerChallengesLabel">Tower Challenge最速クリア</h2>
                   <ol id="fastestTowerChallengeTimes"></ol>
                 </section>
@@ -723,23 +728,23 @@
             </section>
             <section class="statistics-subpanel" data-statistics-panel="eternity">
               <section class="statistics-grid">
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="currentEternityRun">現在のEternity周回（ゲーム時間）</span>
                   <strong id="currentEternityRunTime">0秒</strong>
                 </div>
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="currentEternityRealTime">現在のEternity周回（実プレイ時間）</span>
                   <strong id="currentEternityRealTime">0秒</strong>
                 </div>
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="fastestEternity">最速Eternity（ゲーム時間）</span>
                   <strong id="fastestEternityTime">記録なし</strong>
                 </div>
-                <div class="settings-card stat-card">
+                <div class="dense-row stat-row">
                   <span data-i18n="fastestEternityRealTime">最速Eternity（実プレイ時間）</span>
                   <strong id="fastestEternityRealTime">記録なし</strong>
                 </div>
-                <section class="settings-card run-history">
+                <section class="dense-section run-history">
                   <h2 data-i18n="lastEternityRunsLabel">過去10回のEternity</h2>
                   <ol id="lastEternityRuns"></ol>
                 </section>
@@ -805,8 +810,9 @@
               <h1>Settings</h1>
             </div>
           </header>
-          <div class="settings-grid">
-            <section class="settings-card">
+          <div class="settings-grid dense-grid">
+            <section class="dense-section settings-options">
+              <h2 class="dense-section-heading" data-i18n="settingsDisplaySection">表示</h2>
               <div class="setting-row">
                 <label for="languageSelect" data-i18n="language">言語</label>
                 <select id="languageSelect">
@@ -840,6 +846,8 @@
                   <option value="hidden">隠す</option>
                 </select>
               </div>
+              <hr class="dense-divider" />
+              <h2 class="dense-section-heading" data-i18n="settingsProgressSection">進行</h2>
               <div class="setting-row">
                 <label for="offlineProgressToggle" data-i18n="offlineProgressEnabled">オフライン進行</label>
                 <input id="offlineProgressToggle" type="checkbox" checked />
@@ -848,6 +856,8 @@
                 <label for="offlineTickInput" data-i18n="offlineTickCount">オフラインティック数</label>
                 <input id="offlineTickInput" type="number" min="1000" max="1000000" step="100" value="1000" />
               </div>
+              <hr class="dense-divider" />
+              <h2 class="dense-section-heading" data-i18n="settingsInterfaceSection">インターフェース</h2>
               <div class="setting-row">
                 <label for="floatingTextToggle" data-i18n="floatingText">浮遊テキスト</label>
                 <input id="floatingTextToggle" type="checkbox" checked />
@@ -862,8 +872,8 @@
               </div>
             </section>
 
-            <section class="settings-card tab-visibility-card">
-              <h2 class="settings-card-heading" data-i18n="tabVisibility">タブ表示</h2>
+            <section class="dense-section tab-visibility-card">
+              <h2 class="dense-section-heading" data-i18n="tabVisibility">タブ表示</h2>
               <p class="tab-visibility-description" data-i18n="tabVisibilityDescription">下部タブバーに表示するタブ</p>
               <div id="tabVisibilityList" class="tab-visibility-list"></div>
             </section>

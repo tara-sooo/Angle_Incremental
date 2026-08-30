@@ -1905,10 +1905,104 @@ canvas {
   align-items: start;
 }
 
-.settings-card-heading {
+.dense-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 360px);
+}
+
+.automation-panel .dense-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dense-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 0;
+  border-block: 1px solid var(--line);
+}
+
+.dense-section-heading {
   margin: 0 0 4px;
   color: var(--ink);
   font-size: 1rem;
+}
+
+.dense-divider {
+  width: 100%;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.dense-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dense-summary > p {
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.dense-summary > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  text-align: right;
+}
+
+.dense-summary span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.dense-summary strong {
+  color: var(--gold);
+  overflow-wrap: anywhere;
+}
+
+.dense-action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dense-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dense-row > span:first-child {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.dense-row strong {
+  color: var(--gold);
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.dense-row:last-child {
+  border-bottom: 0;
 }
 
 .tab-visibility-description {
@@ -1932,7 +2026,7 @@ canvas {
 
 .statistics-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -1960,23 +2054,11 @@ canvas {
   line-height: 1.45;
 }
 
-.stat-card {
-  display: grid;
-  gap: 8px;
-}
-
-.stat-card span,
 .run-history h2 {
   margin: 0;
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 900;
-}
-
-.stat-card strong {
-  color: var(--gold);
-  font-size: 1.24rem;
-  overflow-wrap: anywhere;
 }
 
 .run-history {
