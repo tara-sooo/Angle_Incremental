@@ -1020,7 +1020,7 @@ try {
   assert.deepEqual(eternityNormalUpgradeDisplay.active.costs, eternityNormalUpgradeDisplay.inactive.costs, "Milestone 1-2 display should not change normal-upgrade costs");
   assert.deepEqual(eternityNormalUpgradeDisplay.stacked.costs, eternityNormalUpgradeDisplay.inactive.costs, "TC3 and IU stacking should not change normal-upgrade costs");
   const timeFluxRemoval = await page.evaluate(async () => {
-    const { state, advanceOnlineTime, processOfflineElapsed } = window.__angleDebug;
+    const { runtime, state, advanceOnlineTime, processOfflineElapsed } = window.__angleDebug;
     state.totalPlayTime = 0;
     state.totalRealPlayTime = 0;
     state.currentInfinityRunTime = 0;
@@ -1052,6 +1052,56 @@ try {
       mainPanelsHeight: layoutRect(".main-panels")?.height ?? 0,
     };
     const report = await processOfflineElapsed(1, "test", { clockSource: "server" });
+    const changedReport = {
+      ...report,
+      before: { ...report.before, scoreLog10: 1, scoreUnlocked: true },
+      after: { ...report.after, scoreLog10: 2, scoreUnlocked: true },
+    };
+    runtime.offlineReport = changedReport;
+    runtime.updateOfflineReportUi();
+    const completedRows = Array.from(
+      document.querySelectorAll("#offlineReportChanges .offline-report-change"),
+      (row) => ({ key: row.dataset.offlineReportChange, text: row.textContent.trim() }),
+    );
+    const completedUi = {
+      progressHidden: document.querySelector("#offlineReportProgress")?.hidden ?? false,
+      resultHidden: document.querySelector("#offlineReportResult")?.hidden ?? true,
+      compactGrid: Boolean(document.querySelector(".offline-report-grid")),
+      rows: completedRows,
+      noChangesHidden: document.querySelector("#offlineReportNoChanges")?.hidden ?? true,
+      diagnosticIds: [
+        "offlineReportEffective",
+        "offlineReportConfiguredTicks",
+        "offlineReportRequestedTicks",
+        "offlineReportTicks",
+        "offlineReportProcessingTime",
+        "offlineReportNormalInfinity",
+        "offlineReportAggregatedInfinity",
+        "offlineReportInfinity",
+        "offlineReportIp",
+      ].filter((id) => document.getElementById(id)),
+    };
+    runtime.offlineReport = { ...changedReport, processing: true };
+    runtime.updateOfflineReportUi();
+    const processingUi = {
+      mode: document.querySelector("#offlineReportMode")?.textContent?.trim() ?? "",
+      progressHidden: document.querySelector("#offlineReportProgress")?.hidden ?? true,
+      resultHidden: document.querySelector("#offlineReportResult")?.hidden ?? false,
+      closeHidden: document.querySelector("#offlineReportClose")?.hidden ?? false,
+    };
+    runtime.offlineReport = {
+      ...changedReport,
+      processing: false,
+      before: { ...changedReport.before },
+      after: { ...changedReport.before },
+    };
+    runtime.updateOfflineReportUi();
+    const noChangeUi = {
+      rowCount: document.querySelectorAll("#offlineReportChanges .offline-report-change").length,
+      fallbackHidden: document.querySelector("#offlineReportNoChanges")?.hidden ?? true,
+    };
+    runtime.offlineReport = report;
+    runtime.updateOfflineReportUi();
     const reportPanel = document.querySelector("#offlineReportPanel");
     const layoutAfter = {
       shellHeight: layoutRect("#shell")?.height ?? 0,
@@ -1062,6 +1112,9 @@ try {
       ui,
       online,
       report,
+      completedUi,
+      processingUi,
+      noChangeUi,
       reportVisible: document.querySelector("#offlineReportPanel")?.hidden === false,
       reportMode: document.querySelector("#offlineReportMode")?.textContent?.trim() ?? "",
       reportOutsideShell: reportPanel?.closest("#shell") === null,
@@ -1089,6 +1142,21 @@ try {
   assert.equal(timeFluxRemoval.report.timeFluxGained, undefined, "normal offline reports should not grant dormant Time Flux");
   assert.equal(timeFluxRemoval.reportVisible, true, "normal offline processing should show the report");
   assert.equal(timeFluxRemoval.reportMode, "オフライン進行", "the report should identify normal offline progress");
+  assert.equal(timeFluxRemoval.completedUi.progressHidden, true, "completed reports should hide the processing progress bar");
+  assert.equal(timeFluxRemoval.completedUi.resultHidden, false, "completed reports should show the result surface");
+  assert.equal(timeFluxRemoval.completedUi.compactGrid, false, "completed reports should not use the old card grid");
+  assert.ok(timeFluxRemoval.completedUi.rows.length > 0, "completed reports should list a changed player-facing value");
+  assert.ok(
+    timeFluxRemoval.completedUi.rows.every((row) => row.text.includes("→")),
+    "completed report rows should show before-to-after values",
+  );
+  assert.deepEqual(timeFluxRemoval.completedUi.diagnosticIds, [], "completed reports should omit implementation diagnostics");
+  assert.equal(timeFluxRemoval.processingUi.mode, "オフライン進行を計算中", "processing reports should use a concise calculating status");
+  assert.equal(timeFluxRemoval.processingUi.progressHidden, false, "processing reports should show progress");
+  assert.equal(timeFluxRemoval.processingUi.resultHidden, true, "processing reports should hide the completed result");
+  assert.equal(timeFluxRemoval.processingUi.closeHidden, true, "processing reports should not offer an unsafe close action");
+  assert.equal(timeFluxRemoval.noChangeUi.rowCount, 0, "no-change reports should not render change rows");
+  assert.equal(timeFluxRemoval.noChangeUi.fallbackHidden, false, "no-change reports should show the concise fallback");
   assert.equal(timeFluxRemoval.reportOutsideShell, true, "the offline report should not participate in the shell grid");
   assert.equal(timeFluxRemoval.reportPosition, "fixed", "the offline report should render as an overlay");
   for (const key of ["shellHeight", "mainTabsHeight", "mainPanelsHeight"]) {

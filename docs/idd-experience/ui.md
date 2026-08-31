@@ -23,3 +23,14 @@
 - Verification: for a changed shared UI surface, enumerate the runtime collection and confirm every member carries the shared base contract; verify common hidden/visible, active, keyboard/focus, and responsive behavior applies to all members; inspect feature-specific CSS for copied shared component rules; and use rendered browser assertions rather than only DOM properties. For main navigation specifically, a common visibility rule such as `[hidden]` handling must affect every element in `runtime.elements.mainTabs`, including runtime-injected entries. Browser fixtures that navigate to a runtime-created tab must establish its legitimate unlock condition first, so a hidden-rendering regression cannot be masked by clicking a tab that should be unavailable.
 - Authoritative at: not yet promoted
 - Last verified: 2026-08-31
+
+### EXP-UI-003 — Exercise offline result states with controlled snapshots
+
+- Status: active
+- Scope: offline progress result UI; `src/ui/render-offline-report.js`, `tests/browser-feature-regression.mjs`
+- Learned from: Issue #290
+- Context: a one-second offline simulation can legitimately produce no visible resource change, so a changed-row assertion based only on elapsed time was unreliable.
+- Cause: the test assumed the simulation would cross a player-facing resource threshold even though the actual game state determines whether a row belongs in the result.
+- Reusable lesson: keep one real offline-processing call for integration coverage, but use explicit before/after snapshots to exercise changed-row rendering and equal snapshots to exercise the no-change fallback.
+- Verification: assert processing, completed, and no-change UI contracts separately; never infer a changed resource from a short elapsed interval alone.
+- Last verified: 2026-08-31
