@@ -146,6 +146,17 @@ function updateSaveRecoveryUi() {
     && renderedSaveConflictCheckpointReady === Boolean(runtime.saveConflictCheckpointReady)
   ) return;
   const recovery = runtime.recoveryEntries();
+  if (
+    elements.saveRecoveryDetails
+    && (recovery.loadFailure
+      || runtime.loadRecoveryMode
+      || runtime.saveConflictMode
+      || recovery.quarantine
+      || recovery.preImport
+      || recovery.undo)
+  ) {
+    elements.saveRecoveryDetails.open = true;
+  }
   elements.preImportBackupStatus.textContent = recovery.preImport
     ? `${runtime.t("preImportBackupAvailable")} ${formatRecoveryTimestamp(recovery.preImport.backedUpAt)}`
     : runtime.t("noPreImportBackup");

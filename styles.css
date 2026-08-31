@@ -2213,7 +2213,7 @@ canvas {
 
 .save-panel > div.save-code-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   min-height: 0;
   padding: 0;
@@ -2225,20 +2225,39 @@ canvas {
   font-size: 0.82rem;
 }
 
+.save-code-details,
 .save-recovery {
   display: grid;
   gap: 8px;
+  min-width: 0;
+}
+
+.save-code-details[open],
+.save-recovery[open] {
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
 }
 
-.save-panel > div.save-recovery {
-  grid-template-columns: minmax(0, 1fr);
-  min-height: 0;
+.save-code-details > summary,
+.save-recovery > summary {
+  min-height: 44px;
   padding: 10px 0;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 900;
 }
 
-.save-recovery-title,
+.save-code-details > summary:focus-visible,
+.save-recovery > summary:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.save-code-details .save-code-actions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .save-recovery-label {
   display: block;
   color: var(--muted);
@@ -2259,6 +2278,18 @@ canvas {
 .save-recovery-actions .reset-button {
   min-height: 38px;
   font-size: 0.78rem;
+}
+
+.save-panel > div.save-reset-action {
+  display: block;
+  min-height: 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.save-reset-action .reset-button {
+  width: 100%;
 }
 
 .save-checkpoint-list {
