@@ -234,6 +234,11 @@ function updateEternityUi() {
   const performButton = eternityRoot.querySelector("#eternityPerformButton");
   const entitlement = eternityRoot.querySelector("#eternityChoiceEntitlement");
   const allOwned = eternityRoot.querySelector("#eternityChoiceAllOwned");
+  const requirement = eternityRoot.querySelector(".eternity-requirement");
+  if (requirement) {
+    requirement.textContent = runtime.t("eternityRequirementCompact")
+      .replace("{ip}", runtime.formatUiLogNumber(runtime.ETERNITY_REQUIREMENT_LOG10));
+  }
 
   if (headingCount) headingCount.textContent = `Eternity ${runtime.formatUiNumber(count)}`;
   if (currentIp) {

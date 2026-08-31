@@ -613,9 +613,16 @@ try {
       floor: document.querySelector("#towerFloorValue")?.textContent?.trim() ?? "",
       cost: document.querySelector("#towerNextCost")?.textContent?.trim() ?? "",
       scoreExponent: document.querySelector("#towerScoreExponentValue")?.textContent?.trim() ?? "",
-      tc1Base: document.querySelector("#towerChallenge1ScorePowerBase")?.textContent?.trim() ?? "",
-      tc1Bonus: document.querySelector("#towerChallenge1ScorePowerBonus")?.textContent?.trim() ?? "",
-      tc1Total: document.querySelector("#towerChallenge1ScorePowerTotal")?.textContent?.trim() ?? "",
+      coreBoostRawGrowthRow: Boolean(document.querySelector("#coreBoostRequirementGrowthPowerRaw")),
+      towerChallenge1BaseRow: Boolean(document.querySelector("#towerChallenge1ScorePowerBase")),
+      towerChallenge1BonusRow: Boolean(document.querySelector("#towerChallenge1ScorePowerBonus")),
+      towerChallenge1TotalRow: Boolean(document.querySelector("#towerChallenge1ScorePowerTotal")),
+      towerChallenge1ScorePower: document.querySelector("#towerChallenge1ScorePower")?.textContent?.trim() ?? "",
+      commonInfiniteScore: Boolean(document.querySelector(".infinity-summary #infiniteScore")),
+      commonInfiniteAngleBoost: Boolean(document.querySelector(".infinity-summary #infiniteAngleBoost")),
+      dedicatedInfiniteScore: Boolean(document.querySelector('[data-infinity-panel="angle"] #infiniteScorePanel')),
+      dedicatedInfiniteAngleBoost: Boolean(document.querySelector('[data-infinity-panel="angle"] #infiniteAngleBoostPanel')),
+      infinityUnlockNote: document.querySelector("#infinityUnlockNote")?.textContent?.trim() ?? "",
       buildDisabled: Boolean(document.querySelector("#towerBuildButton")?.disabled),
     };
     switchMainTab("challenges");
@@ -624,7 +631,8 @@ try {
       towerState,
       challengePanelActive: Boolean(document.querySelector('[data-challenge-panel="tc"]')?.classList.contains("is-active")),
       towerChallengeRows: document.querySelectorAll("#towerChallengeList .tower-challenge-row").length,
-      towerChallengeReleaseStatus: document.querySelector('[data-i18n="towerChallengeReleaseStatus"]')?.textContent?.trim() ?? "",
+      towerChallengeReleaseStatus: Boolean(document.querySelector('[data-i18n="towerChallengeReleaseStatus"]')),
+      challengeReleaseNote: Boolean(document.querySelector('[data-i18n="challengeReleaseNote"]')),
       towerChallengeButton: document.querySelector("#towerChallengeList .tower-challenge-row button")?.textContent?.trim() ?? "",
       towerChallengeButtonDisabled: Boolean(document.querySelector("#towerChallengeList .tower-challenge-row button")?.disabled),
       towerChallengeRestriction: document.querySelector("#towerChallengeList .tower-challenge-row .challenge-restriction")?.textContent?.trim() ?? "",
@@ -644,7 +652,18 @@ try {
   assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
   assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
   assert.equal(towerInitial.towerChallengeRows, 4, "TC1-TC4 rows should be visible");
-  assert.equal(towerInitial.towerChallengeReleaseStatus, "TC1〜TC4実装済み", "Tower Challenge status should reflect the implemented TC range");
+  assert.equal(towerInitial.towerChallengeReleaseStatus, false, "Tower Challenge should not show implementation-status copy");
+  assert.equal(towerInitial.challengeReleaseNote, false, "Challenges should not show the non-actionable IC/TC note");
+  assert.equal(towerInitial.towerState.coreBoostRawGrowthRow, false, "Core Boost should not show the raw growth row");
+  assert.equal(towerInitial.towerState.towerChallenge1BaseRow, false, "Tower should not show the TC1 base decomposition");
+  assert.equal(towerInitial.towerState.towerChallenge1BonusRow, false, "Tower should not show the TC1 bonus decomposition");
+  assert.equal(towerInitial.towerState.towerChallenge1TotalRow, false, "Tower should not show the TC1 total decomposition");
+  assert.equal(towerInitial.towerState.towerChallenge1ScorePower, "^0.300", "Tower should retain the final Infinity Score exponent");
+  assert.equal(towerInitial.towerState.commonInfiniteScore, false, "Infinity summary should not duplicate Infinite Score");
+  assert.equal(towerInitial.towerState.commonInfiniteAngleBoost, false, "Infinity summary should not duplicate the IA multiplier");
+  assert.equal(towerInitial.towerState.dedicatedInfiniteScore, true, "IA should retain its Infinite Score metric");
+  assert.equal(towerInitial.towerState.dedicatedInfiniteAngleBoost, true, "IA should retain its multiplier metric");
+  assert.match(towerInitial.towerState.infinityUnlockNote, /1\.80e308/);
   assert.equal(towerInitial.towerChallengeButton, "挑戦開始", "implemented TC rows should expose a start button");
   assert.equal(towerInitial.towerChallengeButtonDisabled, true, "locked TC rows should disable their start button");
   assert.match(towerInitial.towerChallengeRestriction, /通常強化/);
@@ -658,9 +677,6 @@ try {
   assert.match(towerInitial.towerChallenge4Target, /1\.00e7,777/);
   assert.equal(towerInitial.towerChallenge4UpgradeControls, 0, "TC4 upgrades should not appear in the Challenge list");
   assert.equal(towerInitial.towerState.scoreExponent, "^1.00");
-  assert.equal(towerInitial.towerState.tc1Base, "^0.300");
-  assert.equal(towerInitial.towerState.tc1Bonus, "+^0.000");
-  assert.equal(towerInitial.towerState.tc1Total, "^0.300");
   const towerChallenge4Ui = await page.evaluate(() => {
     const { state, toggleTowerChallenge, switchMainTab } = window.__angleDebug;
     const original = structuredClone(state);
@@ -867,6 +883,7 @@ try {
       base: document.querySelector("#towerChallenge1ScorePowerBase")?.textContent?.trim() ?? "",
       bonus: document.querySelector("#towerChallenge1ScorePowerBonus")?.textContent?.trim() ?? "",
       total: document.querySelector("#towerChallenge1ScorePowerTotal")?.textContent?.trim() ?? "",
+      final: document.querySelector("#towerChallenge1ScorePower")?.textContent?.trim() ?? "",
     };
     state.towerFloor = 22;
     window.advanceTime(0);
@@ -887,25 +904,35 @@ try {
       gain: document.querySelector("#gainLevel")?.textContent?.trim() ?? "",
     };
     const englishLabels = {
-      tc1Base: document.querySelector('[data-i18n="towerChallenge1ScorePowerBase"]')?.textContent?.trim() ?? "",
+      tc1Final: document.querySelector('[data-i18n="towerChallenge1ScorePower"]')?.textContent?.trim() ?? "",
       tc2Effective: document.querySelector('[data-i18n="coreBoostGrowthPower"]')?.textContent?.trim() ?? "",
+      tc2Reward: document.querySelector('#towerChallengeList [data-tower-challenge="2"] .challenge-reward')?.textContent?.trim() ?? "",
       tc3Name: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-name')?.textContent?.trim() ?? "",
       tc4Name: document.querySelector('#towerChallengeList [data-tower-challenge="4"] .challenge-name')?.textContent?.trim() ?? "",
       tc3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
+      routineText: Array.from(
+        document.querySelectorAll('.main-panel:not([data-panel="help"]):not([data-panel="eternity"])'),
+        (panel) => panel.textContent,
+      ).join(" "),
+      lapSpeed: document.querySelector("#lapSpeedValue")?.textContent?.trim() ?? "",
     };
     Object.assign(state, original);
     window.advanceTime(0);
     return { tc1, tc2, effectiveUpgradeLevels, englishLabels };
   });
-  assert.equal(towerRewardDisplay.tc1.base, "^0.300", "TC1 should expose its base exponent in the Tower panel");
-  assert.equal(towerRewardDisplay.tc1.bonus, "+^0.154", "TC1 should expose its floor-scaled bonus in the Tower panel");
-  assert.equal(towerRewardDisplay.tc1.total, "^0.454", "TC1 should expose the combined exponent in the Tower panel");
-  assert.equal(towerRewardDisplay.tc2.raw, "^1.490", "TC2 should expose the raw requirement growth power");
+  assert.equal(towerRewardDisplay.tc1.base, "", "TC1 base exponent should be removed from the Tower panel");
+  assert.equal(towerRewardDisplay.tc1.bonus, "", "TC1 bonus exponent should be removed from the Tower panel");
+  assert.equal(towerRewardDisplay.tc1.total, "", "TC1 total decomposition should be removed from the Tower panel");
+  assert.equal(towerRewardDisplay.tc1.final, "^0.454", "Tower should retain the final Infinity Score exponent");
+  assert.equal(towerRewardDisplay.tc2.raw, "", "raw Core Boost growth should be removed from the Angle panel");
   assert.equal(towerRewardDisplay.tc2.effective, "^1.499", "TC2 should expose the soft-capped requirement growth power");
   assert.match(towerRewardDisplay.effectiveUpgradeLevels.speed, /Level 100 .*Effective 127\.628/, "TC3 should expose effective Speed levels");
   assert.match(towerRewardDisplay.effectiveUpgradeLevels.gain, /Level 100 .*Effective 127\.628/, "TC3 should expose effective Gain levels");
-  assert.equal(towerRewardDisplay.englishLabels.tc1Base, "TC1 base exponent", "TC1 exponent labels should be translated to English");
-  assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth (effective)", "TC2 exponent labels should be translated to English");
+  assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth", "the final Core Boost growth label should be translated to English");
+  assert.equal(towerRewardDisplay.englishLabels.tc1Final, "Infinity Score exponent", "the final Tower exponent label should be translated to English");
+  assert.doesNotMatch(towerRewardDisplay.englishLabels.tc2Reward, /raw power|log10|parts|effective CB/i, "TC2 reward copy should use player-facing wording");
+  assert.doesNotMatch(towerRewardDisplay.englishLabels.routineText, /log10|parts|effective CB/i, "routine gameplay UI should avoid implementation terminology");
+  assert.doesNotMatch(towerRewardDisplay.englishLabels.lapSpeed, /raw/i, "lap speed should show only its governing value");
   assert.match(towerRewardDisplay.englishLabels.tc3Name, /Age When Infinity Was a Concept/, "TC3 name should be translated to English");
   assert.equal(towerRewardDisplay.englishLabels.tc4Name, "TC4 Substitute for Existing Products", "the English Challenges screen should use the canonical TC4 title");
   assert.match(towerRewardDisplay.englishLabels.tc3Restriction, /Score gain starts/, "TC3 restriction should be translated to English");

@@ -80,8 +80,8 @@ const TOWER_CHALLENGES = Object.freeze([
       en: "Core Boost is sealed, GR's score multiplier is raised to ^0.1, and its cost factor has a hard floor of x0.90.",
     },
     reward: {
-      ja: "Core Boost要求量増加指数を強化。Floor 5以降の追加階層で生指数を下げ、1.50未満ではソフトキャップする",
-      en: "Improves Core Boost requirement growth. Additional floors after Floor 5 lower the raw power, with a soft cap below 1.50.",
+      ja: "Core Boost要求量増加指数を強化。Floor 5以降の追加階層で指数を下げ、1.50未満ではソフトキャップする",
+      en: "Improves Core Boost requirement growth. Additional floors after Floor 5 lower the growth exponent, with a soft cap below 1.50.",
     },
     implemented: true,
   },

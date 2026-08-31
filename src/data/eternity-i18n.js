@@ -4,7 +4,7 @@ const ETERNITY_TEXT = {
   ja: {
     eternity: "Eternity",
     eternityTab: "Eternity",
-    eternityRequirementCompact: "TC4クリア + 1.80e308 IP",
+    eternityRequirementCompact: "TC4クリア + {ip} IP",
     eternityCurrentIp: "現在IP",
     eternityPerform: "Eternityする",
     eternityPerformUnavailable: "Eternity条件未達成",
@@ -79,7 +79,7 @@ const ETERNITY_TEXT = {
   en: {
     eternity: "Eternity",
     eternityTab: "Eternity",
-    eternityRequirementCompact: "TC4 clear + 1.80e308 IP",
+    eternityRequirementCompact: "TC4 clear + {ip} IP",
     eternityCurrentIp: "Current IP",
     eternityPerform: "Perform Eternity",
     eternityPerformUnavailable: "Eternity requirements not met",

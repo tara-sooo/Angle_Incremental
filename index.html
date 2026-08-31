@@ -242,11 +242,7 @@
                     <strong id="coreBoostRequirement">1.00e20</strong>
                   </div>
                   <div>
-                    <span data-i18n="coreBoostGrowthPowerRaw">CB要求増加指数（生）</span>
-                    <strong id="coreBoostRequirementGrowthPowerRaw">^2.000</strong>
-                  </div>
-                  <div>
-                    <span data-i18n="coreBoostGrowthPower">CB要求増加指数（実効）</span>
+                    <span data-i18n="coreBoostGrowthPower">CB要求増加指数</span>
                     <strong id="coreBoostRequirementGrowthPower">^2.000</strong>
                   </div>
                   <div>
@@ -272,7 +268,7 @@
               <p class="eyebrow">Infinity</p>
               <h1>Infinity</h1>
             </div>
-            <div class="unlock-note" id="infinityUnlockNote">1.80e308で解放</div>
+            <div class="unlock-note" id="infinityUnlockNote" data-i18n="infinityUnlockNote"></div>
           </header>
 
           <section class="infinity-summary">
@@ -283,14 +279,6 @@
             <div>
               <span>Infinity Point</span>
               <strong id="infinityPoints">0</strong>
-            </div>
-            <div>
-              <span data-i18n="infiniteScore">Infinite Score</span>
-              <strong id="infiniteScore">0</strong>
-            </div>
-            <div>
-              <span data-i18n="infiniteAngleBoost">Infinite Angle倍率</span>
-              <strong id="infiniteAngleBoost">×1.00</strong>
             </div>
             <div>
               <span data-i18n="infinityGain">Infinity獲得</span>
@@ -377,8 +365,8 @@
                   </div>
                 </div>
                 <div id="infiniteAngleUnlockNote" class="infinite-angle-unlock-note">
-                  <span data-i18n="infiniteAngleUnlockNote">1.00e20 IPで解放</span>
-                  <strong id="infiniteAngleUnlockCost">必要 1.00e20 IP</strong>
+                  <span data-i18n="infiniteAngleUnlockNote">IA解放条件</span>
+                  <strong id="infiniteAngleUnlockCost">必要</strong>
                 </div>
                 <button id="infiniteAngleUnlockButton" class="infinite-angle-unlock-button" type="button" disabled data-i18n="infiniteAngleUnlock">
                   IAを解放
@@ -428,16 +416,8 @@
                     <strong id="towerScoreExponentValue">^1.00</strong>
                   </div>
                   <div>
-                    <span data-i18n="towerChallenge1ScorePowerBase">TC1基礎指数</span>
-                    <strong id="towerChallenge1ScorePowerBase">^0.300</strong>
-                  </div>
-                  <div>
-                    <span data-i18n="towerChallenge1ScorePowerBonus">TC1追加指数</span>
-                    <strong id="towerChallenge1ScorePowerBonus">+^0.000</strong>
-                  </div>
-                  <div>
-                    <span data-i18n="towerChallenge1ScorePowerTotal">TC1合計指数</span>
-                    <strong id="towerChallenge1ScorePowerTotal">^0.300</strong>
+                    <span data-i18n="towerChallenge1ScorePower">Infinity Score累乗</span>
+                    <strong id="towerChallenge1ScorePower">^0.300</strong>
                   </div>
                   <div>
                     <span data-i18n="towerNextCost">次の階層の必要IP</span>
@@ -559,7 +539,6 @@
               <p class="eyebrow">Challenges</p>
               <h1 data-i18n="challenges">チャレンジ</h1>
             </div>
-            <div class="unlock-note" data-i18n="challengeReleaseNote">ICとTC</div>
           </header>
 
           <nav class="challenge-subtabs" aria-label="Challenge sub tabs">
@@ -584,7 +563,6 @@
             <section class="challenge-panel challenge-subpanel" data-challenge-panel="tc">
               <div class="panel-heading">
                 <span data-i18n="towerChallenges">Tower Challenges</span>
-                <strong data-i18n="towerChallengeReleaseStatus">TC1〜TC4実装済み</strong>
               </div>
               <div id="towerChallengeList" class="challenge-list" aria-label="Tower Challenge list"></div>
             </section>

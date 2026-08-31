@@ -499,9 +499,8 @@ function updateUi() {
   const vertexGainIncreaseLog10 = runtime.vertexGainIncreaseLog10();
   runtime.elements.vertexGainValue.textContent = `+${formatVertexGainIncrease(vertexGainIncreaseLog10)}`;
   runtime.elements.lapValue.textContent = runtime.formatDuration(runtime.lapDuration());
-  runtime.elements.lapSpeedValue.textContent = runtime.isLapSpeedSoftcapped()
-    ? `${formatMultiplierLog(runtime.effectiveLapSpeedLog10())} ${runtime.t("lapSpeedSoftcapped")} / raw ${formatMultiplierLog(runtime.rawLapSpeedLog10())}`
-    : formatMultiplierLog(runtime.effectiveLapSpeedLog10());
+  runtime.elements.lapSpeedValue.textContent = formatMultiplierLog(runtime.effectiveLapSpeedLog10());
+  if (runtime.isLapSpeedSoftcapped()) runtime.elements.lapSpeedValue.textContent += " " + runtime.t("lapSpeedSoftcapped");
   const freeNormalUpgradeLevel = runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0;
   const effectiveSpeedLevel = runtime.effectiveSpeedLevel();
   const effectiveVertexCount = runtime.effectiveVertexCount();
@@ -541,8 +540,7 @@ function updateUi() {
   runtime.elements.generationCostFactor.textContent = formatMultiplierPreview(runtime.generationCostFactorEffect(), nextGeneration.costFactor);
 
   runtime.elements.coreBoostCount.textContent = String(runtime.state.coreBoostCount);
-  runtime.elements.coreBoostRequirement.textContent = runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10());
-  runtime.elements.coreBoostRequirementGrowthPowerRaw.textContent = `^${runtime.coreBoostRequirementRawGrowthPower().toFixed(3)}`;
+  runtime.elements.coreBoostRequirement.textContent = runtime.formatUiLogNumber(runtime.coreBoostRequirementLog10());
   runtime.elements.coreBoostRequirementGrowthPower.textContent = `^${runtime.coreBoostRequirementGrowthPower().toFixed(3)}`;
   const nextCoreBoost = runtime.nextCoreBoostValues();
   runtime.elements.coreBoostGainBoost.textContent = formatMultiplierPreview(runtime.coreBoostGainIncreaseMultiplier(), nextCoreBoost.gainMultiplier);
@@ -554,14 +552,14 @@ function updateUi() {
   const infinityUnlocked = runtime.state.infinityCount > 0;
   runtime.elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";
   runtime.elements.infinityUnlockNote.hidden = infinityUnlocked;
+  runtime.elements.infinityUnlockNote.textContent = runtime.t("infinityUnlockNote")
+    .replace("{score}", runtime.formatUiLogNumber(runtime.INFINITY_REQUIREMENT_LOG10));
   runtime.elements.infinityPoints.textContent = runtime.formatHeldUiLogNumber(
     runtime.currentInfinityPointsLog10(),
     runtime.state.infinityPointsExact,
   );
-  runtime.elements.infiniteScore.textContent = runtime.formatHeldUiLogNumber(runtime.currentInfiniteScoreLog10());
   runtime.elements.infiniteScorePanel.textContent = runtime.formatHeldUiLogNumber(runtime.currentInfiniteScoreLog10());
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
-  runtime.elements.infiniteAngleBoost.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`;
   runtime.elements.infinityButton.disabled = runtime.state.infinityCount === 0 || !runtime.canInfinity();
@@ -612,12 +610,7 @@ function updateUi() {
   runtime.elements.towerFloorHeading.textContent = `Floor ${currentTowerFloor}`;
   runtime.elements.towerFloorValue.textContent = String(currentTowerFloor);
   runtime.elements.towerScoreExponentValue.textContent = `^${runtime.towerScoreExponent().toFixed(2)}`;
-  const towerChallenge1ScorePowerBase = runtime.hasInfinityUpgrade("13-1") ? 0.5 : runtime.INFINITE_ANGLE_SCORE_POWER;
-  const towerChallenge1ScorePowerBonus = runtime.towerChallenge1InfinityScorePowerBonus();
-  const towerChallenge1ScorePowerTotal = runtime.infiniteAngleScorePower();
-  runtime.elements.towerChallenge1ScorePowerBase.textContent = `^${towerChallenge1ScorePowerBase.toFixed(3)}`;
-  runtime.elements.towerChallenge1ScorePowerBonus.textContent = `+^${towerChallenge1ScorePowerBonus.toFixed(3)}`;
-  runtime.elements.towerChallenge1ScorePowerTotal.textContent = `^${towerChallenge1ScorePowerTotal.toFixed(3)}`;
+  runtime.elements.towerChallenge1ScorePower.textContent = `^${runtime.infiniteAngleScorePower().toFixed(3)}`;
   runtime.elements.towerNextCost.textContent = `${runtime.formatUiLogNumber(nextTowerCostLog10)} IP`;
   runtime.elements.towerGateStatus.textContent = !towerGateReady
     ? runtime.t("towerNeedChallenge").replace("{index}", String(towerGate))
@@ -625,7 +618,7 @@ function updateUi() {
       ? runtime.t("towerNeedIp")
       : runtime.t("towerBuildReady");
   runtime.elements.towerBuildButton.disabled = !runtime.canBuildTower();
-  const breakCapRequirement = runtime.formatPowerOfTen(runtime.BREAK_CAP_REQUIREMENT_LOG10);
+  const breakCapRequirement = runtime.formatUiLogNumber(runtime.BREAK_CAP_REQUIREMENT_LOG10);
   runtime.elements.breakCapRequirement.textContent = runtime.state.infiniteCapBroken
     ? runtime.t("breakCapBroken")
     : runtime.t("breakCapRequirement").replace("{score}", breakCapRequirement);

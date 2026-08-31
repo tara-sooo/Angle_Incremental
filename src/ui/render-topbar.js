@@ -113,7 +113,7 @@ function updateTopBar() {
         : generationUnlocked
           ? runtime.t("generationUnlocked")
           : runtime.t("generationLocked");
-    runtime.elements.newsTickerText.textContent = `GR ${runtime.state.generationCount} ${generationState} / CB ${runtime.state.coreBoostCount} next ${runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10())} / INF ${infinityState} / ACH ${runtime.achievementCount()}/${runtime.ACHIEVEMENT_COUNT}`;
+    runtime.elements.newsTickerText.textContent = `GR ${runtime.state.generationCount} ${generationState} / CB ${runtime.state.coreBoostCount} next ${runtime.formatUiLogNumber(runtime.coreBoostRequirementLog10())} / INF ${infinityState} / ACH ${runtime.achievementCount()}/${runtime.ACHIEVEMENT_COUNT}`;
     return;
   }
   if (label) label.textContent = runtime.t("topBarNews");
