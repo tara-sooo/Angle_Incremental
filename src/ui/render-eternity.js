@@ -110,11 +110,11 @@ function installEternityUi() {
             <button id="eternityPerformButton" class="eternity-perform-button" type="button" data-eternity-action="perform"></button>
           </div>
           <nav class="eternity-subtabs" aria-label="Eternity sub tabs">
-            <button class="eternity-subtab is-active" type="button" data-eternity-tab="milestone" aria-controls="eternityMilestoneSubpanel" aria-selected="true">
+            <button class="subtab eternity-subtab is-active" type="button" data-eternity-tab="milestone" aria-controls="eternityMilestoneSubpanel" aria-selected="true">
               <span>MS</span>
               <strong data-i18n="eternityMilestoneTab">Milestone</strong>
             </button>
-            <button class="eternity-subtab" type="button" data-eternity-tab="timeline" aria-controls="eternityTimelineSubpanel" aria-selected="false">
+            <button class="subtab eternity-subtab" type="button" data-eternity-tab="timeline" aria-controls="eternityTimelineSubpanel" aria-selected="false">
               <span>TL</span>
               <strong data-i18n="timelineTab">Timeline</strong>
             </button>

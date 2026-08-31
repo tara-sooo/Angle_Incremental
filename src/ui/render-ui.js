@@ -577,7 +577,6 @@ function updateUi() {
   const infinityReady = runtime.canInfinity();
   const infinityUnlocked = runtime.state.infinityCount > 0;
   runtime.elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";
-  runtime.elements.infinityTabBadge.classList.toggle("is-visible", infinityReady);
   runtime.elements.infinityUnlockNote.hidden = infinityUnlocked;
   runtime.elements.infinityPoints.textContent = runtime.formatHeldUiLogNumber(
     runtime.currentInfinityPointsLog10(),

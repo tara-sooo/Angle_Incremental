@@ -1059,6 +1059,7 @@ function setSaveConflictLock(locked) {
       || ["exportSaveCodeButton", "copySaveCodeButton", "saveCodeArea", "resetSaveButton"].includes(control.id);
     const navigationControl = [
       "main-tab",
+      "subtab",
       "infinity-subtab",
       "challenge-subtab",
       "statistics-subtab",
