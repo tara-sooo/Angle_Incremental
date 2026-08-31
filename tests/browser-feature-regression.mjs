@@ -635,7 +635,7 @@ try {
       towerChallenge3Target: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-target')?.textContent?.trim() ?? "",
       towerChallenge3Restriction: document.querySelector('#towerChallengeList [data-tower-challenge="3"] .challenge-restriction')?.textContent?.trim() ?? "",
       towerChallenge4Target: document.querySelector('#towerChallengeList [data-tower-challenge="4"] .challenge-target')?.textContent?.trim() ?? "",
-      towerChallenge4UpgradeCards: document.querySelectorAll('#towerChallengeList [data-tower-challenge="4"] .tc4-upgrade-card').length,
+      towerChallenge4UpgradeControls: document.querySelectorAll('#towerChallengeList [data-tower-challenge="4"] [data-tc4-upgrade]').length,
     };
   });
   assert.equal(towerInitial.towerState.panelActive, true, "Infinity > Tower should activate the Tower panel");
@@ -656,11 +656,95 @@ try {
   assert.match(towerInitial.towerChallenge3Restriction, /\^0\.001/);
   assert.match(towerInitial.towerChallenge3Restriction, /\^0\.100/);
   assert.match(towerInitial.towerChallenge4Target, /1\.00e7,777/);
-  assert.equal(towerInitial.towerChallenge4UpgradeCards, 3, "TC4 should expose its three exclusive upgrade cards");
+  assert.equal(towerInitial.towerChallenge4UpgradeControls, 0, "TC4 upgrades should not appear in the Challenge list");
   assert.equal(towerInitial.towerState.scoreExponent, "^1.00");
   assert.equal(towerInitial.towerState.tc1Base, "^0.300");
   assert.equal(towerInitial.towerState.tc1Bonus, "+^0.000");
   assert.equal(towerInitial.towerState.tc1Total, "^0.300");
+  const towerChallenge4Ui = await page.evaluate(() => {
+    const { state, toggleTowerChallenge, switchMainTab } = window.__angleDebug;
+    const original = structuredClone(state);
+    const originalTab = window.__angleDebug.runtime.activeMainTab;
+    Object.assign(state, {
+      towerFloor: 12,
+      activeChallenge: 0,
+      activeTowerChallenge: 0,
+      completedTowerChallenges: 0,
+      score: 0,
+      scoreLog10: -Infinity,
+      infiniteScore: 0,
+      infiniteScoreLog10: -Infinity,
+      tc4BaseGainLevel: 0,
+      tc4BaseGainPriceStep: 0,
+      tc4InfinityScoreVertexGainLevel: 0,
+      tc4InfinityScoreVertexGainPriceStep: 0,
+      tc4FreeCoreBoostLevel: 0,
+      tc4FreeCoreBoostPriceStep: 0,
+      language: "ja",
+    });
+    const started = toggleTowerChallenge(4);
+    state.score = Number.MAX_VALUE;
+    state.scoreLog10 = 300;
+    state.infiniteScore = Number.MAX_VALUE;
+    state.infiniteScoreLog10 = 300;
+    switchMainTab("angle");
+    window.advanceTime(0);
+    const list = document.querySelector("#tc4UpgradeList");
+    const buttons = Array.from(list?.querySelectorAll("button[data-tc4-upgrade]") ?? []);
+    const readTexts = () => buttons.map((button) => button.textContent.trim());
+    const japaneseTexts = readTexts();
+    const before = {
+      started,
+      challengeControls: document.querySelectorAll('#towerChallengeList [data-tower-challenge="4"] [data-tc4-upgrade]').length,
+      normalHidden: document.querySelector("#normalUpgradeList")?.hidden ?? false,
+      tc4Hidden: list?.hidden ?? true,
+      buttonCount: buttons.length,
+      rowHeights: buttons.map((button) => button.getBoundingClientRect().height),
+      rowOverflow: buttons.some((button) => button.scrollWidth > button.clientWidth + 1),
+      japaneseTexts,
+      japaneseForbidden: japaneseTexts.some((text) => /parts|log10|effective CB/i.test(text)),
+    };
+    state.language = "en";
+    window.advanceTime(0);
+    const englishTexts = readTexts();
+    const englishForbidden = englishTexts.some((text) => /parts|log10|effective CB/i.test(text));
+    state.language = "ja";
+    window.advanceTime(0);
+    buttons[0]?.click();
+    window.advanceTime(0);
+    const purchased = {
+      baseGainLevel: state.tc4BaseGainLevel,
+      baseGainPriceStep: state.tc4BaseGainPriceStep,
+    };
+    const stopped = toggleTowerChallenge(4);
+    const restored = {
+      normalHidden: document.querySelector("#normalUpgradeList")?.hidden ?? true,
+      tc4Hidden: list?.hidden ?? false,
+      levels: [state.tc4BaseGainLevel, state.tc4InfinityScoreVertexGainLevel, state.tc4FreeCoreBoostLevel],
+    };
+    Object.assign(state, original);
+    switchMainTab(originalTab);
+    window.advanceTime(0);
+    window.__angleDebug.runtime.saveGame("manual");
+    return { before, englishTexts, englishForbidden, purchased, stopped, restored };
+  });
+  assert.equal(towerChallenge4Ui.before.started, true, "TC4 should start from its unlocked challenge state");
+  assert.equal(towerChallenge4Ui.before.challengeControls, 0, "TC4 controls should stay off the Challenge row");
+  assert.equal(towerChallenge4Ui.before.normalHidden, true, "TC4 should hide ordinary ANGLE controls");
+  assert.equal(towerChallenge4Ui.before.tc4Hidden, false, "TC4 should show its ANGLE controls");
+  assert.equal(towerChallenge4Ui.before.buttonCount, 3, "TC4 should expose three ANGLE purchase rows");
+  assert.ok(towerChallenge4Ui.before.rowHeights.every((height) => height >= 42), "TC4 rows should remain touch-safe on desktop");
+  assert.equal(towerChallenge4Ui.before.rowOverflow, false, "TC4 rows should not overflow on desktop");
+  assert.equal(towerChallenge4Ui.before.japaneseForbidden, false, "Japanese TC4 effects should use player-facing wording");
+  assert.equal(towerChallenge4Ui.englishForbidden, false, "English TC4 effects should use player-facing wording");
+  assert.match(towerChallenge4Ui.englishTexts[0], /Core Gain/);
+  assert.match(towerChallenge4Ui.englishTexts[1], /Vertex gain from Infinity Score/);
+  assert.equal(towerChallenge4Ui.purchased.baseGainLevel, 1, "the ANGLE TC4 row should call the existing purchase behavior");
+  assert.equal(towerChallenge4Ui.purchased.baseGainPriceStep, 1, "TC4 purchase pricing should retain its shared step");
+  assert.equal(towerChallenge4Ui.stopped, true, "TC4 should stop through its existing challenge action");
+  assert.equal(towerChallenge4Ui.restored.normalHidden, false, "stopping TC4 should restore ordinary ANGLE controls");
+  assert.equal(towerChallenge4Ui.restored.tc4Hidden, true, "stopping TC4 should hide the TC4 ANGLE controls");
+  assert.deepEqual(towerChallenge4Ui.restored.levels, [0, 0, 0], "stopping TC4 should reset its exclusive upgrades");
   const towerChallenge3Flow = await page.evaluate(() => {
     const { state } = window.__angleDebug;
     const original = {
@@ -1332,6 +1416,9 @@ try {
     window.advanceTime(0);
     const canvas = document.querySelector("#infiniteAngleCanvas");
     const panel = document.querySelector('[data-infinity-panel="angle"]');
+    const infiniteAngleLayout = document.querySelector(".infinite-angle-panel");
+    const metricColumn = document.querySelector(".infinite-angle-metrics");
+    const compactRows = Array.from(document.querySelectorAll(".infinite-angle-upgrades .upgrade-row"));
     const beforeLevel = state.infiniteAngleSpeedLevel;
     const upgradeCosts = [
       document.querySelector("#infiniteAngleSpeedCost")?.textContent?.trim() ?? "",
@@ -1367,8 +1454,14 @@ try {
       panelActive: Boolean(panel?.classList.contains("is-active")),
       canvasWidth: canvas?.getBoundingClientRect().width ?? 0,
       canvasHeight: canvas?.getBoundingClientRect().height ?? 0,
+      metricWidth: metricColumn?.getBoundingClientRect().width ?? 0,
+      compactRowCount: compactRows.length,
+      compactRowHeights: compactRows.map((row) => row.getBoundingClientRect().height),
+      compactRowOverflow: compactRows.some((row) => row.scrollWidth > row.clientWidth + 1),
+      panelOverflow: Boolean(infiniteAngleLayout && infiniteAngleLayout.scrollWidth > infiniteAngleLayout.clientWidth + 1),
       canvasPixel: canvas?.getContext("2d")?.getImageData(1, 1, 1, 1).data?.[0] ?? 0,
       scoreText: document.querySelector("#infiniteScorePanel")?.textContent?.trim() ?? "",
+      renderTextLength: window.render_game_to_text().length,
       unlockHidden: Boolean(document.querySelector("#infiniteAngleUnlockButton")?.hidden),
       unlockNoteDisplay: getComputedStyle(document.querySelector("#infiniteAngleUnlockNote")).display,
       bought,
@@ -1385,8 +1478,14 @@ try {
   });
   assert.equal(infiniteAnglePanel.panelActive, true, "Infinity > IA should activate the IA panel");
   assert.ok(infiniteAnglePanel.canvasWidth > 0 && infiniteAnglePanel.canvasHeight > 0, "IA canvas should have a rendered size");
+  assert.ok(infiniteAnglePanel.metricWidth >= 200, "IA metrics should retain a readable minimum column");
+  assert.equal(infiniteAnglePanel.compactRowCount, 3, "IA should expose three shared purchase rows");
+  assert.ok(infiniteAnglePanel.compactRowHeights.every((height) => height >= 42), "IA purchase rows should remain touch-safe");
+  assert.equal(infiniteAnglePanel.compactRowOverflow, false, "IA purchase rows should not overflow");
+  assert.equal(infiniteAnglePanel.panelOverflow, false, "IA should not overflow its panel");
   assert.notEqual(infiniteAnglePanel.canvasPixel, 0, "IA canvas should render nonblank pixels");
   assert.notEqual(infiniteAnglePanel.scoreText, "", "IA panel should display Infinity Score");
+  assert.ok(infiniteAnglePanel.renderTextLength > 0, "IA should retain the render_game_to_text debug surface");
   assert.equal(infiniteAnglePanel.unlockHidden, true, "IA unlock control should hide after unlocking");
   assert.equal(infiniteAnglePanel.unlockNoteDisplay, "none", "IA unlock note should hide after unlocking");
   assert.ok(infiniteAnglePanel.upgradeWidths.every((width) => width > 0), "IA upgrade controls should remain visible");
@@ -1736,6 +1835,71 @@ try {
     assert.equal(mobileStartup.timeFluxPanel, false, "mobile startup should omit the dormant Time Flux panel");
     assert.equal(mobileStartup.timeFluxQuickBar, false, "mobile startup should omit the dormant Time Flux quick bar");
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
+    const mobileAngleSurface = await mobilePage.evaluate(() => {
+      const { state, switchMainTab } = window.__angleDebug;
+      state.language = "ja";
+      state.activeTowerChallenge = 0;
+      switchMainTab("angle");
+      window.advanceTime(0);
+      const panel = document.querySelector(".angle-panel");
+      const canvas = document.querySelector("#gameCanvas").getBoundingClientRect();
+      const dock = document.querySelector(".reset-dock").getBoundingClientRect();
+      const rows = Array.from(document.querySelectorAll(".normal-upgrades .upgrade-row"));
+      return {
+        normalHidden: document.querySelector("#normalUpgradeList")?.hidden ?? true,
+        tc4Hidden: document.querySelector("#tc4UpgradeList")?.hidden ?? false,
+        rowHeights: rows.map((row) => row.getBoundingClientRect().height),
+        rowWidths: rows.map((row) => row.getBoundingClientRect().width),
+        panelOverflow: Boolean(panel && panel.scrollWidth > panel.clientWidth + 1),
+        rowOverflow: rows.some((row) => row.scrollWidth > row.clientWidth + 1),
+        resetPosition: getComputedStyle(document.querySelector(".reset-dock")).position,
+        resetOverlapsCanvas: dock.top < canvas.bottom - 1,
+        renderTextLength: window.render_game_to_text().length,
+      };
+    });
+    assert.equal(mobileAngleSurface.normalHidden, false, "mobile ANGLE should show ordinary controls outside TC4");
+    assert.equal(mobileAngleSurface.tc4Hidden, true, "mobile ANGLE should hide TC4 controls when inactive");
+    assert.ok(mobileAngleSurface.rowHeights.every((height) => height >= 42), "mobile ANGLE rows should remain touch-safe");
+    assert.ok(mobileAngleSurface.rowWidths.every((width) => width > 300), "mobile ANGLE rows should use the available width");
+    assert.equal(mobileAngleSurface.panelOverflow, false, "mobile ANGLE should not overflow horizontally");
+    assert.equal(mobileAngleSurface.rowOverflow, false, "mobile ANGLE rows should not overflow");
+    assert.equal(mobileAngleSurface.resetPosition, "static", "mobile ANGLE reset summaries should remain in normal flow");
+    assert.equal(mobileAngleSurface.resetOverlapsCanvas, false, "mobile reset summaries should not cover the ANGLE canvas");
+    assert.ok(mobileAngleSurface.renderTextLength > 0, "mobile ANGLE should retain the render_game_to_text debug surface");
+    const mobileTc4Surface = await mobilePage.evaluate(() => {
+      const { state } = window.__angleDebug;
+      const original = structuredClone(state);
+      Object.assign(state, {
+        towerFloor: 12,
+        activeChallenge: 0,
+        activeTowerChallenge: 4,
+        score: Number.MAX_VALUE,
+        scoreLog10: 300,
+        infiniteScore: Number.MAX_VALUE,
+        infiniteScoreLog10: 300,
+        language: "en",
+      });
+      window.advanceTime(0);
+      const panel = document.querySelector(".angle-panel");
+      const rows = Array.from(document.querySelectorAll("#tc4UpgradeList button[data-tc4-upgrade]"));
+      const result = {
+        normalHidden: document.querySelector("#normalUpgradeList")?.hidden ?? false,
+        tc4Hidden: document.querySelector("#tc4UpgradeList")?.hidden ?? true,
+        rowHeights: rows.map((row) => row.getBoundingClientRect().height),
+        rowOverflow: rows.some((row) => row.scrollWidth > row.clientWidth + 1),
+        panelOverflow: Boolean(panel && panel.scrollWidth > panel.clientWidth + 1),
+        forbidden: rows.some((row) => /parts|log10|effective CB/i.test(row.textContent)),
+      };
+      Object.assign(state, original);
+      window.advanceTime(0);
+      return result;
+    });
+    assert.equal(mobileTc4Surface.normalHidden, true, "mobile TC4 should hide ordinary controls");
+    assert.equal(mobileTc4Surface.tc4Hidden, false, "mobile TC4 should show the ANGLE-specific rows");
+    assert.ok(mobileTc4Surface.rowHeights.every((height) => height >= 42), "mobile TC4 rows should remain touch-safe");
+    assert.equal(mobileTc4Surface.rowOverflow, false, "mobile TC4 rows should not overflow");
+    assert.equal(mobileTc4Surface.panelOverflow, false, "mobile TC4 should not overflow horizontally");
+    assert.equal(mobileTc4Surface.forbidden, false, "mobile TC4 should use player-facing effect wording");
 
     const mobileLayoutOriginal = await mobilePage.evaluate(() => ({
       infinityCount: window.__angleDebug.state.infinityCount,
