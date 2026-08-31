@@ -165,6 +165,12 @@ try {
   const measureMainTabBar = (targetPage) => targetPage.evaluate(() => {
     const nav = document.querySelector(".main-tabs");
     const strip = document.querySelector(".main-tab-scroll");
+    const shell = document.querySelector(".shell");
+    const active = nav?.querySelector(".main-tab.is-active");
+    const navStyle = nav ? getComputedStyle(nav) : null;
+    const activeStyle = active ? getComputedStyle(active) : null;
+    const navRect = nav?.getBoundingClientRect();
+    const shellRect = shell?.getBoundingClientRect();
     const settings = document.querySelector('[data-tab="settings"]');
     const visibleButtons = Array.from(document.querySelectorAll("[data-tab]")).filter((button) => !button.hidden);
     const rects = visibleButtons.map((button) => button.getBoundingClientRect());
@@ -177,6 +183,18 @@ try {
       navHeight: nav?.getBoundingClientRect().height ?? 0,
       navClientHeight: nav?.clientHeight ?? 0,
       navScrollHeight: nav?.scrollHeight ?? 0,
+      navWidth: navRect?.width ?? 0,
+      shellWidth: shellRect?.width ?? 0,
+      navBackgroundImage: navStyle?.backgroundImage ?? "",
+      navBorderTopWidth: navStyle?.borderTopWidth ?? "",
+      navBorderRightWidth: navStyle?.borderRightWidth ?? "",
+      navBorderBottomWidth: navStyle?.borderBottomWidth ?? "",
+      navBorderLeftWidth: navStyle?.borderLeftWidth ?? "",
+      navBoxShadow: navStyle?.boxShadow ?? "",
+      activeBackgroundImage: activeStyle?.backgroundImage ?? "",
+      activeBoxShadow: activeStyle?.boxShadow ?? "",
+      activeBorderBottomWidth: activeStyle?.borderBottomWidth ?? "",
+      activeHeight: active?.getBoundingClientRect().height ?? 0,
       stripClientWidth: strip?.clientWidth ?? 0,
       stripScrollWidth: strip?.scrollWidth ?? 0,
       rows: rects.length > 0 ? Math.max(...rects.map((rect) => rect.top)) - Math.min(...rects.map((rect) => rect.top)) : Infinity,
@@ -265,7 +283,18 @@ try {
     assert.equal(layout.settingsInScrollHost, true, `${viewportName} SET should stay inside the scrolling strip`);
     assert.equal(layout.hasTabOverlap, false, `${viewportName} tabs should not overlap horizontally`);
     assert.equal(layout.hasTabContentOverflow, false, `${viewportName} tabs should retain intrinsic content widths`);
+    assert.equal(layout.navBackgroundImage, "none", `${viewportName} navigation should not use a card gradient`);
+    assert.equal(layout.navBoxShadow, "none", `${viewportName} navigation should not use a card shadow`);
+    assert.equal(layout.navBorderTopWidth, "0px", `${viewportName} navigation should not use a card border`);
+    assert.equal(layout.navBorderRightWidth, "0px", `${viewportName} navigation should not use a card border`);
+    assert.equal(layout.navBorderBottomWidth, "0px", `${viewportName} navigation should not use a card border`);
+    assert.equal(layout.navBorderLeftWidth, "0px", `${viewportName} navigation should not use a card border`);
+    assert.equal(layout.activeBackgroundImage, "none", `${viewportName} active tab should not use a gradient fill`);
+    assert.equal(layout.activeBoxShadow, "none", `${viewportName} active tab should not use a heavy shadow`);
+    assert.equal(layout.activeBorderBottomWidth, "2px", `${viewportName} active tab should retain an underline cue`);
+    assert.ok(layout.activeHeight >= 40, `${viewportName} active tab should retain a touch-sized target`);
   }
+  assert.ok(desktopTabBar.navWidth < desktopTabBar.shellWidth - 100, "desktop navigation should end near its content instead of framing dead space");
   assert.ok(tabletTabBar.stripScrollWidth > tabletTabBar.stripClientWidth, "tablet overflow should remain horizontal inside the shared strip");
   assert.equal(endSettings.reachedEnd, true, "SET should be reachable at the end of the shared scrolling strip");
   assert.equal(endSettings.fullyVisible, true, "SET should be fully visible at the end of the shared scrolling strip");
