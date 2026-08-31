@@ -24,6 +24,7 @@ const expectedOrder = [
   "src/ui/render-achievements.js",
   "src/ui/render-automation.js",
   "src/ui/render-offline-report.js",
+  "src/ui/render-help.js",
   "src/ui/render-ui.js",
   "src/systems/angle.js",
   "src/systems/generation.js",

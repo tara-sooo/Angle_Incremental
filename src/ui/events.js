@@ -18,6 +18,7 @@ const MAIN_TAB_UNLOCKS = Object.freeze({
 });
 
 let mainTabVisibilitySignature = "";
+let helpContextMainTab = "angle";
 
 function hasPositiveValue(values) {
   return Array.isArray(values) && values.some((value) => Number(value) > 0);
@@ -102,6 +103,11 @@ function updateMainTabVisibility() {
 }
 
 function switchMainTab(tab) {
+  if (tab === "help" && runtime.activeMainTab !== "help") {
+    helpContextMainTab = runtime.activeMainTab || "angle";
+  } else if (tab !== "help") {
+    helpContextMainTab = tab;
+  }
   runtime.activeMainTab = tab;
   runtime.elements.mainTabs.forEach((button) => {
     const active = button.dataset.tab === runtime.activeMainTab;
@@ -378,6 +384,7 @@ expose("switchEternitySubtab", () => switchEternitySubtab, (value) => { switchEt
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
 expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
 expose("switchStatisticsSubtab", () => switchStatisticsSubtab, (value) => { switchStatisticsSubtab = value; });
+expose("helpContextMainTab", () => helpContextMainTab, (value) => { helpContextMainTab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
 expose("mainTabIsUnlocked", () => mainTabIsUnlocked);
 expose("mainTabIsVisible", () => mainTabIsVisible);
