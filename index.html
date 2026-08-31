@@ -132,31 +132,68 @@
               </section>
 
               <section class="upgrades" aria-label="The Angle upgrades">
-                <button id="buyAllUpgrade" class="buy-all-button" type="button">
-                  <b data-i18n="buyAll">全購入</b>
-                  <small data-i18n="buyAllHint">通常強化を順番に購入</small>
-                </button>
-                <button id="speedUpgrade" class="upgrade-button" type="button">
-                  <span>
-                    <b data-i18n="speedUpgrade">周回速度</b>
-                    <small id="speedLevel">レベル0</small>
-                  </span>
-                  <em id="speedCost">必要 25</em>
-                </button>
-                <button id="vertexUpgrade" class="upgrade-button" type="button">
-                  <span>
-                    <b data-i18n="vertexUpgrade">角の追加</b>
-                    <small id="vertexCount">3頂点</small>
-                  </span>
-                  <em id="vertexCost">必要 50</em>
-                </button>
-                <button id="gainUpgrade" class="upgrade-button" type="button">
-                  <span>
-                    <b data-i18n="gainUpgrade">頂点獲得量</b>
-                    <small id="gainLevel">レベル0</small>
-                  </span>
-                  <em id="gainCost">必要 75</em>
-                </button>
+                <div id="normalUpgradeList" class="normal-upgrades">
+                  <button id="buyAllUpgrade" class="buy-all-button" type="button">
+                    <b data-i18n="buyAll">全購入</b>
+                    <small data-i18n="buyAllHint">通常強化を順番に購入</small>
+                  </button>
+                  <button id="speedUpgrade" class="upgrade-button upgrade-row" type="button">
+                    <span>
+                      <b data-i18n="speedUpgrade">周回速度</b>
+                      <small id="speedLevel">レベル0</small>
+                    </span>
+                    <em id="speedCost">必要 25</em>
+                  </button>
+                  <button id="vertexUpgrade" class="upgrade-button upgrade-row" type="button">
+                    <span>
+                      <b data-i18n="vertexUpgrade">角の追加</b>
+                      <small id="vertexCount">3頂点</small>
+                    </span>
+                    <em id="vertexCost">必要 50</em>
+                  </button>
+                  <button id="gainUpgrade" class="upgrade-button upgrade-row" type="button">
+                    <span>
+                      <b data-i18n="gainUpgrade">頂点獲得量</b>
+                      <small id="gainLevel">レベル0</small>
+                    </span>
+                    <em id="gainCost">必要 75</em>
+                  </button>
+                </div>
+                <div id="tc4UpgradeList" class="tc4-upgrade-list" hidden aria-label="TC4 upgrades">
+                  <button class="tc4-upgrade-button upgrade-button upgrade-row" type="button" data-tc4-upgrade="baseGain" data-label-key="towerChallenge4UpgradeBaseGain" data-effect-key="towerChallenge4UpgradeBaseGainEffect">
+                    <span class="tc4-upgrade-copy">
+                      <b class="tc4-upgrade-label" data-i18n="towerChallenge4UpgradeBaseGain">TC4 A強化</b>
+                      <small class="tc4-upgrade-effect" data-i18n="towerChallenge4UpgradeBaseGainEffect">核到達時の獲得量</small>
+                    </span>
+                    <em class="tc4-upgrade-meta">
+                      <span class="tc4-upgrade-level">レベル 0</span>
+                      <span class="tc4-upgrade-cost">価格: 1.00e100</span>
+                      <strong class="tc4-upgrade-action" data-i18n="towerChallenge4UpgradeBuy">購入</strong>
+                    </em>
+                  </button>
+                  <button class="tc4-upgrade-button upgrade-button upgrade-row" type="button" data-tc4-upgrade="infinityScoreVertexGain" data-label-key="towerChallenge4UpgradeInfinityScoreVertexGain" data-effect-key="towerChallenge4UpgradeInfinityScoreVertexGainEffect">
+                    <span class="tc4-upgrade-copy">
+                      <b class="tc4-upgrade-label" data-i18n="towerChallenge4UpgradeInfinityScoreVertexGain">TC4 B強化</b>
+                      <small class="tc4-upgrade-effect" data-i18n="towerChallenge4UpgradeInfinityScoreVertexGainEffect">Infinity Scoreによる頂点獲得量</small>
+                    </span>
+                    <em class="tc4-upgrade-meta">
+                      <span class="tc4-upgrade-level">レベル 0</span>
+                      <span class="tc4-upgrade-cost">価格: 1.00e500</span>
+                      <strong class="tc4-upgrade-action" data-i18n="towerChallenge4UpgradeBuy">購入</strong>
+                    </em>
+                  </button>
+                  <button class="tc4-upgrade-button upgrade-button upgrade-row" type="button" data-tc4-upgrade="freeCoreBoost" data-label-key="towerChallenge4UpgradeFreeCoreBoost" data-effect-key="towerChallenge4UpgradeFreeCoreBoostEffect">
+                    <span class="tc4-upgrade-copy">
+                      <b class="tc4-upgrade-label" data-i18n="towerChallenge4UpgradeFreeCoreBoost">TC4 C強化</b>
+                      <small class="tc4-upgrade-effect" data-i18n="towerChallenge4UpgradeFreeCoreBoostEffect">核増幅の効果</small>
+                    </span>
+                    <em class="tc4-upgrade-meta">
+                      <span class="tc4-upgrade-level">レベル 0</span>
+                      <span class="tc4-upgrade-cost">価格: 1.00e900</span>
+                      <strong class="tc4-upgrade-action" data-i18n="towerChallenge4UpgradeBuy">購入</strong>
+                    </em>
+                  </button>
+                </div>
               </section>
             </aside>
 
@@ -350,21 +387,21 @@
                   <button id="infiniteAngleBuyAllUpgrade" class="upgrade-button infinite-angle-buy-all" type="button" data-i18n="infiniteAngleBuyAll">
                     IA強化を全購入
                   </button>
-                  <button id="infiniteAngleSpeedUpgrade" class="upgrade-button" type="button">
+                  <button id="infiniteAngleSpeedUpgrade" class="upgrade-button upgrade-row" type="button">
                     <span>
                       <b data-i18n="speedUpgrade">周回速度</b>
                       <small id="infiniteAngleSpeedLevel">レベル0</small>
                     </span>
                     <em id="infiniteAngleSpeedCost">必要 5 IP</em>
                   </button>
-                  <button id="infiniteAngleVertexUpgrade" class="upgrade-button" type="button">
+                  <button id="infiniteAngleVertexUpgrade" class="upgrade-button upgrade-row" type="button">
                     <span>
                       <b data-i18n="vertexUpgrade">角の追加</b>
                       <small id="infiniteAngleVertexLevel">レベル0</small>
                     </span>
                     <em id="infiniteAngleVertexCost">必要 12 IP</em>
                   </button>
-                  <button id="infiniteAngleGainUpgrade" class="upgrade-button" type="button">
+                  <button id="infiniteAngleGainUpgrade" class="upgrade-button upgrade-row" type="button">
                     <span>
                       <b data-i18n="gainUpgrade">頂点獲得量</b>
                       <small id="infiniteAngleGainLevel">レベル0</small>

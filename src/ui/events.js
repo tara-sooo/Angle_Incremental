@@ -241,6 +241,11 @@ function bindEvents() {
   runtime.elements.infiniteAngleSpeedUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("speed"));
   runtime.elements.infiniteAngleVertexUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("vertex"));
   runtime.elements.infiniteAngleGainUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("gain"));
+  runtime.elements.tc4UpgradeList?.addEventListener("click", (event) => {
+    const button = event.target?.closest?.("button[data-tc4-upgrade]");
+    if (!button || !runtime.elements.tc4UpgradeList.contains(button)) return;
+    runtime.buyTowerChallenge4Upgrade(button.dataset.tc4Upgrade);
+  });
   runtime.elements.towerBuildButton.addEventListener("click", runtime.buildTower);
   runtime.elements.breakCapButton.addEventListener("click", runtime.breakInfiniteCap);
   runtime.elements.timelineScoreClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("score"));

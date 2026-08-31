@@ -276,6 +276,13 @@ button {
   box-shadow: none;
 }
 
+.angle-panel .upgrade-rail,
+.angle-panel .stage-panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
 .angle-layout {
   height: 100%;
   min-height: 0;
@@ -386,7 +393,7 @@ canvas {
 .metric,
 .generation > div,
 .core-boost > div,
-.infinity-panel > div:not(.upgrade-row):not(.panel-heading):not(.challenge-list):not(.infinity-upgrade-tree):not(.tower-panel),
+.infinity-panel > div:not(.upgrade-row):not(.panel-heading):not(.challenge-list):not(.infinity-upgrade-tree):not(.tower-panel):not(.infinite-angle-panel),
 .infinity-summary > div:not(.metric),
 .infinite-angle-panel > div:not(.upgrade-row),
 .tower-metrics > div,
@@ -449,6 +456,12 @@ canvas {
   align-content: start;
 }
 
+.normal-upgrades {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 6px;
+}
+
 .upgrade-button,
 .buy-all-button,
 .generation-button,
@@ -470,7 +483,7 @@ canvas {
 }
 
 .buy-all-button {
-  min-height: 58px;
+  min-height: 48px;
   padding: 10px 12px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -590,9 +603,26 @@ canvas {
 
 .generation,
 .core-boost {
-  padding: 10px;
-  background: rgba(17, 27, 47, 0.95);
-  border: 2px solid var(--line);
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.angle-panel .reset-dock {
+  padding: 6px 0 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.angle-panel .generation > div,
+.angle-panel .core-boost > div {
+  min-height: 30px;
+  padding: 4px 0;
+}
+
+.angle-panel .generation-button,
+.angle-panel .core-boost-button {
+  min-height: 44px;
 }
 
 .generation-button,
@@ -1346,11 +1376,12 @@ canvas {
 
 .infinite-angle-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.8fr) minmax(220px, 0.8fr);
   gap: 10px;
 }
 
 .infinite-angle-panel > div:not(.upgrade-row) {
+  min-width: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
@@ -1378,8 +1409,8 @@ canvas {
   overflow: hidden;
   height: clamp(220px, 42vh, 420px);
   min-height: 220px;
-  border: 1px solid var(--line);
-  background: #0b1630;
+  border: 0;
+  background: transparent;
 }
 
 .infinite-angle-playfield-wrap canvas {
@@ -1392,6 +1423,7 @@ canvas {
 .infinite-angle-panel .infinite-angle-metrics {
   grid-column: 2;
   grid-row: 1;
+  min-width: 0;
   gap: 0;
   grid-template-columns: 1fr !important;
 }
@@ -1446,7 +1478,9 @@ canvas {
 
 .infinite-angle-upgrades .infinite-angle-buy-all {
   grid-column: 1 / -1;
-  min-height: 42px;
+  min-height: 44px;
+  background: rgba(76, 123, 217, 0.16);
+  border-color: var(--line);
   text-align: center;
 }
 
@@ -1467,6 +1501,72 @@ canvas {
   grid-template-columns: minmax(0, 1fr) minmax(54px, auto);
   gap: 8px;
   align-items: center;
+}
+
+.normal-upgrades .upgrade-row,
+.infinite-angle-upgrades .upgrade-row,
+.tc4-upgrade-list .upgrade-row {
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  background: rgba(76, 123, 217, 0.12);
+  border: 1px solid var(--line);
+}
+
+.normal-upgrades .upgrade-row > span,
+.infinite-angle-upgrades .upgrade-row > span,
+.tc4-upgrade-list .upgrade-row > span {
+  min-width: 0;
+  display: grid;
+  justify-content: initial;
+  align-items: start;
+  gap: 2px;
+}
+
+.normal-upgrades .upgrade-row small,
+.infinite-angle-upgrades .upgrade-row small,
+.tc4-upgrade-list .upgrade-row small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.normal-upgrades .upgrade-row > em,
+.infinite-angle-upgrades .upgrade-row > em {
+  white-space: nowrap;
+  text-align: right;
+}
+
+.tc4-upgrade-copy {
+  overflow: hidden;
+}
+
+.tc4-upgrade-copy small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.tc4-upgrade-meta {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  min-width: max-content;
+  text-align: right;
+}
+
+.tc4-upgrade-meta span {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.tc4-upgrade-meta .tc4-upgrade-action {
+  color: var(--gold);
+  font-size: 0.72rem;
+  white-space: nowrap;
 }
 
 .upgrade-row strong {
@@ -1688,28 +1788,13 @@ canvas {
 .tc4-upgrade-list {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 6px;
 }
 
-.tc4-upgrade-card {
-  display: grid;
-  gap: 3px;
-  padding: 8px;
-  border: 1px solid rgba(91, 113, 153, 0.55);
-  border-radius: 8px;
-  background: rgba(9, 16, 29, 0.72);
-}
-
-.tc4-upgrade-card small {
-  min-height: 2.4em;
-  color: var(--muted);
-  font-size: 0.7rem;
-}
-
-.tc4-upgrade-button {
-  min-height: 34px;
-  padding: 6px 8px;
+.tc4-upgrade-list[hidden],
+.normal-upgrades[hidden] {
+  display: none;
 }
 
 .break-button {
@@ -3052,6 +3137,12 @@ canvas {
     overflow: auto;
   }
 
+  .angle-panel .reset-dock {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
   .generation,
   .core-boost {
     padding: 5px;
@@ -3068,6 +3159,12 @@ canvas {
   .generation span,
   .core-boost span {
     font-size: 0.68rem;
+  }
+
+  .angle-panel .generation span,
+  .angle-panel .core-boost span {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .generation strong,
