@@ -70,7 +70,7 @@ function installEternityUi() {
   eternityTab = mainTabHost.querySelector('[data-tab="eternity"]');
   if (!eternityTab) {
     eternityTab = document.createElement("button");
-    eternityTab.className = "eternity-main-tab";
+    eternityTab.className = "main-tab";
     eternityTab.type = "button";
     eternityTab.dataset.tab = "eternity";
     eternityTab.setAttribute("aria-selected", "false");
