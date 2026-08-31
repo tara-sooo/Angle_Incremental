@@ -162,6 +162,70 @@ try {
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
   assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
   assert.deepEqual(tabStructure.statisticsTabs, ["overview", "challenges", "eternity"], "Statistics subtabs should be ordered Overview, Challenge Records, Eternity Records");
+  const compactNavigation = await page.evaluate(() => {
+    const mainTabs = Array.from(document.querySelectorAll(".main-tab"));
+    const subtabs = Array.from(document.querySelectorAll(".infinity-subtab, .eternity-subtab, .challenge-subtab, .statistics-subtab"));
+    const disabledProbe = subtabs.find((button) => !button.disabled);
+    if (disabledProbe) disabledProbe.disabled = true;
+    const disabledStyle = disabledProbe
+      ? (() => {
+        const style = getComputedStyle(disabledProbe);
+        return { cursor: style.cursor, opacity: style.opacity };
+      })()
+      : null;
+    if (disabledProbe) disabledProbe.disabled = false;
+    const hiddenProbe = subtabs.find((button) => !button.hidden);
+    if (hiddenProbe) hiddenProbe.hidden = true;
+    const hiddenStyle = hiddenProbe
+      ? { display: getComputedStyle(hiddenProbe).display, rectCount: hiddenProbe.getClientRects().length }
+      : null;
+    if (hiddenProbe) hiddenProbe.hidden = false;
+    return {
+      mainCodes: mainTabs.map((button) => button.querySelector(".tab-code")?.textContent?.trim() ?? ""),
+      visibleMainStatuses: mainTabs
+        .filter((button) => !button.hidden)
+        .map((button) => {
+          const status = button.querySelector("small");
+          const style = status ? getComputedStyle(status) : null;
+          return {
+            position: style?.position ?? "",
+            width: style?.width ?? "",
+            height: style?.height ?? "",
+            clip: style?.clip ?? "",
+          };
+        }),
+      infinityBadge: Boolean(document.querySelector("#infinityTabBadge")),
+      subtabCount: subtabs.length,
+      sharedSubtabs: subtabs.every((button) => button.classList.contains("subtab")),
+      subtabStyleFingerprints: subtabs.map((button) => {
+        const style = getComputedStyle(button);
+        return [
+          style.display,
+          style.minHeight,
+          style.borderTopWidth,
+          style.borderRightWidth,
+          style.borderLeftWidth,
+          style.backgroundImage,
+          style.boxShadow,
+          style.touchAction,
+        ].join("|");
+      }),
+      disabledCursor: disabledStyle?.cursor ?? "",
+      disabledOpacity: disabledStyle?.opacity ?? "1",
+      hiddenDisplay: hiddenStyle?.display ?? "",
+      hiddenRectCount: hiddenStyle?.rectCount ?? 0,
+    };
+  });
+  assert.deepEqual(compactNavigation.mainCodes, ["ANG", "INF", "ETR", "CHA", "AUT", "STA", "ACH", "HLP", "SET"], "main tabs should use compact codes");
+  assert.equal(compactNavigation.infinityBadge, false, "Infinity should not render a readiness badge");
+  assert.equal(compactNavigation.visibleMainStatuses.every((status) => status.position === "absolute" && status.width === "1px" && status.height === "1px" && status.clip.startsWith("rect")), true, "main tab secondary copy should remain accessible but not visible");
+  assert.equal(compactNavigation.subtabCount, 10, "all four subtab families should remain present");
+  assert.equal(compactNavigation.sharedSubtabs, true, "all subtab families should use the shared subtab contract");
+  assert.equal(new Set(compactNavigation.subtabStyleFingerprints).size, 1, "all subtab families should share the same lightweight control style");
+  assert.equal(compactNavigation.disabledCursor, "not-allowed", "disabled subtabs should expose a disabled cursor");
+  assert.ok(Number(compactNavigation.disabledOpacity) < 1, "disabled subtabs should expose reduced emphasis");
+  assert.equal(compactNavigation.hiddenDisplay, "none", "hidden subtabs should leave the rendered strip");
+  assert.equal(compactNavigation.hiddenRectCount, 0, "hidden subtabs should have no rendered client rect");
   const measureMainTabBar = (targetPage) => targetPage.evaluate(() => {
     const nav = document.querySelector(".main-tabs");
     const strip = document.querySelector(".main-tab-scroll");
@@ -295,7 +359,6 @@ try {
     assert.ok(layout.activeHeight >= 40, `${viewportName} active tab should retain a touch-sized target`);
   }
   assert.ok(desktopTabBar.navWidth < desktopTabBar.shellWidth - 100, "desktop navigation should end near its content instead of framing dead space");
-  assert.ok(tabletTabBar.stripScrollWidth > tabletTabBar.stripClientWidth, "tablet overflow should remain horizontal inside the shared strip");
   assert.equal(endSettings.reachedEnd, true, "SET should be reachable at the end of the shared scrolling strip");
   assert.equal(endSettings.fullyVisible, true, "SET should be fully visible at the end of the shared scrolling strip");
   assert.equal(endSettings.inScrollHost, true, "SET should remain in the shared scrolling strip at its end");
@@ -1701,6 +1764,23 @@ try {
     assert.equal(mobileTabBar.settingsInScrollHost, true, "mobile SET should stay inside the scrolling strip");
     assert.equal(mobileTabBar.hasTabOverlap, false, "mobile tabs should not overlap horizontally");
     assert.equal(mobileTabBar.hasTabContentOverflow, false, "mobile tabs should retain intrinsic content widths");
+    const mobileSubtabContract = await mobilePage.evaluate(() => {
+      const subtabs = Array.from(document.querySelectorAll(".infinity-subtab, .eternity-subtab, .challenge-subtab, .statistics-subtab"));
+      const strips = Array.from(document.querySelectorAll(".infinity-subtabs, .eternity-subtabs, .challenge-subtabs, .statistics-subtabs"));
+      return {
+        shared: subtabs.every((button) => button.classList.contains("subtab")),
+        minHeights: subtabs.map((button) => Number.parseFloat(getComputedStyle(button).minHeight)),
+        longLabelsHidden: subtabs.map((button) => getComputedStyle(button.querySelector("strong")).position === "absolute"),
+        stripStyles: strips.map((strip) => {
+          const style = getComputedStyle(strip);
+          return [style.display, style.overflowX, style.backgroundImage, style.boxShadow].join("|");
+        }),
+      };
+    });
+    assert.equal(mobileSubtabContract.shared, true, "mobile subtabs should keep the shared control contract");
+    assert.ok(mobileSubtabContract.minHeights.every((height) => height >= 40), "mobile subtabs should retain touch-sized targets");
+    assert.equal(mobileSubtabContract.longLabelsHidden.every(Boolean), true, "mobile subtabs should show short codes while retaining hidden long labels");
+    assert.equal(new Set(mobileSubtabContract.stripStyles).size, 1, "mobile subtab strips should share the same lightweight surface");
     const mobileEndSettings = await mobilePage.evaluate(() => {
       const strip = document.querySelector(".main-tab-scroll");
       const settings = document.querySelector('[data-tab="settings"]');

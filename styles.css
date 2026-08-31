@@ -131,10 +131,7 @@ button {
 .stage-panel,
 .infinity-summary,
 .infinity-panel,
-.infinity-subtabs,
 .challenge-panel,
-.challenge-subtabs,
-.statistics-subtabs,
 .achievement-overview,
 .settings-card,
 .save-panel {
@@ -185,7 +182,7 @@ button {
 .main-tab {
   position: relative;
   display: grid;
-  grid-template-columns: auto auto auto;
+  grid-template-columns: auto auto;
   grid-template-rows: 1fr;
   align-items: center;
   justify-content: center;
@@ -239,27 +236,15 @@ button {
 }
 
 .main-tab small {
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 0.58rem;
-  letter-spacing: 0;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.main-tab i {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: var(--accent-strong);
-  box-shadow: 0 0 12px rgba(255, 118, 89, 0.85);
-  opacity: 0;
-}
-
-.main-tab i.is-visible {
-  opacity: 1;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .main-panels {
@@ -1216,145 +1201,87 @@ canvas {
   align-self: stretch;
 }
 
-.infinity-subtabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
-  margin-bottom: 6px;
-  padding: 5px;
-}
-
-.infinity-subtab {
-  min-height: 38px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 7px;
-  padding: 6px 8px;
-  color: var(--muted);
-  border: 2px solid var(--line);
-  background: linear-gradient(180deg, #19253e, #0f182a);
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.infinity-subtab span {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 26px;
-  color: var(--gold);
-  font-size: 0.78rem;
-  border: 1px solid var(--line-strong);
-  background: rgba(242, 184, 75, 0.08);
-}
-
-.infinity-subtab strong {
-  color: inherit;
-  font-size: 0.82rem;
-  text-align: left;
-  overflow-wrap: anywhere;
-}
-
-.infinity-subtab.is-active {
-  color: white;
-  border-color: var(--line-strong);
-  filter: brightness(1.14);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .infinity-subtab:hover {
-    color: white;
-    border-color: var(--line-strong);
-    filter: brightness(1.14);
-  }
-}
-
-.infinity-subtab.is-active {
-  background: linear-gradient(180deg, #4f6fb8, #253f82);
-  box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
-}
-
+.infinity-subtabs,
 .challenge-subtabs,
 .statistics-subtabs,
 .eternity-subtabs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
   margin-bottom: 6px;
-  padding: 5px;
+  padding: 0 0 2px;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
 }
 
-.statistics-subtabs {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.challenge-subtab,
-.statistics-subtab,
-.eternity-subtab {
-  min-height: 38px;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+.subtab {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: max-content;
+  min-height: 42px;
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 8px;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
   color: var(--muted);
-  border: 2px solid var(--line);
-  background: linear-gradient(180deg, #19253e, #0f182a);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
   font-weight: 900;
+  white-space: nowrap;
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
-.challenge-subtab span,
-.statistics-subtab span,
-.eternity-subtab span {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 26px;
+.subtab[hidden] {
+  display: none;
+}
+
+.subtab span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3ch;
   color: var(--gold);
   font-size: 0.78rem;
-  border: 1px solid var(--line-strong);
-  background: rgba(242, 184, 75, 0.08);
+  line-height: 1;
 }
 
-.challenge-subtab strong,
-.statistics-subtab strong,
-.eternity-subtab strong {
+.subtab strong {
   color: inherit;
   font-size: 0.82rem;
   text-align: left;
   overflow-wrap: anywhere;
 }
 
-.statistics-subtab.is-active {
+.subtab.is-active {
   color: white;
-  border-color: var(--line-strong);
-  filter: brightness(1.14);
-}
-
-.challenge-subtab.is-active,
-.eternity-subtab.is-active {
-  color: white;
-  border-color: var(--line-strong);
-  filter: brightness(1.14);
+  border-bottom-color: var(--gold);
+  background: rgba(76, 123, 217, 0.12);
 }
 
 @media (hover: hover) and (pointer: fine) {
-.challenge-subtab:hover,
-.statistics-subtab:hover,
-.eternity-subtab:hover {
+  .subtab:hover:not(:disabled) {
     color: white;
-    border-color: var(--line-strong);
-    filter: brightness(1.14);
+    border-bottom-color: var(--line-strong);
+    background: rgba(76, 123, 217, 0.08);
   }
 }
 
-.challenge-subtab.is-active,
-.statistics-subtab.is-active,
-.eternity-subtab.is-active {
-  background: linear-gradient(180deg, #4f6fb8, #253f82);
-  box-shadow: inset 0 -4px 0 var(--gold), inset 0 0 24px rgba(100, 136, 225, 0.35);
+.subtab:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.subtab:disabled {
+  color: var(--disabled);
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 .challenge-subpanel {
@@ -2629,10 +2556,6 @@ canvas {
     overflow-x: auto;
   }
 
-  .main-tab small {
-    white-space: nowrap;
-  }
-
   .main-panels,
   .main-panel,
   .angle-layout {
@@ -2831,77 +2754,32 @@ canvas {
     font-size: 0.7rem;
   }
 
-  .infinity-subtabs {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 4px;
-    margin-bottom: 4px;
-    padding: 4px;
-  }
-
-  .infinity-subtab {
-    min-height: 30px;
-    display: flex;
-    justify-content: center;
-    gap: 0;
-    padding: 4px 5px;
-  }
-
-  .infinity-subtab span {
-    width: auto;
-    height: auto;
-    min-width: 32px;
-    padding: 2px 5px;
-    font-size: 0.72rem;
-  }
-
-  .infinity-subtab strong {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-  }
-
+  .infinity-subtabs,
   .challenge-subtabs,
   .statistics-subtabs,
   .eternity-subtabs {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
+    gap: 2px;
     margin-bottom: 4px;
-    padding: 4px;
+    padding-bottom: 2px;
   }
 
-  .statistics-subtabs {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .challenge-subtab,
-  .statistics-subtab,
-  .eternity-subtab {
-    min-height: 30px;
-    display: flex;
-    justify-content: center;
+  .subtab {
+    min-height: 40px;
     gap: 0;
-    padding: 4px 5px;
+    padding: 6px 9px;
   }
 
-  .challenge-subtab span,
-  .statistics-subtab span,
-  .eternity-subtab span {
-    width: auto;
-    height: auto;
-    min-width: 32px;
-    padding: 2px 5px;
+  .subtab span {
+    min-width: 3ch;
     font-size: 0.72rem;
   }
 
-  .challenge-subtab strong,
-  .statistics-subtab strong,
-  .eternity-subtab strong {
+  .subtab strong {
     position: absolute;
     width: 1px;
     height: 1px;
+    padding: 0;
+    margin: -1px;
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;

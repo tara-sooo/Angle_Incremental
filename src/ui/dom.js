@@ -160,7 +160,6 @@ const elements = {
   updateModalClose: document.getElementById("updateModalClose"),
   i18nNodes: Array.from(document.querySelectorAll("[data-i18n]")),
   infinityTabState: document.getElementById("infinityTabState"),
-  infinityTabBadge: document.getElementById("infinityTabBadge"),
   challengeTabState: document.getElementById("challengeTabState"),
   infinityUnlockNote: document.getElementById("infinityUnlockNote"),
   automationMasterToggle: document.getElementById("automationMasterToggle"),
