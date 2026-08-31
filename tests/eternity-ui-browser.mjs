@@ -133,6 +133,10 @@ try {
     legacyIp: document.getElementById("eternityIpRequirement"),
     legacyReady: document.getElementById("eternityRequirementState"),
     legacyWarning: document.getElementById("eternityForcedNote"),
+    firstTierHint: document.querySelector('[data-i18n="eternityFirstTierHint"]')?.textContent,
+    timelineManualHint: document.querySelector('[data-i18n="timelineManualHint"]')?.textContent ?? null,
+    timelineTreeHint: document.querySelector('[data-i18n="timelineTreeHint"]')?.textContent ?? null,
+    milestoneEffects: Array.from(document.querySelectorAll(".eternity-milestone-effect"), (node) => node.textContent),
     title11: document.querySelector('[data-eternity-milestone="1-1"] [data-i18n="eternityMilestone11Name"]')?.textContent,
     title6: document.querySelector('[data-eternity-milestone="6"] [data-i18n="eternityMilestone6Name"]')?.textContent,
     status6: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-status')?.textContent,
@@ -179,6 +183,23 @@ try {
   assert.equal(initial.legacyIp, null, "Eternity should remove the separate IP status row");
   assert.equal(initial.legacyReady, null, "Eternity should remove the separate readiness row");
   assert.equal(initial.legacyWarning, null, "Eternity should remove the repeated manual-execution warning");
+  assert.equal(initial.firstTierHint, "最初の3種類(1-1,1-2,1-3)は任意のものを得られるが、1回のEternityにつき1つしか獲得ができない。", "first-tier copy should explain only the current selection rule");
+  assert.equal(initial.timelineManualHint, null, "Timeline should remove the redundant manual-claim explanation");
+  assert.equal(initial.timelineTreeHint, null, "Timeline should remove the redundant tree hint");
+  assert.deepEqual(initial.milestoneEffects, [
+    "Infinity以前の自動化を最初から解放",
+    "Eternity回数によって通常強化のレベルが増加する（Eternity回数×10、TC3報酬がある場合は適用後に加算）",
+    "IAが最初から通常強化のレベルをそれぞれ5持った状態で開始する",
+    "IC7は最初からクリアされた状態になる",
+    "GRとCBは何もリセットしない",
+    "核増幅に必要なコストを^0.9",
+    "IUの自動化を解放",
+    "ICは全て最初からクリアされた状態になる",
+    "TCは解放された瞬間にクリアされる",
+    "IAの自動購入とTowerの自動建設を解放",
+    "最初からIPを1000持った状態で開始される",
+    "Break Eternityを実行",
+  ], "Japanese milestone effects should use the concise player-facing wording");
   assert.equal(initial.title11, "1-1 QoLの精神", "Japanese Milestone copy should render");
   assert.equal(initial.title6, "6 有限回の無限チャレンジを0に", "Milestone 6 Japanese copy should render");
   assert.equal(initial.status6, "未解放", "Milestone 6 should remain locked before Eternity 27");
@@ -276,6 +297,19 @@ try {
     detailCurrentEffect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
     cardDescription: document.querySelector('.timeline-node[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
     warning: document.querySelector(".timeline-respec p")?.textContent,
+    availableCount: document.querySelectorAll("#timelineAvailableTf").length,
+    trackInfoCount: document.querySelectorAll(".timeline-track-info").length,
+    legacyBuildSurface: document.querySelector(".timeline-build") !== null,
+    treeBorder: getComputedStyle(document.querySelector(".timeline-tree")).borderTopWidth,
+    timelineScroll: (() => {
+      const timeline = document.querySelector('[data-eternity-panel="timeline"]');
+      const eternity = document.querySelector('[data-panel="eternity"]');
+      return {
+        overflowY: getComputedStyle(timeline).overflowY,
+        overscrollBehavior: getComputedStyle(timeline).overscrollBehavior,
+        parentOverflowY: getComputedStyle(eternity).overflowY,
+      };
+    })(),
   }));
   assert.equal(timelineInitial.active, true, "Timeline should be selectable as an Eternity subpanel");
   assert.equal(timelineInitial.milestoneInactive, true, "Timeline selection should hide the Milestone subpanel");
@@ -295,10 +329,19 @@ try {
   assert.equal(timelineInitial.detailPurchaseNode, "Real-BC16500");
   assert.equal(timelineInitial.detailButtonDisabled, true, "a node without available TF should be disabled");
   assert.match(timelineInitial.realStatus || "", /TF不足/);
-  assert.match(timelineInitial.detailDescription || "", /IP獲得量.*log10/);
+  assert.equal(timelineInitial.detailDescription, "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）");
   assert.match(timelineInitial.detailCurrentEffect || "", /未購入/);
   assert.equal(timelineInitial.cardDescription, undefined, "compact nodes should not expand long descriptions");
   assert.match(timelineInitial.warning || "", /TF.*Eternity/, "Timeline should explain the respec consequences");
+  assert.equal(timelineInitial.availableCount, 1, "available TF should have one primary value");
+  assert.equal(timelineInitial.trackInfoCount, 3, "each TF claim should keep requirement and state in one compact row");
+  assert.equal(timelineInitial.legacyBuildSurface, false, "Timeline should not wrap the build summary in another card");
+  assert.equal(timelineInitial.treeBorder, "0px", "the tree should provide hierarchy without a surrounding card");
+  assert.deepEqual(timelineInitial.timelineScroll, {
+    overflowY: "visible",
+    overscrollBehavior: "auto",
+    parentOverflowY: "auto",
+  }, "the nested Timeline should defer scrolling to the Eternity panel");
 
   await page.click('[data-timeline-node="Parallel-BC16500"]');
   const selectedParallel = await page.evaluate(() => ({
@@ -309,7 +352,7 @@ try {
   }));
   assert.equal(selectedParallel.selected, "Parallel-BC16500", "clicking a node should move the focused detail");
   assert.equal(selectedParallel.detailName, "終わらない氷河期");
-  assert.match(selectedParallel.detailDescription || "", /IC8.*毎秒.*1e10/);
+  assert.equal(selectedParallel.detailDescription, "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×1e10でソフトキャップ）");
   assert.equal(selectedParallel.purchaseNode, "Parallel-BC16500");
   await page.click('[data-timeline-node="Real-BC16500"]');
 
@@ -341,7 +384,7 @@ try {
   assert.equal(timelineClaimed.score, 25000, "claiming TF must not consume Score");
   assert.equal(timelineClaimed.detailButtonDisabled, false, "one available TF should make the selected node purchasable");
   assert.equal(timelineClaimed.detailPurchaseNode, "Real-BC16500");
-  assert.match(timelineClaimed.detailDescription || "", /IP獲得量.*log10/);
+  assert.equal(timelineClaimed.detailDescription, "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）");
   assert.match(timelineClaimed.detailCurrentEffect || "", /未購入/);
 
   await page.click("#timelineNodePurchaseButton");
@@ -418,7 +461,7 @@ try {
   assert.equal(progressed.owned11, "取得済み", "owned first-tier Milestones should be represented as owned");
   assert.equal(progressed.disabled11, true, "owned first-tier Milestones should no longer be selectable");
   assert.equal(progressed.active2, "有効", "count-based Milestone 2 should show active at Eternity 5");
-  assert.equal(progressed.effect2, "IC7をクリア済みの状態で開始する", "Milestone 2 should describe the direct IC7 completion state");
+  assert.equal(progressed.effect2, "IC7は最初からクリアされた状態になる", "Milestone 2 should describe the direct IC7 completion state");
   assert.equal(progressed.locked3, "未解放", "later count-based Milestones should remain locked below their threshold");
   assert.equal(progressed.locked6, "未解放", "Milestone 6 should remain locked at Eternity 5");
   assert.equal(progressed.locked7, "未解放", "Milestone 7 should remain locked at Eternity 5");
@@ -463,7 +506,7 @@ try {
     effect: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-effect')?.textContent,
   }));
   assert.equal(milestoneSix.status, "有効", "Milestone 6 should become active at Eternity 27");
-  assert.match(milestoneSix.effect || "", /IC1.*IC8.*クリア済み/, "Milestone 6 should explain the all-completed IC state");
+  assert.equal(milestoneSix.effect, "ICは全て最初からクリアされた状態になる", "Milestone 6 should explain the all-completed IC state");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -487,7 +530,7 @@ try {
     effect: document.querySelector('[data-eternity-milestone="7"] .eternity-milestone-effect')?.textContent,
   }));
   assert.equal(milestoneSeven.status, "有効", "Milestone 7 should become active at Eternity 44");
-  assert.match(milestoneSeven.effect || "", /Eternity 44.*Tower Challenge.*解放階.*クリア済み/, "Milestone 7 should explain auto-completion at normal unlock floors");
+  assert.equal(milestoneSeven.effect, "TCは解放された瞬間にクリアされる", "Milestone 7 should explain auto-completion at unlock");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -522,7 +565,7 @@ try {
     ],
   }));
   assert.equal(milestoneEight.status, "有効", "Milestone 8 should activate at Eternity 81");
-  assert.match(milestoneEight.effect || "", /Eternity 81.*IA.*Tower.*自動/, "Milestone 8 should describe IA and Tower automation");
+  assert.equal(milestoneEight.effect, "IAの自動購入とTowerの自動建設を解放", "Milestone 8 should describe IA and Tower automation");
   assert.deepEqual(milestoneEight.controlsDisabled, [false, false, false, false], "Milestone 8 controls should be available at Eternity 81");
 
   await page.evaluate(() => {
@@ -547,7 +590,7 @@ try {
     effect: document.querySelector('[data-eternity-milestone="9"] .eternity-milestone-effect')?.textContent,
   }));
   assert.equal(milestoneNine.status, "有効", "Milestone 9 should activate at Eternity 108");
-  assert.match(milestoneNine.effect || "", /Eternity 108.*1000.*IP.*開始/, "Milestone 9 should describe the 1000 IP starting baseline");
+  assert.equal(milestoneNine.effect, "最初からIPを1000持った状態で開始される", "Milestone 9 should describe the 1000 IP starting baseline");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -571,7 +614,7 @@ try {
     effect: document.querySelector('[data-eternity-milestone="10"] .eternity-milestone-effect')?.textContent,
   }));
   assert.equal(milestoneTen.status, "有効", "Milestone 10 should activate at Eternity 128");
-  assert.match(milestoneTen.effect || "", /Eternity 128.*Infinity Point.*上限.*解除/, "Milestone 10 should describe Break Eternity without changing the requirement");
+  assert.equal(milestoneTen.effect, "Break Eternityを実行", "Milestone 10 should describe Break Eternity");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -591,6 +634,7 @@ try {
     title9: document.querySelector('[data-i18n="eternityMilestone9Name"]')?.textContent,
     effect9: document.querySelector('[data-i18n="eternityMilestone9Effect"]')?.textContent,
     title10: document.querySelector('[data-i18n="eternityMilestone10Name"]')?.textContent,
+    milestoneEffects: Array.from(document.querySelectorAll(".eternity-milestone-effect"), (node) => node.textContent),
     effect10: document.querySelector('[data-i18n="eternityMilestone10Effect"]')?.textContent,
     timelineTitle: document.querySelector('[data-i18n="timeline"]')?.textContent,
     timelineTree: document.querySelector('[data-i18n="timelineTree"]')?.textContent,
@@ -607,23 +651,23 @@ try {
   assert.equal(english.compactRequirement, "TC4 clear + 1.80e308 IP", "Eternity requirement should switch to English");
   assert.equal(english.title11, "1-1 Spirit of QoL", "Milestone names should have English copy");
   assert.equal(english.title6, "6 Finite Infinity Challenges", "Milestone 6 should have English copy");
-  assert.equal(english.effect2, "Start each Eternity run with IC7 completed", "Milestone 2 English copy should describe the direct IC7 completion state");
-  assert.match(english.effect6 || "", /Eternity 27\+.*IC1.*IC8.*completed/, "Milestone 6 English copy should describe the completed IC state");
+  assert.equal(english.effect2, "Start with IC7 already cleared", "Milestone 2 English copy should describe the direct IC7 completion state");
+  assert.equal(english.milestoneEffects[7], "Start with all ICs already cleared", "Milestone 6 English copy should describe the completed IC state");
   assert.equal(english.title7, "7 One-Point Challenges", "Milestone 7 should have English copy");
-  assert.match(english.effect7 || "", /Eternity 44\+.*Tower Challenge.*completed.*normal unlock floor/, "Milestone 7 English copy should describe the normal unlock completion state");
+  assert.equal(english.milestoneEffects[8], "Clear each TC when it unlocks", "Milestone 7 English copy should describe completion at unlock");
   assert.equal(english.title8, "8 Babel of Infinite", "Milestone 8 should have English copy");
-  assert.match(english.effect8 || "", /Eternity 81\+.*Infinite Angle.*Tower.*auto/, "Milestone 8 English copy should describe IA and Tower automation");
+  assert.equal(english.milestoneEffects[9], "Unlock IA autobuy and Tower auto-build", "Milestone 8 English copy should describe IA and Tower automation");
   assert.equal(english.title9, "9 Worldly Desires", "Milestone 9 should have English copy");
-  assert.match(english.effect9 || "", /Eternity 108\+.*1000.*Infinity Points/, "Milestone 9 English copy should describe the 1000 IP starting baseline");
+  assert.equal(english.milestoneEffects[10], "Start with 1000 IP", "Milestone 9 English copy should describe the 1000 IP starting baseline");
   assert.equal(english.title10, "10 Eternity Is Balance", "Milestone 10 should have English copy");
-  assert.match(english.effect10 || "", /Eternity 128\+.*Infinity Point cap.*requirement remains unchanged/, "Milestone 10 English copy should describe the uncapped IP range and unchanged requirement");
+  assert.equal(english.milestoneEffects[11], "Perform Break Eternity", "Milestone 10 English copy should describe Break Eternity");
   assert.equal(english.timelineTitle, "Timeline", "Timeline should have English copy");
   assert.equal(english.timelineTree, "Timeline Tree", "Timeline Tree should have English copy");
   assert.equal(english.realNodeName, "Inert Stone Tools", "Real node should have English copy");
   assert.equal(english.parallelNodeName, "Endless Ice Age", "Parallel node should have English copy");
   assert.equal(english.detailLabel, "Selected node");
   assert.equal(english.detailName, "Inert Stone Tools");
-  assert.match(english.detailDescription || "", /Infinity Point gain.*log10/);
+  assert.equal(english.detailDescription, "Infinity Point gain is strengthened based on current IP (original gain × (1 + log10(IP))).");
   assert.match(english.detailCurrentEffect || "", /Inactive/);
   assert.match(english.timelineWarning || "", /respec.*node.*TF.*Eternity run/i, "Timeline respec warning should have English copy");
   assert.equal(english.manual, "", "Eternity should not show the repeated manual-execution warning");
