@@ -483,6 +483,11 @@
                   <strong id="timelineSpentTf">0 TF</strong>
                 </div>
               </div>
+              <div class="timeline-respec">
+                <button id="timelineRespecButton" class="timeline-respec-button reset-button" type="button" disabled data-i18n="timelineRespec">
+                  Respec Timeline
+                </button>
+              </div>
             </div>
             <div class="timeline-claim-grid">
               <article class="timeline-track">
@@ -491,8 +496,7 @@
                   <strong id="timelineScoreClaims">0</strong>
                 </div>
                 <div class="timeline-track-info">
-                  <p><span data-i18n="timelineNextRequirement">Next requirement</span>: <strong id="timelineScoreRequirement">1e20000 Score</strong></p>
-                  <p id="timelineScoreStatus" class="timeline-track-status">Not met</p>
+                  <p><span data-i18n="timelineNextRequirement">Next requirement</span>: <strong id="timelineScoreRequirement">— Score</strong></p>
                 </div>
                 <button id="timelineScoreClaimButton" class="timeline-claim-button upgrade-button" type="button" disabled data-i18n="timelineClaim">
                   Claim TF
@@ -504,8 +508,7 @@
                   <strong id="timelineIpClaims">0</strong>
                 </div>
                 <div class="timeline-track-info">
-                  <p><span data-i18n="timelineNextRequirement">Next requirement</span>: <strong id="timelineIpRequirement">1e400 IP</strong></p>
-                  <p id="timelineIpStatus" class="timeline-track-status">Not met</p>
+                  <p><span data-i18n="timelineNextRequirement">Next requirement</span>: <strong id="timelineIpRequirement">— IP</strong></p>
                 </div>
                 <button id="timelineIpClaimButton" class="timeline-claim-button upgrade-button" type="button" disabled data-i18n="timelineClaim">
                   Claim TF
@@ -518,7 +521,6 @@
                 </div>
                 <div class="timeline-track-info">
                   <p><span data-i18n="timelineNextRequirement">Next requirement</span>: <strong id="timelineEternityRequirement">2</strong></p>
-                  <p id="timelineEternityStatus" class="timeline-track-status">Not met</p>
                 </div>
                 <button id="timelineEternityClaimButton" class="timeline-claim-button upgrade-button" type="button" disabled data-i18n="timelineClaim">
                   Claim TF
@@ -532,36 +534,22 @@
                 <div class="timeline-node-detail-label" data-i18n="timelineNodeDetail">Selected node</div>
                 <div class="timeline-node-heading">
                   <div>
-                    <p id="timelineNodeDetailEra" class="timeline-node-era"></p>
                     <h3 id="timelineNodeDetailHeading" class="timeline-node-name"></h3>
                   </div>
-                  <span id="timelineNodeDetailRoute" class="timeline-node-route"></span>
                 </div>
                 <p id="timelineNodeDetailDescription" class="timeline-node-description"></p>
                 <p id="timelineNodeDetailCurrentEffect" class="timeline-node-current-effect"></p>
                 <dl class="timeline-node-meta">
                   <div>
-                    <dt data-i18n="timelineNodeCost">Cost</dt>
-                    <dd id="timelineNodeDetailCost" class="timeline-node-cost"></dd>
-                  </div>
-                  <div>
                     <dt data-i18n="timelineNodePrerequisites">Prerequisites</dt>
                     <dd id="timelineNodeDetailPrerequisites" class="timeline-node-prerequisites"></dd>
                   </div>
                 </dl>
-                <p id="timelineNodeDetailStatus" class="timeline-node-status"></p>
                 <button id="timelineNodePurchaseButton" class="timeline-node-purchase upgrade-button" type="button" data-timeline-node-purchase disabled>
                   Purchase node
                 </button>
               </section>
             </section>
-            <p id="timelinePurchasedNodes" class="timeline-build-summary" data-i18n="timelineNoNodes">No Timeline nodes purchased.</p>
-            <div class="timeline-respec">
-              <p data-i18n="timelineRespecWarning">Respec removes every Timeline node, refunds all spent TF, and restarts the current Eternity run.</p>
-              <button id="timelineRespecButton" class="timeline-respec-button reset-button" type="button" disabled data-i18n="timelineRespec">
-                Respec Timeline
-              </button>
-            </div>
           </section>
         </section>
 
