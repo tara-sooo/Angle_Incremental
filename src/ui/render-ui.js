@@ -446,9 +446,7 @@ function updateTimelineUi() {
   const spent = runtime.timelineSpentTf();
   runtime.elements.timelineEarnedTf.textContent = `${runtime.formatUiNumber(earned)} TF`;
   runtime.elements.timelineAvailableTf.textContent = `${runtime.formatUiNumber(available)} TF`;
-  runtime.elements.timelineAvailableTfSummary.textContent = `${runtime.formatUiNumber(available)} TF`;
   runtime.elements.timelineSpentTf.textContent = `${runtime.formatUiNumber(spent)} TF`;
-  runtime.elements.timelineSpentTfBuild.textContent = `${runtime.formatUiNumber(spent)} TF`;
 
   const tracks = [
     {

@@ -138,9 +138,7 @@ button {
 .statistics-subtabs,
 .achievement-overview,
 .settings-card,
-.save-panel,
-.timeline-surface,
-.timeline-track {
+.save-panel {
   background: linear-gradient(180deg, rgba(23, 36, 59, 0.96), rgba(12, 20, 35, 0.96));
   border: 2px solid var(--line-strong);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 18px 46px rgba(0, 0, 0, 0.3);
@@ -685,7 +683,6 @@ canvas {
 
 .infinity-summary,
 .infinity-panel,
-.timeline-surface,
 .challenge-panel,
 .achievement-overview,
 .settings-card,
@@ -756,35 +753,55 @@ canvas {
   padding-bottom: 5px;
 }
 
-.timeline-page {
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
 .timeline-surface {
-  padding: 12px;
+  padding: 8px 0 0;
 }
 
-.timeline-summary,
-.timeline-claim-grid {
+.timeline-overview {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
 }
 
-.timeline-summary > div {
+.timeline-available {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   padding: 10px;
-  border: 1px solid var(--line);
-  background: rgba(10, 18, 34, 0.68);
+  border-bottom: 2px solid var(--gold);
 }
 
+.timeline-available span,
 .timeline-summary span,
 .timeline-track p {
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.timeline-available span {
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.timeline-available strong {
+  color: var(--gold);
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  overflow-wrap: anywhere;
+}
+
+.timeline-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.timeline-summary > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .timeline-summary strong,
@@ -793,32 +810,55 @@ canvas {
   overflow-wrap: anywhere;
 }
 
-.timeline-hint,
-.timeline-build p,
-.timeline-respec p {
-  color: var(--muted);
-  line-height: 1.5;
+.timeline-claim-grid {
+  display: grid;
+  gap: 0;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
 }
 
-.timeline-hint {
-  margin: 12px 0 0;
+.timeline-track {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(0, 1.8fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.timeline-track-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.timeline-track h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.timeline-track-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
 }
 
 .timeline-tree {
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  background: rgba(10, 18, 34, 0.52);
+  margin-top: 18px;
 }
 
-.timeline-tree > .panel-heading {
-  margin: -12px -12px 0;
-}
-
-.timeline-tree-hint {
-  margin: 10px 0 0;
-  color: var(--muted);
-  line-height: 1.5;
+.timeline-tree-heading {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--line);
+  color: var(--ink);
+  font-size: 1rem;
 }
 
 .timeline-eras {
@@ -877,11 +917,11 @@ canvas {
   display: flex;
   width: 100%;
   min-width: 0;
-  min-height: 104px;
+  min-height: 92px;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 8px;
+  padding: 9px 10px;
   border: 1px solid var(--line);
   background: rgba(10, 18, 34, 0.68);
   color: var(--ink);
@@ -1033,10 +1073,9 @@ canvas {
 }
 
 .timeline-node-detail {
-  margin-top: 16px;
-  padding: 12px;
-  border: 1px solid var(--line-strong);
-  background: rgba(10, 18, 34, 0.74);
+  margin-top: 14px;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line-strong);
 }
 
 .timeline-node-detail-label {
@@ -1070,15 +1109,14 @@ canvas {
 .timeline-node-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 0 12px;
   margin: 12px 0 0;
 }
 
 .timeline-node-meta > div {
   min-width: 0;
-  padding: 7px;
-  border: 1px solid var(--line);
-  background: rgba(10, 18, 34, 0.42);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .timeline-node-meta dt {
@@ -1123,34 +1161,9 @@ canvas {
   text-align: center;
 }
 
-.timeline-track {
-  min-width: 0;
-  padding: 9px;
-  border-color: var(--line);
-  box-shadow: none;
-}
-
-.timeline-track-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 7px;
-}
-
-.timeline-track h2 {
-  margin: 0;
-  color: var(--ink);
-  font-size: 1rem;
-}
-
-.timeline-track p {
-  margin: 7px 0 0;
-}
-
 .timeline-track-status {
   font-weight: 900;
+  text-align: right;
 }
 
 .timeline-track-status.is-met {
@@ -1162,26 +1175,18 @@ canvas {
 }
 
 .timeline-claim-button {
-  width: 100%;
+  width: auto;
+  min-width: 92px;
   min-height: 36px;
-  margin-top: 8px;
+  margin: 0;
   padding: 8px 10px;
   text-align: center;
 }
 
-.timeline-build {
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px solid var(--line);
-  background: rgba(10, 18, 34, 0.52);
-}
-
-.timeline-build .panel-heading {
-  margin: -12px -12px 0;
-}
-
-.timeline-build p {
-  margin: 10px 0 0;
+.timeline-build-summary {
+  margin: 16px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
@@ -1190,14 +1195,15 @@ canvas {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 12px;
-  padding: 10px;
-  border: 1px solid rgba(255, 166, 89, 0.38);
-  background: rgba(112, 57, 28, 0.18);
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 166, 89, 0.45);
 }
 
 .timeline-respec p {
   margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .timeline-respec-button {
@@ -2608,6 +2614,7 @@ canvas {
   .achievement-list,
   .infinite-angle-panel,
   .tower-metrics,
+  .timeline-overview,
   .timeline-summary,
   .timeline-claim-grid,
   .timeline-node-grid,
@@ -2624,6 +2631,25 @@ canvas {
   }
 
   .timeline-respec-button {
+    width: 100%;
+  }
+
+  .timeline-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .timeline-track {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .timeline-track-info {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .timeline-claim-button {
+    grid-column: 1 / -1;
+    grid-row: 3;
     width: 100%;
   }
 
