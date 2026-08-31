@@ -110,7 +110,7 @@ function updateTowerChallenge4UpgradeRows() {
     const kind = button.dataset.tc4Upgrade;
     const level = runtime.towerChallenge4UpgradeLevel(kind);
     const label = runtime.t(button.dataset.labelKey);
-    const price = runtime.formatPowerOfTen(runtime.towerChallenge4UpgradePriceLog10(kind));
+    const price = runtime.formatUiLogNumber(runtime.towerChallenge4UpgradePriceLog10(kind));
     button.querySelector(".tc4-upgrade-label").textContent = label;
     button.querySelector(".tc4-upgrade-effect").textContent = towerChallenge4UpgradeEffectText(kind, button.dataset.effectKey);
     button.querySelector(".tc4-upgrade-level").textContent = `${runtime.t("level")} ${level}`;
@@ -170,7 +170,7 @@ function updateTowerChallengeRows() {
             ? runtime.t("towerChallengeAvailable")
             : runtime.t("towerChallengeLocked").replace("{floor}", String(unlockFloor));
     row.querySelector(".challenge-target").textContent = Number.isFinite(targetLog10)
-      ? `${runtime.t("towerChallengeTarget")}: ${runtime.formatPowerOfTen(targetLog10)} Score`
+      ? `${runtime.t("towerChallengeTarget")}: ${runtime.formatUiLogNumber(targetLog10)} Score`
       : runtime.t("towerChallengeComingSoon");
     row.querySelector(".challenge-restriction").textContent = `${runtime.t("challengeRestrictionLabel")}: ${runtime.towerChallengeRestriction(index)}`;
     row.querySelector(".challenge-reward").textContent = `${runtime.t("challengeRewardLabel")}: ${runtime.towerChallengeReward(index)}${runtime.towerChallengeRewardUnlocked(index) ? ` (${runtime.t("towerChallengeRewardUnlocked")})` : ""}`;

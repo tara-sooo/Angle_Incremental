@@ -12,7 +12,7 @@ function formatInfinityRunTime(value) {
 
 function infinityRunRecordText(record, index) {
   const challenge = record.challenge > 0 ? ` IC${record.challenge}` : "";
-  return `#${index + 1}${challenge} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.formatPowerOfTen(record.scoreLog10)} / +${runtime.formatUiNumber(record.ipGain)} IP`;
+  return `#${index + 1}${challenge} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.formatUiLogNumber(record.scoreLog10)} / +${runtime.formatUiNumber(record.ipGain)} IP`;
 }
 
 function eternityRunRecordText(record, index) {
