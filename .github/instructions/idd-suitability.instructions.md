@@ -87,6 +87,8 @@ or configured needs-decision label from `labels.needsDecisionLabelName`
   superseded by newer work, or the work was already completed or is in
   progress (including draft PRs)
 - **Outcome on fail**: `duplicate`
+- **Candidate exclusion**: Ignore issues whose GitHub `state_reason` is
+  `duplicate` when searching for duplicate or superseded work.
 
 #### High-confidence tier (#1484)
 
