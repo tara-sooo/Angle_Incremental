@@ -16,6 +16,7 @@ import "./ui/render-infinity.js";
 import "./ui/render-achievements.js";
 import "./ui/render-automation.js";
 import "./ui/render-offline-report.js";
+import "./ui/render-help.js";
 import "./ui/render-ui.js";
 import "./systems/angle.js";
 import "./systems/generation.js";

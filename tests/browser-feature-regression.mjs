@@ -94,6 +94,166 @@ try {
   assert.equal(await page.locator('[data-tab="settings"]').isVisible(), true, "SET should remain visible after restoring HELP");
   assert.equal(await page.locator('#tabVisibilityList input[data-main-tab-visibility="settings"]').isDisabled(), true, "SET should remain unhideable");
 
+  const helpUi = await page.evaluate(() => {
+    const { state, runtime, switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+    const originalState = structuredClone(state);
+    const originalMainTab = runtime.activeMainTab;
+    const originalInfinitySubtab = runtime.activeInfinitySubtab;
+    const originalHelpContext = runtime.helpContextMainTab;
+    const readHelp = () => ({
+      topics: Array.from(document.querySelectorAll("#helpSections [data-help-topic]"), (node) => node.dataset.helpTopic),
+      navCount: document.querySelectorAll("#helpNav a").length,
+      sectionCount: document.querySelectorAll("#helpSections details").length,
+      open: Array.from(document.querySelectorAll("#helpSections details[open]"), (node) => node.dataset.helpTopic),
+      current: document.querySelector("#helpNav a[aria-current]")?.textContent?.trim() ?? "",
+      context: document.querySelector("#helpContext")?.textContent?.trim() ?? "",
+      text: document.querySelector("#helpSections")?.textContent?.trim() ?? "",
+    });
+
+    switchMainTab("angle");
+    switchMainTab("help");
+    window.advanceTime(0);
+    const fresh = readHelp();
+
+    Object.assign(state, {
+      generationCount: 1,
+      coreBoostCount: 1,
+      infinityCount: 1,
+      infinityUpgradeMask: 1 << 5,
+      completedChallenges: 1,
+      infiniteCapBroken: true,
+      infiniteAngleUnlocked: true,
+      towerFloor: 3,
+      completedTowerChallenges: 1,
+      eternityCount: 1,
+      eternityMilestoneMask: 7,
+      unlockedMainTabs: ["infinity", "challenges", "automation", "eternity", "timeline"],
+      automationEnabled: true,
+      activeChallenge: 0,
+      activeTowerChallenge: 0,
+      language: "ja",
+    });
+    switchMainTab("infinity");
+    switchInfinitySubtab("tower");
+    window.advanceTime(0);
+    switchMainTab("help");
+    window.advanceTime(0);
+    const upper = readHelp();
+
+    state.infinityCount = 0;
+    state.infinityUpgradeMask = 0;
+    state.completedChallenges = 0;
+    state.infiniteCapBroken = false;
+    state.infiniteAngleUnlocked = false;
+    state.towerFloor = 0;
+    state.completedTowerChallenges = 0;
+    state.eternityCount = 1;
+    state.unlockedMainTabs = ["timeline"];
+    window.advanceTime(0);
+    const afterReset = readHelp();
+
+    state.language = "en";
+    window.advanceTime(0);
+    const english = readHelp();
+
+    Object.assign(state, originalState);
+    runtime.helpContextMainTab = originalHelpContext;
+    switchInfinitySubtab(originalInfinitySubtab);
+    switchMainTab(originalMainTab);
+    window.advanceTime(0);
+    runtime.saveGame("manual");
+    return { fresh, upper, afterReset, english };
+  });
+  assert.deepEqual(
+    helpUi.fresh.topics,
+    ["angle", "generation", "resets", "offline", "notation"],
+    "fresh Help should show only immediate and always-available topics",
+  );
+  assert.equal(helpUi.fresh.navCount, helpUi.fresh.sectionCount, "fresh Help navigation should match rendered sections");
+  assert.equal(helpUi.fresh.open.includes("angle"), true, "Help should open the topic matching the previous main tab");
+  assert.equal(helpUi.fresh.current, "The Angle と通常強化", "Help should mark the contextual topic");
+  assert.doesNotMatch(helpUi.fresh.text, /Infinity Upgrade|Eternity Milestone|Tower Challenge/, "fresh Help should omit undiscovered spoilers");
+  assert.equal(helpUi.upper.topics.length, 17, "upper progression should expose every shipped Help topic");
+  assert.equal(helpUi.upper.open.includes("tower"), true, "Help should focus the previous Infinity subtab");
+  assert.equal(helpUi.upper.current, "Tower", "Help navigation should mark the previous subtab topic");
+  assert.equal(helpUi.upper.context, "現在の焦点: Tower", "Help should translate its contextual focus");
+  assert.deepEqual(helpUi.afterReset.topics, helpUi.upper.topics, "discovered Help topics should survive a reset");
+  assert.match(helpUi.english.current, /Tower/, "Help navigation should switch to English");
+  assert.match(helpUi.english.text, /TC4|1e7777/, "English Help should contain the shipped TC4 guidance");
+  assert.match(helpUi.english.context, /Current focus: Tower/, "Help context should switch language with the guide");
+
+  await page.evaluate(() => {
+    const { state, runtime, switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+    window.__helpLayoutOriginal = {
+      state: structuredClone(state),
+      mainTab: runtime.activeMainTab,
+      infinitySubtab: runtime.activeInfinitySubtab,
+      helpContext: runtime.helpContextMainTab,
+    };
+    Object.assign(state, {
+      infinityCount: 1,
+      infinityUpgradeMask: 0x7fff,
+      completedChallenges: 0xff,
+      infiniteCapBroken: true,
+      infiniteAngleUnlocked: true,
+      towerFloor: 12,
+      completedTowerChallenges: 0xf,
+      eternityCount: 1,
+      eternityMilestoneMask: 0x3ff,
+      unlockedMainTabs: ["infinity", "challenges", "automation", "eternity", "timeline"],
+      automationEnabled: true,
+      activeChallenge: 0,
+      activeTowerChallenge: 0,
+      achievementMask: 0x7fffffff,
+      achievementMaskHigh: 0x3ff,
+      floatingTexts: [],
+      language: "ja",
+    });
+    switchMainTab("infinity");
+    switchInfinitySubtab("tower");
+    switchMainTab("help");
+    window.advanceTime(0);
+  });
+  const measureHelpLayout = () => page.evaluate(() => {
+    const panel = document.querySelector('[data-panel="help"]');
+    const nav = document.querySelector("#helpNav");
+    const sections = document.querySelector("#helpSections");
+    const bodies = Array.from(document.querySelectorAll("#helpSections .help-section-body"));
+    return {
+      topicCount: sections?.querySelectorAll("details").length ?? 0,
+      navHeight: nav?.getBoundingClientRect().height ?? 0,
+      navClientWidth: nav?.clientWidth ?? 0,
+      navScrollWidth: nav?.scrollWidth ?? 0,
+      panelOverflow: Boolean(panel && panel.scrollWidth > panel.clientWidth + 1),
+      bodyOverflow: bodies.some((body) => body.scrollWidth > body.clientWidth + 1),
+      summaryHeights: Array.from(document.querySelectorAll("#helpSections summary"), (summary) => summary.getBoundingClientRect().height),
+    };
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const desktopHelpLayout = await measureHelpLayout();
+  assert.equal(desktopHelpLayout.topicCount, 17, "desktop Help should render every discovered topic");
+  assert.equal(desktopHelpLayout.panelOverflow, false, "desktop Help should not overflow horizontally");
+  assert.equal(desktopHelpLayout.bodyOverflow, false, "desktop Help text should not overflow its section");
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileHelpLayout = await measureHelpLayout();
+  assert.equal(mobileHelpLayout.topicCount, 17, "mobile Help should render every discovered topic");
+  assert.ok(mobileHelpLayout.navScrollWidth > mobileHelpLayout.navClientWidth, "mobile Help topics should scroll in one row");
+  assert.ok(mobileHelpLayout.navHeight <= 60, "mobile Help topics should keep the navigation compact");
+  assert.equal(mobileHelpLayout.panelOverflow, false, "mobile Help should not overflow horizontally");
+  assert.equal(mobileHelpLayout.bodyOverflow, false, "mobile Help text should not overflow its section");
+  assert.ok(mobileHelpLayout.summaryHeights.every((height) => height >= 42), "mobile Help summaries should remain touch-safe");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(() => {
+    const { state, runtime, switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+    const original = window.__helpLayoutOriginal;
+    Object.assign(state, original.state);
+    runtime.helpContextMainTab = original.helpContext;
+    switchInfinitySubtab(original.infinitySubtab);
+    switchMainTab(original.mainTab);
+    delete window.__helpLayoutOriginal;
+    window.advanceTime(0);
+  });
+
   const desktopButtonInteraction = await page.evaluate(() => {
     const selectors = ["[data-tab=angle]", "#speedUpgrade"];
     return selectors.map((selector) => {
