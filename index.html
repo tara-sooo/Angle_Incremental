@@ -873,15 +873,20 @@
                 <span data-i18n="save">セーブ</span>
                 <strong id="saveStatus">未保存</strong>
               </div>
-              <label class="save-code-label" for="saveCodeArea" data-i18n="saveCode">セーブコード</label>
-              <textarea id="saveCodeArea" class="save-code-area" spellcheck="false"></textarea>
               <div class="save-code-actions">
                 <button id="exportSaveCodeButton" class="reset-button" type="button" data-i18n="exportSaveCode">書き出し</button>
                 <button id="importSaveCodeButton" class="reset-button" type="button" data-i18n="importSaveCode">読み込み</button>
-                <button id="copySaveCodeButton" class="reset-button" type="button" data-i18n="copySaveCode">コピー</button>
               </div>
-              <div class="save-recovery">
-                <strong class="save-recovery-title" data-i18n="saveRecovery">セーブ復旧</strong>
+              <details id="saveCodeDetails" class="save-code-details">
+                <summary class="save-code-title" data-i18n="saveCode">セーブコード</summary>
+                <label class="save-code-label" for="saveCodeArea" data-i18n="saveCode">セーブコード</label>
+                <textarea id="saveCodeArea" class="save-code-area" spellcheck="false"></textarea>
+                <div class="save-code-actions">
+                  <button id="copySaveCodeButton" class="reset-button" type="button" data-i18n="copySaveCode">コピー</button>
+                </div>
+              </details>
+              <details id="saveRecoveryDetails" class="save-recovery">
+                <summary class="save-recovery-title" data-i18n="saveRecovery">セーブ復旧</summary>
                 <p id="preImportBackupStatus" class="save-recovery-status"></p>
                 <p id="loadFailureStatus" class="save-recovery-status"></p>
                 <p id="quarantineStatus" class="save-recovery-status"></p>
@@ -901,10 +906,12 @@
                 </div>
                 <p class="save-recovery-label" data-i18n="saveCheckpoints">チェックポイント</p>
                 <div id="saveCheckpointList" class="save-checkpoint-list"></div>
+              </details>
+              <div class="save-reset-action">
+                <button id="resetSaveButton" class="reset-button" type="button" data-i18n="resetSave">
+                  セーブをリセット
+                </button>
               </div>
-              <button id="resetSaveButton" class="reset-button" type="button" data-i18n="resetSave">
-                セーブをリセット
-              </button>
             </section>
           </div>
         </section>

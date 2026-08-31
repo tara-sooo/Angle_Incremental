@@ -1390,6 +1390,47 @@ try {
     });
   });
   await page.locator('[data-tab="settings"]').click();
+  assert.equal(await page.locator("#saveCodeArea").isVisible(), false, "save-code input should be collapsed by default");
+  assert.equal(await page.locator("#exportSaveCodeButton").isVisible(), true, "Export should stay prominent");
+  assert.equal(await page.locator("#importSaveCodeButton").isVisible(), true, "Import should stay prominent");
+  assert.equal(await page.locator("#resetSaveButton").isVisible(), true, "reset should remain separately available");
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      codeOpen: document.querySelector("#saveCodeDetails")?.open ?? true,
+      recoveryOpen: document.querySelector("#saveRecoveryDetails")?.open ?? true,
+    })),
+    { codeOpen: false, recoveryOpen: false },
+    "save details and recovery should start collapsed",
+  );
+  const saveLabels = await page.evaluate(() => {
+    const { state } = window.__angleDebug;
+    const originalLanguage = state.language;
+    const read = () => ({
+      summary: document.querySelector("#saveCodeDetails > summary")?.textContent?.trim() ?? "",
+      exportText: document.querySelector("#exportSaveCodeButton")?.textContent?.trim() ?? "",
+      importText: document.querySelector("#importSaveCodeButton")?.textContent?.trim() ?? "",
+    });
+    state.language = "ja";
+    window.advanceTime(0);
+    const ja = read();
+    state.language = "en";
+    window.advanceTime(0);
+    const en = read();
+    state.language = originalLanguage;
+    window.advanceTime(0);
+    return { ja, en };
+  });
+  assert.deepEqual(saveLabels.ja, { summary: "セーブコード", exportText: "書き出し", importText: "読み込み" }, "Japanese save labels should remain clear");
+  assert.deepEqual(saveLabels.en, { summary: "Save code", exportText: "Export", importText: "Import" }, "English save labels should remain clear");
+  await page.locator("#importSaveCodeButton").click();
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      codeOpen: document.querySelector("#saveCodeDetails")?.open ?? false,
+      activeId: document.activeElement?.id ?? null,
+    })),
+    { codeOpen: true, activeId: "saveCodeArea" },
+    "Import should reveal and focus the editable save-code input",
+  );
   const saveCodeArea = page.locator("#saveCodeArea");
   await saveCodeArea.focus();
   const focusBeforeInput = await page.evaluate(() => ({
@@ -1416,12 +1457,24 @@ try {
   });
   await page.locator("#exportSaveCodeButton").click();
   await page.waitForFunction(() => document.querySelector("#saveCodeArea")?.value.startsWith("ANGLE_SAVE_V2:"));
+  assert.equal(
+    await page.evaluate(() => document.querySelector("#saveCodeDetails")?.open ?? false),
+    true,
+    "Export should reveal the generated save code",
+  );
+  assert.equal(await saveCodeArea.isVisible(), true, "exported save code should be visible for review");
   const exportedSaveCodeLength = await saveCodeArea.inputValue().then((value) => value.length);
   await page.evaluate(() => {
     window.__angleDebug.state.generationCount = 99;
   });
   await page.locator("#importSaveCodeButton").click();
   await page.waitForFunction(() => window.__angleDebug.state.generationCount === 7);
+  assert.equal(
+    await page.evaluate(() => document.querySelector("#saveRecoveryDetails")?.open ?? false),
+    true,
+    "a successful import should reveal pre-import recovery",
+  );
+  assert.equal(await page.locator("#restorePreImportButton").isVisible(), true, "pre-import recovery should be actionable");
   assert.ok(exportedSaveCodeLength > 20, "save-code export should populate the textarea");
   assert.equal(
     await page.evaluate(() => window.__angleDebug.state.previousGenerationScoreLog10),
@@ -1803,12 +1856,21 @@ try {
       optionSectionWidth: document.querySelector('[data-panel="settings"] .settings-options')?.getBoundingClientRect().width ?? 0,
       rowHeights: Array.from(document.querySelectorAll('[data-panel="settings"] .settings-options .setting-row'), (row) => row.getBoundingClientRect().height),
       rowOverflow: Array.from(document.querySelectorAll('[data-panel="settings"] .settings-options .setting-row')).some((row) => row.scrollWidth > row.clientWidth + 1),
+      saveCodeOpen: document.querySelector("#saveCodeDetails")?.open ?? true,
+      saveRecoveryOpen: document.querySelector("#saveRecoveryDetails")?.open ?? true,
+      saveActionsOverflow: ["#exportSaveCodeButton", "#importSaveCodeButton", "#resetSaveButton"].some((selector) => {
+        const button = document.querySelector(selector);
+        return Boolean(button && button.scrollWidth > button.clientWidth + 1);
+      }),
     }));
     assert.equal(mobileSettingsDensity.panelActive, true, "the mobile Settings tab should activate");
     assert.equal(mobileSettingsDensity.cardCount, 0, "mobile Settings options should avoid per-section cards");
     assert.ok(mobileSettingsDensity.optionSectionWidth > 0, "mobile Settings should keep its option section visible");
     assert.ok(mobileSettingsDensity.rowHeights.every((height) => height >= 44), "mobile Settings rows should remain touch-safe");
     assert.equal(mobileSettingsDensity.rowOverflow, false, "mobile Settings rows should keep controls within the viewport");
+    assert.equal(mobileSettingsDensity.saveCodeOpen, false, "mobile save-code input should remain collapsed by default");
+    assert.equal(mobileSettingsDensity.saveRecoveryOpen, false, "mobile recovery should remain collapsed by default");
+    assert.equal(mobileSettingsDensity.saveActionsOverflow, false, "mobile save actions should remain readable");
 
     const mobileUpgradeCenters = await mobilePage.evaluate(() => {
       const { switchMainTab, switchInfinitySubtab } = window.__angleDebug;
