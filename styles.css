@@ -2092,30 +2092,68 @@ canvas {
   font-weight: 800;
 }
 
-.offline-report-grid {
+.offline-report-result {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.offline-report-grid > div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--line);
-  background: rgba(7, 16, 31, 0.42);
+.offline-report-away {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--line);
 }
 
-.offline-report-grid span {
+.offline-report-away span,
+.offline-report-change-label {
   color: var(--muted);
   font-size: 0.76rem;
   font-weight: 800;
 }
 
-.offline-report-grid strong {
+.offline-report-away strong,
+.offline-report-change-after {
   color: var(--ink);
+}
+
+.offline-report-changes {
+  display: grid;
+}
+
+.offline-report-change {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.offline-report-change:last-child {
+  border-bottom: 0;
+}
+
+.offline-report-change-values {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  text-align: right;
+}
+
+.offline-report-change-before,
+.offline-report-change-after {
   overflow-wrap: anywhere;
+}
+
+.offline-report-change-before {
+  color: var(--muted);
+}
+
+.offline-report-change-arrow {
+  color: var(--gold);
 }
 
 .offline-report {
@@ -2499,6 +2537,15 @@ canvas {
     bottom: calc(72px + env(safe-area-inset-bottom));
     width: min(600px, calc(100vw - 24px));
     max-height: calc(100svh - 84px - env(safe-area-inset-bottom));
+  }
+
+  .offline-report-change {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .offline-report-change-values {
+    text-align: left;
   }
 
   .top-bar-hidden .achievement-toasts {

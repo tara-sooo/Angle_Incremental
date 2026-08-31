@@ -926,17 +926,13 @@
         <strong id="offlineReportMode">オフライン進行</strong>
       </div>
       <progress id="offlineReportProgress" max="1" value="0" aria-label="Offline progress"></progress>
-      <div class="offline-report-grid">
-        <div><span data-i18n="offlineReportElapsedLabel">離席時間</span><strong id="offlineReportElapsed">0秒</strong></div>
-        <div><span data-i18n="offlineReportEffectiveLabel">処理時間</span><strong id="offlineReportEffective">0秒</strong></div>
-        <div><span data-i18n="offlineReportConfiguredTicksLabel">設定ティック数</span><strong id="offlineReportConfiguredTicks">0</strong></div>
-        <div><span data-i18n="offlineReportRequestedTicksLabel">要求ティック数</span><strong id="offlineReportRequestedTicks">0</strong></div>
-        <div><span data-i18n="offlineReportTicksLabel">処理ティック数</span><strong id="offlineReportTicks">0</strong></div>
-        <div><span data-i18n="offlineReportProcessingTimeLabel">実計算時間</span><strong id="offlineReportProcessingTime">0ms</strong></div>
-        <div><span data-i18n="offlineReportNormalInfinityLabel">通常Infinity増加</span><strong id="offlineReportNormalInfinity">+0</strong></div>
-        <div><span data-i18n="offlineReportAggregatedInfinityLabel">集約Infinity増加</span><strong id="offlineReportAggregatedInfinity">+0</strong></div>
-        <div><span data-i18n="offlineReportInfinityLabel">Infinity増加</span><strong id="offlineReportInfinity">+0</strong></div>
-        <div><span data-i18n="offlineReportIpLabel">現在IP</span><strong id="offlineReportIp">0</strong></div>
+      <div id="offlineReportResult" class="offline-report-result" hidden>
+        <div class="offline-report-away">
+          <span data-i18n="offlineReportElapsedLabel">離席時間</span>
+          <strong id="offlineReportElapsed">0秒</strong>
+        </div>
+        <div id="offlineReportChanges" class="offline-report-changes"></div>
+        <p id="offlineReportNoChanges" data-i18n="offlineReportNoChanges" hidden>変化はありませんでした</p>
       </div>
       <p id="offlineReportNote"></p>
       <button id="offlineReportClose" class="reset-button" type="button" data-i18n="offlineReportClose">閉じる</button>

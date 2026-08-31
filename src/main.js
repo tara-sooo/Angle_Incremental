@@ -885,12 +885,29 @@ function advanceOnlineTime(realSeconds) {
 }
 
 function offlineSnapshot() {
+  const state = runtime.state;
+  const generationCount = Math.max(0, Math.floor(Number(state.generationCount) || 0));
+  const coreBoostCount = Math.max(0, Math.floor(Number(state.coreBoostCount) || 0));
+  const infinityCount = Math.max(0, Math.floor(Number(state.infinityCount) || 0));
+  const eternityCount = Math.max(0, Math.floor(Number(state.eternityCount) || 0));
   return {
-    infinityCount: runtime.state.infinityCount,
+    scoreLog10: runtime.currentScoreLog10(),
+    generationCount,
+    coreBoostCount,
+    infinityCount,
     infinityPointsLog10: runtime.currentInfinityPointsLog10(),
+    infinityPointsExact: typeof state.infinityPointsExact === "string" ? state.infinityPointsExact : "",
     infiniteScoreLog10: runtime.currentInfiniteScoreLog10(),
-    timeFlux: runtime.state.timeFlux,
-    totalPlayTime: runtime.state.totalPlayTime,
+    eternityCount,
+    scoreUnlocked: true,
+    generationUnlocked: generationCount > 0
+      || runtime.currentTotalScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE),
+    coreBoostUnlocked: coreBoostCount > 0,
+    infinityUnlocked: infinityCount > 0,
+    infiniteAngleUnlocked: Boolean(state.infiniteAngleUnlocked),
+    eternityUnlocked: eternityCount > 0,
+    timeFlux: state.timeFlux,
+    totalPlayTime: state.totalPlayTime,
   };
 }
 
@@ -1084,6 +1101,7 @@ function refreshOfflineReportProgress(
   currentTime = monotonicClockNow(),
 ) {
   const current = offlineSnapshot();
+  report.after = current;
   report.infinityCountAfter = current.infinityCount;
   report.infinityPointsAfterLog10 = current.infinityPointsLog10;
   report.infiniteScoreAfterLog10 = current.infiniteScoreLog10;
@@ -1211,6 +1229,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         const startedAt = monotonicClockNow();
         const progressReport = offlineReport = {
           source,
+          processing: true,
+          before,
+          after: before,
           elapsedSeconds: elapsed,
           effectiveElapsedSeconds: simulatedSeconds,
           simulatedSeconds,
@@ -1354,6 +1375,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       : simulatedSeconds;
     offlineReport = {
       source,
+      processing: false,
+      before,
+      after,
       elapsedSeconds: elapsed,
       effectiveElapsedSeconds,
       simulatedSeconds,
