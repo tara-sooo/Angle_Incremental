@@ -233,13 +233,6 @@ function formatVertexGainIncrease(log10Value) {
   return runtime.formatUiLogNumber(log10Value);
 }
 
-function setTimelineTrackStatus(element, met) {
-  if (!element) return;
-  element.textContent = runtime.t(met ? "timelineRequirementMet" : "timelineRequirementMissing");
-  element.classList.toggle("is-met", met);
-  element.classList.toggle("is-missing", !met);
-}
-
 function formatTimelineEternityRequirement() {
   const claims = runtime.timelineTrackClaimCount("eternity");
   const requirement = runtime.timelineEternityRequirement();
@@ -251,6 +244,10 @@ function formatTimelineEternityRequirement() {
 function localizedTimelineText(value) {
   if (!value || typeof value !== "object") return "";
   return value[runtime.state.language] || value.en || value.ja || "";
+}
+
+function timelineNodeDescriptionText(node) {
+  return localizedTimelineText(node.description).replace("{softcap}", runtime.formatUiLogNumber(10));
 }
 
 function timelineNodeStatusText(availability) {
@@ -286,8 +283,7 @@ function timelineNodeCurrentEffectText(node, availability) {
     const effectiveLog10 = runtime.timelineParallelEffectiveLog10?.() ?? 0;
     return runtime.t("timelineParallelCurrentEffect")
       .replace("{multiplier}", formatMultiplierLog(effectiveLog10))
-      .replace("{time}", runtime.formatLongDuration(runtime.timelineParallelSecondsSinceIc8Clear?.() ?? 0))
-      .replace("{effectiveLog}", effectiveLog10.toFixed(4));
+      .replace("{time}", runtime.formatLongDuration(runtime.timelineParallelSecondsSinceIc8Clear?.() ?? 0));
   }
   return runtime.t("timelineNodeInactive");
 }
@@ -403,25 +399,16 @@ function updateTimelineNodeDetail(node, availability) {
   detail.classList.toggle("is-conflict", availability.reason === "route-conflict");
   const prerequisites = Array.isArray(node.prerequisites) ? node.prerequisites : [];
   if (runtime.elements.timelineNodeDetailHeading) runtime.elements.timelineNodeDetailHeading.textContent = localizedTimelineText(node.name);
-  if (runtime.elements.timelineNodeDetailEra) runtime.elements.timelineNodeDetailEra.textContent = node.era;
-  if (runtime.elements.timelineNodeDetailRoute) {
-    runtime.elements.timelineNodeDetailRoute.textContent = node.route;
-    runtime.elements.timelineNodeDetailRoute.classList.toggle("timeline-node-route-real", node.route === "Real");
-    runtime.elements.timelineNodeDetailRoute.classList.toggle("timeline-node-route-parallel", node.route === "Parallel");
-  }
-  if (runtime.elements.timelineNodeDetailDescription) runtime.elements.timelineNodeDetailDescription.textContent = localizedTimelineText(node.description);
+  if (runtime.elements.timelineNodeDetailDescription) runtime.elements.timelineNodeDetailDescription.textContent = timelineNodeDescriptionText(node);
   if (runtime.elements.timelineNodeDetailCurrentEffect) runtime.elements.timelineNodeDetailCurrentEffect.textContent = timelineNodeCurrentEffectText(node, availability);
-  if (runtime.elements.timelineNodeDetailCost) runtime.elements.timelineNodeDetailCost.textContent = `${runtime.formatUiNumber(node.costTF)} TF`;
   if (runtime.elements.timelineNodeDetailPrerequisites) runtime.elements.timelineNodeDetailPrerequisites.textContent = prerequisites.length > 0
     ? prerequisites.join(", ")
     : runtime.t("timelineNoPrerequisites");
-  if (runtime.elements.timelineNodeDetailStatus) runtime.elements.timelineNodeDetailStatus.textContent = timelineNodeStatusText(availability);
   if (runtime.elements.timelineNodePurchaseButton) {
     runtime.elements.timelineNodePurchaseButton.dataset.timelineNodePurchase = node.id;
+    runtime.elements.timelineNodePurchaseButton.hidden = availability.reason === "owned";
     runtime.elements.timelineNodePurchaseButton.disabled = !availability.canPurchase;
-    runtime.elements.timelineNodePurchaseButton.textContent = availability.reason === "owned"
-      ? runtime.t("timelineNodePurchased")
-      : runtime.t("timelinePurchase");
+    runtime.elements.timelineNodePurchaseButton.textContent = runtime.t("timelinePurchase");
   }
 }
 
@@ -464,44 +451,33 @@ function updateTimelineUi() {
       id: "score",
       claims: runtime.elements.timelineScoreClaims,
       requirement: runtime.elements.timelineScoreRequirement,
-      status: runtime.elements.timelineScoreStatus,
       button: runtime.elements.timelineScoreClaimButton,
-      requirementText: `${runtime.formatPowerOfTen(runtime.timelineScoreRequirementLog10())} Score`,
+      requirementText: `${runtime.formatUiLogNumber(runtime.timelineScoreRequirementLog10())} Score`,
     },
     {
       id: "ip",
       claims: runtime.elements.timelineIpClaims,
       requirement: runtime.elements.timelineIpRequirement,
-      status: runtime.elements.timelineIpStatus,
       button: runtime.elements.timelineIpClaimButton,
-      requirementText: `${runtime.formatPowerOfTen(runtime.timelineIpRequirementLog10())} IP`,
+      requirementText: `${runtime.formatUiLogNumber(runtime.timelineIpRequirementLog10())} IP`,
     },
     {
       id: "eternity",
       claims: runtime.elements.timelineEternityClaims,
       requirement: runtime.elements.timelineEternityRequirement,
-      status: runtime.elements.timelineEternityStatus,
       button: runtime.elements.timelineEternityClaimButton,
       requirementText: formatTimelineEternityRequirement(),
     },
   ];
   tracks.forEach((track) => {
-    const met = runtime.timelineRequirementMet(track.id);
     if (track.claims) track.claims.textContent = runtime.formatUiNumber(runtime.timelineTrackClaimCount(track.id));
     if (track.requirement) track.requirement.textContent = track.requirementText;
-    setTimelineTrackStatus(track.status, met);
     if (track.button) {
       track.button.disabled = !runtime.canClaimTimelineTf(track.id);
       track.button.textContent = runtime.t("timelineClaim");
     }
   });
 
-  const purchasedNodes = runtime.state.timelinePurchasedNodes || [];
-  if (runtime.elements.timelinePurchasedNodes) {
-    runtime.elements.timelinePurchasedNodes.textContent = purchasedNodes.length === 0
-      ? runtime.t("timelineNoNodes")
-      : `${runtime.t("timelinePurchasedNodeCount").replace("{count}", String(purchasedNodes.length))}: ${purchasedNodes.map((node) => node.id).join(", ")}`;
-  }
   if (runtime.elements.timelineRespecButton) {
     runtime.elements.timelineRespecButton.disabled = runtime.timelineDiscovered?.() !== true;
   }
