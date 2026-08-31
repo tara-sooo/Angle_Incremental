@@ -117,6 +117,7 @@ try {
     debug.state.eternityMilestoneMask = 0;
     debug.state.eternityMilestoneChoice = "";
     debug.state.achievementMaskHigh = (1 << (38 - 32)) | (1 << (39 - 32));
+    debug.state.towerFloor = 12;
     debug.state.timeFlux = 246;
     debug.state.timeFluxCapacityLevel = 2;
     debug.state.timeFluxGainLevel = 3;

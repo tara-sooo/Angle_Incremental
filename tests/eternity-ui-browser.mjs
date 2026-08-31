@@ -28,7 +28,15 @@ try {
     infinityHidden: document.querySelector('[data-tab="infinity"]')?.hidden,
     challengesHidden: document.querySelector('[data-tab="challenges"]')?.hidden,
     automationHidden: document.querySelector('[data-tab="automation"]')?.hidden,
-    eternityHidden: document.querySelector('[data-tab="eternity"]')?.hidden,
+    eternity: (() => {
+      const button = document.querySelector('[data-tab="eternity"]');
+      return {
+        className: button?.className,
+        hidden: button?.hidden,
+        display: button ? getComputedStyle(button).display : "",
+        rectCount: button?.getClientRects().length ?? 0,
+      };
+    })(),
     timelineMainTabPresent: document.querySelector('[data-tab="timeline"]') !== null,
     timelineSubtabHidden: document.querySelector('[data-eternity-tab="timeline"]')?.hidden,
     timelineSubtabDisabled: document.querySelector('[data-eternity-tab="timeline"]')?.disabled,
@@ -40,7 +48,10 @@ try {
   assert.equal(lockedNavigation.infinityHidden, true, "INF should be hidden on a fresh new game");
   assert.equal(lockedNavigation.challengesHidden, true, "CHAL should be hidden on a fresh new game");
   assert.equal(lockedNavigation.automationHidden, true, "AUTO should be hidden on a fresh new game");
-  assert.equal(lockedNavigation.eternityHidden, true, "ETR should be hidden before TC4 unlock");
+  assert.equal(lockedNavigation.eternity.className, "main-tab", "ETR should use the shared main-tab class");
+  assert.equal(lockedNavigation.eternity.hidden, true, "ETR should be hidden before TC4 unlock");
+  assert.equal(lockedNavigation.eternity.display, "none", "undiscovered ETR should be removed by shared hidden styling");
+  assert.equal(lockedNavigation.eternity.rectCount, 0, "undiscovered ETR should have no rendered client rect");
   assert.equal(lockedNavigation.timelineMainTabPresent, false, "Timeline should no longer be a top-level tab");
   assert.equal(lockedNavigation.timelineSubtabHidden, false, "Timeline subtab should not carry a navigation-level lock");
   assert.equal(lockedNavigation.timelineSubtabDisabled, false, "Timeline subtab should stay selectable when the Eternity page is available");
@@ -54,11 +65,26 @@ try {
     debug.state.towerFloor = 12;
     debug.runtime.updateUi();
   });
-  assert.equal(
-    await page.evaluate(() => document.querySelector('[data-tab="eternity"]')?.hidden),
-    false,
-    "normal TC4 unlock should reveal ETR before the first Eternity",
-  );
+  const discoveredEternity = await page.evaluate(() => {
+    const button = document.querySelector('[data-tab="eternity"]');
+    const mainTabs = window.__angleDebug.runtime.elements.mainTabs;
+    const tabIds = mainTabs.map((tab) => tab.dataset.tab);
+    return {
+      className: button?.className,
+      hidden: button?.hidden,
+      display: button ? getComputedStyle(button).display : "",
+      rectCount: button?.getClientRects().length ?? 0,
+      inRuntimeCollection: mainTabs.includes(button),
+      infinityIndex: tabIds.indexOf("infinity"),
+      eternityIndex: tabIds.indexOf("eternity"),
+    };
+  });
+  assert.equal(discoveredEternity.className, "main-tab", "discovered ETR should retain the shared main-tab class");
+  assert.equal(discoveredEternity.hidden, false, "normal TC4 unlock should reveal ETR before the first Eternity");
+  assert.notEqual(discoveredEternity.display, "none", "discovered ETR should use the shared visible tab styling");
+  assert.ok(discoveredEternity.rectCount > 0, "discovered ETR should have a rendered client rect");
+  assert.equal(discoveredEternity.inRuntimeCollection, true, "ETR should remain in the shared main-tab runtime collection");
+  assert.equal(discoveredEternity.eternityIndex, discoveredEternity.infinityIndex + 1, "ETR should follow Infinity in the main navigation order");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -67,9 +93,13 @@ try {
   });
   const hiddenEternity = await page.evaluate(() => ({
     hidden: document.querySelector('[data-tab="eternity"]')?.hidden,
+    display: getComputedStyle(document.querySelector('[data-tab="eternity"]')).display,
+    rectCount: document.querySelector('[data-tab="eternity"]')?.getClientRects().length ?? 0,
     unlocked: window.__angleDebug.mainTabIsUnlocked("eternity"),
   }));
   assert.equal(hiddenEternity.hidden, true, "hiddenTabs should hide a discovered ETR tab");
+  assert.equal(hiddenEternity.display, "none", "shared hidden styling should hide a discovered ETR tab");
+  assert.equal(hiddenEternity.rectCount, 0, "hidden discovered ETR should have no rendered client rect");
   assert.equal(hiddenEternity.unlocked, true, "hiddenTabs must not revoke ETR discovery");
   await page.evaluate(() => {
     const debug = window.__angleDebug;
