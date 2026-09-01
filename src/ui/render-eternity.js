@@ -107,9 +107,6 @@ function installEternityUi() {
               <strong id="eternityCurrentIp">0 IP</strong>
             </div>
           </div>
-          <div class="eternity-action-row dense-action-row ui-action-row">
-            <button id="eternityPerformButton" class="eternity-perform-button" type="button" data-eternity-action="perform"></button>
-          </div>
           <nav class="eternity-subtabs ui-subtab-strip ui-scroll-x" data-scroll-owner="horizontal" aria-label="Eternity sub tabs">
             <button class="subtab eternity-subtab is-active" type="button" data-eternity-tab="milestone" aria-controls="eternityMilestoneSubpanel" aria-selected="true">
               <span>MS</span>
@@ -168,12 +165,6 @@ function installEternityUi() {
   if (!eternityRoot.dataset.choiceBound) {
     eternityRoot.dataset.choiceBound = "true";
     eternityRoot.addEventListener("click", (event) => {
-      const performButton = event.target?.closest?.("[data-eternity-action=\"perform\"]");
-      if (performButton && !performButton.disabled) {
-        runtime.performEternity?.();
-        return;
-      }
-
       const button = event.target?.closest?.("[data-eternity-choice]");
       if (!button || button.disabled) return;
       const id = button.dataset.eternityChoice;
@@ -233,7 +224,6 @@ function updateEternityUi() {
 
   const headingCount = eternityRoot.querySelector("#eternityHeadingCount");
   const currentIp = eternityRoot.querySelector("#eternityCurrentIp");
-  const performButton = eternityRoot.querySelector("#eternityPerformButton");
   const entitlement = eternityRoot.querySelector("#eternityChoiceEntitlement");
   const allOwned = eternityRoot.querySelector("#eternityChoiceAllOwned");
   const requirement = eternityRoot.querySelector(".eternity-requirement");
@@ -248,10 +238,6 @@ function updateEternityUi() {
       runtime.currentInfinityPointsLog10(),
       runtime.state.infinityPointsExact,
     )} IP`;
-  }
-  if (performButton) {
-    performButton.disabled = !ready;
-    performButton.textContent = runtime.t(ready ? "eternityPerform" : "eternityPerformUnavailable");
   }
   const timelineSubtab = eternityRoot.querySelector('[data-eternity-tab="timeline"]');
   if (timelineSubtab) {

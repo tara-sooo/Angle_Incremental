@@ -464,6 +464,7 @@ canvas {
 .generation-button,
 .core-boost-button,
 .infinity-button,
+.prestige-action-button,
 .mini-button,
 .infinity-upgrade-node,
 .infinity-upgrade-detail-buy,
@@ -528,6 +529,7 @@ canvas {
   .generation-button:hover:not(:disabled),
   .core-boost-button:hover:not(:disabled),
   .infinity-button:hover:not(:disabled),
+  .prestige-action-button:hover:not(:disabled),
   .mini-button:hover:not(:disabled),
   .infinity-upgrade-node:hover:not(:disabled),
   .infinity-upgrade-detail-buy:hover:not(:disabled),
@@ -547,6 +549,7 @@ canvas {
 .generation-button:active:not(:disabled),
 .core-boost-button:active:not(:disabled),
 .infinity-button:active:not(:disabled),
+.prestige-action-button:active:not(:disabled),
 .mini-button:active:not(:disabled),
 .infinity-upgrade-node:active:not(:disabled),
 .infinity-upgrade-detail-buy:active:not(:disabled),
@@ -563,6 +566,7 @@ canvas {
 .generation-button:disabled,
 .core-boost-button:disabled,
 .infinity-button:disabled,
+.prestige-action-button:disabled,
 .mini-button:disabled,
 .infinity-upgrade-node:disabled,
 .infinity-upgrade-detail-buy:disabled,
@@ -634,6 +638,7 @@ canvas {
 .generation-button,
 .core-boost-button,
 .infinity-button,
+.prestige-action-button,
 .challenge-button,
 .break-button {
   min-height: 52px;
@@ -3411,6 +3416,10 @@ canvas {
     margin-inline: auto;
   }
 
+  .angle-panel .ui-playfield {
+    width: min(100%, calc(42svh * 4 / 3 - 16px));
+  }
+
   .ui-playfield > canvas,
   .infinite-angle-panel .infinite-angle-playfield-wrap > canvas {
     width: 100%;
@@ -3441,6 +3450,119 @@ canvas {
   display: flex;
   align-items: center;
   gap: var(--ui-action-gap);
+}
+
+.angle-panel.is-active {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.angle-panel > .angle-layout {
+  flex: 1 0 auto;
+  height: auto;
+}
+
+.ui-page .prestige-action-surface {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) auto;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 0 0 2px;
+  padding: 6px 10px;
+}
+
+.prestige-action-copy,
+.prestige-action-detail {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.prestige-action-label,
+.prestige-action-detail span {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.prestige-action-name {
+  font-size: 1.05rem;
+  line-height: 1.1;
+}
+
+.prestige-action-status {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.prestige-action-surface.is-ready .prestige-action-status {
+  color: var(--green);
+}
+
+.prestige-action-detail strong {
+  max-width: none;
+  color: var(--gold);
+  font-size: 0.82rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.prestige-action-button {
+  min-width: 108px;
+  min-height: var(--ui-touch-target);
+  padding: 7px 12px;
+  background: linear-gradient(180deg, #7256d9, #4b36a0);
+  white-space: nowrap;
+}
+
+.prestige-action-surface[data-action="eternity"] .prestige-action-button {
+  background: linear-gradient(180deg, #9b4b78, #5f2b66);
+}
+
+.prestige-action-button:focus-visible {
+  outline: var(--ui-focus-width) solid var(--gold);
+  outline-offset: 2px;
+}
+
+@media (max-width: 820px) {
+  .ui-page .prestige-action-surface {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 3px 8px;
+    margin-bottom: 0;
+    padding: 5px 7px;
+  }
+
+  .prestige-action-copy {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .prestige-action-detail {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .prestige-action-button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-width: 96px;
+    padding: 6px 8px;
+    font-size: 0.78rem;
+  }
+
+  .prestige-action-name {
+    font-size: 0.92rem;
+  }
+
+  .prestige-action-detail strong {
+    font-size: 0.72rem;
+  }
 }
 
 .ui-main-nav :focus-visible,

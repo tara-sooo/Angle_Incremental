@@ -92,18 +92,26 @@ async function performQualifiedEternityThroughUi() {
   await page.evaluate(() => {
     const debug = window.__angleDebug;
     debug.runtime.syncInfinityPointCachesFromExact(debug.runtime.MAX_EXACT_INFINITY_POINTS);
+    debug.switchMainTab("angle");
     debug.runtime.updateUi();
   });
-  await openEternityThroughUi();
   const ready = await page.evaluate(() => ({
+    activeMainTab: window.__angleDebug.runtime.activeMainTab,
     canEternity: window.__angleDebug.canEternity(),
     legacyForced: window.__angleDebug.maybeForceEternity({ save: false, update: false }),
-    buttonDisabled: document.getElementById("eternityPerformButton")?.disabled,
+    actionKind: document.getElementById("prestigeActionSurface")?.dataset.action,
+    buttonDisabled: document.getElementById("prestigeActionButton")?.disabled,
+    oldInfinityAction: document.getElementById("infinityButton"),
+    oldEternityAction: document.getElementById("eternityPerformButton"),
   }));
+  assert.equal(ready.activeMainTab, "angle", "qualified Eternity should be reachable from the gameplay page without opening ETR");
   assert.equal(ready.canEternity, true, "TC4 completion plus 1.80e308 IP should make Eternity available");
   assert.equal(ready.legacyForced, false, "qualified state must not trigger Eternity through the legacy automatic hook");
+  assert.equal(ready.actionKind, "eternity", "the shared action should promote the ready higher prestige layer");
   assert.equal(ready.buttonDisabled, false, "the player-facing Eternity button should enable when qualified");
-  await page.click("#eternityPerformButton");
+  assert.equal(ready.oldInfinityAction, null, "the old Infinity execution control should be removed");
+  assert.equal(ready.oldEternityAction, null, "the old Eternity execution control should be removed");
+  await page.click("#prestigeActionButton");
 }
 
 try {
@@ -278,8 +286,20 @@ try {
   assert.equal(thresholdBefore.canEternity, true, "the controlled threshold fixture should qualify for manual Eternity");
   assert.equal(thresholdBefore.forced, false, "the threshold fixture must remain stable until the player acts");
 
-  await openEternityThroughUi();
-  await page.click("#eternityPerformButton");
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.switchMainTab("angle");
+    debug.runtime.updateUi();
+  });
+  const thresholdAction = await page.evaluate(() => ({
+    activeMainTab: window.__angleDebug.runtime.activeMainTab,
+    kind: document.getElementById("prestigeActionSurface")?.dataset.action,
+    disabled: document.getElementById("prestigeActionButton")?.disabled,
+  }));
+  assert.equal(thresholdAction.activeMainTab, "angle", "the threshold Eternity action should remain on the gameplay page");
+  assert.equal(thresholdAction.kind, "eternity", "the shared action should select Eternity at the threshold fixture");
+  assert.equal(thresholdAction.disabled, false, "the shared Eternity action should be enabled at the threshold fixture");
+  await page.click("#prestigeActionButton");
   const thresholdState = await page.evaluate(() => ({
     completedIc7: (window.__angleDebug.state.completedChallenges & (1 << 6)) !== 0,
     count: window.__angleDebug.state.eternityCount,

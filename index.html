@@ -107,6 +107,20 @@
 
       <div class="main-panels">
         <section class="main-panel angle-panel ui-page is-active" data-panel="angle" data-scroll-owner="primary" aria-label="The Angle">
+          <section id="prestigeActionSurface" class="prestige-action-surface ui-section ui-action-row" aria-labelledby="prestigeActionName">
+            <div class="prestige-action-copy">
+              <span class="prestige-action-label" data-i18n="prestigeActionLabel">プレステージ</span>
+              <strong id="prestigeActionName" class="prestige-action-name">Infinity</strong>
+              <small id="prestigeActionStatus" class="prestige-action-status" aria-live="polite">未解放</small>
+            </div>
+            <div class="prestige-action-detail">
+              <span id="prestigeActionDetailLabel">Infinity獲得</span>
+              <strong id="prestigeActionDetail" aria-live="polite">必要スコア: 1.80e308</strong>
+            </div>
+            <button id="prestigeActionButton" class="prestige-action-button" type="button" disabled aria-describedby="prestigeActionStatus prestigeActionDetail">
+              Infinity
+            </button>
+          </section>
           <div class="angle-layout">
             <aside class="upgrade-rail" aria-label="The Angle upgrades">
               <section class="stats ui-section">
@@ -296,9 +310,6 @@
               <span data-i18n="infinityGain">Infinity獲得</span>
               <strong id="infinityPointGain">+0 IP</strong>
             </div>
-            <button id="infinityButton" class="infinity-button" type="button" disabled>
-              Infinity
-            </button>
           </section>
 
           <section class="break-cap-row ui-section" aria-label="Break Infinite Cap">

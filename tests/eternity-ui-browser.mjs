@@ -15,6 +15,7 @@ try {
     debug.state.eternityMilestoneMask = 0;
     debug.state.eternityMilestoneChoice = "";
     debug.state.infinityUpgradeMask = 0;
+    debug.state.infinityCount = 0;
     debug.state.towerFloor = 0;
     debug.state.completedTowerChallenges = 0;
     debug.state.hiddenTabs = [];
@@ -161,8 +162,13 @@ try {
     button11: document.querySelector('[data-eternity-choice="1-1"]')?.textContent,
     disabled11: document.querySelector('[data-eternity-choice="1-1"]')?.disabled,
     entitlement: document.getElementById("eternityChoiceEntitlement")?.textContent,
-    perform: document.getElementById("eternityPerformButton")?.textContent,
-    performDisabled: document.getElementById("eternityPerformButton")?.disabled,
+    sharedAction: document.getElementById("prestigeActionButton")?.textContent?.trim(),
+    sharedActionKind: document.getElementById("prestigeActionSurface")?.dataset.action,
+    sharedActionStatus: document.getElementById("prestigeActionStatus")?.textContent,
+    sharedActionDetail: document.getElementById("prestigeActionDetail")?.textContent,
+    sharedActionDisabled: document.getElementById("prestigeActionButton")?.disabled,
+    legacyInfinityAction: document.getElementById("infinityButton"),
+    legacyEternityAction: document.getElementById("eternityPerformButton"),
     panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
   }));
   assert.equal(initial.tabActive, true, "Eternity should be selectable as a top-level main tab");
@@ -224,8 +230,13 @@ try {
   assert.equal(initial.button11, "未解放", "first-tier Milestones should not be acquirable before the first Eternity");
   assert.equal(initial.disabled11, true, "first-tier acquisition controls should be disabled before an entitlement exists");
   assert.equal(initial.entitlement, "現在取得できるMilestoneはありません。", "the UI should explain the lack of a current acquisition right");
-  assert.equal(initial.perform, "Eternity条件未達成", "manual Eternity action should expose its unavailable state");
-  assert.equal(initial.performDisabled, true, "manual Eternity action should be disabled before the full requirement is met");
+  assert.equal(initial.sharedAction, "Infinity", "the shared action should identify the current lower prestige layer");
+  assert.equal(initial.sharedActionKind, "infinity", "the shared action should default to Infinity before Eternity is ready");
+  assert.equal(initial.sharedActionStatus, "未解放", "the shared action should expose the locked state before the first Infinity");
+  assert.equal(initial.sharedActionDetail, "必要スコア: 1.80e308", "the shared action should show the Infinity requirement before readiness");
+  assert.equal(initial.sharedActionDisabled, true, "the shared action should be disabled before the manual Infinity path is legal");
+  assert.equal(initial.legacyInfinityAction, null, "the Infinity tab should not keep a duplicate execution control");
+  assert.equal(initial.legacyEternityAction, null, "the Eternity tab should not keep a duplicate execution control");
   assert.equal(initial.panelText.includes("Eternity Point"), false, "Eternity UI must not introduce an Eternity Point surface");
 
   await page.click('[data-eternity-tab="timeline"]');
@@ -779,16 +790,61 @@ try {
     timelineMobile.gridWidth > 0 && timelineMobile.nodeWidth > 0 && timelineMobile.detailWidth > 0,
     "Timeline nodes and focused detail should keep a visible mobile layout",
   );
+
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.language = "ja";
+    debug.runtime.appliedLanguage = "";
+    debug.state.infinityCount = 1;
+    debug.state.score = Number.MAX_VALUE;
+    debug.state.scoreLog10 = debug.runtime.INFINITY_REQUIREMENT_LOG10 + 0.5;
+    debug.state.totalScore = Number.MAX_VALUE;
+    debug.state.totalScoreLog10 = debug.state.scoreLog10;
+    debug.state.generationScore = Number.MAX_VALUE;
+    debug.state.generationScoreLog10 = debug.state.scoreLog10;
+    debug.switchMainTab("angle");
+    debug.runtime.updateUi();
+  });
+  const infinityAction = await page.evaluate(() => ({
+    activeMainTab: window.__angleDebug.runtime.activeMainTab,
+    kind: document.getElementById("prestigeActionSurface")?.dataset.action,
+    status: document.getElementById("prestigeActionStatus")?.textContent,
+    detail: document.getElementById("prestigeActionDetail")?.textContent,
+    disabled: document.getElementById("prestigeActionButton")?.disabled,
+  }));
+  assert.equal(infinityAction.activeMainTab, "angle", "the shared action should be available on the gameplay page");
+  assert.equal(infinityAction.kind, "infinity", "Infinity should remain the active lower prestige action when Eternity is unavailable");
+  assert.equal(infinityAction.status, "実行可能", "the shared action should expose Infinity readiness");
+  assert.equal(infinityAction.detail, "+1 IP", "the shared action should show the pending Infinity gain");
+  assert.equal(infinityAction.disabled, false, "the shared Infinity action should enable when its canonical condition is met");
+  await page.click("#prestigeActionButton");
+  const infinityAfter = await page.evaluate(() => ({
+    count: window.__angleDebug.state.infinityCount,
+    scoreLog10: window.__angleDebug.state.scoreLog10,
+  }));
+  assert.ok(infinityAfter.count > 1, "the shared Infinity action should use the canonical Infinity reset");
+  assert.equal(infinityAfter.scoreLog10, -Infinity, "the shared Infinity action should reset the current run");
+
+  const mobileAngle = await page.evaluate(() => ({
+    activeMainTab: window.__angleDebug.runtime.activeMainTab,
+    sharedSurfaceWidth: document.getElementById("prestigeActionSurface")?.getBoundingClientRect().width || 0,
+    sharedActionWidth: document.getElementById("prestigeActionButton")?.getBoundingClientRect().width || 0,
+    sharedActionBottom: document.getElementById("prestigeActionSurface")?.getBoundingClientRect().bottom || 0,
+    playfieldTop: document.querySelector(".angle-panel .angle-layout")?.getBoundingClientRect().top || 0,
+  }));
+  assert.equal(mobileAngle.activeMainTab, "angle", "the shared action should stay on the gameplay page");
+  assert.ok(mobileAngle.sharedSurfaceWidth > 0 && mobileAngle.sharedActionWidth > 0, "the shared gameplay action should keep a visible mobile layout");
+  assert.ok(mobileAngle.sharedActionBottom <= mobileAngle.playfieldTop, "the shared action should stay in normal flow without covering the playfield");
+
   await page.click('[data-tab="eternity"]');
   await page.click('[data-eternity-tab="milestone"]');
   const mobile = await page.evaluate(() => ({
     visible: document.querySelector('[data-panel="eternity"]')?.classList.contains("is-active"),
     width: document.querySelector('[data-panel="eternity"]')?.getBoundingClientRect().width || 0,
     firstButtonWidth: document.querySelector('[data-eternity-choice="1-2"]')?.getBoundingClientRect().width || 0,
-    performWidth: document.getElementById("eternityPerformButton")?.getBoundingClientRect().width || 0,
   }));
   assert.equal(mobile.visible, true, "Eternity top-level panel should remain usable at a mobile viewport");
-  assert.ok(mobile.width > 0 && mobile.firstButtonWidth > 0 && mobile.performWidth > 0, "Eternity controls should keep a visible mobile layout");
+  assert.ok(mobile.width > 0 && mobile.firstButtonWidth > 0, "Eternity information controls should keep a visible mobile layout");
 
   console.log("Eternity UI browser test passed");
 } finally {
