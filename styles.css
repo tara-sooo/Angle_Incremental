@@ -15,6 +15,9 @@
   --violet: #7256d9;
   --green: #3ba36e;
   --disabled: #4c566f;
+  --ui-action-gap: 10px;
+  --ui-touch-target: 40px;
+  --ui-focus-width: 2px;
   --fps-counter-height: 0px;
   font-family: "Noto Sans JP", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -3318,4 +3321,60 @@ canvas {
   .infinity-upgrade-detail {
     position: static;
   }
+}
+
+/* Canonical UI roles from docs/ui-contract.md. Feature classes extend these hooks. */
+.ui-page[data-scroll-owner="primary"] {
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.ui-main-nav,
+.ui-subtab-strip,
+.ui-section,
+.ui-tree,
+.ui-tree-node,
+.ui-selected-detail,
+.ui-playfield {
+  min-width: 0;
+}
+
+.ui-scroll-x[data-scroll-owner="horizontal"] {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.ui-action-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-action-gap);
+}
+
+.ui-main-nav :focus-visible,
+.ui-subtab-strip :focus-visible,
+.upgrade-row:focus-visible,
+.ui-tree-node:focus-visible,
+.ui-selected-detail :focus-visible {
+  outline: var(--ui-focus-width) solid var(--gold);
+  outline-offset: 2px;
+}
+
+.ui-main-nav [hidden],
+.ui-subtab-strip [hidden] {
+  display: none;
+}
+
+.ui-main-nav button,
+.ui-subtab-strip button,
+.upgrade-row,
+.ui-tree-node,
+.ui-action-row button {
+  min-height: var(--ui-touch-target);
 }
