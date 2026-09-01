@@ -73,6 +73,7 @@ function updateMainTabVisibility() {
   const signature = tabStates.join("|");
   runtime.elements.mainTabs.forEach((button) => {
     const tab = button.dataset.tab;
+    button.setAttribute("role", "tab");
     const unlocked = mainTabIsUnlocked(tab);
     button.hidden = !mainTabIsVisible(tab);
     button.tabIndex = button.hidden ? -1 : 0;
@@ -111,6 +112,7 @@ function switchMainTab(tab) {
   runtime.activeMainTab = tab;
   runtime.elements.mainTabs.forEach((button) => {
     const active = button.dataset.tab === runtime.activeMainTab;
+    button.setAttribute("role", "tab");
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
@@ -126,6 +128,7 @@ function switchEternitySubtab(tab) {
   runtime.activeEternitySubtab = nextTab;
   (runtime.elements.eternitySubtabs || []).forEach((button) => {
     const active = button.dataset.eternityTab === nextTab;
+    button.setAttribute("role", "tab");
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
@@ -140,6 +143,7 @@ function switchInfinitySubtab(tab) {
   runtime.activeInfinitySubtab = tab;
   runtime.elements.infinitySubtabs.forEach((button) => {
     const active = button.dataset.infinityTab === runtime.activeInfinitySubtab;
+    button.setAttribute("role", "tab");
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
@@ -153,6 +157,7 @@ function switchChallengeSubtab(tab) {
   runtime.activeChallengeSubtab = tab;
   runtime.elements.challengeSubtabs.forEach((button) => {
     const active = button.dataset.challengeTab === runtime.activeChallengeSubtab;
+    button.setAttribute("role", "tab");
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
@@ -165,6 +170,7 @@ function switchStatisticsSubtab(tab) {
   runtime.activeStatisticsSubtab = tab;
   runtime.elements.statisticsSubtabs.forEach((button) => {
     const active = button.dataset.statisticsTab === runtime.activeStatisticsSubtab;
+    button.setAttribute("role", "tab");
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
@@ -240,7 +246,12 @@ function bindEvents() {
   runtime.elements.buyAllUpgrade.addEventListener("click", () => runtime.buyAllUpgrades());
   runtime.elements.generationButton.addEventListener("click", runtime.runGeneration);
   runtime.elements.coreBoostButton.addEventListener("click", runtime.runCoreBoost);
-  runtime.elements.prestigeActionButton.addEventListener("click", runtime.runPrestigeAction);
+  runtime.elements.prestigeActionButton.addEventListener("click", () => {
+    runtime.runPrestigeAction(runtime.elements.prestigeActionButton.dataset.prestigeAction);
+  });
+  runtime.elements.prestigeSecondaryActionButton?.addEventListener("click", () => {
+    runtime.runPrestigeAction(runtime.elements.prestigeSecondaryActionButton.dataset.prestigeAction);
+  });
   runtime.elements.infinityUpgradeDetailBuy.addEventListener("click", runtime.buySelectedInfinityUpgrade);
   runtime.elements.infiniteAngleUnlockButton.addEventListener("click", runtime.unlockInfiniteAngle);
   runtime.elements.infiniteAngleBuyAllUpgrade.addEventListener("click", () => runtime.buyAllInfiniteAngleUpgrades());

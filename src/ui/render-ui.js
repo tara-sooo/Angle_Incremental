@@ -78,11 +78,6 @@ function formatNormalUpgradeLevel(rawLevel, effectiveLevel, freeLevel) {
     : formatEffectiveLevel(rawLevel, effectiveLevel);
 }
 
-function updateUpgradeRowAction(button, canBuy) {
-  const action = button?.querySelector(".upgrade-row-action");
-  if (action) action.textContent = runtime.t(canBuy ? "upgradeActionBuy" : "upgradeActionUnavailable");
-}
-
 function prestigeActionKind() {
   return runtime.canEternity?.() === true ? "eternity" : "infinity";
 }
@@ -92,29 +87,31 @@ function canRunPrestigeAction(kind = prestigeActionKind()) {
   return Number(runtime.state.infinityCount) > 0 && runtime.canInfinity?.() === true;
 }
 
-function updatePrestigeActionUi() {
-  const surface = runtime.elements.prestigeActionSurface;
-  const name = runtime.elements.prestigeActionName;
-  const status = runtime.elements.prestigeActionStatus;
-  const detailLabel = runtime.elements.prestigeActionDetailLabel;
-  const detail = runtime.elements.prestigeActionDetail;
-  const button = runtime.elements.prestigeActionButton;
-  if (!surface || !name || !status || !detailLabel || !detail || !button) return;
+function prestigeActionUnlocked(kind) {
+  if (kind === "eternity") {
+    return Number(runtime.state.eternityCount) > 0 || Number(runtime.state.infinityCount) > 0;
+  }
+  return Number(runtime.state.infinityCount) > 0;
+}
 
-  const kind = prestigeActionKind();
+function renderPrestigeCard(card, fields, kind) {
+  if (!card || !fields.name || !fields.status || !fields.detailLabel || !fields.detail || !fields.button) return null;
+  const unlocked = prestigeActionUnlocked(kind);
   const ready = canRunPrestigeAction(kind);
-  const infinityUnlocked = Number(runtime.state.infinityCount) > 0;
-  surface.dataset.action = kind;
-  surface.dataset.state = ready ? "ready" : "unavailable";
-  surface.classList.toggle("is-ready", ready);
-  surface.classList.toggle("is-eternity", kind === "eternity");
-  name.textContent = kind === "eternity" ? runtime.t("eternity") : "Infinity";
-  status.textContent = ready
+  card.dataset.action = kind;
+  card.dataset.state = ready ? "ready" : unlocked ? "unavailable" : "locked";
+  card.classList.toggle("is-ready", ready);
+  card.classList.toggle("is-unavailable", unlocked && !ready);
+  card.classList.toggle("is-locked", !unlocked);
+  card.classList.toggle("is-eternity", kind === "eternity");
+  fields.name.textContent = kind === "eternity" ? runtime.t("eternity") : "Infinity";
+  fields.status.textContent = ready
     ? runtime.t("prestigeActionReady")
-    : infinityUnlocked
+    : unlocked
       ? runtime.t("prestigeActionUnavailable")
       : runtime.t("prestigeActionLocked");
-  button.disabled = !ready;
+  fields.button.dataset.prestigeAction = kind;
+  fields.button.disabled = !ready;
 
   if (kind === "eternity") {
     const requirement = runtime.t("eternityRequirementCompact")
@@ -123,24 +120,59 @@ function updatePrestigeActionUi() {
       runtime.currentInfinityPointsLog10(),
       runtime.state.infinityPointsExact,
     );
-    detailLabel.textContent = runtime.t("prestigeActionEternityRequirement");
-    detail.textContent = `${requirement} / ${runtime.t("prestigeActionCurrentIp")}: ${currentIp} IP`;
-    button.textContent = runtime.t(ready ? "eternityPerform" : "eternityPerformUnavailable");
-    return;
+    fields.detailLabel.textContent = runtime.t("prestigeActionEternityRequirement");
+    fields.detail.textContent = `${requirement} / ${runtime.t("prestigeActionCurrentIp")}: ${currentIp} IP`;
+    fields.button.textContent = runtime.t(ready ? "eternityPerform" : "eternityPerformUnavailable");
+  } else {
+    fields.detailLabel.textContent = runtime.t("infinityGain");
+    fields.detail.textContent = ready
+      ? `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`
+      : runtime.t("prestigeActionInfinityRequirement")
+        .replace("{score}", runtime.formatUiLogNumber(runtime.INFINITY_REQUIREMENT_LOG10));
+    fields.button.textContent = "Infinity";
   }
-
-  detailLabel.textContent = runtime.t("infinityGain");
-  detail.textContent = ready
-    ? `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`
-    : runtime.t("prestigeActionInfinityRequirement")
-      .replace("{score}", runtime.formatUiLogNumber(runtime.INFINITY_REQUIREMENT_LOG10));
-  button.textContent = "Infinity";
+  return { ready, unlocked };
 }
 
-function runPrestigeAction() {
-  const kind = prestigeActionKind();
-  if (!canRunPrestigeAction(kind)) return false;
-  if (kind === "eternity") return runtime.performEternity?.() === true;
+function updatePrestigeActionUi() {
+  const surface = runtime.elements.prestigeActionSurface;
+  const primaryKind = prestigeActionKind();
+  const secondaryKind = primaryKind === "eternity" ? "infinity" : "eternity";
+  const primary = renderPrestigeCard(
+    runtime.elements.prestigePrimaryActionCard,
+    {
+      name: runtime.elements.prestigeActionName,
+      status: runtime.elements.prestigeActionStatus,
+      detailLabel: runtime.elements.prestigeActionDetailLabel,
+      detail: runtime.elements.prestigeActionDetail,
+      button: runtime.elements.prestigeActionButton,
+    },
+    primaryKind,
+  );
+  const secondary = renderPrestigeCard(
+    runtime.elements.prestigeSecondaryActionCard,
+    {
+      name: runtime.elements.prestigeSecondaryActionName,
+      status: runtime.elements.prestigeSecondaryActionStatus,
+      detailLabel: runtime.elements.prestigeSecondaryActionDetailLabel,
+      detail: runtime.elements.prestigeSecondaryActionDetail,
+      button: runtime.elements.prestigeSecondaryActionButton,
+    },
+    secondaryKind,
+  );
+  if (!surface || !primary || !secondary) return;
+  surface.dataset.action = primaryKind;
+  surface.dataset.state = primary.ready ? "ready" : primary.unlocked ? "unavailable" : "locked";
+  surface.classList.toggle("is-ready", primary.ready);
+  surface.classList.toggle("is-eternity", primaryKind === "eternity");
+  surface.classList.toggle("is-locked", !primary.unlocked);
+  surface.dataset.secondaryAction = secondaryKind;
+}
+
+function runPrestigeAction(kind = prestigeActionKind()) {
+  const actionKind = kind === "eternity" || kind === "infinity" ? kind : prestigeActionKind();
+  if (!canRunPrestigeAction(actionKind)) return false;
+  if (actionKind === "eternity") return runtime.performEternity?.() === true;
   runtime.runInfinity?.(false);
   return true;
 }
@@ -475,7 +507,7 @@ function updateTimelineNodeDetail(node, availability) {
     : runtime.t("timelineNoPrerequisites");
   if (runtime.elements.timelineNodePurchaseButton) {
     runtime.elements.timelineNodePurchaseButton.dataset.timelineNodePurchase = node.id;
-    runtime.elements.timelineNodePurchaseButton.hidden = availability.reason === "owned";
+    runtime.elements.timelineNodePurchaseButton.hidden = !availability.canPurchase;
     runtime.elements.timelineNodePurchaseButton.disabled = !availability.canPurchase;
     runtime.elements.timelineNodePurchaseButton.textContent = runtime.t("timelinePurchase");
   }
@@ -601,9 +633,6 @@ function updateUi() {
   runtime.elements.speedUpgrade.disabled = !canBuyNormal.speed;
   runtime.elements.vertexUpgrade.disabled = !canBuyNormal.vertex;
   runtime.elements.gainUpgrade.disabled = !canBuyNormal.gain;
-  updateUpgradeRowAction(runtime.elements.speedUpgrade, canBuyNormal.speed);
-  updateUpgradeRowAction(runtime.elements.vertexUpgrade, canBuyNormal.vertex);
-  updateUpgradeRowAction(runtime.elements.gainUpgrade, canBuyNormal.gain);
   runtime.elements.buyAllUpgrade.disabled = !canBuyNormal.speed && !canBuyNormal.vertex && !canBuyNormal.gain;
 
   const ready = runtime.canRunGeneration();
@@ -673,9 +702,6 @@ function updateUi() {
   runtime.elements.infiniteAngleSpeedUpgrade.disabled = !canBuyInfiniteAngle.speed;
   runtime.elements.infiniteAngleVertexUpgrade.disabled = !canBuyInfiniteAngle.vertex;
   runtime.elements.infiniteAngleGainUpgrade.disabled = !canBuyInfiniteAngle.gain;
-  updateUpgradeRowAction(runtime.elements.infiniteAngleSpeedUpgrade, canBuyInfiniteAngle.speed);
-  updateUpgradeRowAction(runtime.elements.infiniteAngleVertexUpgrade, canBuyInfiniteAngle.vertex);
-  updateUpgradeRowAction(runtime.elements.infiniteAngleGainUpgrade, canBuyInfiniteAngle.gain);
   const completed = runtime.completedChallengeCount();
   runtime.elements.challengeStatus.textContent = runtime.state.activeChallenge > 0
     ? `${runtime.challengeName(runtime.state.activeChallenge)} ${runtime.t("challengeRunning")}`

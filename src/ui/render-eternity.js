@@ -72,6 +72,7 @@ function installEternityUi() {
     eternityTab = document.createElement("button");
     eternityTab.className = "main-tab";
     eternityTab.type = "button";
+    eternityTab.setAttribute("role", "tab");
     eternityTab.dataset.tab = "eternity";
     eternityTab.setAttribute("aria-selected", "false");
     eternityTab.innerHTML = '<span class="tab-icon">E</span><span class="tab-code">ETR</span><small data-i18n="eternityTab">Eternity</small>';
@@ -107,7 +108,7 @@ function installEternityUi() {
               <strong id="eternityCurrentIp">0 IP</strong>
             </div>
           </div>
-          <nav class="eternity-subtabs ui-subtab-strip ui-scroll-x" data-scroll-owner="horizontal" aria-label="Eternity sub tabs">
+          <nav class="eternity-subtabs ui-subtab-strip ui-scroll-x" role="tablist" data-scroll-owner="horizontal" aria-label="Eternity sub tabs">
             <button class="subtab eternity-subtab is-active" type="button" data-eternity-tab="milestone" aria-controls="eternityMilestoneSubpanel" aria-selected="true">
               <span>MS</span>
               <strong data-i18n="eternityMilestoneTab">Milestone</strong>

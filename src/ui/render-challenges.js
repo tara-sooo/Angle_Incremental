@@ -119,7 +119,6 @@ function updateTowerChallenge4UpgradeRows() {
     const action = canBuy
       ? runtime.t("upgradeActionBuy")
       : runtime.t("upgradeActionUnavailable");
-    button.querySelector(".tc4-upgrade-action").textContent = action;
     button.disabled = !canBuy;
     button.setAttribute("aria-label", `${label} — ${button.querySelector(".tc4-upgrade-effect").textContent} — ${button.querySelector(".tc4-upgrade-cost").textContent} — ${action}`);
   });

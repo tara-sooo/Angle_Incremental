@@ -50,6 +50,9 @@ async function readUiContract(targetPage) {
         ? [getComputedStyle(helpPage).overflowY, getComputedStyle(helpPage).overflowX]
         : [],
       mainNavRole: document.querySelector(".ui-main-nav")?.matches("nav") ?? false,
+      mainTabListRole: document.querySelector(".ui-main-nav")?.getAttribute("role") === "tablist",
+      mainTabRolesValid: Array.from(document.querySelectorAll(".ui-main-nav [data-tab]"))
+        .every((tab) => tab.getAttribute("role") === "tab"),
       mainScrollRole: Boolean(mainScroll),
       horizontalHostsValid: horizontalHosts.length > 0 && horizontalHosts.every((host) => {
         const style = getComputedStyle(host);
@@ -75,6 +78,25 @@ async function readUiContract(targetPage) {
         && window.render_game_to_text().length > 0,
       eternityPageRole: Boolean(document.querySelector('.main-panel[data-panel="eternity"].ui-page[data-scroll-owner="primary"]')),
       timelineNoLongerPage: Boolean(document.querySelector('.eternity-subpanel[data-eternity-panel="timeline"]:not(.ui-page):not([data-scroll-owner])')),
+      prestigeCardCount: document.querySelectorAll("#prestigeActionSurface > .prestige-action-card").length,
+      prestigeCardKinds: Array.from(
+        document.querySelectorAll("#prestigeActionSurface > .prestige-action-card"),
+        (card) => card.dataset.action,
+      ),
+      prestigeOutsideMainPanel: !document.querySelector("#prestigeActionSurface")?.closest(".main-panel"),
+      prestigeButtonsExplicit: Array.from(
+        document.querySelectorAll("#prestigeActionSurface .prestige-action-button"),
+        (button) => button.dataset.prestigeAction,
+      ),
+      legacyAngleLayoutCount: document.querySelectorAll(".angle-layout, .upgrade-rail, .stage-panel").length,
+      angleWorkspaceCount: document.querySelectorAll(".angle-workspace").length,
+      angleActionsCount: document.querySelectorAll(".angle-workspace > .angle-actions").length,
+      anglePlayfieldBeforeActions: (() => {
+        const workspace = document.querySelector(".angle-workspace");
+        const stage = workspace?.querySelector(":scope > .angle-stage");
+        const actions = workspace?.querySelector(":scope > .angle-actions");
+        return Boolean(stage && actions && (stage.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING));
+      })(),
     };
   });
 }
@@ -315,10 +337,10 @@ try {
   assert.equal(helpUi.upper.accordionCount, 0, "upper Help should keep one content surface");
   assert.equal(helpUi.upper.articleTopic, "tower", "Help should focus the previous Infinity subtab");
   assert.equal(helpUi.upper.current, "Tower", "Help navigation should mark the previous subtab topic");
-  assert.equal(helpUi.upper.context, "現在の焦点: Tower", "Help should translate its contextual focus");
+  assert.equal(helpUi.upper.context, "", "Help should omit the redundant contextual focus meta");
   assert.deepEqual(helpUi.afterReset.topics, helpUi.upper.topics, "discovered Help topics should survive a reset");
   assert.match(helpUi.english.current, /Tower/, "Help navigation should switch to English");
-  assert.match(helpUi.english.context, /Current focus: Tower/, "Help context should switch language with the guide");
+  assert.equal(helpUi.english.context, "", "Help should omit the redundant contextual focus meta in English");
   assert.equal(helpUi.englishChallenges.articleTopic, "tower-challenges", "Help should focus the first-era challenge topic from the challenge subtab");
   assert.match(helpUi.englishChallenges.text, /TC4|1e7777/, "English Help should contain the shipped TC4 guidance when selected");
 
@@ -337,7 +359,7 @@ try {
     current: "offline",
     articleCount: 1,
     activeElement: "helpArticle",
-    context: "現在の焦点: Offline Progress",
+    context: "",
   }, "clicking a Help topic should expose and focus one article");
   const notationButton = page.locator('#helpNav button[data-help-topic="notation"]');
   await notationButton.focus();
@@ -532,6 +554,8 @@ try {
   assert.equal(desktopUiContract.activePageOverflow.join("|"), "auto|hidden", "desktop page surfaces should own vertical scrolling");
   assert.equal(desktopUiContract.helpPageOverflow.join("|"), "auto|hidden", "Help should use the shared page scroll contract");
   assert.equal(desktopUiContract.mainNavRole, true, "main navigation should expose the shared role");
+  assert.equal(desktopUiContract.mainTabListRole, true, "main navigation should expose the tablist role");
+  assert.equal(desktopUiContract.mainTabRolesValid, true, "main navigation members should expose tab roles");
   assert.equal(desktopUiContract.mainScrollRole, true, "main navigation should expose a shared horizontal scroll host");
   assert.equal(desktopUiContract.horizontalHostsValid, true, "desktop horizontal hosts should hide vertical overflow");
   assert.equal(desktopUiContract.subtabRolesValid, true, "subtab strips should share the horizontal role");
@@ -548,6 +572,14 @@ try {
   assert.equal(desktopUiContract.renderTextAvailable, true, "the render_game_to_text debug surface should remain available");
   assert.equal(desktopUiContract.eternityPageRole, true, "runtime Eternity should use the shared page role");
   assert.equal(desktopUiContract.timelineNoLongerPage, true, "reparented Timeline should not retain page ownership");
+  assert.equal(desktopUiContract.prestigeCardCount, 2, "global prestige actions should render two independent cards");
+  assert.deepEqual(desktopUiContract.prestigeCardKinds, ["infinity", "eternity"], "global prestige cards should keep explicit action kinds");
+  assert.equal(desktopUiContract.prestigeOutsideMainPanel, true, "global prestige actions should sit between navigation and pages");
+  assert.deepEqual(desktopUiContract.prestigeButtonsExplicit, ["infinity", "eternity"], "prestige buttons should bind to their own action kind");
+  assert.equal(desktopUiContract.legacyAngleLayoutCount, 0, "ANGLE should remove the retired rail and stage layout");
+  assert.equal(desktopUiContract.angleWorkspaceCount, 1, "ANGLE should expose one playfield workspace");
+  assert.equal(desktopUiContract.angleActionsCount, 1, "ANGLE should keep upgrades and resets in one action stack");
+  assert.equal(desktopUiContract.anglePlayfieldBeforeActions, true, "ANGLE should place the playfield workspace before its action stack");
   assert.deepEqual(desktopAngleScrollOwnership.pageOverflow, ["auto", "hidden"], "desktop ANGLE should use the page as its vertical owner");
   assert.deepEqual(desktopAngleScrollOwnership.nestedVerticalOwners, [], "desktop ANGLE should have no nested vertical scroll trap");
   assert.deepEqual(desktopAngleScrollOwnership.mainPanelsOverflow, ["hidden", "hidden"], "desktop ANGLE main panels should not own page scrolling");
@@ -562,7 +594,6 @@ try {
       "upgrade-row-name",
       "upgrade-row-detail",
       "upgrade-row-cost",
-      "upgrade-row-action",
     ].find((slot) => child.classList.contains(slot)) ?? "");
     const readRows = () => rows.map((row) => {
       const style = getComputedStyle(row);
@@ -611,8 +642,8 @@ try {
     return { purchasable, buyAllWide, japaneseUnavailable, unavailableBuyAllDisabled, englishUnavailable };
   });
   assert.deepEqual(angleUpgradeContract.purchasable.map((row) => row.kind), ["speed", "vertex", "gain"], "ANGLE actions should keep their three identities");
-  assert.ok(angleUpgradeContract.purchasable.every((row) => row.slots === "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action"), "ANGLE rows should expose the canonical four-slot order");
-  assert.ok(angleUpgradeContract.purchasable.every((row) => row.action === "購入" && !row.disabled), "affordable ANGLE rows should expose the purchase action");
+  assert.ok(angleUpgradeContract.purchasable.every((row) => row.slots === "upgrade-row-name,upgrade-row-detail,upgrade-row-cost"), "ANGLE rows should expose the compact three-slot order");
+  assert.ok(angleUpgradeContract.purchasable.every((row) => row.action === "" && !row.disabled), "affordable ANGLE rows should expose state through the control itself");
   assert.ok(angleUpgradeContract.purchasable.every((row) => row.height <= 56 && !row.overflow), "desktop ANGLE rows should stay dense without overflow");
   assert.equal(new Set(angleUpgradeContract.purchasable.map((row) => row.borderColor)).size, 3, "ANGLE actions should retain distinct color identities");
   assert.ok(angleUpgradeContract.purchasable.every((row) => row.backgroundImage === "none"), "ANGLE rows should avoid large gradient fills");
@@ -620,9 +651,9 @@ try {
   assert.ok(angleUpgradeContract.buyAllWide.width < angleUpgradeContract.buyAllWide.parentWidth, "ANGLE Buy All should remain a compact section action");
   assert.ok(angleUpgradeContract.buyAllWide.height <= 42, "ANGLE Buy All should remain compact");
   assert.equal(angleUpgradeContract.buyAllWide.backgroundImage, "none", "ANGLE Buy All should avoid a dominant gradient fill");
-  assert.ok(angleUpgradeContract.japaneseUnavailable.every((row) => row.disabled && row.action === "購入不可"), "unaffordable Japanese ANGLE rows should expose a non-color unavailable state");
+  assert.ok(angleUpgradeContract.japaneseUnavailable.every((row) => row.disabled && row.action === ""), "unaffordable Japanese ANGLE rows should expose state through the disabled control");
   assert.equal(angleUpgradeContract.unavailableBuyAllDisabled, true, "ANGLE Buy All should disable when no normal action is affordable");
-  assert.ok(angleUpgradeContract.englishUnavailable.every((row) => row.action === "Unavailable"), "unaffordable English ANGLE rows should translate their action state");
+  assert.ok(angleUpgradeContract.englishUnavailable.every((row) => row.action === ""), "unaffordable English ANGLE rows should not render repeated action copy");
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileAngleScrollOwnership = await readScrollOwnership(page);
   assert.deepEqual(mobileAngleScrollOwnership.pageOverflow, ["auto", "hidden"], "mobile ANGLE should use the page as its vertical owner");
@@ -1258,7 +1289,6 @@ try {
       "upgrade-row-name",
       "upgrade-row-detail",
       "upgrade-row-cost",
-      "upgrade-row-action",
     ].find((slot) => child.classList.contains(slot)) ?? "").join(","));
     const rowStyles = buttons.map((button) => {
       const style = getComputedStyle(button);
@@ -1315,12 +1345,12 @@ try {
   assert.ok(towerChallenge4Ui.before.rowHeights.every((height) => height >= 42), "TC4 rows should remain touch-safe on desktop");
   assert.equal(towerChallenge4Ui.before.rowOverflow, false, "TC4 rows should not overflow on desktop");
   assert.deepEqual(towerChallenge4Ui.before.rowSlots, [
-    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
-    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
-    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
-  ], "TC4 rows should use the canonical four-slot order");
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost",
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost",
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost",
+  ], "TC4 rows should use the compact three-slot order");
   assert.ok(towerChallenge4Ui.before.rowStyles.every((row) => row.backgroundImage === "none"), "TC4 rows should avoid large gradient fills");
-  assert.ok(towerChallenge4Ui.before.rowStyles.every((row) => row.gridAreas === '"name detail" "cost action"'), "TC4 rows should keep their four slots readable in the narrow ANGLE rail");
+  assert.ok(towerChallenge4Ui.before.rowStyles.every((row) => row.gridAreas === "none"), "TC4 rows should use the compact shared row layout");
   assert.equal(new Set(towerChallenge4Ui.before.rowStyles.map((row) => row.borderColor)).size, 1, "TC4 rows should share one gold identity accent");
   assert.equal(towerChallenge4Ui.before.japaneseForbidden, false, "Japanese TC4 effects should use player-facing wording");
   assert.equal(towerChallenge4Ui.englishForbidden, false, "English TC4 effects should use player-facing wording");
@@ -2113,12 +2143,10 @@ try {
       "upgrade-row-name",
       "upgrade-row-detail",
       "upgrade-row-cost",
-      "upgrade-row-action",
     ].find((slot) => child.classList.contains(slot)) ?? "").join(","));
     const rowStyles = compactRows.map((row) => {
       const style = getComputedStyle(row);
       return {
-        action: row.querySelector(".upgrade-row-action")?.textContent?.trim() ?? "",
         disabled: row.disabled,
         backgroundImage: style.backgroundImage,
         borderColor: style.borderInlineStartColor,
@@ -2197,11 +2225,10 @@ try {
   assert.ok(infiniteAnglePanel.compactRowHeights.every((height) => height >= 42), "IA purchase rows should remain touch-safe");
   assert.equal(infiniteAnglePanel.compactRowOverflow, false, "IA purchase rows should not overflow");
   assert.deepEqual(infiniteAnglePanel.rowSlots, [
-    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
-    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
-    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
-  ], "IA rows should use the canonical four-slot order");
-  assert.deepEqual(infiniteAnglePanel.rowStyles.map((row) => row.action), ["購入", "購入不可", "購入不可"], "IA should expose translated purchase states");
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost",
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost",
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost",
+  ], "IA rows should use the compact three-slot order");
   assert.deepEqual(infiniteAnglePanel.rowStyles.map((row) => row.disabled), [false, true, true], "IA row affordance should follow the existing affordability predicate");
   assert.equal(new Set(infiniteAnglePanel.rowStyles.map((row) => row.borderColor)).size, 3, "IA actions should retain distinct color identities");
   assert.ok(infiniteAnglePanel.rowStyles.every((row) => row.backgroundImage === "none"), "IA rows should avoid large gradient fills");
