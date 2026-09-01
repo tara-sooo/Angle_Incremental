@@ -131,6 +131,15 @@ function updateTowerChallengeRows() {
   const tc4UpgradeList = runtime.elements.tc4UpgradeList;
   if (normalUpgradeList) normalUpgradeList.hidden = activeTc4;
   if (tc4UpgradeList) tc4UpgradeList.hidden = !activeTc4;
+  let completedCount = 0;
+  for (let index = 1; index <= runtime.TOWER_CHALLENGE_COUNT; index += 1) {
+    if (runtime.towerChallengeCompleted(index)) completedCount += 1;
+  }
+  if (runtime.elements.towerChallengeStatus) {
+    runtime.elements.towerChallengeStatus.textContent = runtime.state.activeTowerChallenge > 0
+      ? `${runtime.towerChallengeName(runtime.state.activeTowerChallenge)} ${runtime.t("challengeRunning")}`
+      : `${completedCount}/${runtime.TOWER_CHALLENGE_COUNT} ${runtime.t("completed")}`;
+  }
   const signature = [
     runtime.state.towerFloor,
     runtime.state.activeTowerChallenge,
@@ -163,9 +172,9 @@ function updateTowerChallengeRows() {
     row.querySelector(".challenge-state").textContent = !implemented
       ? runtime.t("towerChallengeComingSoon")
       : active
-        ? runtime.t("towerChallengeRunning")
+        ? runtime.t("challengeRunning")
         : completed
-          ? runtime.t("towerChallengeCompleted")
+          ? runtime.t("challengeCompleted")
           : unlocked
             ? runtime.t("towerChallengeAvailable")
             : runtime.t("towerChallengeLocked").replace("{floor}", String(unlockFloor));
@@ -174,11 +183,7 @@ function updateTowerChallengeRows() {
       : runtime.t("towerChallengeComingSoon");
     row.querySelector(".challenge-restriction").textContent = `${runtime.t("challengeRestrictionLabel")}: ${runtime.towerChallengeRestriction(index)}`;
     row.querySelector(".challenge-reward").textContent = `${runtime.t("challengeRewardLabel")}: ${runtime.towerChallengeReward(index)}${runtime.towerChallengeRewardUnlocked(index) ? ` (${runtime.t("towerChallengeRewardUnlocked")})` : ""}`;
-    button.textContent = active
-      ? runtime.t("towerChallengeStop")
-      : completed
-        ? runtime.t("towerChallengeReplay")
-        : runtime.t("towerChallengeStart");
+    button.textContent = active ? runtime.t("stopChallenge") : runtime.t("startChallenge");
     button.disabled = !implemented || !unlocked || (runtime.state.activeTowerChallenge > 0 && !active);
 
   });

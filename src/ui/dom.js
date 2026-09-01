@@ -81,6 +81,7 @@ const elements = {
   challengeList: document.getElementById("challengeList"),
   challengeStatus: document.getElementById("challengeStatus"),
   towerChallengeList: document.getElementById("towerChallengeList"),
+  towerChallengeStatus: document.getElementById("towerChallengeStatus"),
   normalUpgradeList: document.getElementById("normalUpgradeList"),
   tc4UpgradeList: document.getElementById("tc4UpgradeList"),
   towerFloorHeading: document.getElementById("towerFloorHeading"),
