@@ -78,6 +78,11 @@ function formatNormalUpgradeLevel(rawLevel, effectiveLevel, freeLevel) {
     : formatEffectiveLevel(rawLevel, effectiveLevel);
 }
 
+function updateUpgradeRowAction(button, canBuy) {
+  const action = button?.querySelector(".upgrade-row-action");
+  if (action) action.textContent = runtime.t(canBuy ? "upgradeActionBuy" : "upgradeActionUnavailable");
+}
+
 function recoveryReasonText(reason) {
   const reasonKeys = {
     periodic: "checkpointReasonPeriodic",
@@ -526,10 +531,18 @@ function updateUi() {
   runtime.elements.speedCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.speed)}`;
   runtime.elements.vertexCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.vertex)}`;
   runtime.elements.gainCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.gain)}`;
-  runtime.elements.speedUpgrade.disabled = !runtime.canBuyNormalUpgrade("speed");
-  runtime.elements.vertexUpgrade.disabled = !runtime.canBuyNormalUpgrade("vertex");
-  runtime.elements.gainUpgrade.disabled = !runtime.canBuyNormalUpgrade("gain");
-  runtime.elements.buyAllUpgrade.disabled = !runtime.canBuyNormalUpgrade("speed") && !runtime.canBuyNormalUpgrade("vertex") && !runtime.canBuyNormalUpgrade("gain");
+  const canBuyNormal = {
+    speed: runtime.canBuyNormalUpgrade("speed"),
+    vertex: runtime.canBuyNormalUpgrade("vertex"),
+    gain: runtime.canBuyNormalUpgrade("gain"),
+  };
+  runtime.elements.speedUpgrade.disabled = !canBuyNormal.speed;
+  runtime.elements.vertexUpgrade.disabled = !canBuyNormal.vertex;
+  runtime.elements.gainUpgrade.disabled = !canBuyNormal.gain;
+  updateUpgradeRowAction(runtime.elements.speedUpgrade, canBuyNormal.speed);
+  updateUpgradeRowAction(runtime.elements.vertexUpgrade, canBuyNormal.vertex);
+  updateUpgradeRowAction(runtime.elements.gainUpgrade, canBuyNormal.gain);
+  runtime.elements.buyAllUpgrade.disabled = !canBuyNormal.speed && !canBuyNormal.vertex && !canBuyNormal.gain;
 
   const ready = runtime.canRunGeneration();
   runtime.elements.generationButton.disabled = !ready;
@@ -590,9 +603,17 @@ function updateUi() {
   runtime.elements.infiniteAngleSpeedCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.speed)} IP`;
   runtime.elements.infiniteAngleVertexCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.vertex)} IP`;
   runtime.elements.infiniteAngleGainCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.gain)} IP`;
-  runtime.elements.infiniteAngleSpeedUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("speed");
-  runtime.elements.infiniteAngleVertexUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("vertex");
-  runtime.elements.infiniteAngleGainUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("gain");
+  const canBuyInfiniteAngle = {
+    speed: runtime.canBuyInfiniteAngleUpgrade("speed"),
+    vertex: runtime.canBuyInfiniteAngleUpgrade("vertex"),
+    gain: runtime.canBuyInfiniteAngleUpgrade("gain"),
+  };
+  runtime.elements.infiniteAngleSpeedUpgrade.disabled = !canBuyInfiniteAngle.speed;
+  runtime.elements.infiniteAngleVertexUpgrade.disabled = !canBuyInfiniteAngle.vertex;
+  runtime.elements.infiniteAngleGainUpgrade.disabled = !canBuyInfiniteAngle.gain;
+  updateUpgradeRowAction(runtime.elements.infiniteAngleSpeedUpgrade, canBuyInfiniteAngle.speed);
+  updateUpgradeRowAction(runtime.elements.infiniteAngleVertexUpgrade, canBuyInfiniteAngle.vertex);
+  updateUpgradeRowAction(runtime.elements.infiniteAngleGainUpgrade, canBuyInfiniteAngle.gain);
   const completed = runtime.completedChallengeCount();
   runtime.elements.challengeStatus.textContent = runtime.state.activeChallenge > 0
     ? `${runtime.challengeName(runtime.state.activeChallenge)} ${runtime.t("challengeRunning")}`

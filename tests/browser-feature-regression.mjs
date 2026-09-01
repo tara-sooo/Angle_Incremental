@@ -553,6 +553,76 @@ try {
   assert.deepEqual(desktopAngleScrollOwnership.mainPanelsOverflow, ["hidden", "hidden"], "desktop ANGLE main panels should not own page scrolling");
   assert.equal(desktopAngleScrollOwnership.visibleSectionsBorderless, true, "desktop shared sections should avoid redundant frames");
   assert.equal(desktopAngleScrollOwnership.finalContentReachable, true, "desktop ANGLE final actions should remain reachable");
+  const angleUpgradeContract = await page.evaluate(() => {
+    const { state, runtime, switchMainTab } = window.__angleDebug;
+    const originalState = structuredClone(state);
+    const originalTab = runtime.activeMainTab;
+    const rows = Array.from(document.querySelectorAll("#normalUpgradeList .upgrade-row"));
+    const slotOrder = (row) => [...row.children].map((child) => [
+      "upgrade-row-name",
+      "upgrade-row-detail",
+      "upgrade-row-cost",
+      "upgrade-row-action",
+    ].find((slot) => child.classList.contains(slot)) ?? "");
+    const readRows = () => rows.map((row) => {
+      const style = getComputedStyle(row);
+      return {
+        kind: row.dataset.upgradeKind,
+        slots: slotOrder(row).join(","),
+        action: row.querySelector(".upgrade-row-action")?.textContent?.trim() ?? "",
+        disabled: row.disabled,
+        height: row.getBoundingClientRect().height,
+        overflow: row.scrollWidth > row.clientWidth + 1,
+        backgroundImage: style.backgroundImage,
+        borderColor: style.borderInlineStartColor,
+      };
+    });
+    Object.assign(state, {
+      activeChallenge: 0,
+      activeTowerChallenge: 0,
+      score: Number.MAX_VALUE,
+      scoreLog10: 300,
+      language: "ja",
+    });
+    switchMainTab("angle");
+    window.advanceTime(0);
+    const purchasable = readRows();
+    const buyAll = document.querySelector("#buyAllUpgrade");
+    const buyAllRect = buyAll?.getBoundingClientRect();
+    const buyAllStyle = buyAll ? getComputedStyle(buyAll) : null;
+    const buyAllWide = {
+      disabled: Boolean(buyAll?.disabled),
+      width: buyAllRect?.width ?? 0,
+      parentWidth: buyAll?.parentElement?.getBoundingClientRect().width ?? 0,
+      height: buyAllRect?.height ?? 0,
+      backgroundImage: buyAllStyle?.backgroundImage ?? "",
+    };
+    state.score = 0;
+    state.scoreLog10 = -Infinity;
+    window.advanceTime(0);
+    const japaneseUnavailable = readRows();
+    const unavailableBuyAllDisabled = Boolean(buyAll?.disabled);
+    state.language = "en";
+    window.advanceTime(0);
+    const englishUnavailable = readRows();
+    Object.assign(state, originalState);
+    switchMainTab(originalTab);
+    window.advanceTime(0);
+    return { purchasable, buyAllWide, japaneseUnavailable, unavailableBuyAllDisabled, englishUnavailable };
+  });
+  assert.deepEqual(angleUpgradeContract.purchasable.map((row) => row.kind), ["speed", "vertex", "gain"], "ANGLE actions should keep their three identities");
+  assert.ok(angleUpgradeContract.purchasable.every((row) => row.slots === "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action"), "ANGLE rows should expose the canonical four-slot order");
+  assert.ok(angleUpgradeContract.purchasable.every((row) => row.action === "購入" && !row.disabled), "affordable ANGLE rows should expose the purchase action");
+  assert.ok(angleUpgradeContract.purchasable.every((row) => row.height <= 56 && !row.overflow), "desktop ANGLE rows should stay dense without overflow");
+  assert.equal(new Set(angleUpgradeContract.purchasable.map((row) => row.borderColor)).size, 3, "ANGLE actions should retain distinct color identities");
+  assert.ok(angleUpgradeContract.purchasable.every((row) => row.backgroundImage === "none"), "ANGLE rows should avoid large gradient fills");
+  assert.equal(angleUpgradeContract.buyAllWide.disabled, false, "ANGLE Buy All should enable when a normal action is affordable");
+  assert.ok(angleUpgradeContract.buyAllWide.width < angleUpgradeContract.buyAllWide.parentWidth, "ANGLE Buy All should remain a compact section action");
+  assert.ok(angleUpgradeContract.buyAllWide.height <= 42, "ANGLE Buy All should remain compact");
+  assert.equal(angleUpgradeContract.buyAllWide.backgroundImage, "none", "ANGLE Buy All should avoid a dominant gradient fill");
+  assert.ok(angleUpgradeContract.japaneseUnavailable.every((row) => row.disabled && row.action === "購入不可"), "unaffordable Japanese ANGLE rows should expose a non-color unavailable state");
+  assert.equal(angleUpgradeContract.unavailableBuyAllDisabled, true, "ANGLE Buy All should disable when no normal action is affordable");
+  assert.ok(angleUpgradeContract.englishUnavailable.every((row) => row.action === "Unavailable"), "unaffordable English ANGLE rows should translate their action state");
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileAngleScrollOwnership = await readScrollOwnership(page);
   assert.deepEqual(mobileAngleScrollOwnership.pageOverflow, ["auto", "hidden"], "mobile ANGLE should use the page as its vertical owner");
@@ -1182,6 +1252,20 @@ try {
     window.advanceTime(0);
     const list = document.querySelector("#tc4UpgradeList");
     const buttons = Array.from(list?.querySelectorAll("button[data-tc4-upgrade]") ?? []);
+    const rowSlots = buttons.map((button) => [...button.children].map((child) => [
+      "upgrade-row-name",
+      "upgrade-row-detail",
+      "upgrade-row-cost",
+      "upgrade-row-action",
+    ].find((slot) => child.classList.contains(slot)) ?? "").join(","));
+    const rowStyles = buttons.map((button) => {
+      const style = getComputedStyle(button);
+      return {
+        backgroundImage: style.backgroundImage,
+        borderColor: style.borderInlineStartColor,
+        gridAreas: style.gridTemplateAreas,
+      };
+    });
     const readTexts = () => buttons.map((button) => button.textContent.trim());
     const japaneseTexts = readTexts();
     const before = {
@@ -1192,6 +1276,8 @@ try {
       buttonCount: buttons.length,
       rowHeights: buttons.map((button) => button.getBoundingClientRect().height),
       rowOverflow: buttons.some((button) => button.scrollWidth > button.clientWidth + 1),
+      rowSlots,
+      rowStyles,
       japaneseTexts,
       japaneseForbidden: japaneseTexts.some((text) => /parts|log10|effective CB/i.test(text)),
     };
@@ -1226,6 +1312,14 @@ try {
   assert.equal(towerChallenge4Ui.before.buttonCount, 3, "TC4 should expose three ANGLE purchase rows");
   assert.ok(towerChallenge4Ui.before.rowHeights.every((height) => height >= 42), "TC4 rows should remain touch-safe on desktop");
   assert.equal(towerChallenge4Ui.before.rowOverflow, false, "TC4 rows should not overflow on desktop");
+  assert.deepEqual(towerChallenge4Ui.before.rowSlots, [
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
+  ], "TC4 rows should use the canonical four-slot order");
+  assert.ok(towerChallenge4Ui.before.rowStyles.every((row) => row.backgroundImage === "none"), "TC4 rows should avoid large gradient fills");
+  assert.ok(towerChallenge4Ui.before.rowStyles.every((row) => row.gridAreas === '"name detail" "cost action"'), "TC4 rows should keep their four slots readable in the narrow ANGLE rail");
+  assert.equal(new Set(towerChallenge4Ui.before.rowStyles.map((row) => row.borderColor)).size, 1, "TC4 rows should share one gold identity accent");
   assert.equal(towerChallenge4Ui.before.japaneseForbidden, false, "Japanese TC4 effects should use player-facing wording");
   assert.equal(towerChallenge4Ui.englishForbidden, false, "English TC4 effects should use player-facing wording");
   assert.match(towerChallenge4Ui.englishTexts[0], /Core Gain/);
@@ -1989,6 +2083,24 @@ try {
     const infiniteAngleLayout = document.querySelector(".infinite-angle-panel");
     const metricColumn = document.querySelector(".infinite-angle-metrics");
     const compactRows = Array.from(document.querySelectorAll(".infinite-angle-upgrades .upgrade-row"));
+    const rowSlots = compactRows.map((row) => [...row.children].map((child) => [
+      "upgrade-row-name",
+      "upgrade-row-detail",
+      "upgrade-row-cost",
+      "upgrade-row-action",
+    ].find((slot) => child.classList.contains(slot)) ?? "").join(","));
+    const rowStyles = compactRows.map((row) => {
+      const style = getComputedStyle(row);
+      return {
+        action: row.querySelector(".upgrade-row-action")?.textContent?.trim() ?? "",
+        disabled: row.disabled,
+        backgroundImage: style.backgroundImage,
+        borderColor: style.borderInlineStartColor,
+      };
+    });
+    const buyAllButton = document.querySelector("#infiniteAngleBuyAllUpgrade");
+    const buyAllRect = buyAllButton?.getBoundingClientRect();
+    const buyAllStyle = buyAllButton ? getComputedStyle(buyAllButton) : null;
     const beforeLevel = state.infiniteAngleSpeedLevel;
     const upgradeCosts = [
       document.querySelector("#infiniteAngleSpeedCost")?.textContent?.trim() ?? "",
@@ -2028,6 +2140,12 @@ try {
       compactRowCount: compactRows.length,
       compactRowHeights: compactRows.map((row) => row.getBoundingClientRect().height),
       compactRowOverflow: compactRows.some((row) => row.scrollWidth > row.clientWidth + 1),
+      rowSlots,
+      rowStyles,
+      buyAllWidth: buyAllRect?.width ?? 0,
+      buyAllParentWidth: buyAllButton?.parentElement?.getBoundingClientRect().width ?? 0,
+      buyAllHeight: buyAllRect?.height ?? 0,
+      buyAllBackgroundImage: buyAllStyle?.backgroundImage ?? "",
       panelOverflow: Boolean(infiniteAngleLayout && infiniteAngleLayout.scrollWidth > infiniteAngleLayout.clientWidth + 1),
       canvasPixel: canvas?.getContext("2d")?.getImageData(1, 1, 1, 1).data?.[0] ?? 0,
       scoreText: document.querySelector("#infiniteScorePanel")?.textContent?.trim() ?? "",
@@ -2052,6 +2170,18 @@ try {
   assert.equal(infiniteAnglePanel.compactRowCount, 3, "IA should expose three shared purchase rows");
   assert.ok(infiniteAnglePanel.compactRowHeights.every((height) => height >= 42), "IA purchase rows should remain touch-safe");
   assert.equal(infiniteAnglePanel.compactRowOverflow, false, "IA purchase rows should not overflow");
+  assert.deepEqual(infiniteAnglePanel.rowSlots, [
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
+    "upgrade-row-name,upgrade-row-detail,upgrade-row-cost,upgrade-row-action",
+  ], "IA rows should use the canonical four-slot order");
+  assert.deepEqual(infiniteAnglePanel.rowStyles.map((row) => row.action), ["購入", "購入不可", "購入不可"], "IA should expose translated purchase states");
+  assert.deepEqual(infiniteAnglePanel.rowStyles.map((row) => row.disabled), [false, true, true], "IA row affordance should follow the existing affordability predicate");
+  assert.equal(new Set(infiniteAnglePanel.rowStyles.map((row) => row.borderColor)).size, 3, "IA actions should retain distinct color identities");
+  assert.ok(infiniteAnglePanel.rowStyles.every((row) => row.backgroundImage === "none"), "IA rows should avoid large gradient fills");
+  assert.ok(infiniteAnglePanel.buyAllWidth < infiniteAnglePanel.buyAllParentWidth, "IA Buy All should remain a compact section action");
+  assert.ok(infiniteAnglePanel.buyAllHeight <= 42, "IA Buy All should remain compact");
+  assert.equal(infiniteAnglePanel.buyAllBackgroundImage, "none", "IA Buy All should avoid a dominant gradient fill");
   assert.equal(infiniteAnglePanel.panelOverflow, false, "IA should not overflow its panel");
   assert.notEqual(infiniteAnglePanel.canvasPixel, 0, "IA canvas should render nonblank pixels");
   assert.notEqual(infiniteAnglePanel.scoreText, "", "IA panel should display Infinity Score");
