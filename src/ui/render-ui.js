@@ -83,6 +83,68 @@ function updateUpgradeRowAction(button, canBuy) {
   if (action) action.textContent = runtime.t(canBuy ? "upgradeActionBuy" : "upgradeActionUnavailable");
 }
 
+function prestigeActionKind() {
+  return runtime.canEternity?.() === true ? "eternity" : "infinity";
+}
+
+function canRunPrestigeAction(kind = prestigeActionKind()) {
+  if (kind === "eternity") return runtime.canEternity?.() === true;
+  return Number(runtime.state.infinityCount) > 0 && runtime.canInfinity?.() === true;
+}
+
+function updatePrestigeActionUi() {
+  const surface = runtime.elements.prestigeActionSurface;
+  const name = runtime.elements.prestigeActionName;
+  const status = runtime.elements.prestigeActionStatus;
+  const detailLabel = runtime.elements.prestigeActionDetailLabel;
+  const detail = runtime.elements.prestigeActionDetail;
+  const button = runtime.elements.prestigeActionButton;
+  if (!surface || !name || !status || !detailLabel || !detail || !button) return;
+
+  const kind = prestigeActionKind();
+  const ready = canRunPrestigeAction(kind);
+  const infinityUnlocked = Number(runtime.state.infinityCount) > 0;
+  surface.dataset.action = kind;
+  surface.dataset.state = ready ? "ready" : "unavailable";
+  surface.classList.toggle("is-ready", ready);
+  surface.classList.toggle("is-eternity", kind === "eternity");
+  name.textContent = kind === "eternity" ? runtime.t("eternity") : "Infinity";
+  status.textContent = ready
+    ? runtime.t("prestigeActionReady")
+    : infinityUnlocked
+      ? runtime.t("prestigeActionUnavailable")
+      : runtime.t("prestigeActionLocked");
+  button.disabled = !ready;
+
+  if (kind === "eternity") {
+    const requirement = runtime.t("eternityRequirementCompact")
+      .replace("{ip}", runtime.formatUiLogNumber(runtime.ETERNITY_REQUIREMENT_LOG10));
+    const currentIp = runtime.formatHeldUiLogNumber(
+      runtime.currentInfinityPointsLog10(),
+      runtime.state.infinityPointsExact,
+    );
+    detailLabel.textContent = runtime.t("prestigeActionEternityRequirement");
+    detail.textContent = `${requirement} / ${runtime.t("prestigeActionCurrentIp")}: ${currentIp} IP`;
+    button.textContent = runtime.t(ready ? "eternityPerform" : "eternityPerformUnavailable");
+    return;
+  }
+
+  detailLabel.textContent = runtime.t("infinityGain");
+  detail.textContent = ready
+    ? `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`
+    : runtime.t("prestigeActionInfinityRequirement")
+      .replace("{score}", runtime.formatUiLogNumber(runtime.INFINITY_REQUIREMENT_LOG10));
+  button.textContent = "Infinity";
+}
+
+function runPrestigeAction() {
+  const kind = prestigeActionKind();
+  if (!canRunPrestigeAction(kind)) return false;
+  if (kind === "eternity") return runtime.performEternity?.() === true;
+  runtime.runInfinity?.(false);
+  return true;
+}
+
 function recoveryReasonText(reason) {
   const reasonKeys = {
     periodic: "checkpointReasonPeriodic",
@@ -578,7 +640,7 @@ function updateUi() {
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`;
-  runtime.elements.infinityButton.disabled = runtime.state.infinityCount === 0 || !runtime.canInfinity();
+  updatePrestigeActionUi();
   runtime.updateInfinityUpgradeRows();
   const infiniteAngleUnlocked = runtime.state.infiniteAngleUnlocked;
   const infiniteAngleUnlockCostLog10 = runtime.infiniteAngleUnlockCostLog10();
@@ -764,6 +826,10 @@ expose("canSpend", () => canSpend, (value) => { canSpend = value; });
 expose("formatVertexGainIncrease", () => formatVertexGainIncrease, (value) => { formatVertexGainIncrease = value; });
 expose("updateTimelineUi", () => updateTimelineUi);
 expose("selectTimelineNode", () => selectTimelineNode);
+expose("prestigeActionKind", () => prestigeActionKind);
+expose("canRunPrestigeAction", () => canRunPrestigeAction);
+expose("updatePrestigeActionUi", () => updatePrestigeActionUi);
+expose("runPrestigeAction", () => runPrestigeAction);
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });
 expose("setSaveStatus", () => setSaveStatus, (value) => { setSaveStatus = value; });
 expose("gainExpressionConfig", () => gainExpressionConfig, (value) => { gainExpressionConfig = value; });
