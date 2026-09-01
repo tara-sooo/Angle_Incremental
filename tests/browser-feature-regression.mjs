@@ -1176,6 +1176,7 @@ try {
       towerState,
       challengePanelActive: Boolean(document.querySelector('[data-challenge-panel="tc"]')?.classList.contains("is-active")),
       towerChallengeRows: document.querySelectorAll("#towerChallengeList .tower-challenge-row").length,
+      towerChallengeStatus: document.querySelector("#towerChallengeStatus")?.textContent?.trim() ?? "",
       towerChallengeReleaseStatus: Boolean(document.querySelector('[data-i18n="towerChallengeReleaseStatus"]')),
       challengeReleaseNote: Boolean(document.querySelector('[data-i18n="challengeReleaseNote"]')),
       towerChallengeButton: document.querySelector("#towerChallengeList .tower-challenge-row button")?.textContent?.trim() ?? "",
@@ -1197,6 +1198,7 @@ try {
   assert.equal(towerInitial.towerState.buildDisabled, true, "Tower construction should be disabled without IP");
   assert.equal(towerInitial.challengePanelActive, true, "Challenges > TC should activate the TC panel");
   assert.equal(towerInitial.towerChallengeRows, 4, "TC1-TC4 rows should be visible");
+  assert.equal(towerInitial.towerChallengeStatus, "0/4 完了", "TC should show its completion summary");
   assert.equal(towerInitial.towerChallengeReleaseStatus, false, "Tower Challenge should not show implementation-status copy");
   assert.equal(towerInitial.challengeReleaseNote, false, "Challenges should not show the non-actionable IC/TC note");
   assert.equal(towerInitial.towerState.coreBoostRawGrowthRow, false, "Core Boost should not show the raw growth row");
@@ -1209,7 +1211,7 @@ try {
   assert.equal(towerInitial.towerState.dedicatedInfiniteScore, true, "IA should retain its Infinite Score metric");
   assert.equal(towerInitial.towerState.dedicatedInfiniteAngleBoost, true, "IA should retain its multiplier metric");
   assert.match(towerInitial.towerState.infinityUnlockNote, /1\.80e308/);
-  assert.equal(towerInitial.towerChallengeButton, "挑戦開始", "implemented TC rows should expose a start button");
+  assert.equal(towerInitial.towerChallengeButton, "開始", "implemented TC rows should expose the shared start button");
   assert.equal(towerInitial.towerChallengeButtonDisabled, true, "locked TC rows should disable their start button");
   assert.match(towerInitial.towerChallengeRestriction, /通常強化/);
   assert.match(towerInitial.towerChallengeTarget, /1\.00e1,000/);
@@ -1353,7 +1355,7 @@ try {
     window.advanceTime(0);
     return result;
   });
-  assert.equal(towerChallenge3Flow.button, "挑戦開始", "TC3 should expose a start button at Floor 8");
+  assert.equal(towerChallenge3Flow.button, "開始", "TC3 should expose the shared start button at Floor 8");
   assert.equal(towerChallenge3Flow.disabled, false, "TC3 should be available at Floor 8");
   assert.match(towerChallenge3Flow.restriction, /\^0\.800/);
   assert.match(towerChallenge3Flow.restriction, /\^0\.500/);
@@ -1373,6 +1375,7 @@ try {
       status: row?.querySelector(".challenge-state")?.textContent?.trim() ?? "",
       button: row?.querySelector("button")?.textContent?.trim() ?? "",
       disabled: Boolean(row?.querySelector("button")?.disabled),
+      summary: document.querySelector("#towerChallengeStatus")?.textContent?.trim() ?? "",
       restriction: row?.querySelector(".challenge-restriction")?.textContent?.trim() ?? "",
     };
     Object.assign(state, original);
@@ -1380,7 +1383,8 @@ try {
     return result;
   });
   assert.equal(towerChallenge4Flow.status, "挑戦中", "TC4 should show its active status");
-  assert.equal(towerChallenge4Flow.button, "挑戦中止", "an active TC4 should expose a stop button");
+  assert.equal(towerChallenge4Flow.button, "中止", "an active TC4 should expose the shared stop button");
+  assert.equal(towerChallenge4Flow.summary, "TC4 既存品の代替 挑戦中", "the active TC should appear in the group summary");
   assert.equal(towerChallenge4Flow.disabled, false, "an active TC4 should be stoppable");
   assert.match(towerChallenge4Flow.restriction, /レベル1/);
   const towerChallengeFlow = await page.evaluate(() => {
@@ -1408,6 +1412,7 @@ try {
     window.advanceTime(0);
     const replayButton = document.querySelector("#towerChallengeList .tower-challenge-row button");
     const replayStarted = replayButton?.textContent?.trim() ?? "";
+    const completionSummary = document.querySelector("#towerChallengeStatus")?.textContent?.trim() ?? "";
     replayButton?.click();
     const replay = {
       active: state.activeTowerChallenge,
@@ -1423,20 +1428,22 @@ try {
     state.scoreLog10 = -Infinity;
     state.completedTowerChallenges = 0;
     window.advanceTime(0);
-    return { active, result, replayStarted, replay, replayCompleted };
+    return { active, result, replayStarted, completionSummary, replay, replayCompleted };
   });
   assert.equal(towerChallengeFlow.active.active, 1, "TC1 should become active from its UI button");
-  assert.equal(towerChallengeFlow.active.button, "挑戦中止", "an active TC should expose a stop button");
+  assert.equal(towerChallengeFlow.active.button, "中止", "an active TC should expose the shared stop button");
   assert.equal(towerChallengeFlow.result.completed, true, "TC1 should complete at its displayed target");
   assert.equal(towerChallengeFlow.result.completedMask, 1, "TC1 completion should set its reward flag");
-  assert.equal(towerChallengeFlow.replayStarted, "再挑戦", "a cleared TC should expose a replay button");
+  assert.equal(towerChallengeFlow.replayStarted, "開始", "a cleared TC should expose the normal start action");
+  assert.equal(towerChallengeFlow.completionSummary, "1/4 完了", "TC should show the completed count after a clear");
   assert.equal(towerChallengeFlow.replay.active, 1, "a cleared TC should become active when replayed");
-  assert.equal(towerChallengeFlow.replay.button, "挑戦中止", "a replaying TC should expose a stop button");
+  assert.equal(towerChallengeFlow.replay.button, "中止", "a replaying TC should expose the shared stop button");
   assert.equal(towerChallengeFlow.replay.disabled, false, "a replaying TC stop button should be enabled");
   assert.equal(towerChallengeFlow.replayCompleted, true, "a replaying TC should complete at its displayed target");
   const towerRewardDisplay = await page.evaluate(() => {
     const { state } = window.__angleDebug;
     const original = {
+      activeChallenge: state.activeChallenge,
       completedTowerChallenges: state.completedTowerChallenges,
       language: state.language,
       towerFloor: state.towerFloor,
@@ -1468,11 +1475,26 @@ try {
     state.numberFormat = "detailed";
     state.language = "en";
     window.advanceTime(0);
+    const infinityStart = document.querySelector('#challengeList [data-challenge="1"] button')?.textContent?.trim() ?? "";
+    state.activeChallenge = 1;
+    window.advanceTime(0);
+    const infinityStop = document.querySelector('#challengeList [data-challenge="1"] button')?.textContent?.trim() ?? "";
+    state.activeChallenge = original.activeChallenge;
+    window.advanceTime(0);
+    state.completedTowerChallenges = 0b1111;
+    window.advanceTime(0);
+    const towerSummary = document.querySelector("#towerChallengeStatus")?.textContent?.trim() ?? "";
+    state.completedTowerChallenges = 4;
+    window.advanceTime(0);
     const effectiveUpgradeLevels = {
       speed: document.querySelector("#speedLevel")?.textContent?.trim() ?? "",
       gain: document.querySelector("#gainLevel")?.textContent?.trim() ?? "",
     };
     const englishLabels = {
+      infinityStart,
+      infinityStop,
+      towerSummary,
+      towerButton: document.querySelector('#towerChallengeList [data-tower-challenge="1"] button')?.textContent?.trim() ?? "",
       tc1Final: document.querySelector('[data-i18n="towerChallenge1ScorePower"]')?.textContent?.trim() ?? "",
       tc2Effective: document.querySelector('[data-i18n="coreBoostGrowthPower"]')?.textContent?.trim() ?? "",
       tc2Reward: document.querySelector('#towerChallengeList [data-tower-challenge="2"] .challenge-reward')?.textContent?.trim() ?? "",
@@ -1499,6 +1521,10 @@ try {
   assert.match(towerRewardDisplay.effectiveUpgradeLevels.gain, /Level 100 .*Effective 127\.628/, "TC3 should expose effective Gain levels");
   assert.equal(towerRewardDisplay.englishLabels.tc2Effective, "CB requirement growth", "the final Core Boost growth label should be translated to English");
   assert.equal(towerRewardDisplay.englishLabels.tc1Final, "Infinity Score exponent", "the final Tower exponent label should be translated to English");
+  assert.equal(towerRewardDisplay.englishLabels.towerSummary, "4/4 complete", "the English TC summary should show completed progress");
+  assert.equal(towerRewardDisplay.englishLabels.towerButton, "Start", "the English TC action should use the shared start label");
+  assert.equal(towerRewardDisplay.englishLabels.infinityStart, "Start", "the English IC action should use the shared start label");
+  assert.equal(towerRewardDisplay.englishLabels.infinityStop, "Stop", "the English IC action should use the shared stop label");
   assert.doesNotMatch(towerRewardDisplay.englishLabels.tc2Reward, /raw power|log10|parts|effective CB/i, "TC2 reward copy should use player-facing wording");
   assert.doesNotMatch(towerRewardDisplay.englishLabels.routineText, /log10|parts|effective CB/i, "routine gameplay UI should avoid implementation terminology");
   assert.doesNotMatch(towerRewardDisplay.englishLabels.lapSpeed, /raw/i, "lap speed should show only its governing value");
