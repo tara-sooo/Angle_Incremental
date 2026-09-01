@@ -30,7 +30,7 @@ function createInfinityUpgradeRows() {
       const upgrade = runtime.infinityUpgradeById(id);
       if (!upgrade) return;
       const button = document.createElement("button");
-      button.className = "infinity-upgrade-node";
+      button.className = "infinity-upgrade-node ui-tree-node";
       button.type = "button";
       button.dataset.upgrade = upgrade.id;
       button.addEventListener("click", () => runtime.selectInfinityUpgrade(upgrade.id));

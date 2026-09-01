@@ -6,6 +6,79 @@ const errors = [];
 const httpFailures = [];
 let context;
 let page;
+
+async function readUiContract(targetPage) {
+  return targetPage.evaluate(() => {
+    const mainScroll = document.querySelector(".ui-main-nav .ui-scroll-x");
+    const mainScrollBefore = mainScroll?.scrollLeft ?? 0;
+    const firstMainTab = mainScroll?.querySelector(".main-tab");
+    const firstMainTabHiddenBefore = firstMainTab?.hidden ?? false;
+    if (firstMainTab) firstMainTab.hidden = true;
+    const hiddenDisplay = firstMainTab ? getComputedStyle(firstMainTab).display : "";
+    if (firstMainTab) firstMainTab.hidden = firstMainTabHiddenBefore;
+
+    const focusProbe = document.querySelector(".ui-main-nav .main-tab");
+    focusProbe?.focus();
+    const focusStyle = focusProbe ? getComputedStyle(focusProbe) : null;
+    const mainScrollRect = mainScroll?.getBoundingClientRect();
+    const lastMainTab = mainScroll?.querySelector(".main-tab:last-of-type");
+    if (mainScroll) mainScroll.scrollLeft = mainScroll.scrollWidth;
+    const lastMainTabRect = lastMainTab?.getBoundingClientRect();
+    const mainReachableAtEnd = Boolean(
+      mainScrollRect
+      && lastMainTabRect
+      && lastMainTabRect.right <= mainScrollRect.right + 1,
+    );
+    if (mainScroll) mainScroll.scrollLeft = mainScrollBefore;
+
+    const activePage = document.querySelector(".main-panel.is-active");
+    const activePrimaryPages = document.querySelectorAll('.main-panel.is-active.ui-page[data-scroll-owner="primary"]');
+    const pageOwners = Array.from(document.querySelectorAll('.main-panel.ui-page[data-scroll-owner="primary"]'));
+    const helpPage = document.querySelector('.main-panel[data-panel="help"]');
+    const horizontalHosts = Array.from(document.querySelectorAll('.ui-scroll-x[data-scroll-owner="horizontal"]'));
+    const subtabStrips = Array.from(document.querySelectorAll(".ui-subtab-strip"));
+    const treeNodes = Array.from(document.querySelectorAll(".ui-tree-node"));
+    const upgradeRows = Array.from(document.querySelectorAll(".upgrade-row"));
+    return {
+      activePrimaryPageCount: activePrimaryPages.length,
+      activePageOverflow: activePage
+        ? [getComputedStyle(activePage).overflowY, getComputedStyle(activePage).overflowX]
+        : [],
+      pageOwnerCount: pageOwners.length,
+      mainPanelCount: document.querySelectorAll(".main-panel").length,
+      helpPageOverflow: helpPage
+        ? [getComputedStyle(helpPage).overflowY, getComputedStyle(helpPage).overflowX]
+        : [],
+      mainNavRole: document.querySelector(".ui-main-nav")?.matches("nav") ?? false,
+      mainScrollRole: Boolean(mainScroll),
+      horizontalHostsValid: horizontalHosts.length > 0 && horizontalHosts.every((host) => {
+        const style = getComputedStyle(host);
+        return style.overflowX === "auto" && style.overflowY === "hidden";
+      }),
+      subtabRolesValid: subtabStrips.length > 0 && subtabStrips.every((strip) => (
+        strip.classList.contains("ui-scroll-x")
+        && strip.dataset.scrollOwner === "horizontal"
+      )),
+      upgradeRowsHaveSharedHook: upgradeRows.length > 0 && upgradeRows.every((row) => row.classList.contains("upgrade-row")),
+      treeNodesHaveSharedHook: treeNodes.length > 0 && treeNodes.every((node) => node.classList.contains("ui-tree-node")),
+      treeCount: document.querySelectorAll(".ui-tree").length,
+      selectedDetailCount: document.querySelectorAll(".ui-selected-detail").length,
+      playfieldCount: document.querySelectorAll(".ui-playfield").length,
+      hiddenDisplay,
+      focusActive: document.activeElement === focusProbe,
+      focusOutlineWidth: focusStyle?.outlineWidth ?? "",
+      touchTargetMinimums: [...document.querySelectorAll(".ui-main-nav .main-tab, .ui-subtab-strip .subtab, .upgrade-row, .ui-tree-node")]
+        .filter((control) => control.getClientRects().length > 0)
+        .every((control) => control.getBoundingClientRect().height >= 40),
+      mainReachableAtEnd,
+      renderTextAvailable: typeof window.render_game_to_text === "function"
+        && window.render_game_to_text().length > 0,
+      eternityPageRole: Boolean(document.querySelector('.main-panel[data-panel="eternity"].ui-page[data-scroll-owner="primary"]')),
+      timelineNoLongerPage: Boolean(document.querySelector('.eternity-subpanel[data-eternity-panel="timeline"]:not(.ui-page):not([data-scroll-owner])')),
+    };
+  });
+}
+
 try {
   ({ context, page } = await openGamePage(gameTest.browser, gameTest.origin, {
     viewport: { width: 1280, height: 900 },
@@ -322,6 +395,28 @@ try {
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
   assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
   assert.deepEqual(tabStructure.statisticsTabs, ["overview", "challenges", "eternity"], "Statistics subtabs should be ordered Overview, Challenge Records, Eternity Records");
+  const desktopUiContract = await readUiContract(page);
+  assert.equal(desktopUiContract.activePrimaryPageCount, 1, "desktop should expose one primary owner for the active page");
+  assert.equal(desktopUiContract.pageOwnerCount, desktopUiContract.mainPanelCount, "every main page should declare the primary owner");
+  assert.equal(desktopUiContract.activePageOverflow.join("|"), "auto|hidden", "desktop page surfaces should own vertical scrolling");
+  assert.equal(desktopUiContract.helpPageOverflow.join("|"), "auto|hidden", "Help should use the shared page scroll contract");
+  assert.equal(desktopUiContract.mainNavRole, true, "main navigation should expose the shared role");
+  assert.equal(desktopUiContract.mainScrollRole, true, "main navigation should expose a shared horizontal scroll host");
+  assert.equal(desktopUiContract.horizontalHostsValid, true, "desktop horizontal hosts should hide vertical overflow");
+  assert.equal(desktopUiContract.subtabRolesValid, true, "subtab strips should share the horizontal role");
+  assert.equal(desktopUiContract.upgradeRowsHaveSharedHook, true, "purchase rows should retain the shared upgrade-row hook");
+  assert.equal(desktopUiContract.treeNodesHaveSharedHook, true, "rendered tree nodes should use the shared node hook");
+  assert.ok(desktopUiContract.treeCount >= 1, "desktop should render a shared tree surface");
+  assert.ok(desktopUiContract.selectedDetailCount >= 1, "desktop should render a selected-detail surface");
+  assert.equal(desktopUiContract.playfieldCount, 2, "ANGLE and IA should expose the shared playfield role");
+  assert.equal(desktopUiContract.hiddenDisplay, "none", "hidden shared navigation members should leave layout");
+  assert.equal(desktopUiContract.focusActive, true, "shared navigation controls should remain keyboard focusable");
+  assert.ok(Number.parseFloat(desktopUiContract.focusOutlineWidth) >= 2, "shared navigation focus should remain visible");
+  assert.equal(desktopUiContract.touchTargetMinimums, true, "shared controls should retain touch-sized targets");
+  assert.equal(desktopUiContract.mainReachableAtEnd, true, "the main navigation end should remain reachable");
+  assert.equal(desktopUiContract.renderTextAvailable, true, "the render_game_to_text debug surface should remain available");
+  assert.equal(desktopUiContract.eternityPageRole, true, "runtime Eternity should use the shared page role");
+  assert.equal(desktopUiContract.timelineNoLongerPage, true, "reparented Timeline should not retain page ownership");
   const compactNavigation = await page.evaluate(() => {
     const mainTabs = Array.from(document.querySelectorAll(".main-tab"));
     const subtabs = Array.from(document.querySelectorAll(".infinity-subtab, .eternity-subtab, .challenge-subtab, .statistics-subtab"));
@@ -2173,6 +2268,16 @@ try {
       window.advanceTime(0);
     });
     const mobileTabBar = await measureMainTabBar(mobilePage);
+    const mobileUiContract = await readUiContract(mobilePage);
+    assert.equal(mobileUiContract.activePrimaryPageCount, 1, "mobile should expose one primary owner for the active page");
+    assert.equal(mobileUiContract.activePageOverflow.join("|"), "auto|hidden", "mobile page surfaces should own vertical scrolling");
+    assert.equal(mobileUiContract.horizontalHostsValid, true, "mobile horizontal hosts should hide vertical overflow");
+    assert.equal(mobileUiContract.subtabRolesValid, true, "mobile subtab strips should share the horizontal role");
+    assert.equal(mobileUiContract.touchTargetMinimums, true, "mobile shared controls should retain touch-sized targets");
+    assert.equal(mobileUiContract.mainReachableAtEnd, true, "mobile navigation end should remain reachable");
+    assert.equal(mobileUiContract.renderTextAvailable, true, "mobile render_game_to_text should remain available");
+    assert.equal(mobileUiContract.eternityPageRole, true, "mobile runtime Eternity should use the shared page role");
+    assert.equal(mobileUiContract.timelineNoLongerPage, true, "mobile reparented Timeline should not retain page ownership");
     assert.equal(mobileTabBar.navDisplay, "flex", "mobile navigation should use a compact flex bar");
     assert.equal(mobileTabBar.navFlexWrap, "nowrap", "mobile navigation should never wrap");
     assert.equal(mobileTabBar.stripFlexWrap, "nowrap", "mobile navigation should never wrap");

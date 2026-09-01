@@ -83,8 +83,9 @@ function installEternityUi() {
   eternityRoot = mainPanels.querySelector('[data-panel="eternity"]');
   if (!eternityRoot) {
     eternityRoot = document.createElement("section");
-    eternityRoot.className = "main-panel eternity-page";
+    eternityRoot.className = "main-panel eternity-page ui-page";
     eternityRoot.dataset.panel = "eternity";
+    eternityRoot.dataset.scrollOwner = "primary";
     eternityRoot.setAttribute("aria-label", "Eternity");
     eternityRoot.innerHTML = `
       <header class="page-heading">
@@ -106,10 +107,10 @@ function installEternityUi() {
               <strong id="eternityCurrentIp">0 IP</strong>
             </div>
           </div>
-          <div class="eternity-action-row dense-action-row">
+          <div class="eternity-action-row dense-action-row ui-action-row">
             <button id="eternityPerformButton" class="eternity-perform-button" type="button" data-eternity-action="perform"></button>
           </div>
-          <nav class="eternity-subtabs" aria-label="Eternity sub tabs">
+          <nav class="eternity-subtabs ui-subtab-strip ui-scroll-x" data-scroll-owner="horizontal" aria-label="Eternity sub tabs">
             <button class="subtab eternity-subtab is-active" type="button" data-eternity-tab="milestone" aria-controls="eternityMilestoneSubpanel" aria-selected="true">
               <span>MS</span>
               <strong data-i18n="eternityMilestoneTab">Milestone</strong>
@@ -141,9 +142,10 @@ function installEternityUi() {
   const timelinePanel = mainPanels.querySelector('[data-panel="timeline"]');
   const eternitySubpanels = eternityRoot.querySelector(".eternity-subpanels");
   if (timelinePanel && eternitySubpanels) {
-    timelinePanel.classList.remove("main-panel");
+    timelinePanel.classList.remove("main-panel", "ui-page");
     timelinePanel.classList.add("eternity-subpanel");
     timelinePanel.removeAttribute("data-panel");
+    timelinePanel.removeAttribute("data-scroll-owner");
     timelinePanel.dataset.eternityPanel = "timeline";
     timelinePanel.id = "eternityTimelineSubpanel";
     timelinePanel.hidden = true;

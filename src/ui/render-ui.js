@@ -295,7 +295,7 @@ function timelineNodeRouteClass(route) {
 function createTimelineNodeCard(node) {
   const card = document.createElement("button");
   card.type = "button";
-  card.className = "timeline-node";
+  card.className = "timeline-node ui-tree-node";
   card.dataset.timelineNode = node.id;
   card.dataset.route = node.route || "";
   card.setAttribute("aria-controls", "timelineNodeDetail");

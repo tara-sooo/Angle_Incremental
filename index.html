@@ -60,8 +60,8 @@
         </div>
       </section>
 
-      <nav class="main-tabs" aria-label="Main tabs">
-        <div class="main-tab-scroll">
+      <nav class="main-tabs ui-main-nav" aria-label="Main tabs">
+        <div class="main-tab-scroll ui-scroll-x" data-scroll-owner="horizontal">
           <button class="main-tab is-active" type="button" data-tab="angle" aria-selected="true">
             <span class="tab-icon">△</span>
             <span class="tab-code">ANG</span>
@@ -106,10 +106,10 @@
       </nav>
 
       <div class="main-panels">
-        <section class="main-panel angle-panel is-active" data-panel="angle" aria-label="The Angle">
+        <section class="main-panel angle-panel ui-page is-active" data-panel="angle" data-scroll-owner="primary" aria-label="The Angle">
           <div class="angle-layout">
             <aside class="upgrade-rail" aria-label="The Angle upgrades">
-              <section class="stats">
+              <section class="stats ui-section">
                 <div class="metric primary">
                   <span data-i18n="score">スコア</span>
                   <strong id="scoreValue">0</strong>
@@ -132,7 +132,7 @@
                 </div>
               </section>
 
-              <section class="upgrades" aria-label="The Angle upgrades">
+              <section class="upgrades ui-section" aria-label="The Angle upgrades">
                 <div id="normalUpgradeList" class="normal-upgrades">
                   <button id="buyAllUpgrade" class="buy-all-button" type="button">
                     <b data-i18n="buyAll">全購入</b>
@@ -198,7 +198,7 @@
               </section>
             </aside>
 
-            <section class="stage-panel" aria-label="Angle Incremental">
+            <section class="stage-panel ui-section" aria-label="Angle Incremental">
               <header class="topbar">
                 <div>
                   <p class="eyebrow">Angle Incremental</p>
@@ -206,7 +206,7 @@
                 </div>
               </header>
 
-              <div class="playfield-wrap">
+              <div class="playfield-wrap ui-playfield">
                 <canvas id="gameCanvas" width="900" height="620" aria-label="The Angle playfield"></canvas>
               </div>
 
@@ -263,7 +263,7 @@
           </div>
         </section>
 
-        <section class="main-panel infinity-page" data-panel="infinity" aria-label="Infinity">
+        <section class="main-panel infinity-page ui-page" data-panel="infinity" data-scroll-owner="primary" aria-label="Infinity">
           <header class="page-heading">
             <div>
               <p class="eyebrow">Infinity</p>
@@ -272,7 +272,7 @@
             <div class="unlock-note" id="infinityUnlockNote" data-i18n="infinityUnlockNote"></div>
           </header>
 
-          <section class="infinity-summary">
+          <section class="infinity-summary ui-section">
             <div class="metric primary">
               <span>Infinity</span>
               <strong id="infinityCount">0</strong>
@@ -290,7 +290,7 @@
             </button>
           </section>
 
-          <section class="break-cap-row" aria-label="Break Infinite Cap">
+          <section class="break-cap-row ui-section" aria-label="Break Infinite Cap">
             <div>
               <span>Break Infinite Cap</span>
               <strong id="breakCapRequirement">条件: 1e350 score</strong>
@@ -300,7 +300,7 @@
             </button>
           </section>
 
-          <nav class="infinity-subtabs" aria-label="Infinity sub tabs">
+          <nav class="infinity-subtabs ui-subtab-strip ui-scroll-x" data-scroll-owner="horizontal" aria-label="Infinity sub tabs">
             <button class="subtab infinity-subtab is-active" type="button" data-infinity-tab="upgrades" aria-selected="true">
               <span>UPG</span>
               <strong>Upgrades</strong>
@@ -316,13 +316,13 @@
           </nav>
 
           <div class="infinity-subpanels">
-            <section class="infinity-panel infinity-subpanel is-active" data-infinity-panel="upgrades">
+            <section class="infinity-panel infinity-subpanel ui-section is-active" data-infinity-panel="upgrades">
               <div class="panel-heading">
                 <span>Infinity Upgrade</span>
                 <strong>IP</strong>
               </div>
-              <div id="infinityUpgradeTree" class="infinity-upgrade-tree" aria-label="Infinity Upgrade tree"></div>
-              <aside class="infinity-upgrade-detail" aria-live="polite">
+              <div id="infinityUpgradeTree" class="infinity-upgrade-tree ui-tree" aria-label="Infinity Upgrade tree"></div>
+              <aside class="infinity-upgrade-detail ui-selected-detail" aria-live="polite">
                 <div class="infinity-upgrade-detail-head">
                   <span id="infinityUpgradeDetailState">選択中</span>
                   <strong id="infinityUpgradeDetailCost">1 IP</strong>
@@ -334,13 +334,13 @@
               </aside>
             </section>
 
-            <section class="infinity-panel infinity-subpanel" data-infinity-panel="angle">
+            <section class="infinity-panel infinity-subpanel ui-section" data-infinity-panel="angle">
               <div class="panel-heading">
                 <span>Infinite Angle</span>
                 <strong data-i18n="infiniteAngle">IA</strong>
               </div>
               <div class="infinite-angle-panel">
-                <div class="infinite-angle-playfield-wrap">
+                <div class="infinite-angle-playfield-wrap ui-playfield">
                   <canvas id="infiniteAngleCanvas" width="900" height="420" aria-label="Infinite Angle playfield"></canvas>
                 </div>
                 <div class="infinite-angle-metrics">
@@ -401,7 +401,7 @@
               </div>
             </section>
 
-            <section class="infinity-panel infinity-subpanel" data-infinity-panel="tower">
+            <section class="infinity-panel infinity-subpanel ui-section" data-infinity-panel="tower">
               <div class="panel-heading">
                 <span data-i18n="tower">Tower</span>
                 <strong id="towerFloorHeading">Floor 0</strong>
@@ -440,7 +440,7 @@
           </div>
         </section>
 
-        <section class="main-panel timeline-page" data-panel="timeline" aria-label="Timeline">
+        <section class="main-panel timeline-page ui-page" data-panel="timeline" data-scroll-owner="primary" aria-label="Timeline">
           <header class="page-heading">
             <div>
               <p class="eyebrow">Timeline</p>
@@ -448,7 +448,7 @@
             </div>
           </header>
 
-          <section class="timeline-surface">
+          <section class="timeline-surface ui-section">
             <div class="timeline-overview">
               <div class="timeline-available">
                 <span data-i18n="timelineAvailable">Available TF</span>
@@ -508,10 +508,10 @@
                 </button>
               </article>
             </div>
-            <section class="timeline-tree" aria-labelledby="timelineTreeHeading">
+            <section class="timeline-tree ui-tree" aria-labelledby="timelineTreeHeading">
               <h2 id="timelineTreeHeading" class="timeline-tree-heading" data-i18n="timelineTree">Timeline Tree</h2>
               <div id="timelineNodeGrid" class="timeline-eras"></div>
-              <section id="timelineNodeDetail" class="timeline-node-detail" aria-labelledby="timelineNodeDetailHeading" aria-live="polite">
+              <section id="timelineNodeDetail" class="timeline-node-detail ui-selected-detail" aria-labelledby="timelineNodeDetailHeading" aria-live="polite">
                 <div class="timeline-node-detail-label" data-i18n="timelineNodeDetail">Selected node</div>
                 <div class="timeline-node-heading">
                   <div>
@@ -534,7 +534,7 @@
           </section>
         </section>
 
-        <section class="main-panel challenges-panel" data-panel="challenges" aria-label="Challenges">
+        <section class="main-panel challenges-panel ui-page" data-panel="challenges" data-scroll-owner="primary" aria-label="Challenges">
           <header class="page-heading">
             <div>
               <p class="eyebrow">Challenges</p>
@@ -542,7 +542,7 @@
             </div>
           </header>
 
-          <nav class="challenge-subtabs" aria-label="Challenge sub tabs">
+          <nav class="challenge-subtabs ui-subtab-strip ui-scroll-x" data-scroll-owner="horizontal" aria-label="Challenge sub tabs">
             <button class="subtab challenge-subtab is-active" type="button" data-challenge-tab="ic" aria-selected="true">
               <span>IC</span>
               <strong data-i18n="infinityChallenges">Infinity Challenges</strong>
@@ -554,14 +554,14 @@
           </nav>
 
           <div class="challenge-subpanels">
-            <section class="challenge-panel challenge-subpanel is-active" data-challenge-panel="ic">
+            <section class="challenge-panel challenge-subpanel ui-section is-active" data-challenge-panel="ic">
               <div class="panel-heading">
                 <span data-i18n="infinityChallenges">Infinity Challenges</span>
                 <strong id="challengeStatus">未解放</strong>
               </div>
               <div id="challengeList" class="challenge-list" aria-label="Infinity Challenge list"></div>
             </section>
-            <section class="challenge-panel challenge-subpanel" data-challenge-panel="tc">
+            <section class="challenge-panel challenge-subpanel ui-section" data-challenge-panel="tc">
               <div class="panel-heading">
                 <span data-i18n="towerChallenges">Tower Challenges</span>
               </div>
@@ -570,7 +570,7 @@
           </div>
         </section>
 
-        <section class="main-panel automation-panel" data-panel="automation" aria-label="Automation">
+        <section class="main-panel automation-panel ui-page" data-panel="automation" data-scroll-owner="primary" aria-label="Automation">
           <header class="page-heading">
             <div>
               <p class="eyebrow">Automation</p>
@@ -579,7 +579,7 @@
             <div class="unlock-note" id="automationLockNote">IU 1-2で解放</div>
           </header>
           <div class="settings-grid dense-grid">
-            <section class="dense-section automation-settings">
+            <section class="dense-section ui-section automation-settings">
               <h2 class="dense-section-heading" data-i18n="automationPurchaseSection">購入</h2>
               <div class="setting-row">
                 <label for="automationMasterToggle" data-i18n="automationMaster">自動購入</label>
@@ -653,14 +653,14 @@
           </div>
         </section>
 
-        <section class="main-panel statistics-panel" data-panel="statistics" aria-label="Statistics">
+        <section class="main-panel statistics-panel ui-page" data-panel="statistics" data-scroll-owner="primary" aria-label="Statistics">
           <header class="page-heading">
             <div>
               <p class="eyebrow">Statistics</p>
               <h1 data-i18n="statistics">統計</h1>
             </div>
           </header>
-          <nav class="statistics-subtabs" aria-label="Statistics sub tabs">
+          <nav class="statistics-subtabs ui-subtab-strip ui-scroll-x" data-scroll-owner="horizontal" aria-label="Statistics sub tabs">
             <button class="subtab statistics-subtab is-active" type="button" data-statistics-tab="overview" aria-selected="true">
               <span>OVW</span>
               <strong data-i18n="statisticsOverview">概要</strong>
@@ -701,7 +701,7 @@
                   <span data-i18n="fastestInfinityRealTime">最速Infinity（実プレイ時間）</span>
                   <strong id="fastestInfinityRealTime">記録なし</strong>
                 </div>
-                <section class="dense-section run-history">
+                <section class="dense-section ui-section run-history">
                   <h2 data-i18n="lastInfinityRunsLabel">過去10回のInfinity</h2>
                   <ol id="lastInfinityRuns"></ol>
                 </section>
@@ -709,11 +709,11 @@
             </section>
             <section class="statistics-subpanel" data-statistics-panel="challenges">
               <div class="challenge-time-grid">
-                <section class="dense-section challenge-time-group">
+                <section class="dense-section ui-section challenge-time-group">
                   <h2 data-i18n="fastestInfinityChallengesLabel">Infinity Challenge最速クリア</h2>
                   <ol id="fastestInfinityChallengeTimes"></ol>
                 </section>
-                <section class="dense-section challenge-time-group">
+                <section class="dense-section ui-section challenge-time-group">
                   <h2 data-i18n="fastestTowerChallengesLabel">Tower Challenge最速クリア</h2>
                   <ol id="fastestTowerChallengeTimes"></ol>
                 </section>
@@ -737,7 +737,7 @@
                   <span data-i18n="fastestEternityRealTime">最速Eternity（実プレイ時間）</span>
                   <strong id="fastestEternityRealTime">記録なし</strong>
                 </div>
-                <section class="dense-section run-history">
+                <section class="dense-section ui-section run-history">
                   <h2 data-i18n="lastEternityRunsLabel">過去10回のEternity</h2>
                   <ol id="lastEternityRuns"></ol>
                 </section>
@@ -746,7 +746,7 @@
           </div>
         </section>
 
-        <section class="main-panel achievements-panel" data-panel="achievements" aria-label="Achievements">
+        <section class="main-panel achievements-panel ui-page" data-panel="achievements" data-scroll-owner="primary" aria-label="Achievements">
           <header class="page-heading">
             <div>
               <p class="eyebrow">Achievements</p>
@@ -755,7 +755,7 @@
             <div class="unlock-note" id="achievementSummary">0/41 実績</div>
           </header>
 
-          <section class="achievement-overview">
+          <section class="achievement-overview ui-section">
             <div class="metric primary">
               <span data-i18n="achievementBoost">実績増加倍率</span>
               <strong id="achievementBoost">×1.00</strong>
@@ -769,7 +769,7 @@
           <div id="achievementList" class="achievement-list" aria-label="Achievement list"></div>
         </section>
 
-        <section class="main-panel help-panel" data-panel="help" aria-label="Help">
+        <section class="main-panel help-panel ui-page" data-panel="help" data-scroll-owner="primary" aria-label="Help">
           <header class="page-heading">
             <div>
               <p class="eyebrow">Guide</p>
@@ -782,7 +782,7 @@
           <div id="helpSections" class="help-sections"></div>
         </section>
 
-        <section class="main-panel settings-panel" data-panel="settings" aria-label="Settings">
+        <section class="main-panel settings-panel ui-page" data-panel="settings" data-scroll-owner="primary" aria-label="Settings">
           <header class="page-heading">
             <div>
               <p class="eyebrow">System</p>
@@ -790,7 +790,7 @@
             </div>
           </header>
           <div class="settings-grid dense-grid">
-            <section class="dense-section settings-options">
+            <section class="dense-section ui-section settings-options">
               <h2 class="dense-section-heading" data-i18n="settingsDisplaySection">表示</h2>
               <div class="setting-row">
                 <label for="languageSelect" data-i18n="language">言語</label>
@@ -851,7 +851,7 @@
               </div>
             </section>
 
-            <section class="dense-section tab-visibility-card">
+            <section class="dense-section ui-section tab-visibility-card">
               <h2 class="dense-section-heading" data-i18n="tabVisibility">タブ表示</h2>
               <p class="tab-visibility-description" data-i18n="tabVisibilityDescription">下部タブバーに表示するタブ</p>
               <div id="tabVisibilityList" class="tab-visibility-list"></div>
