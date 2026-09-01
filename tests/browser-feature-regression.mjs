@@ -601,12 +601,51 @@ try {
       activeHeight: active?.getBoundingClientRect().height ?? 0,
       stripClientWidth: strip?.clientWidth ?? 0,
       stripScrollWidth: strip?.scrollWidth ?? 0,
+      tabWidths: rects.map((rect) => rect.width),
       rows: rects.length > 0 ? Math.max(...rects.map((rect) => rect.top)) - Math.min(...rects.map((rect) => rect.top)) : Infinity,
       allVisibleInStrip: visibleButtons.every((button) => button.parentElement === strip),
       settingsInScrollHost: settings?.parentElement === strip,
       hasTabOverlap: sortedRects.some((rect, index) => sortedRects[index + 1] && rect.right > sortedRects[index + 1].left + 0.5),
       hasTabContentOverflow: visibleButtons.some((button) => button.scrollWidth > button.clientWidth + 1),
     };
+  });
+  const measureSubtabRails = (targetPage) => targetPage.evaluate(() => {
+    const { switchMainTab } = window.__angleDebug;
+    return [
+      ["infinity", ".infinity-subtabs"],
+      ["eternity", ".eternity-subtabs"],
+      ["challenges", ".challenge-subtabs"],
+      ["statistics", ".statistics-subtabs"],
+    ].map(([panel, selector]) => {
+      switchMainTab(panel);
+      const strip = document.querySelector(selector);
+      const buttons = Array.from(strip?.querySelectorAll(":scope > .subtab") ?? []).filter((button) => !button.hidden);
+      const rects = buttons.map((button) => button.getBoundingClientRect());
+      const sortedRects = [...rects].sort((a, b) => a.left - b.left);
+      const stripRect = strip?.getBoundingClientRect();
+      const before = strip?.scrollLeft ?? 0;
+      if (strip) strip.scrollLeft = strip.scrollWidth;
+      const lastRect = buttons.at(-1)?.getBoundingClientRect();
+      const endStripRect = strip?.getBoundingClientRect();
+      const lastReachableAtEnd = Boolean(
+        endStripRect
+        && lastRect
+        && lastRect.right <= endStripRect.right + 1,
+      );
+      if (strip) strip.scrollLeft = before;
+      return {
+        panel,
+        childCount: buttons.length,
+        width: stripRect?.width ?? 0,
+        clientWidth: strip?.clientWidth ?? 0,
+        scrollWidth: strip?.scrollWidth ?? 0,
+        childWidths: rects.map((rect) => rect.width),
+        rows: rects.length > 0 ? Math.max(...rects.map((rect) => rect.top)) - Math.min(...rects.map((rect) => rect.top)) : Infinity,
+        hasOverlap: sortedRects.some((rect, index) => sortedRects[index + 1] && rect.right > sortedRects[index + 1].left + 0.5),
+        hasContentOverflow: buttons.some((button) => button.scrollWidth > button.clientWidth + 1),
+        lastReachableAtEnd,
+      };
+    });
   });
   const layoutOriginal = await page.evaluate(() => ({
     infinityCount: window.__angleDebug.state.infinityCount,
@@ -628,8 +667,10 @@ try {
   });
   await page.setViewportSize({ width: 1280, height: 800 });
   const desktopTabBar = await measureMainTabBar(page);
+  const desktopSubtabRails = await measureSubtabRails(page);
   await page.setViewportSize({ width: 821, height: 900 });
   const breakpointWideTabBar = await measureMainTabBar(page);
+  const breakpointWideSubtabRails = await measureSubtabRails(page);
   await page.setViewportSize({ width: 820, height: 900 });
   const breakpointCompactTabBar = await measureMainTabBar(page);
   await page.setViewportSize({ width: 768, height: 900 });
@@ -657,6 +698,8 @@ try {
       inScrollHost: settings.parentElement === strip,
     };
   });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const compactSubtabRails = await measureSubtabRails(page);
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.evaluate((original) => {
     const { state } = window.__angleDebug;
@@ -698,7 +741,28 @@ try {
     assert.equal(layout.activeBorderBottomWidth, "2px", `${viewportName} active tab should retain an underline cue`);
     assert.ok(layout.activeHeight >= 40, `${viewportName} active tab should retain a touch-sized target`);
   }
-  assert.ok(desktopTabBar.navWidth < desktopTabBar.shellWidth - 100, "desktop navigation should end near its content instead of framing dead space");
+  for (const [viewportName, layout] of [["desktop", desktopTabBar], ["breakpoint-wide", breakpointWideTabBar]]) {
+    assert.ok(layout.navWidth >= layout.shellWidth - 1, `${viewportName} navigation should use the available rail`);
+    assert.ok(layout.stripClientWidth >= layout.navWidth - 1, `${viewportName} navigation strip should fill the available rail`);
+    assert.ok(Math.max(...layout.tabWidths) - Math.min(...layout.tabWidths) <= 1, `${viewportName} main tabs should distribute evenly`);
+  }
+  for (const [viewportName, rails] of [["desktop", desktopSubtabRails], ["breakpoint-wide", breakpointWideSubtabRails]]) {
+    for (const rail of rails) {
+      assert.ok(rail.childCount > 0, `${viewportName} ${rail.panel} subtabs should render`);
+      assert.ok(rail.width > 0, `${viewportName} ${rail.panel} subtabs should use the page rail`);
+      assert.ok(Math.max(...rail.childWidths) - Math.min(...rail.childWidths) <= 1, `${viewportName} ${rail.panel} subtabs should distribute evenly`);
+      assert.equal(rail.rows < 1, true, `${viewportName} ${rail.panel} subtabs should share one row`);
+      assert.equal(rail.hasOverlap, false, `${viewportName} ${rail.panel} subtabs should not overlap`);
+      assert.equal(rail.hasContentOverflow, false, `${viewportName} ${rail.panel} subtabs should retain intrinsic content widths`);
+      assert.ok(rail.scrollWidth <= rail.clientWidth + 1, `${viewportName} ${rail.panel} subtabs should fit when the rail is wide`);
+    }
+  }
+  for (const rail of compactSubtabRails) {
+    assert.equal(rail.rows < 1, true, `narrow ${rail.panel} subtabs should share one row`);
+    assert.equal(rail.hasOverlap, false, `narrow ${rail.panel} subtabs should not overlap`);
+    assert.equal(rail.hasContentOverflow, false, `narrow ${rail.panel} subtabs should retain intrinsic content widths`);
+    assert.equal(rail.lastReachableAtEnd, true, `narrow ${rail.panel} subtabs should reach their final control`);
+  }
   assert.equal(endSettings.reachedEnd, true, "SET should be reachable at the end of the shared scrolling strip");
   assert.equal(endSettings.fullyVisible, true, "SET should be fully visible at the end of the shared scrolling strip");
   assert.equal(endSettings.inScrollHost, true, "SET should remain in the shared scrolling strip at its end");

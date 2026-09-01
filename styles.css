@@ -3327,6 +3327,23 @@ canvas {
   touch-action: pan-x;
 }
 
+@media (min-width: 821px) {
+  .main-tabs {
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .main-tab-scroll {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .main-tab-scroll > .main-tab,
+  .ui-subtab-strip > .subtab {
+    flex: 1 1 0;
+  }
+}
+
 .ui-action-row {
   min-width: 0;
   display: flex;
