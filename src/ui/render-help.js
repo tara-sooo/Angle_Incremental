@@ -112,6 +112,8 @@ const HELP_TOPICS = Object.freeze([
 ]);
 
 let renderedSignature = "";
+let selectedTopicId = "";
+let lastContextTopicId = "";
 
 function positiveStateValue(key) {
   return Number(runtime.state?.[key]) > 0;
@@ -179,55 +181,67 @@ function updateHelpUi() {
   const contextCandidate = activeContextTopicId();
   const contextTopic = topics.find((topic) => topic.id === contextCandidate) || topics[0] || null;
   const contextId = contextTopic?.id || "";
+  if (contextId !== lastContextTopicId || !topicIds.includes(selectedTopicId)) {
+    selectedTopicId = contextId;
+  }
+  lastContextTopicId = contextId;
+  const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) || contextTopic;
+  const selectedId = selectedTopic?.id || "";
   const signature = [
     runtime.state.language,
     topicIds.join(","),
     contextId,
+    selectedId,
   ].join("|");
   if (signature === renderedSignature) return false;
 
-  const openIds = new Set(
-    Array.from(sections.querySelectorAll("details[open]"), (section) => section.dataset.helpTopic),
-  );
   clearElement(nav);
   clearElement(sections);
   nav.setAttribute("aria-label", runtime.t("helpTopics"));
 
   topics.forEach((topic) => {
-    const anchor = "help-" + topic.id;
-    const section = document.createElement("details");
-    section.className = "help-section";
-    section.id = anchor;
-    section.dataset.helpTopic = topic.id;
-    section.open = openIds.has(topic.id) || topic.id === contextId;
+    const button = document.createElement("button");
+    button.className = "help-nav-link";
+    button.type = "button";
+    button.dataset.helpTopic = topic.id;
+    button.textContent = runtime.t(topic.titleKey);
+    button.setAttribute("aria-controls", "helpArticle");
+    button.setAttribute("aria-pressed", String(topic.id === selectedId));
+    if (topic.id === selectedId) button.setAttribute("aria-current", "page");
+    button.addEventListener("click", () => {
+      selectedTopicId = topic.id;
+      renderedSignature = "";
+      updateHelpUi();
+      const article = sections.querySelector("#helpArticle");
+      article?.focus({ preventScroll: true });
+      article?.scrollIntoView({ block: "start" });
+    });
+    nav.append(button);
+  });
 
-    const summary = document.createElement("summary");
-    summary.className = "help-section-summary";
-    summary.textContent = runtime.t(topic.titleKey);
-    section.append(summary);
+  if (selectedTopic) {
+    const article = document.createElement("article");
+    article.className = "help-article";
+    article.id = "helpArticle";
+    article.dataset.helpTopic = selectedTopic.id;
+    article.tabIndex = -1;
+    article.setAttribute("aria-labelledby", "helpArticleTitle");
+
+    const heading = document.createElement("h2");
+    heading.className = "help-article-title";
+    heading.id = "helpArticleTitle";
+    heading.textContent = runtime.t(selectedTopic.titleKey);
 
     const body = document.createElement("p");
     body.className = "help-section-body";
-    body.textContent = runtime.t(topic.bodyKey);
-    section.append(body);
-
-    const link = document.createElement("a");
-    link.className = "help-nav-link";
-    link.href = "#" + anchor;
-    link.textContent = runtime.t(topic.titleKey);
-    link.setAttribute("aria-controls", anchor);
-    if (topic.id === contextId) link.setAttribute("aria-current", "location");
-    link.addEventListener("click", () => {
-      section.open = true;
-    });
-
-    nav.append(link);
-    sections.append(section);
-  });
+    body.textContent = runtime.t(selectedTopic.bodyKey);
+    article.append(heading, body);
+    sections.append(article);
+  }
 
   if (runtime.elements.helpContext) {
-    runtime.elements.helpContext.textContent = contextTopic
-      ? runtime.t("helpContext").replace("{topic}", runtime.t(contextTopic.titleKey))
+    runtime.elements.helpContext.textContent = selectedTopic
+      ? runtime.t("helpContext").replace("{topic}", runtime.t(selectedTopic.titleKey))
       : "";
   }
   renderedSignature = signature;
