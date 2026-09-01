@@ -176,10 +176,6 @@ button {
   display: flex;
   align-items: stretch;
   gap: 4px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
 }
 
 .main-tab {
@@ -258,6 +254,7 @@ button {
   height: 100%;
   min-height: 0;
   display: grid;
+  overflow: hidden;
 }
 
 .main-panel {
@@ -300,15 +297,12 @@ button {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  overflow: auto;
-  overscroll-behavior: contain;
 }
 
 .stage-panel {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(180px, 1fr) auto;
-  overflow: auto;
 }
 
 .topbar,
@@ -684,19 +678,6 @@ canvas {
 .help-panel,
 .settings-panel {
   padding: 0 14px 14px;
-}
-
-.settings-panel {
-  overflow: auto;
-  overscroll-behavior: contain;
-}
-
-.infinity-page,
-.challenges-panel,
-.automation-panel,
-.statistics-panel,
-.achievements-panel {
-  overflow: auto;
 }
 
 .infinity-summary,
@@ -1201,10 +1182,6 @@ canvas {
   margin-bottom: 6px;
   padding: 0 0 2px;
   border-bottom: 1px solid var(--line);
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  scrollbar-width: thin;
 }
 
 .subtab {
@@ -2722,8 +2699,6 @@ canvas {
     order: 1;
     height: auto;
     min-height: 0;
-    overflow: hidden;
-    overflow-x: auto;
   }
 
   .main-panels,
@@ -2750,9 +2725,6 @@ canvas {
 
   .help-nav {
     flex-wrap: nowrap;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: thin;
   }
 
   .help-nav-link {
@@ -3124,14 +3096,6 @@ canvas {
     font-size: 0.78rem;
   }
 
-  .main-panel {
-    overflow: auto;
-  }
-
-  .angle-panel {
-    overflow: auto;
-  }
-
   .angle-layout {
     grid-template-rows: auto auto;
     gap: 6px;
@@ -3332,6 +3296,18 @@ canvas {
   overscroll-behavior-y: contain;
 }
 
+.ui-page .upgrade-rail,
+.ui-page .stage-panel {
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
+.ui-page .ui-section:not(.break-cap-row) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
 .ui-main-nav,
 .ui-subtab-strip,
 .ui-section,
@@ -3348,6 +3324,7 @@ canvas {
   overflow-y: hidden;
   overscroll-behavior-x: contain;
   scrollbar-width: thin;
+  touch-action: pan-x;
 }
 
 .ui-action-row {

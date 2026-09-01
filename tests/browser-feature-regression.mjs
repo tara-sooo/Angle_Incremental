@@ -79,6 +79,57 @@ async function readUiContract(targetPage) {
   });
 }
 
+async function readScrollOwnership(targetPage) {
+  return targetPage.evaluate(() => {
+    const page = document.querySelector('.main-panel.is-active.ui-page[data-scroll-owner="primary"]');
+    const mainPanels = document.querySelector(".main-panels");
+    const isVisible = (node) => node.getClientRects().length > 0;
+    const before = page?.scrollTop ?? 0;
+    const maxScrollTop = page ? Math.max(0, page.scrollHeight - page.clientHeight) : 0;
+    const nestedVerticalOwners = page
+      ? Array.from(page.querySelectorAll("*"))
+        .filter((node) => isVisible(node) && ["auto", "scroll"].includes(getComputedStyle(node).overflowY))
+        .map((node) => node.id || String(node.className) || node.tagName)
+      : [];
+    const finalContent = page?.dataset.panel === "angle"
+      ? page.querySelector(".reset-dock")
+      : page?.dataset.panel === "help"
+        ? page.querySelector("#helpSections > .help-section:last-child")
+        : page?.lastElementChild;
+    if (page) page.scrollTop = maxScrollTop;
+    const pageRect = page?.getBoundingClientRect();
+    const finalRect = finalContent?.getBoundingClientRect();
+    const mainPanelsStyle = mainPanels ? getComputedStyle(mainPanels) : null;
+    const sharedSections = page
+      ? Array.from(page.querySelectorAll(".ui-section:not(.break-cap-row)")).filter(isVisible)
+      : [];
+    const result = {
+      pageOverflow: page ? [getComputedStyle(page).overflowY, getComputedStyle(page).overflowX] : [],
+      pageScrollHeight: page?.scrollHeight ?? 0,
+      pageClientHeight: page?.clientHeight ?? 0,
+      pageAtEnd: page ? page.scrollTop >= maxScrollTop - 1 : false,
+      finalContentReachable: Boolean(
+        pageRect
+        && finalRect
+        && finalRect.top >= pageRect.top - 1
+        && finalRect.bottom <= pageRect.bottom + 1,
+      ),
+      nestedVerticalOwners,
+      mainPanelsOverflow: mainPanelsStyle ? [mainPanelsStyle.overflowY, mainPanelsStyle.overflowX] : [],
+      visibleSectionsBorderless: sharedSections.length > 0 && sharedSections.every((section) => {
+        const style = getComputedStyle(section);
+        return [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth]
+          .every((width) => width === "0px")
+          && style.backgroundImage === "none"
+          && style.boxShadow === "none";
+      }),
+      helpNavRole: document.querySelector("#helpNav")?.matches('.ui-scroll-x[data-scroll-owner="horizontal"]') ?? false,
+    };
+    if (page) page.scrollTop = before;
+    return result;
+  });
+}
+
 try {
   ({ context, page } = await openGamePage(gameTest.browser, gameTest.origin, {
     viewport: { width: 1280, height: 900 },
@@ -304,17 +355,33 @@ try {
   });
   await page.setViewportSize({ width: 1280, height: 900 });
   const desktopHelpLayout = await measureHelpLayout();
+  const desktopHelpScrollOwnership = await readScrollOwnership(page);
   assert.equal(desktopHelpLayout.topicCount, 17, "desktop Help should render every discovered topic");
   assert.equal(desktopHelpLayout.panelOverflow, false, "desktop Help should not overflow horizontally");
   assert.equal(desktopHelpLayout.bodyOverflow, false, "desktop Help text should not overflow its section");
+  assert.equal(desktopHelpScrollOwnership.pageOverflow.join("|"), "auto|hidden", "desktop Help should use the page as its vertical owner");
+  assert.ok(desktopHelpScrollOwnership.pageScrollHeight > desktopHelpScrollOwnership.pageClientHeight, "desktop Help should have vertically reachable content");
+  assert.equal(desktopHelpScrollOwnership.pageAtEnd, true, "desktop Help should reach its final topic through the page owner");
+  assert.equal(desktopHelpScrollOwnership.finalContentReachable, true, "desktop Help final content should remain visible at scroll end");
+  assert.deepEqual(desktopHelpScrollOwnership.nestedVerticalOwners, [], "desktop Help should have no nested vertical scroll trap");
+  assert.deepEqual(desktopHelpScrollOwnership.mainPanelsOverflow, ["hidden", "hidden"], "desktop main panels should not own page scrolling");
+  assert.equal(desktopHelpScrollOwnership.helpNavRole, true, "desktop Help topics should use the shared horizontal role");
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileHelpLayout = await measureHelpLayout();
+  const mobileHelpScrollOwnership = await readScrollOwnership(page);
   assert.equal(mobileHelpLayout.topicCount, 17, "mobile Help should render every discovered topic");
   assert.ok(mobileHelpLayout.navScrollWidth > mobileHelpLayout.navClientWidth, "mobile Help topics should scroll in one row");
   assert.ok(mobileHelpLayout.navHeight <= 60, "mobile Help topics should keep the navigation compact");
   assert.equal(mobileHelpLayout.panelOverflow, false, "mobile Help should not overflow horizontally");
   assert.equal(mobileHelpLayout.bodyOverflow, false, "mobile Help text should not overflow its section");
   assert.ok(mobileHelpLayout.summaryHeights.every((height) => height >= 42), "mobile Help summaries should remain touch-safe");
+  assert.equal(mobileHelpScrollOwnership.pageOverflow.join("|"), "auto|hidden", "mobile Help should use the page as its vertical owner");
+  assert.ok(mobileHelpScrollOwnership.pageScrollHeight > mobileHelpScrollOwnership.pageClientHeight, "mobile Help should have vertically reachable content");
+  assert.equal(mobileHelpScrollOwnership.pageAtEnd, true, "mobile Help should reach its final topic through the page owner");
+  assert.equal(mobileHelpScrollOwnership.finalContentReachable, true, "mobile Help final content should remain visible at scroll end");
+  assert.deepEqual(mobileHelpScrollOwnership.nestedVerticalOwners, [], "mobile Help should have no nested vertical scroll trap");
+  assert.deepEqual(mobileHelpScrollOwnership.mainPanelsOverflow, ["hidden", "hidden"], "mobile main panels should not own page scrolling");
+  assert.equal(mobileHelpScrollOwnership.helpNavRole, true, "mobile Help topics should use the shared horizontal role");
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.evaluate(() => {
     const { state, runtime, switchMainTab, switchInfinitySubtab } = window.__angleDebug;
@@ -395,7 +462,12 @@ try {
   assert.deepEqual(tabStructure.infinityTabs, ["upgrades", "angle", "tower"], "Infinity subtabs should be ordered Upgrades, IA, Tower");
   assert.deepEqual(tabStructure.challengeTabs, ["ic", "tc"], "Challenges should expose IC and TC subtabs");
   assert.deepEqual(tabStructure.statisticsTabs, ["overview", "challenges", "eternity"], "Statistics subtabs should be ordered Overview, Challenge Records, Eternity Records");
+  await page.evaluate(() => {
+    window.__angleDebug.switchMainTab("angle");
+    window.advanceTime(0);
+  });
   const desktopUiContract = await readUiContract(page);
+  const desktopAngleScrollOwnership = await readScrollOwnership(page);
   assert.equal(desktopUiContract.activePrimaryPageCount, 1, "desktop should expose one primary owner for the active page");
   assert.equal(desktopUiContract.pageOwnerCount, desktopUiContract.mainPanelCount, "every main page should declare the primary owner");
   assert.equal(desktopUiContract.activePageOverflow.join("|"), "auto|hidden", "desktop page surfaces should own vertical scrolling");
@@ -417,6 +489,19 @@ try {
   assert.equal(desktopUiContract.renderTextAvailable, true, "the render_game_to_text debug surface should remain available");
   assert.equal(desktopUiContract.eternityPageRole, true, "runtime Eternity should use the shared page role");
   assert.equal(desktopUiContract.timelineNoLongerPage, true, "reparented Timeline should not retain page ownership");
+  assert.deepEqual(desktopAngleScrollOwnership.pageOverflow, ["auto", "hidden"], "desktop ANGLE should use the page as its vertical owner");
+  assert.deepEqual(desktopAngleScrollOwnership.nestedVerticalOwners, [], "desktop ANGLE should have no nested vertical scroll trap");
+  assert.deepEqual(desktopAngleScrollOwnership.mainPanelsOverflow, ["hidden", "hidden"], "desktop ANGLE main panels should not own page scrolling");
+  assert.equal(desktopAngleScrollOwnership.visibleSectionsBorderless, true, "desktop shared sections should avoid redundant frames");
+  assert.equal(desktopAngleScrollOwnership.finalContentReachable, true, "desktop ANGLE final actions should remain reachable");
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileAngleScrollOwnership = await readScrollOwnership(page);
+  assert.deepEqual(mobileAngleScrollOwnership.pageOverflow, ["auto", "hidden"], "mobile ANGLE should use the page as its vertical owner");
+  assert.deepEqual(mobileAngleScrollOwnership.nestedVerticalOwners, [], "mobile ANGLE should have no nested vertical scroll trap");
+  assert.deepEqual(mobileAngleScrollOwnership.mainPanelsOverflow, ["hidden", "hidden"], "mobile ANGLE main panels should not own page scrolling");
+  assert.equal(mobileAngleScrollOwnership.visibleSectionsBorderless, true, "mobile shared sections should avoid redundant frames");
+  assert.equal(mobileAngleScrollOwnership.finalContentReachable, true, "mobile ANGLE final actions should remain reachable");
+  await page.setViewportSize({ width: 1280, height: 900 });
   const compactNavigation = await page.evaluate(() => {
     const mainTabs = Array.from(document.querySelectorAll(".main-tab"));
     const subtabs = Array.from(document.querySelectorAll(".infinity-subtab, .eternity-subtab, .challenge-subtab, .statistics-subtab"));
