@@ -167,6 +167,10 @@ try {
     sharedActionStatus: document.getElementById("prestigeActionStatus")?.textContent,
     sharedActionDetail: document.getElementById("prestigeActionDetail")?.textContent,
     sharedActionDisabled: document.getElementById("prestigeActionButton")?.disabled,
+    secondaryAction: document.getElementById("prestigeSecondaryActionName")?.textContent?.trim(),
+    secondaryActionKind: document.getElementById("prestigeSecondaryActionCard")?.dataset.action,
+    secondaryActionStatus: document.getElementById("prestigeSecondaryActionStatus")?.textContent,
+    secondaryActionDisabled: document.getElementById("prestigeSecondaryActionButton")?.disabled,
     legacyInfinityAction: document.getElementById("infinityButton"),
     legacyEternityAction: document.getElementById("eternityPerformButton"),
     panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
@@ -235,6 +239,10 @@ try {
   assert.equal(initial.sharedActionStatus, "未解放", "the shared action should expose the locked state before the first Infinity");
   assert.equal(initial.sharedActionDetail, "必要スコア: 1.80e308", "the shared action should show the Infinity requirement before readiness");
   assert.equal(initial.sharedActionDisabled, true, "the shared action should be disabled before the manual Infinity path is legal");
+  assert.equal(initial.secondaryAction, "Eternity", "the secondary prestige card should identify Eternity");
+  assert.equal(initial.secondaryActionKind, "eternity", "the secondary prestige card should keep an explicit action kind");
+  assert.equal(initial.secondaryActionStatus, "未解放", "the secondary prestige card should expose its locked state");
+  assert.equal(initial.secondaryActionDisabled, true, "the secondary prestige action should be disabled before Infinity");
   assert.equal(initial.legacyInfinityAction, null, "the Infinity tab should not keep a duplicate execution control");
   assert.equal(initial.legacyEternityAction, null, "the Eternity tab should not keep a duplicate execution control");
   assert.equal(initial.panelText.includes("Eternity Point"), false, "Eternity UI must not introduce an Eternity Point surface");
@@ -296,9 +304,9 @@ try {
     scoreDisabled: document.getElementById("timelineScoreClaimButton")?.disabled,
     respecTop: document.querySelector(".timeline-overview .timeline-respec") !== null,
     respecBeforeClaims: (() => {
-      const surfaceChildren = Array.from(document.querySelector(".timeline-surface")?.children || []);
-      return surfaceChildren.indexOf(document.querySelector(".timeline-overview")) <
-        surfaceChildren.indexOf(document.querySelector(".timeline-claim-grid"));
+      const respec = document.getElementById("timelineRespecButton");
+      const claim = document.getElementById("timelineScoreClaimButton");
+      return Boolean(respec && claim && (respec.compareDocumentPosition(claim) & Node.DOCUMENT_POSITION_FOLLOWING));
     })(),
     treeNodeCount: document.querySelectorAll(".timeline-node").length,
     eraCount: document.querySelectorAll(".timeline-era").length,
@@ -309,6 +317,9 @@ try {
     detailName: document.getElementById("timelineNodeDetailHeading")?.textContent,
     detailButtonDisabled: document.getElementById("timelineNodePurchaseButton")?.disabled,
     detailButtonHidden: document.getElementById("timelineNodePurchaseButton")?.hidden,
+    detailButtonDisplay: document.getElementById("timelineNodePurchaseButton")
+      ? getComputedStyle(document.getElementById("timelineNodePurchaseButton")).display
+      : "",
     detailPurchaseNode: document.getElementById("timelineNodePurchaseButton")?.dataset.timelineNodePurchase,
     realStatus: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-status')?.textContent,
     detailDescription: document.getElementById("timelineNodeDetailDescription")?.textContent,
@@ -364,7 +375,8 @@ try {
   assert.equal(timelineInitial.detailName, "惰性の打製石器", "the focused detail should show the selected node");
   assert.equal(timelineInitial.detailPurchaseNode, "Real-BC16500");
   assert.equal(timelineInitial.detailButtonDisabled, true, "a node without available TF should be disabled");
-  assert.equal(timelineInitial.detailButtonHidden, false, "a locked node should keep its disabled purchase action for context");
+  assert.equal(timelineInitial.detailButtonHidden, true, "a locked node should hide its unavailable purchase action");
+  assert.equal(timelineInitial.detailButtonDisplay, "none", "a hidden node action should leave the Timeline layout");
   assert.match(timelineInitial.realStatus || "", /TF不足/);
   assert.equal(timelineInitial.detailDescription, "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）");
   assert.match(timelineInitial.detailCurrentEffect || "", /未購入/);
@@ -830,7 +842,7 @@ try {
     sharedSurfaceWidth: document.getElementById("prestigeActionSurface")?.getBoundingClientRect().width || 0,
     sharedActionWidth: document.getElementById("prestigeActionButton")?.getBoundingClientRect().width || 0,
     sharedActionBottom: document.getElementById("prestigeActionSurface")?.getBoundingClientRect().bottom || 0,
-    playfieldTop: document.querySelector(".angle-panel .angle-layout")?.getBoundingClientRect().top || 0,
+    playfieldTop: document.querySelector(".angle-panel .angle-workspace")?.getBoundingClientRect().top || 0,
   }));
   assert.equal(mobileAngle.activeMainTab, "angle", "the shared action should stay on the gameplay page");
   assert.ok(mobileAngle.sharedSurfaceWidth > 0 && mobileAngle.sharedActionWidth > 0, "the shared gameplay action should keep a visible mobile layout");

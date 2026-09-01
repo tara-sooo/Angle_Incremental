@@ -239,11 +239,6 @@ function updateHelpUi() {
     sections.append(article);
   }
 
-  if (runtime.elements.helpContext) {
-    runtime.elements.helpContext.textContent = selectedTopic
-      ? runtime.t("helpContext").replace("{topic}", runtime.t(selectedTopic.titleKey))
-      : "";
-  }
   renderedSignature = signature;
   return true;
 }
