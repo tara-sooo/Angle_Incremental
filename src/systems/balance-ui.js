@@ -32,9 +32,14 @@ function balanceCreateInfinityUpgradeRows() {
       button.addEventListener("click", () => runtime.selectInfinityUpgrade(upgrade.id));
       const name = document.createElement("strong");
       name.className = "infinity-upgrade-name";
+      const meta = document.createElement("span");
+      meta.className = "infinity-upgrade-node-meta";
+      const cost = document.createElement("small");
+      cost.className = "infinity-upgrade-cost";
       const status = document.createElement("small");
       status.className = "infinity-upgrade-state";
-      button.append(name, status);
+      meta.append(cost, status);
+      button.append(name, meta);
       tier.append(button);
     });
     runtime.elements.infinityUpgradeTree.append(tier);

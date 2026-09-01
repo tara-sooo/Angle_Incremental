@@ -36,9 +36,14 @@ function createInfinityUpgradeRows() {
       button.addEventListener("click", () => runtime.selectInfinityUpgrade(upgrade.id));
       const name = document.createElement("strong");
       name.className = "infinity-upgrade-name";
+      const meta = document.createElement("span");
+      meta.className = "infinity-upgrade-node-meta";
+      const cost = document.createElement("small");
+      cost.className = "infinity-upgrade-cost";
       const status = document.createElement("small");
       status.className = "infinity-upgrade-state";
-      button.append(name, status);
+      meta.append(cost, status);
+      button.append(name, meta);
       tier.append(button);
     });
     runtime.elements.infinityUpgradeTree.append(tier);
@@ -105,6 +110,7 @@ function updateInfinityUpgradeRows() {
     node.classList.toggle("is-locked", !purchased && !prerequisitesMet);
     node.classList.toggle("is-unaffordable", !purchased && prerequisitesMet && !affordable);
     node.querySelector(".infinity-upgrade-name").textContent = upgrade.id;
+    node.querySelector(".infinity-upgrade-cost").textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(runtime.log10Value(upgrade.cost))} IP`;
     node.querySelector(".infinity-upgrade-state").textContent = infinityUpgradeStateText(upgrade);
   });
   updateInfinityUpgradeDetail();

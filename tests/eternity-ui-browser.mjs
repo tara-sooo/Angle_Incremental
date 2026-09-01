@@ -303,6 +303,16 @@ try {
     detailDescription: document.getElementById("timelineNodeDetailDescription")?.textContent,
     detailCurrentEffect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
     cardDescription: document.querySelector('.timeline-node[data-timeline-node="Real-BC16500"] .timeline-node-description')?.textContent,
+    nodeGridColumns: getComputedStyle(document.querySelector(".timeline-node-grid")).gridTemplateColumns.trim().split(/\s+/).length,
+    nodeRects: Array.from(document.querySelectorAll(".timeline-node"), (node) => {
+      const rect = node.getBoundingClientRect();
+      return { route: node.dataset.route, x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    }),
+    treeConnector: {
+      borderTop: getComputedStyle(document.querySelector(".timeline-node-grid"), "::before").borderTopWidth,
+      borderLeft: getComputedStyle(document.querySelector(".timeline-node-grid"), "::before").borderLeftWidth,
+    },
+    detailOrder: Array.from(document.getElementById("timelineNodeDetail")?.children || [], (node) => node.id || node.className),
     repeatedDetailFields: ["timelineNodeDetailEra", "timelineNodeDetailRoute", "timelineNodeDetailCost", "timelineNodeDetailStatus"]
       .some((id) => document.getElementById(id) !== null),
     respecWarning: document.querySelector(".timeline-respec p") !== null,
@@ -358,6 +368,14 @@ try {
   assert.equal(timelineInitial.trackInfoCount, 3, "each TF claim should keep requirement and state in one compact row");
   assert.equal(timelineInitial.legacyBuildSurface, false, "Timeline should not wrap the build summary in another card");
   assert.equal(timelineInitial.treeBorder, "0px", "the tree should provide hierarchy without a surrounding card");
+  assert.equal(timelineInitial.nodeGridColumns, 2, "desktop Timeline should keep two route columns");
+  assert.ok(timelineInitial.nodeRects.every((node) => node.height <= 60), "desktop Timeline nodes should stay compact");
+  assert.equal(timelineInitial.treeConnector.borderTop, "2px", "desktop Timeline should keep its branch connector");
+  assert.equal(timelineInitial.treeConnector.borderLeft, "0px", "desktop Timeline should use a horizontal branch connector");
+  assert.ok(
+    timelineInitial.detailOrder.indexOf("timelineNodePurchaseButton") < timelineInitial.detailOrder.indexOf("timelineNodeDetailDescription"),
+    "selected Timeline purchase should precede the long description in document order",
+  );
   assert.deepEqual(timelineInitial.timelineScroll, {
     overflowY: "visible",
     overscrollBehavior: "auto",
@@ -718,6 +736,28 @@ try {
     nodeWidth: document.querySelector(".timeline-node")?.getBoundingClientRect().width || 0,
     detailWidth: document.getElementById("timelineNodeDetail")?.getBoundingClientRect().width || 0,
     gridColumns: getComputedStyle(document.querySelector(".timeline-node-grid")).gridTemplateColumns,
+    gridColumnCount: getComputedStyle(document.querySelector(".timeline-node-grid")).gridTemplateColumns.trim().split(/\s+/).length,
+    nodeRects: Array.from(document.querySelectorAll(".timeline-node"), (node) => {
+      const rect = node.getBoundingClientRect();
+      return { route: node.dataset.route, x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+    }),
+    treeConnector: {
+      borderTop: getComputedStyle(document.querySelector(".timeline-node-grid"), "::before").borderTopWidth,
+      borderLeft: getComputedStyle(document.querySelector(".timeline-node-grid"), "::before").borderLeftWidth,
+    },
+    claimRows: Array.from(document.querySelectorAll(".timeline-track"), (row) => ({
+      width: row.getBoundingClientRect().width,
+      buttonWidth: row.querySelector("button")?.getBoundingClientRect().width || 0,
+    })),
+    detailOrder: Array.from(document.getElementById("timelineNodeDetail")?.children || [], (node) => node.id || node.className),
+    detailPositions: (() => {
+      const purchase = document.getElementById("timelineNodePurchaseButton");
+      const description = document.getElementById("timelineNodeDetailDescription");
+      return {
+        purchaseTop: purchase?.getBoundingClientRect().top || 0,
+        descriptionTop: description?.getBoundingClientRect().top || 0,
+      };
+    })(),
     branchRouteOrder: Array.from(document.querySelectorAll(".timeline-node"), (node) => node.dataset.route),
     subtabCodes: Array.from(document.querySelectorAll(".eternity-subtab span"), (node) => node.textContent),
     subtabNavWidth: document.querySelector(".eternity-subtabs")?.scrollWidth || 0,
@@ -726,8 +766,15 @@ try {
   assert.equal(timelineMobile.visible, true, "Timeline should remain usable at a mobile viewport");
   assert.deepEqual(timelineMobile.subtabCodes, ["MS", "TL"], "mobile Eternity subtabs should expose compact codes");
   assert.ok(timelineMobile.subtabNavWidth <= timelineMobile.subtabClientWidth, "mobile Eternity subtabs should fit without horizontal overflow");
-  assert.equal(timelineMobile.gridColumns.trim().split(/\s+/).length, 1, "Timeline nodes should stack at a narrow viewport");
+  assert.equal(timelineMobile.gridColumnCount, 2, "Timeline nodes should preserve two route columns on mobile");
   assert.deepEqual(timelineMobile.branchRouteOrder, ["Real", "Parallel"], "Timeline should preserve route order on mobile");
+  assert.ok(timelineMobile.nodeRects[0].x < timelineMobile.nodeRects[1].x, "mobile Real and Parallel nodes should retain left/right topology");
+  assert.ok(Math.abs(timelineMobile.nodeRects[0].y - timelineMobile.nodeRects[1].y) <= 1, "mobile route nodes should share a tree level");
+  assert.ok(timelineMobile.nodeRects.every((node) => node.height <= 60), "mobile Timeline nodes should stay in the compact class");
+  assert.equal(timelineMobile.treeConnector.borderTop, "2px", "mobile Timeline should keep a visible horizontal branch connector");
+  assert.equal(timelineMobile.treeConnector.borderLeft, "0px", "mobile Timeline should not collapse to a vertical list connector");
+  assert.ok(timelineMobile.claimRows.every((row) => row.buttonWidth < row.width), "mobile Timeline claim actions should remain compact row actions");
+  assert.ok(timelineMobile.detailPositions.purchaseTop < timelineMobile.detailPositions.descriptionTop, "mobile selected Timeline purchase should precede the long description");
   assert.ok(
     timelineMobile.gridWidth > 0 && timelineMobile.nodeWidth > 0 && timelineMobile.detailWidth > 0,
     "Timeline nodes and focused detail should keep a visible mobile layout",
