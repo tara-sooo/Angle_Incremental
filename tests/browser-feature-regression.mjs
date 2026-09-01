@@ -914,6 +914,7 @@ try {
     const tier12CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="12"]');
     const tier13CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="13"]');
     const tier14CenterDelta = centerDelta('[data-infinity-panel="upgrades"] [data-tier="14"]');
+    const infinityUpgradeNodes = Array.from(document.querySelectorAll('[data-infinity-panel="upgrades"] .infinity-upgrade-node'));
     document.querySelector('[data-infinity-panel="upgrades"] [data-upgrade="14-1"]')?.click();
     window.advanceTime(0);
     switchMainTab("statistics");
@@ -959,6 +960,14 @@ try {
       tier14Effect: document.querySelector("#infinityUpgradeDetailEffect")?.textContent?.trim() ?? "",
       tier14Requires: document.querySelector("#infinityUpgradeDetailRequires")?.textContent?.trim() ?? "",
       tier14Cost: document.querySelector("#infinityUpgradeDetailCost")?.textContent?.trim() ?? "",
+      infinityUpgradeNodeCount: infinityUpgradeNodes.length,
+      infinityUpgradeNodeContract: infinityUpgradeNodes.every((node) => (
+        Boolean(node.querySelector(".infinity-upgrade-name")?.textContent?.trim())
+        && Boolean(node.querySelector(".infinity-upgrade-cost")?.textContent?.trim())
+        && Boolean(node.querySelector(".infinity-upgrade-state")?.textContent?.trim())
+        && !node.querySelector(".infinity-upgrade-effect")
+      )),
+      infinityUpgradeNodeHeights: infinityUpgradeNodes.map((node) => node.getBoundingClientRect().height),
     };
   });
   assert.equal(desktopUiChanges.statisticsPanelActive, true, "Statistics challenge records subtab should activate");
@@ -1002,6 +1011,9 @@ try {
   assert.equal(desktopUiChanges.tier14Effect, "IU11-2のハードキャップを×3遅らせる", "IU 14-1 should render its Japanese effect");
   assert.match(desktopUiChanges.tier14Requires, /13-1/, "IU 14-1 should render its prerequisite");
   assert.match(desktopUiChanges.tier14Cost, /e80/, "IU 14-1 should render its 1e80 cost");
+  assert.equal(desktopUiChanges.infinityUpgradeNodeCount, 21, "desktop IU should render every upgrade node");
+  assert.equal(desktopUiChanges.infinityUpgradeNodeContract, true, "desktop IU nodes should keep name, cost, and state in the node");
+  assert.ok(desktopUiChanges.infinityUpgradeNodeHeights.every((height) => height <= 50), "desktop IU nodes should stay compact");
   const towerInitial = await page.evaluate(() => {
     const { state, switchMainTab, switchInfinitySubtab, switchChallengeSubtab } = window.__angleDebug;
     state.towerFloor = 0;
@@ -2640,11 +2652,23 @@ try {
         tier12: centerDelta('[data-infinity-panel="upgrades"] [data-tier="12"]'),
         tier13: centerDelta('[data-infinity-panel="upgrades"] [data-tier="13"]'),
         tier14: centerDelta('[data-infinity-panel="upgrades"] [data-tier="14"]'),
+        nodeContract: Array.from(document.querySelectorAll('[data-infinity-panel="upgrades"] .infinity-upgrade-node')).every((node) => (
+          Boolean(node.querySelector(".infinity-upgrade-name")?.textContent?.trim())
+          && Boolean(node.querySelector(".infinity-upgrade-cost")?.textContent?.trim())
+          && Boolean(node.querySelector(".infinity-upgrade-state")?.textContent?.trim())
+        )),
+        nodeHeights: Array.from(document.querySelectorAll('[data-infinity-panel="upgrades"] .infinity-upgrade-node'), (node) => node.getBoundingClientRect().height),
+        treeOverflow: document.querySelector('[data-infinity-panel="upgrades"] .infinity-upgrade-tree')?.scrollWidth > document.querySelector('[data-infinity-panel="upgrades"] .infinity-upgrade-tree')?.clientWidth,
+        tierOneColumns: getComputedStyle(document.querySelector('[data-infinity-panel="upgrades"] [data-tier="1"]')).gridTemplateColumns.trim().split(/\s+/).length,
       };
     });
     assert.ok(mobileUpgradeCenters.tier12 !== null && mobileUpgradeCenters.tier12 < 1, "mobile IU 12-1 should be centered");
     assert.ok(mobileUpgradeCenters.tier13 !== null && mobileUpgradeCenters.tier13 < 1, "mobile IU 13-1 should be centered");
     assert.ok(mobileUpgradeCenters.tier14 !== null && mobileUpgradeCenters.tier14 < 1, "mobile IU 14-1 should be centered");
+    assert.equal(mobileUpgradeCenters.nodeContract, true, "mobile IU nodes should keep name, cost, and state in the node");
+    assert.ok(mobileUpgradeCenters.nodeHeights.every((height) => height <= 50), "mobile IU nodes should stay compact");
+    assert.equal(mobileUpgradeCenters.treeOverflow, false, "mobile IU tree should fit the viewport");
+    assert.equal(mobileUpgradeCenters.tierOneColumns, 2, "mobile IU should preserve the first branching tier");
 
     const mobileInfiniteAngle = await mobilePage.evaluate(() => {
       const { state, unlockInfiniteAngle, switchMainTab, switchInfinitySubtab, applySetting } = window.__angleDebug;

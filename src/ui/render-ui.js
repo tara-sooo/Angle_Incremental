@@ -363,6 +363,8 @@ function updateTimelineNodeCard(card, node, availability) {
   const cost = card.querySelector(".timeline-node-cost");
   const status = card.querySelector(".timeline-node-status");
   const selected = node.id === selectedTimelineNodeId;
+  const costText = `${runtime.t("timelineNodeCost")}: ${runtime.formatUiNumber(node.costTF)} TF`;
+  const statusText = timelineNodeStatusText(availability);
   if (name) name.textContent = localizedTimelineText(node.name);
   if (era) era.textContent = node.era;
   if (route) {
@@ -370,8 +372,8 @@ function updateTimelineNodeCard(card, node, availability) {
     route.classList.toggle("timeline-node-route-real", node.route === "Real");
     route.classList.toggle("timeline-node-route-parallel", node.route === "Parallel");
   }
-  if (cost) cost.textContent = `${runtime.t("timelineNodeCost")}: ${runtime.formatUiNumber(node.costTF)} TF`;
-  if (status) status.textContent = timelineNodeStatusText(availability);
+  if (cost) cost.textContent = costText;
+  if (status) status.textContent = statusText;
   card.dataset.state = availability.reason;
   card.dataset.route = node.route || "";
   card.classList.toggle("is-available", availability.canPurchase);
@@ -380,7 +382,7 @@ function updateTimelineNodeCard(card, node, availability) {
   card.classList.toggle("is-conflict", availability.reason === "route-conflict");
   card.classList.toggle("is-selected", selected);
   card.setAttribute("aria-pressed", String(selected));
-  card.setAttribute("aria-label", `${localizedTimelineText(node.name)}, ${node.era}, ${node.route}, ${timelineNodeStatusText(availability)}`);
+  card.setAttribute("aria-label", `${localizedTimelineText(node.name)}, ${node.era}, ${node.route}, ${costText}, ${statusText}`);
 }
 
 function updateTimelineNodeDetail(node, availability) {
