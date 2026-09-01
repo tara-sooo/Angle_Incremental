@@ -5,8 +5,74 @@ import { openGamePage, root, startGameTest, writeReport } from "./browser-harnes
 const reportPath = path.join(root, "output", "render-regression.json");
 const contexts = Object.freeze([
   Object.freeze({ name: "desktop", width: 1280, height: 800, deviceScaleFactor: 1 }),
+  Object.freeze({ name: "tablet", width: 768, height: 900, deviceScaleFactor: 2 }),
   Object.freeze({ name: "mobile", width: 390, height: 844, deviceScaleFactor: 3 }),
+  Object.freeze({ name: "wide-mobile", width: 412, height: 915, deviceScaleFactor: 3 }),
 ]);
+
+const MOBILE_PLAYFIELD_ASPECT = 4 / 3;
+const MOBILE_PLAYFIELD_MAX_HEIGHT_RATIO = 0.42;
+
+function collectPlayfieldViolations(prefix, phase, geometry, playfield, isMobile) {
+  const violations = [];
+  const label = `${prefix}/${phase}`;
+  const { wrapper, canvas, backing } = playfield;
+  if (!wrapper || wrapper.width <= 0 || wrapper.height <= 0) {
+    violations.push(`${label} wrapper is not rendered`);
+    return violations;
+  }
+  if (!canvas || canvas.width <= 0 || canvas.height <= 0) {
+    violations.push(`${label} canvas is not rendered`);
+    return violations;
+  }
+  if (canvas.left < wrapper.left - 1 || canvas.right > wrapper.right + 1) {
+    violations.push(`${label} canvas escaped the playfield width`);
+  }
+  if (canvas.top < wrapper.top - 1 || canvas.bottom > wrapper.bottom + 1) {
+    violations.push(`${label} canvas escaped the playfield height`);
+  }
+
+  const expectedScale = Math.min(geometry.devicePixelRatio, geometry.qualityDevicePixelRatio);
+  const expectedPixelWidth = Math.floor(canvas.width * expectedScale);
+  const expectedPixelHeight = Math.floor(canvas.height * expectedScale);
+  if (Math.abs(backing.width - expectedPixelWidth) > 1) {
+    violations.push(`${label} backing width ${backing.width} !== ${expectedPixelWidth} at scale ${expectedScale}`);
+  }
+  if (Math.abs(backing.height - expectedPixelHeight) > 1) {
+    violations.push(`${label} backing height ${backing.height} !== ${expectedPixelHeight} at scale ${expectedScale}`);
+  }
+
+  if (isMobile) {
+    const wrapperAspect = wrapper.width / wrapper.height;
+    if (Math.abs(wrapperAspect - MOBILE_PLAYFIELD_ASPECT) > 0.02) {
+      violations.push(`${label} mobile wrapper aspect ${wrapperAspect.toFixed(3)} is not 4:3`);
+    }
+    if (wrapper.height > geometry.viewport.height * MOBILE_PLAYFIELD_MAX_HEIGHT_RATIO + 1) {
+      violations.push(`${label} mobile wrapper height ${wrapper.height.toFixed(1)} exceeds the 42svh cap`);
+    }
+    if (geometry.viewport.height >= geometry.viewport.width && wrapper.bottom > geometry.viewport.height + 1) {
+      violations.push(`${label} mobile wrapper extends below the portrait first fold`);
+    }
+    const canvasAspect = canvas.width / canvas.height;
+    if (canvasAspect < 1.2 || canvasAspect > 1.5) {
+      violations.push(`${label} mobile canvas aspect ${canvasAspect.toFixed(3)} is stretched`);
+    }
+  } else if (wrapper.height > geometry.viewport.height * 0.8 + 1) {
+    violations.push(`${label} desktop wrapper height is unbounded`);
+  }
+  return violations;
+}
+
+function collectGeometryViolations(result) {
+  const violations = [];
+  const prefix = `${result.viewport.name}/DPR${result.deviceScaleFactor}`;
+  for (const [phase, geometry] of Object.entries(result.geometry ?? {})) {
+    const isMobile = geometry.viewport.width <= 820;
+    violations.push(...collectPlayfieldViolations(prefix, `${phase}/angle`, geometry, geometry.angle, isMobile));
+    violations.push(...collectPlayfieldViolations(prefix, `${phase}/infinite-angle`, geometry, geometry.infiniteAngle, isMobile));
+  }
+  return violations;
+}
 
 function collectViolations(result) {
   const violations = [];
@@ -69,7 +135,56 @@ function collectViolations(result) {
   if (automaticTransitions?.recoveredHigh?.level !== "high") {
     violations.push(`${prefix}/automatic quality did not recover balanced -> high`);
   }
+  violations.push(...collectGeometryViolations(result));
   return violations;
+}
+
+async function captureGeometry(page) {
+  return page.evaluate(() => {
+    const debug = window.__angleDebug;
+    function rectSnapshot(node) {
+      const rect = node?.getBoundingClientRect();
+      return rect
+        ? {
+          left: rect.left,
+          right: rect.right,
+          top: rect.top,
+          bottom: rect.bottom,
+          width: rect.width,
+          height: rect.height,
+        }
+        : null;
+    }
+    function playfieldSnapshot(wrapperSelector, canvasSelector) {
+      const wrapper = document.querySelector(wrapperSelector);
+      const canvas = document.querySelector(canvasSelector);
+      return {
+        wrapper: rectSnapshot(wrapper),
+        canvas: rectSnapshot(canvas),
+        backing: {
+          width: canvas?.width ?? 0,
+          height: canvas?.height ?? 0,
+        },
+      };
+    }
+
+    debug.setRenderQualityForTest("high");
+    debug.switchMainTab("angle");
+    window.advanceTime(0);
+    const angle = playfieldSnapshot(".playfield-wrap", "#gameCanvas");
+    debug.switchMainTab("infinity");
+    debug.switchInfinitySubtab("angle");
+    window.advanceTime(0);
+    const infiniteAngle = playfieldSnapshot(".infinite-angle-playfield-wrap", "#infiniteAngleCanvas");
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      devicePixelRatio: window.devicePixelRatio,
+      qualityDevicePixelRatio: debug.renderQualityState().devicePixelRatio,
+      angle,
+      infiniteAngle,
+      cache: debug.canvasCacheStats(),
+    };
+  });
 }
 
 async function inspectRendering(page, context) {
@@ -187,7 +302,18 @@ try {
       deviceScaleFactor: context.deviceScaleFactor,
     });
     try {
-      results.push(await inspectRendering(gamePage.page, context));
+      const rendering = await inspectRendering(gamePage.page, context);
+      const initialGeometry = await captureGeometry(gamePage.page);
+      await gamePage.page.setViewportSize({ width: context.height, height: context.width });
+      await gamePage.page.waitForTimeout(100);
+      const rotatedGeometry = await captureGeometry(gamePage.page);
+      results.push({
+        ...rendering,
+        geometry: {
+          initial: initialGeometry,
+          rotated: rotatedGeometry,
+        },
+      });
     } finally {
       await gamePage.context.close();
     }
