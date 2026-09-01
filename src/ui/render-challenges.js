@@ -117,8 +117,8 @@ function updateTowerChallenge4UpgradeRows() {
     button.querySelector(".tc4-upgrade-cost").textContent = `${runtime.t("towerChallenge4UpgradePrice")}: ${price}`;
     const canBuy = runtime.canBuyTowerChallenge4Upgrade(kind);
     const action = canBuy
-      ? runtime.t("towerChallenge4UpgradeBuy")
-      : runtime.t("towerChallenge4UpgradeUnavailable");
+      ? runtime.t("upgradeActionBuy")
+      : runtime.t("upgradeActionUnavailable");
     button.querySelector(".tc4-upgrade-action").textContent = action;
     button.disabled = !canBuy;
     button.setAttribute("aria-label", `${label} — ${button.querySelector(".tc4-upgrade-effect").textContent} — ${button.querySelector(".tc4-upgrade-cost").textContent} — ${action}`);

@@ -311,8 +311,8 @@ button {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  min-height: 70px;
-  padding: 10px 14px 8px;
+  min-height: 66px;
+  padding: 7px 12px 6px;
   border-bottom: 2px solid var(--line);
   background: linear-gradient(180deg, rgba(20, 32, 54, 0.9), rgba(15, 25, 44, 0.65));
 }
@@ -329,7 +329,7 @@ button {
 .topbar h1,
 .page-heading h1 {
   font-size: clamp(1.8rem, 3.2vw, 3rem);
-  line-height: 1;
+  line-height: 0.8;
   white-space: nowrap;
 }
 
@@ -480,19 +480,28 @@ canvas {
 }
 
 .buy-all-button {
-  min-height: 48px;
-  padding: 10px 12px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
   text-align: left;
-  background: linear-gradient(180deg, #5b6fb2, #344781);
+  background: rgba(76, 123, 217, 0.1);
+  border-color: rgba(76, 123, 217, 0.58);
+  box-shadow: none;
+}
+
+.buy-all-button b {
+  font-size: 0.82rem;
 }
 
 .buy-all-button small {
-  color: rgba(255, 255, 255, 0.72);
-  font-size: 0.76rem;
+  color: var(--muted);
+  font-size: 0.68rem;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .upgrade-button {
@@ -1404,20 +1413,12 @@ canvas {
 }
 
 .infinite-angle-upgrades {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: 1fr;
+  gap: 6px;
 }
 
 .infinite-angle-panel .infinite-angle-upgrades {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-}
-
-.infinite-angle-upgrades .infinite-angle-buy-all {
-  grid-column: 1 / -1;
-  min-height: 44px;
-  background: rgba(76, 123, 217, 0.16);
-  border-color: var(--line);
-  text-align: center;
+  grid-template-columns: 1fr !important;
 }
 
 .infinite-angle-unlock-note[hidden] {
@@ -1434,7 +1435,7 @@ canvas {
 
 .upgrade-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(54px, auto);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr) auto auto;
   gap: 8px;
   align-items: center;
 }
@@ -1445,71 +1446,120 @@ canvas {
   min-width: 0;
   min-height: 48px;
   padding: 8px 10px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
-  background: rgba(76, 123, 217, 0.12);
+  gap: 8px;
+  background: rgba(17, 27, 47, 0.68);
   border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--upgrade-accent, var(--line-strong));
 }
 
-.normal-upgrades .upgrade-row > span,
-.infinite-angle-upgrades .upgrade-row > span,
-.tc4-upgrade-list .upgrade-row > span {
+.upgrade-row[data-upgrade-kind="speed"] {
+  --upgrade-accent: var(--blue);
+}
+
+.upgrade-row[data-upgrade-kind="vertex"] {
+  --upgrade-accent: var(--cyan);
+}
+
+.upgrade-row[data-upgrade-kind="gain"] {
+  --upgrade-accent: var(--accent-strong);
+}
+
+.upgrade-row[data-upgrade-kind="tc4"] {
+  --upgrade-accent: var(--gold);
+  background: rgba(112, 80, 28, 0.12);
+}
+
+.upgrade-row .upgrade-row-name,
+.upgrade-row .upgrade-row-detail {
   min-width: 0;
   display: grid;
-  justify-content: initial;
-  align-items: start;
   gap: 2px;
+  align-content: center;
 }
 
-.normal-upgrades .upgrade-row small,
-.infinite-angle-upgrades .upgrade-row small,
-.tc4-upgrade-list .upgrade-row small {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.normal-upgrades .upgrade-row > em,
-.infinite-angle-upgrades .upgrade-row > em {
-  white-space: nowrap;
-  text-align: right;
-}
-
-.tc4-upgrade-copy {
+.upgrade-row-name {
   overflow: hidden;
 }
 
-.tc4-upgrade-copy small {
+.upgrade-row-name b {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.upgrade-row-detail {
   color: var(--muted);
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
-.tc4-upgrade-meta {
-  display: grid;
-  justify-items: end;
-  gap: 2px;
+.upgrade-row-detail small {
+  min-width: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  overflow-wrap: anywhere;
+}
+
+.upgrade-row-cost {
   min-width: max-content;
-  text-align: right;
-}
-
-.tc4-upgrade-meta span {
   color: rgba(255, 255, 255, 0.78);
   font-size: 0.72rem;
+  font-style: normal;
   font-weight: 800;
   white-space: nowrap;
+  text-align: right;
 }
 
-.tc4-upgrade-meta .tc4-upgrade-action {
-  color: var(--gold);
+.upgrade-row-action {
+  min-width: max-content;
+  color: var(--upgrade-accent, var(--gold));
   font-size: 0.72rem;
-  white-space: nowrap;
-}
-
-.upgrade-row strong {
-  color: var(--muted);
-  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.2;
   white-space: nowrap;
   text-align: right;
+}
+
+.upgrade-row:disabled .upgrade-row-action {
+  color: var(--muted);
+}
+
+.tc4-upgrade-effect {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.upgrade-section-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+}
+
+.tc4-upgrade-list .upgrade-row {
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr);
+  grid-template-areas:
+    "name detail"
+    "cost action";
+}
+
+.tc4-upgrade-list .upgrade-row-name {
+  grid-area: name;
+}
+
+.tc4-upgrade-list .upgrade-row-detail {
+  grid-area: detail;
+}
+
+.tc4-upgrade-list .upgrade-row-cost {
+  grid-area: cost;
+}
+
+.tc4-upgrade-list .upgrade-row-action {
+  grid-area: action;
 }
 
 .mini-button,
@@ -3413,4 +3463,28 @@ canvas {
 .ui-tree-node,
 .ui-action-row button {
   min-height: var(--ui-touch-target);
+}
+
+@media (min-width: 821px) {
+  .angle-panel .stage-panel {
+    grid-template-rows: auto auto auto;
+    align-content: start;
+  }
+
+  .angle-panel .topbar {
+    background: transparent;
+  }
+
+  .angle-panel .metric.primary {
+    min-height: 64px;
+    padding: 2px 0 8px;
+  }
+
+  .angle-panel .metric.primary strong {
+    font-size: clamp(2rem, 3.5vw, 2.8rem);
+  }
+
+  .angle-panel .playfield-wrap {
+    height: clamp(260px, 52vh, 520px);
+  }
 }
