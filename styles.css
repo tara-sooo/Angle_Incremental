@@ -433,7 +433,6 @@ canvas {
 .generation-button,
 .core-boost-button,
 .infinity-button,
-.prestige-action-button,
 .mini-button,
 .infinity-upgrade-node,
 .infinity-upgrade-detail-buy,
@@ -498,7 +497,6 @@ canvas {
   .generation-button:hover:not(:disabled),
   .core-boost-button:hover:not(:disabled),
   .infinity-button:hover:not(:disabled),
-  .prestige-action-button:hover:not(:disabled),
   .mini-button:hover:not(:disabled),
   .infinity-upgrade-node:hover:not(:disabled),
   .infinity-upgrade-detail-buy:hover:not(:disabled),
@@ -518,7 +516,6 @@ canvas {
 .generation-button:active:not(:disabled),
 .core-boost-button:active:not(:disabled),
 .infinity-button:active:not(:disabled),
-.prestige-action-button:active:not(:disabled),
 .mini-button:active:not(:disabled),
 .infinity-upgrade-node:active:not(:disabled),
 .infinity-upgrade-detail-buy:active:not(:disabled),
@@ -535,7 +532,6 @@ canvas {
 .generation-button:disabled,
 .core-boost-button:disabled,
 .infinity-button:disabled,
-.prestige-action-button:disabled,
 .mini-button:disabled,
 .infinity-upgrade-node:disabled,
 .infinity-upgrade-detail-buy:disabled,
@@ -607,7 +603,6 @@ canvas {
 .generation-button,
 .core-boost-button,
 .infinity-button,
-.prestige-action-button,
 .challenge-button,
 .break-button {
   min-height: 52px;
@@ -3388,198 +3383,62 @@ canvas {
   }
 }
 
-/* Issue #316: one shell flow and one playfield-first workspace hierarchy. */
-.shell {
-  grid-template-rows: auto auto auto minmax(0, 1fr);
-}
-
-.shell.is-top-bar-hidden {
-  grid-template-rows: auto auto minmax(0, 1fr);
-}
-
-.main-tabs {
-  grid-row: 2;
-  order: initial;
-  width: 100%;
-  justify-self: stretch;
-}
-
-.prestige-action-surface {
-  grid-column: 1;
-  grid-row: 3;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: stretch;
-  gap: 8px;
-  margin: 0;
-}
-
-.main-panels {
-  grid-row: 4;
-}
-
-.shell.is-top-bar-hidden .main-tabs {
-  grid-row: 1;
-}
-
-.shell.is-top-bar-hidden .prestige-action-surface {
-  grid-row: 2;
-}
-
-.shell.is-top-bar-hidden .main-panels {
-  grid-row: 3;
-}
-
-.prestige-action-card {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(108px, 0.8fr) minmax(0, 1.35fr) auto;
-  align-items: center;
-  gap: 6px 12px;
-  padding: 7px 10px;
-  border: 1px solid var(--line);
-  border-inline-start: 3px solid var(--violet);
-  background: rgba(23, 36, 59, 0.72);
-}
-
-.prestige-action-card.is-eternity {
-  border-inline-start-color: #9b4b78;
-}
-
-.prestige-action-card[data-state="ready"] {
-  border-color: rgba(104, 211, 145, 0.7);
-  border-inline-start-color: var(--green);
-}
-
-.prestige-action-card[data-state="locked"] {
-  opacity: 0.78;
-}
-
-.prestige-action-card .prestige-action-copy,
-.prestige-action-card .prestige-action-detail {
-  min-width: 0;
-}
-
-.prestige-action-card .prestige-action-status {
-  display: block;
-}
-
-.prestige-action-card[data-state="ready"] .prestige-action-status {
-  color: var(--green);
-}
-
-.prestige-action-card[data-state="locked"] .prestige-action-status {
-  color: var(--muted);
-}
-
-.prestige-action-card .prestige-action-button {
-  min-width: 96px;
-}
-
-.prestige-action-card.is-eternity .prestige-action-button {
-  background: linear-gradient(180deg, #9b4b78, #5f2b66);
-}
-
-.angle-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(250px, 320px);
-  align-items: start;
-  gap: 10px;
-  min-width: 0;
-  min-height: 100%;
-}
-
-.angle-stage {
-  min-width: 0;
+/* Issue #318: restore the stable gameplay composition and layer-local actions. */
+.angle-layout {
+  height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-rows: auto auto auto;
-  align-content: start;
-  gap: 8px;
+  grid-template-columns: 310px minmax(0, 1fr);
+  gap: 10px;
 }
 
-.angle-stage .workspace-heading {
-  min-height: 49px;
-  margin: 0;
-  padding: 5px 2px;
-  border: 0;
+.upgrade-rail,
+.stage-panel {
+  min-width: 0;
+  min-height: 0;
   background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
-.workspace-heading > div {
+.upgrade-rail {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stage-panel {
+  display: grid;
+  grid-template-rows: auto minmax(180px, 1fr) auto;
+}
+
+.stage-panel > .topbar > div:first-child {
   display: flex;
   align-items: baseline;
   gap: 8px;
 }
 
-.workspace-code {
-  color: var(--gold);
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
+.stage-panel .topbar .eyebrow {
+  margin: 0;
 }
 
-.angle-stage .workspace-heading h1 {
-  font-size: clamp(1.45rem, 3vw, 2.15rem);
-  line-height: 1;
+.upgrade-rail .upgrades {
+  flex: 1;
 }
 
-.angle-stage .playfield-wrap {
-  width: 100%;
-  height: clamp(250px, 52svh, 520px);
-  min-height: 250px;
-  padding: 8px;
-}
-
-.angle-stage .stats {
-  display: grid;
-  grid-template-columns: minmax(170px, 1.35fr) repeat(4, minmax(72px, 1fr));
-  gap: 6px 10px;
-  padding: 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 0;
-}
-
-.angle-stage .metric {
-  min-height: 34px;
-  padding: 5px 0;
-}
-
-.angle-stage .metric.primary {
-  min-height: 52px;
-  padding: 4px 0 6px;
-}
-
-.angle-stage .metric.primary strong {
-  font-size: clamp(1.8rem, 3.4vw, 2.7rem);
-}
-
-.angle-actions {
-  min-width: 0;
-  display: grid;
-  align-content: start;
-  gap: 8px;
-}
-
-.angle-actions .upgrades,
-.angle-actions .reset-dock {
-  min-width: 0;
-  padding: 8px;
-}
-
-.angle-actions .normal-upgrades,
-.angle-actions .tc4-upgrade-list {
+.upgrade-rail .normal-upgrades,
+.upgrade-rail .tc4-upgrade-list {
   gap: 5px;
 }
 
-.angle-actions .buy-all-button {
+.upgrade-rail .buy-all-button {
   width: auto;
   justify-self: start;
   justify-content: space-between;
 }
 
-.angle-actions .upgrade-row,
+.upgrade-rail .upgrade-row,
 .infinite-angle-upgrades .upgrade-row,
 .tc4-upgrade-list .upgrade-row {
   grid-template-columns: minmax(0, 1fr) auto;
@@ -3588,61 +3447,63 @@ canvas {
   padding: 6px 8px;
 }
 
-.angle-actions .upgrade-row-name,
+.upgrade-rail .upgrade-row-name,
 .infinite-angle-upgrades .upgrade-row-name,
 .tc4-upgrade-list .upgrade-row-name {
   grid-column: 1;
   grid-row: 1;
 }
 
-.angle-actions .upgrade-row-detail,
+.upgrade-rail .upgrade-row-detail,
 .infinite-angle-upgrades .upgrade-row-detail,
 .tc4-upgrade-list .upgrade-row-detail {
   grid-column: 1;
   grid-row: 2;
 }
 
-.angle-actions .upgrade-row-cost,
+.upgrade-rail .upgrade-row-cost,
 .infinite-angle-upgrades .upgrade-row-cost,
 .tc4-upgrade-list .upgrade-row-cost {
   grid-column: 2;
   grid-row: 1 / span 2;
 }
 
-.angle-actions .reset-dock {
+.stage-panel .reset-dock {
   position: static;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
   padding: 8px;
   border-top: 1px solid var(--line);
   box-shadow: none;
 }
 
-.angle-actions .generation,
-.angle-actions .core-boost {
+.stage-panel .generation,
+.stage-panel .core-boost {
   min-width: 0;
   padding: 0;
 }
 
-.angle-actions .generation-button,
-.angle-actions .core-boost-button {
+.stage-panel .generation-button,
+.stage-panel .core-boost-button {
   min-height: 40px;
 }
 
 .infinite-angle-panel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(210px, 300px);
-  gap: 8px 12px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 10px;
 }
 
 .infinite-angle-panel .infinite-angle-playfield-wrap {
   grid-column: 1;
-  grid-row: 1 / span 3;
-  width: 100%;
-  height: clamp(230px, 48svh, 420px);
-  min-height: 230px;
-  padding: 8px;
+  grid-row: 1 / span 2;
+  align-self: start;
+  overflow: hidden;
+  height: clamp(220px, 42vh, 420px);
+  min-height: 220px;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: #0b1630;
 }
 
 .infinite-angle-panel .infinite-angle-metrics {
@@ -3657,15 +3518,14 @@ canvas {
   grid-row: 2;
 }
 
-.infinite-angle-panel .infinite-angle-unlock-button {
-  grid-column: 2;
-  grid-row: 3;
+.infinite-angle-panel .infinite-angle-unlock-button,
+.infinite-angle-panel .infinite-angle-upgrades {
+  grid-column: 1 / -1;
 }
 
 .infinite-angle-panel .infinite-angle-upgrades {
-  grid-column: 1 / -1;
-  grid-row: 4;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-row: 3;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
   gap: 5px;
 }
 
@@ -3675,6 +3535,12 @@ canvas {
 
 .infinite-angle-panel .infinite-angle-upgrades .upgrade-row {
   grid-column: auto;
+}
+
+@media (max-width: 1180px) {
+  .angle-layout {
+    grid-template-columns: 290px minmax(0, 1fr);
+  }
 }
 
 .timeline-actions {
@@ -3766,117 +3632,35 @@ canvas {
 }
 
 @media (max-width: 820px) {
-  .shell {
-    grid-template-rows: auto auto auto minmax(0, 1fr);
-  }
-
-  .shell.is-top-bar-hidden {
-    grid-template-rows: auto auto minmax(0, 1fr);
-  }
-
-  .main-tabs {
-    grid-row: 2;
-    width: 100%;
-    padding: 0;
-  }
-
-  .prestige-action-surface {
-    grid-row: 3;
+  .angle-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+    height: 100%;
+    min-height: 0;
+    gap: 6px;
+  }
+
+  .upgrade-rail,
+  .stage-panel {
+    min-height: auto;
+  }
+
+  .upgrade-rail {
+    padding: 6px;
     gap: 4px;
+    overflow: visible;
   }
 
-  .main-panels {
-    grid-row: 4;
+  .stage-panel {
+    grid-template-rows: auto minmax(128px, auto) auto;
+    overflow: visible;
   }
 
-  .shell.is-top-bar-hidden .main-tabs {
-    grid-row: 1;
-  }
-
-  .shell.is-top-bar-hidden .prestige-action-surface {
-    grid-row: 2;
-  }
-
-  .shell.is-top-bar-hidden .main-panels {
-    grid-row: 3;
-  }
-
-  .prestige-action-card {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 2px 8px;
-    padding: 6px 8px;
-  }
-
-  .prestige-action-card .prestige-action-copy {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .prestige-action-card .prestige-action-detail {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .prestige-action-card .prestige-action-button {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-    min-width: 88px;
-  }
-
-  .angle-workspace {
-    grid-template-columns: 1fr;
-    min-height: 0;
-  }
-
-  .angle-stage {
-    display: block;
-  }
-
-  .angle-stage .workspace-heading {
-    min-height: 49px;
-    padding: 4px 0;
-  }
-
-  .angle-stage .workspace-heading h1 {
-    font-size: 1.55rem;
-    line-height: 1;
-  }
-
-  .angle-stage .playfield-wrap {
-    width: min(100%, calc(42svh * 4 / 3));
-    height: auto;
-    min-height: 0;
-    aspect-ratio: 4 / 3;
-    margin-inline: auto;
-  }
-
-  .angle-stage .stats {
+  .stage-panel .reset-dock {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 3px 8px;
-    margin-top: 8px;
-  }
-
-  .angle-stage .metric.primary {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: baseline;
-    min-height: 32px;
-    padding: 2px 0 4px;
-  }
-
-  .angle-stage .metric.primary strong {
-    margin-top: 0;
-    font-size: 1.75rem;
-  }
-
-  .angle-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .angle-actions .reset-dock {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    position: static;
+    max-height: none;
+    overflow: visible;
   }
 
   .infinite-angle-panel {
@@ -3901,7 +3685,7 @@ canvas {
   }
 
   .infinite-angle-panel .infinite-angle-upgrades {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
 
   .infinite-angle-panel .infinite-angle-upgrades .upgrade-section-actions,
