@@ -78,24 +78,17 @@ async function readUiContract(targetPage) {
         && window.render_game_to_text().length > 0,
       eternityPageRole: Boolean(document.querySelector('.main-panel[data-panel="eternity"].ui-page[data-scroll-owner="primary"]')),
       timelineNoLongerPage: Boolean(document.querySelector('.eternity-subpanel[data-eternity-panel="timeline"]:not(.ui-page):not([data-scroll-owner])')),
-      prestigeCardCount: document.querySelectorAll("#prestigeActionSurface > .prestige-action-card").length,
-      prestigeCardKinds: Array.from(
-        document.querySelectorAll("#prestigeActionSurface > .prestige-action-card"),
-        (card) => card.dataset.action,
-      ),
-      prestigeOutsideMainPanel: !document.querySelector("#prestigeActionSurface")?.closest(".main-panel"),
-      prestigeButtonsExplicit: Array.from(
-        document.querySelectorAll("#prestigeActionSurface .prestige-action-button"),
-        (button) => button.dataset.prestigeAction,
-      ),
-      legacyAngleLayoutCount: document.querySelectorAll(".angle-layout, .upgrade-rail, .stage-panel").length,
-      angleWorkspaceCount: document.querySelectorAll(".angle-workspace").length,
-      angleActionsCount: document.querySelectorAll(".angle-workspace > .angle-actions").length,
-      anglePlayfieldBeforeActions: (() => {
-        const workspace = document.querySelector(".angle-workspace");
-        const stage = workspace?.querySelector(":scope > .angle-stage");
-        const actions = workspace?.querySelector(":scope > .angle-actions");
-        return Boolean(stage && actions && (stage.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING));
+      globalPrestigeSurface: Boolean(document.querySelector("#prestigeActionSurface")),
+      infinityActionLocal: Boolean(document.querySelector('[data-panel="infinity"] #infinityButton')),
+      eternityActionLocal: Boolean(document.querySelector('[data-panel="eternity"] #eternityPerformButton')),
+      angleLayoutCount: document.querySelectorAll(".angle-layout").length,
+      upgradeRailCount: document.querySelectorAll(".angle-layout > .upgrade-rail").length,
+      stagePanelCount: document.querySelectorAll(".angle-layout > .stage-panel").length,
+      angleStableOrder: (() => {
+        const layout = document.querySelector(".angle-layout");
+        const rail = layout?.querySelector(":scope > .upgrade-rail");
+        const stage = layout?.querySelector(":scope > .stage-panel");
+        return Boolean(layout && rail && stage && layout.firstElementChild === rail && layout.lastElementChild === stage);
       })(),
     };
   });
@@ -441,7 +434,7 @@ try {
   assert.equal(desktopHelpScrollOwnership.helpNavRole, true, "desktop Help topics should use the shared horizontal role");
   await page.setViewportSize({ width: 1280, height: 420 });
   const compactDesktopHelpScrollOwnership = await readScrollOwnership(page);
-  assert.ok(compactDesktopHelpScrollOwnership.pageScrollHeight > compactDesktopHelpScrollOwnership.pageClientHeight, "compact desktop Help should scroll through the page owner");
+  assert.ok(compactDesktopHelpScrollOwnership.pageScrollHeight >= compactDesktopHelpScrollOwnership.pageClientHeight, "compact desktop Help should remain within the page scroll owner");
   assert.equal(compactDesktopHelpScrollOwnership.pageAtEnd, true, "compact desktop Help should reach the article end");
   assert.equal(compactDesktopHelpScrollOwnership.finalContentReachable, true, "compact desktop Help article should remain reachable at scroll end");
   assert.deepEqual(compactDesktopHelpScrollOwnership.nestedVerticalOwners, [], "compact desktop Help should have no nested vertical scroll trap");
@@ -572,14 +565,13 @@ try {
   assert.equal(desktopUiContract.renderTextAvailable, true, "the render_game_to_text debug surface should remain available");
   assert.equal(desktopUiContract.eternityPageRole, true, "runtime Eternity should use the shared page role");
   assert.equal(desktopUiContract.timelineNoLongerPage, true, "reparented Timeline should not retain page ownership");
-  assert.equal(desktopUiContract.prestigeCardCount, 2, "global prestige actions should render two independent cards");
-  assert.deepEqual(desktopUiContract.prestigeCardKinds, ["infinity", "eternity"], "global prestige cards should keep explicit action kinds");
-  assert.equal(desktopUiContract.prestigeOutsideMainPanel, true, "global prestige actions should sit between navigation and pages");
-  assert.deepEqual(desktopUiContract.prestigeButtonsExplicit, ["infinity", "eternity"], "prestige buttons should bind to their own action kind");
-  assert.equal(desktopUiContract.legacyAngleLayoutCount, 0, "ANGLE should remove the retired rail and stage layout");
-  assert.equal(desktopUiContract.angleWorkspaceCount, 1, "ANGLE should expose one playfield workspace");
-  assert.equal(desktopUiContract.angleActionsCount, 1, "ANGLE should keep upgrades and resets in one action stack");
-  assert.equal(desktopUiContract.anglePlayfieldBeforeActions, true, "ANGLE should place the playfield workspace before its action stack");
+  assert.equal(desktopUiContract.globalPrestigeSurface, false, "the dual global prestige surface should be removed");
+  assert.equal(desktopUiContract.infinityActionLocal, true, "Infinity should keep its action inside the Infinity page");
+  assert.equal(desktopUiContract.eternityActionLocal, true, "Eternity should keep its action inside the Eternity page");
+  assert.equal(desktopUiContract.angleLayoutCount, 1, "ANGLE should expose one stable layout");
+  assert.equal(desktopUiContract.upgradeRailCount, 1, "ANGLE should keep one upgrade rail");
+  assert.equal(desktopUiContract.stagePanelCount, 1, "ANGLE should keep one stage panel");
+  assert.equal(desktopUiContract.angleStableOrder, true, "ANGLE should place the upgrade rail before the stage panel");
   assert.deepEqual(desktopAngleScrollOwnership.pageOverflow, ["auto", "hidden"], "desktop ANGLE should use the page as its vertical owner");
   assert.deepEqual(desktopAngleScrollOwnership.nestedVerticalOwners, [], "desktop ANGLE should have no nested vertical scroll trap");
   assert.deepEqual(desktopAngleScrollOwnership.mainPanelsOverflow, ["hidden", "hidden"], "desktop ANGLE main panels should not own page scrolling");

@@ -78,105 +78,6 @@ function formatNormalUpgradeLevel(rawLevel, effectiveLevel, freeLevel) {
     : formatEffectiveLevel(rawLevel, effectiveLevel);
 }
 
-function prestigeActionKind() {
-  return runtime.canEternity?.() === true ? "eternity" : "infinity";
-}
-
-function canRunPrestigeAction(kind = prestigeActionKind()) {
-  if (kind === "eternity") return runtime.canEternity?.() === true;
-  return Number(runtime.state.infinityCount) > 0 && runtime.canInfinity?.() === true;
-}
-
-function prestigeActionUnlocked(kind) {
-  if (kind === "eternity") {
-    return Number(runtime.state.eternityCount) > 0 || Number(runtime.state.infinityCount) > 0;
-  }
-  return Number(runtime.state.infinityCount) > 0;
-}
-
-function renderPrestigeCard(card, fields, kind) {
-  if (!card || !fields.name || !fields.status || !fields.detailLabel || !fields.detail || !fields.button) return null;
-  const unlocked = prestigeActionUnlocked(kind);
-  const ready = canRunPrestigeAction(kind);
-  card.dataset.action = kind;
-  card.dataset.state = ready ? "ready" : unlocked ? "unavailable" : "locked";
-  card.classList.toggle("is-ready", ready);
-  card.classList.toggle("is-unavailable", unlocked && !ready);
-  card.classList.toggle("is-locked", !unlocked);
-  card.classList.toggle("is-eternity", kind === "eternity");
-  fields.name.textContent = kind === "eternity" ? runtime.t("eternity") : "Infinity";
-  fields.status.textContent = ready
-    ? runtime.t("prestigeActionReady")
-    : unlocked
-      ? runtime.t("prestigeActionUnavailable")
-      : runtime.t("prestigeActionLocked");
-  fields.button.dataset.prestigeAction = kind;
-  fields.button.disabled = !ready;
-
-  if (kind === "eternity") {
-    const requirement = runtime.t("eternityRequirementCompact")
-      .replace("{ip}", runtime.formatUiLogNumber(runtime.ETERNITY_REQUIREMENT_LOG10));
-    const currentIp = runtime.formatHeldUiLogNumber(
-      runtime.currentInfinityPointsLog10(),
-      runtime.state.infinityPointsExact,
-    );
-    fields.detailLabel.textContent = runtime.t("prestigeActionEternityRequirement");
-    fields.detail.textContent = `${requirement} / ${runtime.t("prestigeActionCurrentIp")}: ${currentIp} IP`;
-    fields.button.textContent = runtime.t(ready ? "eternityPerform" : "eternityPerformUnavailable");
-  } else {
-    fields.detailLabel.textContent = runtime.t("infinityGain");
-    fields.detail.textContent = ready
-      ? `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`
-      : runtime.t("prestigeActionInfinityRequirement")
-        .replace("{score}", runtime.formatUiLogNumber(runtime.INFINITY_REQUIREMENT_LOG10));
-    fields.button.textContent = "Infinity";
-  }
-  return { ready, unlocked };
-}
-
-function updatePrestigeActionUi() {
-  const surface = runtime.elements.prestigeActionSurface;
-  const primaryKind = prestigeActionKind();
-  const secondaryKind = primaryKind === "eternity" ? "infinity" : "eternity";
-  const primary = renderPrestigeCard(
-    runtime.elements.prestigePrimaryActionCard,
-    {
-      name: runtime.elements.prestigeActionName,
-      status: runtime.elements.prestigeActionStatus,
-      detailLabel: runtime.elements.prestigeActionDetailLabel,
-      detail: runtime.elements.prestigeActionDetail,
-      button: runtime.elements.prestigeActionButton,
-    },
-    primaryKind,
-  );
-  const secondary = renderPrestigeCard(
-    runtime.elements.prestigeSecondaryActionCard,
-    {
-      name: runtime.elements.prestigeSecondaryActionName,
-      status: runtime.elements.prestigeSecondaryActionStatus,
-      detailLabel: runtime.elements.prestigeSecondaryActionDetailLabel,
-      detail: runtime.elements.prestigeSecondaryActionDetail,
-      button: runtime.elements.prestigeSecondaryActionButton,
-    },
-    secondaryKind,
-  );
-  if (!surface || !primary || !secondary) return;
-  surface.dataset.action = primaryKind;
-  surface.dataset.state = primary.ready ? "ready" : primary.unlocked ? "unavailable" : "locked";
-  surface.classList.toggle("is-ready", primary.ready);
-  surface.classList.toggle("is-eternity", primaryKind === "eternity");
-  surface.classList.toggle("is-locked", !primary.unlocked);
-  surface.dataset.secondaryAction = secondaryKind;
-}
-
-function runPrestigeAction(kind = prestigeActionKind()) {
-  const actionKind = kind === "eternity" || kind === "infinity" ? kind : prestigeActionKind();
-  if (!canRunPrestigeAction(actionKind)) return false;
-  if (actionKind === "eternity") return runtime.performEternity?.() === true;
-  runtime.runInfinity?.(false);
-  return true;
-}
-
 function recoveryReasonText(reason) {
   const reasonKeys = {
     periodic: "checkpointReasonPeriodic",
@@ -669,7 +570,7 @@ function updateUi() {
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`;
-  updatePrestigeActionUi();
+  runtime.elements.infinityButton.disabled = runtime.state.infinityCount === 0 || !runtime.canInfinity();
   runtime.updateInfinityUpgradeRows();
   const infiniteAngleUnlocked = runtime.state.infiniteAngleUnlocked;
   const infiniteAngleUnlockCostLog10 = runtime.infiniteAngleUnlockCostLog10();
@@ -852,10 +753,6 @@ expose("canSpend", () => canSpend, (value) => { canSpend = value; });
 expose("formatVertexGainIncrease", () => formatVertexGainIncrease, (value) => { formatVertexGainIncrease = value; });
 expose("updateTimelineUi", () => updateTimelineUi);
 expose("selectTimelineNode", () => selectTimelineNode);
-expose("prestigeActionKind", () => prestigeActionKind);
-expose("canRunPrestigeAction", () => canRunPrestigeAction);
-expose("updatePrestigeActionUi", () => updatePrestigeActionUi);
-expose("runPrestigeAction", () => runPrestigeAction);
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });
 expose("setSaveStatus", () => setSaveStatus, (value) => { setSaveStatus = value; });
 expose("gainExpressionConfig", () => gainExpressionConfig, (value) => { gainExpressionConfig = value; });

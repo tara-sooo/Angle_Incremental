@@ -246,12 +246,7 @@ function bindEvents() {
   runtime.elements.buyAllUpgrade.addEventListener("click", () => runtime.buyAllUpgrades());
   runtime.elements.generationButton.addEventListener("click", runtime.runGeneration);
   runtime.elements.coreBoostButton.addEventListener("click", runtime.runCoreBoost);
-  runtime.elements.prestigeActionButton.addEventListener("click", () => {
-    runtime.runPrestigeAction(runtime.elements.prestigeActionButton.dataset.prestigeAction);
-  });
-  runtime.elements.prestigeSecondaryActionButton?.addEventListener("click", () => {
-    runtime.runPrestigeAction(runtime.elements.prestigeSecondaryActionButton.dataset.prestigeAction);
-  });
+  runtime.elements.infinityButton.addEventListener("click", () => runtime.runInfinity(false));
   runtime.elements.infinityUpgradeDetailBuy.addEventListener("click", runtime.buySelectedInfinityUpgrade);
   runtime.elements.infiniteAngleUnlockButton.addEventListener("click", runtime.unlockInfiniteAngle);
   runtime.elements.infiniteAngleBuyAllUpgrade.addEventListener("click", () => runtime.buyAllInfiniteAngleUpgrades());

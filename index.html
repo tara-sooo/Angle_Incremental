@@ -105,50 +105,10 @@
         </div>
       </nav>
 
-      <section id="prestigeActionSurface" class="prestige-action-surface ui-action-row" data-action="infinity" data-state="unavailable" data-prestige-layout="dual" aria-label="Prestige actions">
-        <article id="prestigePrimaryActionCard" class="prestige-action-card is-primary" data-prestige-card="primary" data-action="infinity">
-          <div class="prestige-action-copy">
-            <span class="prestige-action-label" data-i18n="prestigeActionLabel">プレステージ</span>
-            <strong id="prestigeActionName" class="prestige-action-name">Infinity</strong>
-            <small id="prestigeActionStatus" class="prestige-action-status" aria-live="polite">未解放</small>
-          </div>
-          <div class="prestige-action-detail">
-            <span id="prestigeActionDetailLabel">Infinity獲得</span>
-            <strong id="prestigeActionDetail" aria-live="polite">必要スコア: 1.80e308</strong>
-          </div>
-          <button id="prestigeActionButton" class="prestige-action-button" type="button" data-prestige-action="infinity" disabled aria-describedby="prestigeActionStatus prestigeActionDetail">
-            Infinity
-          </button>
-        </article>
-        <article id="prestigeSecondaryActionCard" class="prestige-action-card" data-prestige-card="secondary" data-action="eternity">
-          <div class="prestige-action-copy">
-            <span class="prestige-action-label" data-i18n="prestigeActionLabel">プレステージ</span>
-            <strong id="prestigeSecondaryActionName" class="prestige-action-name">Eternity</strong>
-            <small id="prestigeSecondaryActionStatus" class="prestige-action-status" aria-live="polite">未解放</small>
-          </div>
-          <div class="prestige-action-detail">
-            <span id="prestigeSecondaryActionDetailLabel">Eternity</span>
-            <strong id="prestigeSecondaryActionDetail" aria-live="polite">必要IP: 1.80e308</strong>
-          </div>
-          <button id="prestigeSecondaryActionButton" class="prestige-action-button" type="button" data-prestige-action="eternity" disabled aria-describedby="prestigeSecondaryActionStatus prestigeSecondaryActionDetail">
-            Eternity
-          </button>
-        </article>
-      </section>
-
       <div class="main-panels">
         <section class="main-panel angle-panel ui-page is-active" data-panel="angle" data-scroll-owner="primary" aria-label="The Angle">
-          <div class="angle-workspace">
-            <section class="angle-stage ui-section" aria-labelledby="angleWorkspaceTitle">
-              <header class="topbar workspace-heading">
-                <div>
-                  <span class="workspace-code">ANG</span>
-                  <h1 id="angleWorkspaceTitle">The Angle</h1>
-                </div>
-              </header>
-              <div class="playfield-wrap ui-playfield">
-                <canvas id="gameCanvas" width="900" height="620" aria-label="The Angle playfield"></canvas>
-              </div>
+          <div class="angle-layout">
+            <aside class="upgrade-rail" aria-label="The Angle upgrades">
               <section class="stats ui-section">
                 <div class="metric primary">
                   <span data-i18n="score">スコア</span>
@@ -172,9 +132,6 @@
                 </div>
               </section>
 
-            </section>
-
-            <aside class="angle-actions" aria-label="The Angle actions">
               <section class="upgrades ui-section" aria-label="The Angle upgrades">
                 <div id="normalUpgradeList" class="normal-upgrades">
                   <div class="upgrade-section-actions ui-action-row">
@@ -244,6 +201,18 @@
                   </button>
                 </div>
               </section>
+            </aside>
+
+            <section class="stage-panel ui-section" aria-labelledby="angleWorkspaceTitle">
+              <header class="topbar">
+                <div>
+                  <p class="eyebrow">Angle Incremental</p>
+                  <h1 id="angleWorkspaceTitle">The Angle</h1>
+                </div>
+              </header>
+              <div class="playfield-wrap ui-playfield">
+                <canvas id="gameCanvas" width="900" height="620" aria-label="The Angle playfield"></canvas>
+              </div>
               <div class="reset-dock" aria-label="Reset layers">
                 <section class="generation">
                   <div>
@@ -293,7 +262,7 @@
                   </button>
                 </section>
               </div>
-            </aside>
+            </section>
           </div>
         </section>
 
@@ -319,6 +288,7 @@
               <span data-i18n="infinityGain">Infinity獲得</span>
               <strong id="infinityPointGain">+0 IP</strong>
             </div>
+            <button id="infinityButton" class="infinity-button" type="button" disabled>Infinity</button>
           </section>
 
           <section class="break-cap-row ui-section" aria-label="Break Infinite Cap">
