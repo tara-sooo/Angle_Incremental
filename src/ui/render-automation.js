@@ -1,6 +1,7 @@
 import { runtime, expose } from "../runtime/shared.js";
 
 let lastInfinityRunListSignature = null;
+let lastEternityRunListSignature = null;
 let lastChallengeTimeSignature = null;
 
 function formatInfinityRunTime(value) {
@@ -11,20 +12,37 @@ function formatInfinityRunTime(value) {
 
 function infinityRunRecordText(record, index) {
   const challenge = record.challenge > 0 ? ` IC${record.challenge}` : "";
-  return `#${index + 1}${challenge} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.formatPowerOfTen(record.scoreLog10)} / +${runtime.formatUiNumber(record.ipGain)} IP`;
+  const gainLog10 = record.ipGainLog10 ?? runtime.log10Value(record.ipGain);
+  return `#${index + 1}${challenge} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.formatUiLogNumber(record.scoreLog10)} / +${runtime.formatUiLogNumber(gainLog10)} IP`;
+}
+
+function eternityRunRecordText(record, index) {
+  return `#${index + 1} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.t("eternityInfinityCountShort")} ${runtime.formatUiNumber(record.infinityCount)}`;
 }
 
 function updateAutomationUi() {
   const unlocked = runtime.normalAutomationUnlocked?.() || false;
   const generationCoreUnlocked = runtime.isAchievementUnlocked(19);
   const infinityUnlocked = runtime.infinityAutomationUnlocked?.() || false;
+  const infinityUpgradeUnlocked = runtime.infinityUpgradeAutomationUnlocked?.() || false;
   if (!runtime.elements.automationMasterToggle) return;
   runtime.elements.automationLockNote.textContent = unlocked ? runtime.t("infinityUpgradeAvailable") : runtime.t("automationLocked");
   runtime.elements.automationMasterToggle.disabled = !unlocked;
   runtime.elements.autoBuySpeedToggle.disabled = !unlocked;
   runtime.elements.autoBuyVertexToggle.disabled = !unlocked;
   runtime.elements.autoBuyGainToggle.disabled = !unlocked;
-  if (runtime.elements.autoCompleteChallengesToggle) runtime.elements.autoCompleteChallengesToggle.disabled = !runtime.infinityChallengesUnlocked();
+  if (runtime.elements.autoBuyInfinityUpgradesToggle) {
+    runtime.elements.autoBuyInfinityUpgradesToggle.disabled = !infinityUpgradeUnlocked;
+  }
+  const milestoneEightUnlocked = runtime.eternityMilestoneActive?.("8") === true;
+  [
+    runtime.elements.autoBuyInfiniteAngleSpeedToggle,
+    runtime.elements.autoBuyInfiniteAngleVertexToggle,
+    runtime.elements.autoBuyInfiniteAngleGainToggle,
+    runtime.elements.autoBuildTowerToggle,
+  ].forEach((element) => {
+    if (element) element.disabled = !milestoneEightUnlocked;
+  });
   [
     runtime.elements.autoRunGenerationToggle,
     runtime.elements.autoGenerationScoreThresholdInput,
@@ -41,7 +59,11 @@ function updateAutomationUi() {
   runtime.syncFormControl(runtime.elements.autoBuySpeedToggle, runtime.state.autoBuySpeed);
   runtime.syncFormControl(runtime.elements.autoBuyVertexToggle, runtime.state.autoBuyVertex);
   runtime.syncFormControl(runtime.elements.autoBuyGainToggle, runtime.state.autoBuyGain);
-  if (runtime.elements.autoCompleteChallengesToggle) runtime.syncFormControl(runtime.elements.autoCompleteChallengesToggle, runtime.state.autoCompleteChallenges);
+  if (runtime.elements.autoBuyInfinityUpgradesToggle) runtime.syncFormControl(runtime.elements.autoBuyInfinityUpgradesToggle, runtime.state.autoBuyInfinityUpgrades);
+  runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleSpeedToggle, runtime.state.autoBuyInfiniteAngleSpeed);
+  runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleVertexToggle, runtime.state.autoBuyInfiniteAngleVertex);
+  runtime.syncFormControl(runtime.elements.autoBuyInfiniteAngleGainToggle, runtime.state.autoBuyInfiniteAngleGain);
+  runtime.syncFormControl(runtime.elements.autoBuildTowerToggle, runtime.state.autoBuildTower);
   if (runtime.elements.autoRunGenerationToggle) runtime.syncFormControl(runtime.elements.autoRunGenerationToggle, runtime.state.autoRunGeneration);
   if (runtime.elements.autoGenerationScoreThresholdInput) runtime.syncFormControl(runtime.elements.autoGenerationScoreThresholdInput, runtime.state.autoGenerationScoreMultiplierThreshold);
   if (runtime.elements.autoGenerationCostThresholdInput) runtime.syncFormControl(runtime.elements.autoGenerationCostThresholdInput, runtime.state.autoGenerationCostMultiplierThreshold);
@@ -62,7 +84,17 @@ function infinityRunListSignature() {
     runtime.state.language,
     runtime.state.numberFormat,
     runtime.state.timeUnit,
-    records.map((record) => `${record.time}:${record.realTime}:${record.scoreLog10}:${record.ipGain}:${record.challenge}`).join(";"),
+    records.map((record) => `${record.time}:${record.realTime}:${record.scoreLog10}:${record.ipGain}:${record.ipGainLog10 ?? ""}:${record.challenge}`).join(";"),
+  ].join("|");
+}
+
+function eternityRunListSignature() {
+  const records = runtime.state.lastEternityRuns;
+  return [
+    runtime.state.language,
+    runtime.state.numberFormat,
+    runtime.state.timeUnit,
+    records.map((record) => `${record.time}:${record.realTime}:${record.infinityCount}`).join(";"),
   ].join("|");
 }
 
@@ -114,7 +146,31 @@ function updateStatisticsUi() {
   runtime.elements.fastestInfinityRealTime.textContent = runtime.state.fastestInfinityRealTime > 0
     ? runtime.formatLongDuration(runtime.state.fastestInfinityRealTime)
     : runtime.t("noInfinityRuns");
+  runtime.elements.currentEternityRunTime.textContent = runtime.formatLongDuration(runtime.state.currentEternityRunTime);
+  runtime.elements.currentEternityRealTime.textContent = runtime.formatLongDuration(runtime.state.currentEternityRealTime);
+  runtime.elements.fastestEternityTime.textContent = runtime.state.fastestEternityTime > 0
+    ? runtime.formatLongDuration(runtime.state.fastestEternityTime)
+    : runtime.t("noEternityRuns");
+  runtime.elements.fastestEternityRealTime.textContent = runtime.state.fastestEternityRealTime > 0
+    ? runtime.formatLongDuration(runtime.state.fastestEternityRealTime)
+    : runtime.t("noEternityRuns");
   updateChallengeTimeLists();
+  const eternitySignature = eternityRunListSignature();
+  if (eternitySignature !== lastEternityRunListSignature) {
+    lastEternityRunListSignature = eternitySignature;
+    runtime.elements.lastEternityRuns.innerHTML = "";
+    if (runtime.state.lastEternityRuns.length === 0) {
+      const row = document.createElement("li");
+      row.textContent = runtime.t("noEternityRuns");
+      runtime.elements.lastEternityRuns.append(row);
+    } else {
+      runtime.state.lastEternityRuns.forEach((record, index) => {
+        const row = document.createElement("li");
+        row.textContent = eternityRunRecordText(record, index);
+        runtime.elements.lastEternityRuns.append(row);
+      });
+    }
+  }
   const signature = infinityRunListSignature();
   if (signature === lastInfinityRunListSignature) return;
   lastInfinityRunListSignature = signature;
@@ -134,4 +190,5 @@ function updateStatisticsUi() {
 
 expose("updateAutomationUi", () => updateAutomationUi);
 expose("infinityRunRecordText", () => infinityRunRecordText);
+expose("eternityRunRecordText", () => eternityRunRecordText);
 expose("updateStatisticsUi", () => updateStatisticsUi);

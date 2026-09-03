@@ -88,8 +88,11 @@ function updateTopBar() {
   if (mode === "resources") {
     if (label) label.textContent = runtime.t("topBarResources");
     const score = runtime.scoreDisplay();
-    const ip = runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10());
-    const ia = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
+    const ip = runtime.formatHeldUiLogNumber(
+      runtime.currentInfinityPointsLog10(),
+      runtime.state.infinityPointsExact,
+    );
+    const ia = runtime.formatHeldUiLogNumber(runtime.currentInfiniteScoreLog10());
     runtime.elements.newsTickerText.textContent = `Score ${score} / IP ${ip} / IA ${ia}`;
     return;
   }
@@ -110,7 +113,7 @@ function updateTopBar() {
         : generationUnlocked
           ? runtime.t("generationUnlocked")
           : runtime.t("generationLocked");
-    runtime.elements.newsTickerText.textContent = `GR ${runtime.state.generationCount} ${generationState} / CB ${runtime.state.coreBoostCount} next ${runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10())} / INF ${infinityState} / ACH ${runtime.achievementCount()}/${runtime.ACHIEVEMENT_COUNT}`;
+    runtime.elements.newsTickerText.textContent = `GR ${runtime.state.generationCount} ${generationState} / CB ${runtime.state.coreBoostCount} next ${runtime.formatUiLogNumber(runtime.coreBoostRequirementLog10())} / INF ${infinityState} / ACH ${runtime.achievementCount()}/${runtime.ACHIEVEMENT_COUNT}`;
     return;
   }
   if (label) label.textContent = runtime.t("topBarNews");

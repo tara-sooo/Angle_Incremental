@@ -16,6 +16,7 @@ import "./ui/render-infinity.js";
 import "./ui/render-achievements.js";
 import "./ui/render-automation.js";
 import "./ui/render-offline-report.js";
+import "./ui/render-help.js";
 import "./ui/render-ui.js";
 import "./systems/angle.js";
 import "./systems/generation.js";
@@ -25,6 +26,7 @@ import "./systems/infinite-angle.js";
 import "./ui/events.js";
 import "./systems/balance.js";
 import "./systems/eternity.js";
+import "./systems/timeline.js";
 
 let autoSaveElapsed = 0;
 let updateCheckElapsed = 0;
@@ -33,6 +35,7 @@ let japaneseFontReady = false;
 let normalAutobuyElapsed = 0;
 let uiUpdateElapsed = 0;
 let activeMainTab = "angle";
+let activeEternitySubtab = "milestone";
 let activeInfinitySubtab = "upgrades";
 let activeChallengeSubtab = "ic";
 let activeStatisticsSubtab = "overview";
@@ -698,6 +701,12 @@ function runAutobuyers() {
     allowVertex: runtime.state.autoBuyVertex,
     allowGain: runtime.state.autoBuyGain,
   });
+  if (runtime.state.autoBuyInfinityUpgrades) {
+    runtime.buyAllInfinityUpgrades({
+      refresh: false,
+      save: false,
+    });
+  }
 }
 
 function shouldAutoRunGeneration() {
@@ -760,7 +769,22 @@ function runLayerAutomation() {
     return true;
   }
 
+  if (runEternityMilestoneEightAutomation()) return true;
   return false;
+}
+
+function runEternityMilestoneEightAutomation() {
+  if (runtime.eternityMilestoneActive?.("8") !== true || !runtime.state.automationEnabled) return false;
+  let changed = false;
+  if (runtime.state.autoBuildTower && runtime.buildTower({ refresh: false, save: false })) changed = true;
+  const purchases = runtime.buyAllInfiniteAngleUpgrades({
+    refresh: false,
+    save: false,
+    allowSpeed: runtime.state.autoBuyInfiniteAngleSpeed,
+    allowVertex: runtime.state.autoBuyInfiniteAngleVertex,
+    allowGain: runtime.state.autoBuyInfiniteAngleGain,
+  });
+  return changed || purchases > 0;
 }
 
 function update(dt, allowOffline = false) {
@@ -768,7 +792,9 @@ function update(dt, allowOffline = false) {
   if (offlineProcessing && !allowOffline) return;
   runtime.state.totalPlayTime += dt;
   runtime.state.currentInfinityRunTime += dt;
+  runtime.state.currentEternityRunTime += dt;
   runtime.state.currentGenerationRunTime += dt;
+  runtime.advanceTimelineRunTime?.(dt);
   runtime.updateChallengeTimers(dt);
   runtime.updateInfiniteAngle(dt);
 
@@ -810,7 +836,6 @@ function update(dt, allowOffline = false) {
     }
   }
   if (runtime.completeTowerChallengeIfReady()) return;
-  if (runtime.completeChallengeIfReady()) return;
   if (runLayerAutomation()) return;
 
   runtime.normalizeVertexProgress();
@@ -845,6 +870,7 @@ function advanceOnlineTime(realSeconds) {
   if (realDt <= 0) return 0;
   runtime.state.totalRealPlayTime += realDt;
   runtime.state.currentInfinityRealTime += realDt;
+  runtime.state.currentEternityRealTime += realDt;
   const gameSeconds = realDt;
 
   runSimulationBatch(() => {
@@ -860,12 +886,29 @@ function advanceOnlineTime(realSeconds) {
 }
 
 function offlineSnapshot() {
+  const state = runtime.state;
+  const generationCount = Math.max(0, Math.floor(Number(state.generationCount) || 0));
+  const coreBoostCount = Math.max(0, Math.floor(Number(state.coreBoostCount) || 0));
+  const infinityCount = Math.max(0, Math.floor(Number(state.infinityCount) || 0));
+  const eternityCount = Math.max(0, Math.floor(Number(state.eternityCount) || 0));
   return {
-    infinityCount: runtime.state.infinityCount,
+    scoreLog10: runtime.currentScoreLog10(),
+    generationCount,
+    coreBoostCount,
+    infinityCount,
     infinityPointsLog10: runtime.currentInfinityPointsLog10(),
+    infinityPointsExact: typeof state.infinityPointsExact === "string" ? state.infinityPointsExact : "",
     infiniteScoreLog10: runtime.currentInfiniteScoreLog10(),
-    timeFlux: runtime.state.timeFlux,
-    totalPlayTime: runtime.state.totalPlayTime,
+    eternityCount,
+    scoreUnlocked: true,
+    generationUnlocked: generationCount > 0
+      || runtime.currentTotalScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE),
+    coreBoostUnlocked: coreBoostCount > 0,
+    infinityUnlocked: infinityCount > 0,
+    infiniteAngleUnlocked: Boolean(state.infiniteAngleUnlocked),
+    eternityUnlocked: eternityCount > 0,
+    timeFlux: state.timeFlux,
+    totalPlayTime: state.totalPlayTime,
   };
 }
 
@@ -908,7 +951,9 @@ function offlineProgressNumericallySafe(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return false;
   if (!Number.isFinite(runtime.state.totalPlayTime + seconds)) return false;
   if (!Number.isFinite(runtime.state.currentInfinityRunTime + seconds)) return false;
+  if (!Number.isFinite(runtime.state.currentEternityRunTime + seconds)) return false;
   if (!Number.isFinite(runtime.state.currentGenerationRunTime + seconds)) return false;
+  if (!Number.isFinite(runtime.state.timelineParallelSecondsSinceIc8Clear + seconds)) return false;
 
   const lapDuration = runtime.lapDuration();
   const vertices = runtime.effectiveVertexCount();
@@ -1032,6 +1077,7 @@ function setSaveConflictLock(locked) {
       || ["exportSaveCodeButton", "copySaveCodeButton", "saveCodeArea", "resetSaveButton"].includes(control.id);
     const navigationControl = [
       "main-tab",
+      "subtab",
       "infinity-subtab",
       "challenge-subtab",
       "statistics-subtab",
@@ -1056,6 +1102,7 @@ function refreshOfflineReportProgress(
   currentTime = monotonicClockNow(),
 ) {
   const current = offlineSnapshot();
+  report.after = current;
   report.infinityCountAfter = current.infinityCount;
   report.infinityPointsAfterLog10 = current.infinityPointsLog10;
   report.infiniteScoreAfterLog10 = current.infiniteScoreLog10;
@@ -1183,6 +1230,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         const startedAt = monotonicClockNow();
         const progressReport = offlineReport = {
           source,
+          processing: true,
+          before,
+          after: before,
           elapsedSeconds: elapsed,
           effectiveElapsedSeconds: simulatedSeconds,
           simulatedSeconds,
@@ -1326,6 +1376,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       : simulatedSeconds;
     offlineReport = {
       source,
+      processing: false,
+      before,
+      after,
       elapsedSeconds: elapsed,
       effectiveElapsedSeconds,
       simulatedSeconds,
@@ -1602,6 +1655,8 @@ function renderGameToText() {
   const totalScoreLog = runtime.currentTotalScoreLog10();
   const generationScoreLog = runtime.currentGenerationScoreLog10();
   const infinityPointsLog = runtime.currentInfinityPointsLog10();
+  const infinityPointGain = runtime.infinityPointGain();
+  const infinityPointGainLog10 = runtime.infinityPointGainLog10();
   const infiniteScoreLog = runtime.currentInfiniteScoreLog10();
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   const infiniteAngleCostLogs = {
@@ -1612,13 +1667,14 @@ function renderGameToText() {
   const currentGainLog = runtime.currentGainLog10();
   const currentCostLogs = runtime.costLogs();
   const gainExpression = runtime.gainExpressionConfig();
+  const timelineEternityRequirement = runtime.timelineEternityRequirement();
   return JSON.stringify({
     coordinateSystem: "canvas pixels, origin top-left, x right, y down",
     score: runtime.scoreDisplay(),
     scoreLog10: Number.isFinite(scoreLog) ? Number(scoreLog.toPrecision(6)) : null,
-    totalScore: runtime.formatUiLogNumber(totalScoreLog),
+    totalScore: runtime.formatHeldUiLogNumber(totalScoreLog),
     totalScoreLog10: Number.isFinite(totalScoreLog) ? Number(totalScoreLog.toPrecision(6)) : null,
-    generationScore: runtime.formatUiLogNumber(generationScoreLog),
+    generationScore: runtime.formatHeldUiLogNumber(generationScoreLog),
     generationScoreLog10: Number.isFinite(generationScoreLog) ? Number(generationScoreLog.toPrecision(6)) : null,
     currentGain: runtime.formatUiLogNumber(currentGainLog),
     currentGainLog10: Number.isFinite(currentGainLog) ? Number(currentGainLog.toPrecision(6)) : null,
@@ -1680,23 +1736,32 @@ function renderGameToText() {
     infinity: {
       canInfinity: runtime.canInfinity(),
       count: runtime.state.infinityCount,
-      points: runtime.formatUiLogNumber(infinityPointsLog),
+      points: runtime.formatHeldUiLogNumber(infinityPointsLog, runtime.state.infinityPointsExact),
       pointsLog10: Number.isFinite(infinityPointsLog) ? Number(infinityPointsLog.toPrecision(6)) : null,
-      pointGain: runtime.infinityPointGain(),
-      infiniteScore: runtime.formatUiLogNumber(infiniteScoreLog),
+      pointGain: infinityPointGainLog10 > runtime.log10Value(Number.MAX_VALUE)
+        ? runtime.formatUiLogNumber(infinityPointGainLog10)
+        : infinityPointGain,
+      pointGainLog10: Number.isFinite(infinityPointGainLog10) ? Number(infinityPointGainLog10.toPrecision(6)) : null,
+      infiniteScore: runtime.formatHeldUiLogNumber(infiniteScoreLog),
       infiniteScoreLog10: Number.isFinite(infiniteScoreLog) ? Number(infiniteScoreLog.toPrecision(6)) : null,
       infiniteAngleBoost: Number(runtime.infiniteAngleBoost().toFixed(2)),
       infiniteAngleBoostLog10: Number.isFinite(infiniteAngleBoostLog10) ? Number(infiniteAngleBoostLog10.toPrecision(6)) : null,
       infiniteAngle: {
         unlocked: runtime.state.infiniteAngleUnlocked,
-        score: runtime.formatUiLogNumber(infiniteScoreLog),
+        score: runtime.formatHeldUiLogNumber(infiniteScoreLog),
         scoreLog10: Number.isFinite(infiniteScoreLog) ? Number(infiniteScoreLog.toPrecision(6)) : null,
         boost: Number(runtime.infiniteAngleBoost().toPrecision(6)),
         boostLog10: Number.isFinite(infiniteAngleBoostLog10) ? Number(infiniteAngleBoostLog10.toPrecision(6)) : null,
         vertices: runtime.infiniteAngleVertexCount(),
-        speedLevel: runtime.state.infiniteAngleSpeedLevel,
-        vertexLevel: runtime.state.infiniteAngleVertexLevel,
-        gainLevel: runtime.state.infiniteAngleGainLevel,
+        purchasedSpeedLevel: runtime.infiniteAnglePurchasedUpgradeLevel("speed"),
+        purchasedVertexLevel: runtime.infiniteAnglePurchasedUpgradeLevel("vertex"),
+        purchasedGainLevel: runtime.infiniteAnglePurchasedUpgradeLevel("gain"),
+        freeSpeedLevel: runtime.infiniteAngleFreeUpgradeLevel("speed"),
+        freeVertexLevel: runtime.infiniteAngleFreeUpgradeLevel("vertex"),
+        freeGainLevel: runtime.infiniteAngleFreeUpgradeLevel("gain"),
+        speedLevel: runtime.infiniteAngleEffectiveUpgradeLevel("speed"),
+        vertexLevel: runtime.infiniteAngleEffectiveUpgradeLevel("vertex"),
+        gainLevel: runtime.infiniteAngleEffectiveUpgradeLevel("gain"),
         currentGain: runtime.formatUiLogNumber(runtime.infiniteAngleCurrentGainLog10()),
         currentGainLog10: Number(runtime.infiniteAngleCurrentGainLog10().toPrecision(6)),
         lapSeconds: Number(runtime.infiniteAngleLapDuration().toPrecision(6)),
@@ -1748,6 +1813,46 @@ function renderGameToText() {
         targetLog10: Number.isFinite(challenge.targetLog10) ? challenge.targetLog10 : null,
       })),
     },
+    timeline: {
+      discovered: runtime.timelineDiscovered(),
+      earnedTf: runtime.timelineEarnedTf(),
+      availableTf: runtime.timelineAvailableTf(),
+      spentTf: runtime.timelineSpentTf(),
+      parallelSecondsSinceIc8Clear: runtime.timelineParallelSecondsSinceIc8Clear(),
+      parallelRawLog10: runtime.timelineParallelRawLog10(),
+      parallelEffectiveLog10: runtime.timelineParallelEffectiveLog10(),
+      ipGainMultiplierLog10: runtime.timelineIpGainMultiplierLog10(),
+      claims: {
+        score: runtime.timelineTrackClaimCount("score"),
+        ip: runtime.timelineTrackClaimCount("ip"),
+        eternity: runtime.timelineTrackClaimCount("eternity"),
+      },
+      nextRequirements: {
+        scoreLog10: runtime.timelineScoreRequirementLog10(),
+        ipLog10: runtime.timelineIpRequirementLog10(),
+        eternity: timelineEternityRequirement?.toString() || null,
+      },
+      canClaim: {
+        score: runtime.canClaimTimelineTf("score"),
+        ip: runtime.canClaimTimelineTf("ip"),
+        eternity: runtime.canClaimTimelineTf("eternity"),
+      },
+      nodes: runtime.timelineNodes().map((node) => {
+        const availability = runtime.timelineNodeAvailability(node.id);
+        return {
+          id: node.id,
+          era: node.era,
+          route: node.route,
+          costTF: node.costTF,
+          prerequisites: node.prerequisites,
+          name: node.name?.[runtime.state.language] || node.name?.en || node.name?.ja || "",
+          canPurchase: availability.canPurchase,
+          state: availability.state,
+          reason: availability.reason,
+        };
+      }),
+      purchasedNodes: runtime.state.timelinePurchasedNodes,
+    },
     achievements: {
       unlocked: runtime.achievementCount(),
       total: runtime.ACHIEVEMENT_COUNT,
@@ -1769,7 +1874,10 @@ function renderGameToText() {
       numberFormat: runtime.state.numberFormat,
       timeUnit: runtime.state.timeUnit,
       showTimeFluxQuickBar: runtime.state.showTimeFluxQuickBar,
+      hiddenTabs: runtime.normalizeHiddenTabs(runtime.state.hiddenTabs),
+      unlockedMainTabs: runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs),
       activeMainTab,
+      activeEternitySubtab,
       activeInfinitySubtab,
       activeChallengeSubtab,
       activeStatisticsSubtab,
@@ -1777,10 +1885,12 @@ function renderGameToText() {
     automation: {
       unlocked: runtime.normalAutomationUnlocked?.() || false,
       layerUnlocked: runtime.infinityAutomationUnlocked?.() || false,
+      infinityUpgradeUnlocked: runtime.infinityUpgradeAutomationUnlocked?.() || false,
       enabled: runtime.state.automationEnabled,
       speed: runtime.state.autoBuySpeed,
       vertex: runtime.state.autoBuyVertex,
       gain: runtime.state.autoBuyGain,
+      infinityUpgrades: runtime.state.autoBuyInfinityUpgrades,
       generation: runtime.state.autoRunGeneration,
       generationScoreMultiplierThreshold: runtime.state.autoGenerationScoreMultiplierThreshold,
       generationCostMultiplierThreshold: runtime.state.autoGenerationCostMultiplierThreshold,
@@ -1803,6 +1913,13 @@ function renderGameToText() {
       fastestInfinityChallengeTimes: runtime.state.fastestInfinityChallengeTimes,
       fastestTowerChallengeTimes: runtime.state.fastestTowerChallengeTimes,
       lastInfinityRuns: runtime.state.lastInfinityRuns,
+      currentEternityRunTime: Number(runtime.state.currentEternityRunTime.toFixed(1)),
+      currentEternityRealTime: Number(runtime.state.currentEternityRealTime.toFixed(1)),
+      fastestEternityTime: runtime.state.fastestEternityTime > 0 ? Number(runtime.state.fastestEternityTime.toFixed(1)) : null,
+      fastestEternityRealTime: runtime.state.fastestEternityRealTime > 0
+        ? Number(runtime.state.fastestEternityRealTime.toFixed(1))
+        : null,
+      lastEternityRuns: runtime.state.lastEternityRuns,
     },
     timeFlux: {
       dormant: true,
@@ -1827,6 +1944,7 @@ async function initializeGame() {
   runtime.createAchievementRows();
   await runtime.loadGame();
   runtime.switchMainTab(activeMainTab);
+  runtime.switchEternitySubtab(activeEternitySubtab);
   runtime.switchInfinitySubtab(activeInfinitySubtab);
   runtime.switchChallengeSubtab(activeChallengeSubtab);
   runtime.switchStatisticsSubtab(activeStatisticsSubtab);
@@ -1855,6 +1973,7 @@ expose("japaneseFontReady", () => japaneseFontReady, (value) => { japaneseFontRe
 expose("normalAutobuyElapsed", () => normalAutobuyElapsed, (value) => { normalAutobuyElapsed = value; });
 expose("uiUpdateElapsed", () => uiUpdateElapsed, (value) => { uiUpdateElapsed = value; });
 expose("activeMainTab", () => activeMainTab, (value) => { activeMainTab = value; });
+expose("activeEternitySubtab", () => activeEternitySubtab, (value) => { activeEternitySubtab = value; });
 expose("activeInfinitySubtab", () => activeInfinitySubtab, (value) => { activeInfinitySubtab = value; });
 expose("activeChallengeSubtab", () => activeChallengeSubtab, (value) => { activeChallengeSubtab = value; });
 expose("activeStatisticsSubtab", () => activeStatisticsSubtab, (value) => { activeStatisticsSubtab = value; });
@@ -1894,6 +2013,7 @@ expose("checkForRemoteUpdate", () => checkForRemoteUpdate, (value) => { checkFor
 expose("runAutobuyers", () => runAutobuyers, (value) => { runAutobuyers = value; });
 expose("shouldAutoRunGeneration", () => shouldAutoRunGeneration, (value) => { shouldAutoRunGeneration = value; });
 expose("runLayerAutomation", () => runLayerAutomation, (value) => { runLayerAutomation = value; });
+expose("runEternityMilestoneEightAutomation", () => runEternityMilestoneEightAutomation);
 expose("update", () => update, (value) => { update = value; });
 expose("advanceOnlineTime", () => advanceOnlineTime, (value) => { advanceOnlineTime = value; });
 expose("processOfflineElapsed", () => processOfflineElapsed, (value) => { processOfflineElapsed = value; });
@@ -1927,9 +2047,28 @@ window.__angleDebug = {
   runInfinity: runtime.runInfinity,
   canEternity: runtime.canEternity,
   performEternity: runtime.performEternity,
+  claimTimelineTf: runtime.claimTimelineTf,
+  claimScoreTf: runtime.claimScoreTf,
+  claimIpTf: runtime.claimIpTf,
+  claimEternityTf: runtime.claimEternityTf,
+  canClaimTimelineTf: runtime.canClaimTimelineTf,
+  timelineEarnedTf: runtime.timelineEarnedTf,
+  timelineAvailableTf: runtime.timelineAvailableTf,
+  timelineSpentTf: runtime.timelineSpentTf,
+  timelineParallelSecondsSinceIc8Clear: runtime.timelineParallelSecondsSinceIc8Clear,
+  timelineParallelRawLog10: runtime.timelineParallelRawLog10,
+  timelineParallelEffectiveLog10: runtime.timelineParallelEffectiveLog10,
+  timelineIpGainMultiplierLog10: runtime.timelineIpGainMultiplierLog10,
+  advanceTimelineRunTime: runtime.advanceTimelineRunTime,
+  timelineNodes: runtime.timelineNodes,
+  timelineNodeAvailability: runtime.timelineNodeAvailability,
+  canPurchaseTimelineNode: runtime.canPurchaseTimelineNode,
+  purchaseTimelineNode: runtime.purchaseTimelineNode,
+  respecTimeline: runtime.respecTimeline,
   maybeForceEternity: runtime.maybeForceEternity,
   selectEternityMilestone: runtime.selectEternityMilestone,
   buyInfinityUpgrade: runtime.buyInfinityUpgrade,
+  buyAllInfinityUpgrades: runtime.buyAllInfinityUpgrades,
   buyAllUpgrades: runtime.buyAllUpgrades,
   generationRewardFor: runtime.generationRewardFor,
   generationScoreMultiplierEffectLog10: runtime.generationScoreMultiplierEffectLog10,
@@ -1941,6 +2080,10 @@ window.__angleDebug = {
   breakInfiniteCap: runtime.breakInfiniteCap,
   checkAchievements: runtime.checkAchievements,
   switchMainTab: runtime.switchMainTab,
+  switchEternitySubtab: runtime.switchEternitySubtab,
+  mainTabIsUnlocked: runtime.mainTabIsUnlocked,
+  mainTabIsVisible: runtime.mainTabIsVisible,
+  setMainTabVisibility: runtime.setMainTabVisibility,
   switchInfinitySubtab: runtime.switchInfinitySubtab,
   switchChallengeSubtab: runtime.switchChallengeSubtab,
   switchStatisticsSubtab: runtime.switchStatisticsSubtab,
@@ -1965,7 +2108,6 @@ window.__angleDebug = {
   resetSave: runtime.resetSave,
   exportSaveCode: runtime.exportSaveCode,
   importSaveCode: runtime.importSaveCode,
-  completeChallengeIfReady: runtime.completeChallengeIfReady,
   syncServerClock,
   offlineElapsedFromSave,
   renderQualityState,

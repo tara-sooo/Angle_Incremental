@@ -143,7 +143,7 @@ const ACHIEVEMENTS = [
     isUnlocked: () => runtime.hasInfinityUpgrade("7-1") && runtime.hasInfinityUpgrade("7-2"),
   },
   {
-    title: { ja: "以前はlog10(score)-307でした", en: "It Used to Be log10(score)-307" },
+    title: { ja: "かつてのスコア上限", en: "The Former Score Cap" },
     condition: { ja: "IU9-1を購入", en: "Buy IU 9-1." },
     reward: { ja: "", en: "" },
     isUnlocked: () => runtime.hasInfinityUpgrade("9-1"),

@@ -60,6 +60,7 @@ async function exportSaveCode() {
   };
   const code = `${runtime.SAVE_CODE_PREFIX}${bytesToBase64Url(encoder.encode(JSON.stringify(envelope)))}`;
   if (runtime.elements.saveCodeArea) runtime.elements.saveCodeArea.value = code;
+  if (runtime.elements.saveCodeDetails) runtime.elements.saveCodeDetails.open = true;
   runtime.setSaveStatus(runtime.t("saveCodeExported"));
   return code;
 }
@@ -117,7 +118,13 @@ async function importSaveCode(code) {
 }
 
 async function importSaveCodeFromUi() {
-  const ok = await importSaveCode(runtime.elements.saveCodeArea ? runtime.elements.saveCodeArea.value : "");
+  const area = runtime.elements.saveCodeArea;
+  if (area && !area.value.trim()) {
+    if (runtime.elements.saveCodeDetails) runtime.elements.saveCodeDetails.open = true;
+    area.focus();
+    return;
+  }
+  const ok = await importSaveCode(area ? area.value : "");
   if (!ok) runtime.updateUi();
 }
 

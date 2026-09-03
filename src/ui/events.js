@@ -5,10 +5,114 @@ import "./render-eternity.js?v=0.12.2";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
+const MAIN_TAB_UNLOCKS = Object.freeze({
+  angle: () => true,
+  infinity: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("infinity"),
+  eternity: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("eternity"),
+  challenges: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("challenges"),
+  automation: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("automation"),
+  statistics: () => true,
+  achievements: () => true,
+  help: () => true,
+  settings: () => true,
+});
+
+let mainTabVisibilitySignature = "";
+let helpContextMainTab = "angle";
+
+function hasPositiveValue(values) {
+  return Array.isArray(values) && values.some((value) => Number(value) > 0);
+}
+
+function discoverMainTabs() {
+  const state = runtime.state;
+  const discovered = [];
+  if (state.eternityCount > 0 || state.infinityCount > 0) discovered.push("infinity");
+  if (
+    state.eternityCount > 0
+    || runtime.infinityChallengesUnlocked?.() === true
+    || state.activeChallenge > 0
+    || state.completedChallenges !== 0
+    || hasPositiveValue(state.fastestInfinityChallengeTimes)
+  ) discovered.push("challenges");
+  if (
+    state.eternityCount > 0
+    || runtime.normalAutomationUnlocked?.() === true
+    || runtime.isAchievementUnlocked?.(19) === true
+    || runtime.infinityAutomationUnlocked?.() === true
+    || runtime.infinityUpgradeAutomationUnlocked?.() === true
+    || runtime.eternityMilestoneActive?.("8") === true
+  ) discovered.push("automation");
+  if (state.eternityCount > 0 || runtime.towerChallengeUnlocked?.(4) === true) discovered.push("eternity");
+  if (state.eternityCount > 0) discovered.push("timeline");
+  return runtime.markMainTabsUnlocked(discovered) === true;
+}
+
+function mainTabIsUnlocked(tab) {
+  return Boolean(MAIN_TAB_UNLOCKS[tab]?.());
+}
+
+function mainTabIsVisible(tab) {
+  if (tab === "settings") return true;
+  return mainTabIsUnlocked(tab) && !runtime.normalizeHiddenTabs(runtime.state.hiddenTabs).includes(tab);
+}
+
+function setMainTabVisibility(tab, visible) {
+  if (tab === "settings" || !mainTabIsUnlocked(tab)) return;
+  const hiddenTabs = new Set(runtime.normalizeHiddenTabs(runtime.state.hiddenTabs));
+  if (visible) hiddenTabs.delete(tab);
+  else hiddenTabs.add(tab);
+  runtime.state.hiddenTabs = runtime.normalizeHiddenTabs([...hiddenTabs]);
+  runtime.updateUi();
+  runtime.draw();
+  runtime.saveGame("manual");
+}
+
+function updateMainTabVisibility() {
+  const tabStates = runtime.MAIN_TAB_IDS.map((tab) => `${tab}:${mainTabIsUnlocked(tab) ? 1 : 0}:${mainTabIsVisible(tab) ? 1 : 0}`);
+  const signature = tabStates.join("|");
+  runtime.elements.mainTabs.forEach((button) => {
+    const tab = button.dataset.tab;
+    button.setAttribute("role", "tab");
+    const unlocked = mainTabIsUnlocked(tab);
+    button.hidden = !mainTabIsVisible(tab);
+    button.tabIndex = button.hidden ? -1 : 0;
+    button.dataset.unlocked = String(unlocked);
+  });
+  if (signature === mainTabVisibilitySignature || !runtime.elements.tabVisibilityList) return;
+  mainTabVisibilitySignature = signature;
+  while (runtime.elements.tabVisibilityList.firstChild) {
+    runtime.elements.tabVisibilityList.removeChild(runtime.elements.tabVisibilityList.firstChild);
+  }
+  runtime.elements.mainTabs.forEach((button) => {
+    const tab = button.dataset.tab;
+    const unlocked = mainTabIsUnlocked(tab);
+    const row = document.createElement("label");
+    row.className = "setting-row tab-visibility-row";
+    const label = document.createElement("span");
+    label.textContent = button.querySelector(".tab-code")?.textContent?.trim() || tab;
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = mainTabIsVisible(tab);
+    input.disabled = tab === "settings" || !unlocked;
+    input.dataset.mainTabVisibility = tab;
+    input.setAttribute("aria-label", label.textContent);
+    input.addEventListener("change", () => setMainTabVisibility(tab, input.checked));
+    row.append(label, input);
+    runtime.elements.tabVisibilityList.append(row);
+  });
+}
+
 function switchMainTab(tab) {
+  if (tab === "help" && runtime.activeMainTab !== "help") {
+    helpContextMainTab = runtime.activeMainTab || "angle";
+  } else if (tab !== "help") {
+    helpContextMainTab = tab;
+  }
   runtime.activeMainTab = tab;
   runtime.elements.mainTabs.forEach((button) => {
     const active = button.dataset.tab === runtime.activeMainTab;
+    button.setAttribute("role", "tab");
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
@@ -19,10 +123,27 @@ function switchMainTab(tab) {
   runtime.resizeInfiniteAngleCanvas();
 }
 
+function switchEternitySubtab(tab) {
+  const nextTab = tab === "timeline" ? "timeline" : "milestone";
+  runtime.activeEternitySubtab = nextTab;
+  (runtime.elements.eternitySubtabs || []).forEach((button) => {
+    const active = button.dataset.eternityTab === nextTab;
+    button.setAttribute("role", "tab");
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  (runtime.elements.eternitySubpanels || []).forEach((panel) => {
+    const active = panel.dataset.eternityPanel === nextTab;
+    panel.classList.toggle("is-active", active);
+    panel.hidden = !active;
+  });
+}
+
 function switchInfinitySubtab(tab) {
   runtime.activeInfinitySubtab = tab;
   runtime.elements.infinitySubtabs.forEach((button) => {
     const active = button.dataset.infinityTab === runtime.activeInfinitySubtab;
+    button.setAttribute("role", "tab");
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
@@ -36,6 +157,7 @@ function switchChallengeSubtab(tab) {
   runtime.activeChallengeSubtab = tab;
   runtime.elements.challengeSubtabs.forEach((button) => {
     const active = button.dataset.challengeTab === runtime.activeChallengeSubtab;
+    button.setAttribute("role", "tab");
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
@@ -48,6 +170,7 @@ function switchStatisticsSubtab(tab) {
   runtime.activeStatisticsSubtab = tab;
   runtime.elements.statisticsSubtabs.forEach((button) => {
     const active = button.dataset.statisticsTab === runtime.activeStatisticsSubtab;
+    button.setAttribute("role", "tab");
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
@@ -79,7 +202,6 @@ function applySetting(key, value) {
   if (key === "showFloatingText" && !value) runtime.state.floatingTexts = [];
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
   if (key === "showFps") runtime.state.showFps = Boolean(value);
-  if (key === "autoCompleteChallenges") runtime.state.autoCompleteChallenges = Boolean(value);
   if (key === "autoGenerationScoreMultiplierThreshold") {
     runtime.state.autoGenerationScoreMultiplierThreshold = Math.max(0, Number(value) || 0);
     runtime.state.autoGenerationLegacyOrMode = false;
@@ -131,8 +253,29 @@ function bindEvents() {
   runtime.elements.infiniteAngleSpeedUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("speed"));
   runtime.elements.infiniteAngleVertexUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("vertex"));
   runtime.elements.infiniteAngleGainUpgrade.addEventListener("click", () => runtime.buyInfiniteAngleUpgrade("gain"));
+  runtime.elements.tc4UpgradeList?.addEventListener("click", (event) => {
+    const button = event.target?.closest?.("button[data-tc4-upgrade]");
+    if (!button || !runtime.elements.tc4UpgradeList.contains(button)) return;
+    runtime.buyTowerChallenge4Upgrade(button.dataset.tc4Upgrade);
+  });
   runtime.elements.towerBuildButton.addEventListener("click", runtime.buildTower);
   runtime.elements.breakCapButton.addEventListener("click", runtime.breakInfiniteCap);
+  runtime.elements.timelineScoreClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("score"));
+  runtime.elements.timelineIpClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("ip"));
+  runtime.elements.timelineEternityClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("eternity"));
+  runtime.elements.timelineTree?.addEventListener("click", (event) => {
+    const nodeButton = event.target?.closest?.(".timeline-node[data-timeline-node]");
+    if (!nodeButton || !runtime.elements.timelineTree.contains(nodeButton)) return;
+    runtime.selectTimelineNode?.(nodeButton.dataset.timelineNode);
+  });
+  runtime.elements.timelineNodePurchaseButton?.addEventListener("click", () => {
+    const nodeId = runtime.elements.timelineNodePurchaseButton.dataset.timelineNodePurchase;
+    if (nodeId) runtime.purchaseTimelineNode?.(nodeId);
+  });
+  runtime.elements.timelineRespecButton?.addEventListener("click", () => {
+    if (typeof window.confirm === "function" && !window.confirm(runtime.t("timelineRespecConfirm"))) return;
+    runtime.respecTimeline?.();
+  });
   runtime.elements.offlineTickInput.addEventListener("change", () => applySetting(
     "offlineTickCount",
     runtime.elements.offlineTickInput.value,
@@ -148,6 +291,9 @@ function bindEvents() {
   runtime.elements.resetSaveButton.addEventListener("click", runtime.resetSave);
   runtime.elements.mainTabs.forEach((button) => {
     button.addEventListener("click", () => switchMainTab(button.dataset.tab));
+  });
+  runtime.elements.eternitySubtabs?.forEach((button) => {
+    button.addEventListener("click", () => switchEternitySubtab(button.dataset.eternityTab));
   });
   runtime.elements.infinitySubtabs.forEach((button) => {
     button.addEventListener("click", () => switchInfinitySubtab(button.dataset.infinityTab));
@@ -165,7 +311,11 @@ function bindEvents() {
   runtime.elements.autoBuySpeedToggle.addEventListener("change", () => applySetting("autoBuySpeed", runtime.elements.autoBuySpeedToggle.checked));
   runtime.elements.autoBuyVertexToggle.addEventListener("change", () => applySetting("autoBuyVertex", runtime.elements.autoBuyVertexToggle.checked));
   runtime.elements.autoBuyGainToggle.addEventListener("change", () => applySetting("autoBuyGain", runtime.elements.autoBuyGainToggle.checked));
-  if (runtime.elements.autoCompleteChallengesToggle) runtime.elements.autoCompleteChallengesToggle.addEventListener("change", () => applySetting("autoCompleteChallenges", runtime.elements.autoCompleteChallengesToggle.checked));
+  if (runtime.elements.autoBuyInfinityUpgradesToggle) runtime.elements.autoBuyInfinityUpgradesToggle.addEventListener("change", () => applySetting("autoBuyInfinityUpgrades", runtime.elements.autoBuyInfinityUpgradesToggle.checked));
+  if (runtime.elements.autoBuyInfiniteAngleSpeedToggle) runtime.elements.autoBuyInfiniteAngleSpeedToggle.addEventListener("change", () => applySetting("autoBuyInfiniteAngleSpeed", runtime.elements.autoBuyInfiniteAngleSpeedToggle.checked));
+  if (runtime.elements.autoBuyInfiniteAngleVertexToggle) runtime.elements.autoBuyInfiniteAngleVertexToggle.addEventListener("change", () => applySetting("autoBuyInfiniteAngleVertex", runtime.elements.autoBuyInfiniteAngleVertexToggle.checked));
+  if (runtime.elements.autoBuyInfiniteAngleGainToggle) runtime.elements.autoBuyInfiniteAngleGainToggle.addEventListener("change", () => applySetting("autoBuyInfiniteAngleGain", runtime.elements.autoBuyInfiniteAngleGainToggle.checked));
+  if (runtime.elements.autoBuildTowerToggle) runtime.elements.autoBuildTowerToggle.addEventListener("change", () => applySetting("autoBuildTower", runtime.elements.autoBuildTowerToggle.checked));
   if (runtime.elements.autoRunGenerationToggle) runtime.elements.autoRunGenerationToggle.addEventListener("change", () => applySetting("autoRunGeneration", runtime.elements.autoRunGenerationToggle.checked));
   if (runtime.elements.autoGenerationScoreThresholdInput) runtime.elements.autoGenerationScoreThresholdInput.addEventListener("change", () => applySetting("autoGenerationScoreMultiplierThreshold", runtime.elements.autoGenerationScoreThresholdInput.value));
   if (runtime.elements.autoGenerationCostThresholdInput) runtime.elements.autoGenerationCostThresholdInput.addEventListener("change", () => applySetting("autoGenerationCostMultiplierThreshold", runtime.elements.autoGenerationCostThresholdInput.value));
@@ -236,9 +386,16 @@ function bindEvents() {
   });
 }
 expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
+expose("switchEternitySubtab", () => switchEternitySubtab, (value) => { switchEternitySubtab = value; });
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
 expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
 expose("switchStatisticsSubtab", () => switchStatisticsSubtab, (value) => { switchStatisticsSubtab = value; });
+expose("helpContextMainTab", () => helpContextMainTab, (value) => { helpContextMainTab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
+expose("mainTabIsUnlocked", () => mainTabIsUnlocked);
+expose("mainTabIsVisible", () => mainTabIsVisible);
+expose("setMainTabVisibility", () => setMainTabVisibility);
+expose("discoverMainTabs", () => discoverMainTabs);
+expose("updateMainTabVisibility", () => updateMainTabVisibility);
 expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
 expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });

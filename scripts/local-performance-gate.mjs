@@ -17,6 +17,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const performanceReportName = path.join("output", "performance-smoke.json");
 const gateReportPath = path.join(repoRoot, "output", "local-performance-gate.json");
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const localPerformanceCommand = ["run", "test:performance"];
 const legacyQualityMarkers = [
   "rebuilt the static cache",
   "geometry change",
@@ -66,15 +67,33 @@ function splitViolations(report) {
   return { budgetViolations, qualityViolations };
 }
 
-function collectFailingScenarioP95(report) {
+export function collectTimingMeasurements(report) {
   const budgets = report.budgets || {};
-  const failures = [];
-  for (const result of report.results || []) {
+  const measurements = [];
+  const addMeasurement = (scenario, metric, p95Ms, budgetMs) => {
+    measurements.push({
+      scenario,
+      metric,
+      p95Ms: Number.isFinite(p95Ms) ? p95Ms : null,
+      budgetMs: Number.isFinite(budgetMs) ? budgetMs : null,
+    });
+  };
+  const simulationResults = report.simulationResults || report.results || [];
+  const renderResults = report.renderResults || report.results || [];
+  for (const result of simulationResults) {
     for (const scenario of result.scenarios || []) {
       const prefix = `${result.viewport.name}/DPR${result.deviceScaleFactor}`;
       const metrics = [
         [`${prefix}/angle/${scenario.vertices}`, "simulation", scenario.angle?.simulation?.p95Ms, budgets.simulationP95Ms],
         [`${prefix}/infinite-angle/${scenario.vertices}`, "simulation", scenario.infiniteAngle?.simulation?.p95Ms, budgets.simulationP95Ms],
+      ];
+      for (const [scenarioName, metric, p95Ms, budgetMs] of metrics) addMeasurement(scenarioName, metric, p95Ms, budgetMs);
+    }
+  }
+  for (const result of renderResults) {
+    for (const scenario of result.scenarios || []) {
+      const prefix = `${result.viewport.name}/DPR${result.deviceScaleFactor}`;
+      const metrics = [
         [
           `${prefix}/angle/${scenario.vertices}`,
           "frame",
@@ -83,14 +102,26 @@ function collectFailingScenarioP95(report) {
         ],
         [`${prefix}/infinite-angle/${scenario.vertices}`, "frame", scenario.infiniteAngle?.frame?.p95Ms, budgets.highLoadFrameP95Ms],
       ];
-      for (const [scenarioName, metric, p95Ms, budgetMs] of metrics) {
-        if (Number.isFinite(p95Ms) && Number.isFinite(budgetMs) && p95Ms > budgetMs) {
-          failures.push({ scenario: scenarioName, metric, p95Ms, budgetMs });
-        }
-      }
+      for (const [scenarioName, metric, p95Ms, budgetMs] of metrics) addMeasurement(scenarioName, metric, p95Ms, budgetMs);
     }
   }
-  return failures;
+  return measurements;
+}
+
+function collectFailingScenarioP95(report) {
+  return collectTimingMeasurements(report).filter(({ p95Ms, budgetMs }) => (
+    Number.isFinite(p95Ms) && Number.isFinite(budgetMs) && p95Ms > budgetMs
+  ));
+}
+
+function assertFocusedTimingSurface(report) {
+  const matrixKeys = Object.keys(report.matrix || {}).sort();
+  if (matrixKeys.join(",") !== "rendering,simulation") {
+    throw new Error(`unexpected local comparison matrix: ${matrixKeys.join(",") || "missing"}`);
+  }
+  if (report.offlineStress || report.offlineResults || report.researchResults) {
+    throw new Error("local comparison report includes a non-timing validation surface");
+  }
 }
 
 function readPerformanceReport(cwd) {
@@ -102,21 +133,32 @@ function readPerformanceReport(cwd) {
   } catch (error) {
     throw new Error(`invalid performance report: ${error.message}`);
   }
-  if (!Array.isArray(report.results)) throw new Error(`invalid performance report results: ${reportPath}`);
+  if (!Array.isArray(report.simulationResults || report.results)
+    || !Array.isArray(report.renderResults || report.results)) {
+    throw new Error(`invalid performance report results: ${reportPath}`);
+  }
+  assertFocusedTimingSurface(report);
   const { budgetViolations, qualityViolations } = splitViolations(report);
   return {
     status: report.status,
     budgetViolations,
     qualityViolations,
     violationKeys: budgetViolations.map(budgetViolationKey),
+    timingMeasurements: collectTimingMeasurements(report),
     failingScenarioP95: collectFailingScenarioP95(report),
   };
 }
 
-function measure(cwd, role, index) {
+function assertCandidateHead(cwd, expectedSha) {
+  if (git(["rev-parse", "HEAD"], cwd) !== expectedSha) throw new Error("candidate HEAD changed during performance measurement");
+}
+
+function measure(cwd, role, index, expectedCandidateSha = null) {
   const reportPath = path.join(cwd, performanceReportName);
   rmSync(reportPath, { force: true });
-  const exitCode = runCommand(npmCommand, ["run", "test:performance"], cwd);
+  if (role === "candidate") assertCandidateHead(cwd, expectedCandidateSha);
+  const exitCode = runCommand(npmCommand, localPerformanceCommand, cwd);
+  if (role === "candidate") assertCandidateHead(cwd, expectedCandidateSha);
   const report = readPerformanceReport(cwd);
   if (report.status !== "passed" && report.budgetViolations.length === 0 && report.qualityViolations.length === 0) {
     throw new Error(`${role} performance report failed without a classified violation`);
@@ -132,11 +174,11 @@ export function classifyRuns(candidateRuns, baselineRuns) {
   if (candidateRuns.length !== RUN_COUNT || baselineRuns.length !== RUN_COUNT) {
     throw new Error(`expected ${RUN_COUNT} candidate and baseline runs`);
   }
-  const allKeys = new Set(candidateRuns.flatMap((run) => [...violationKeys(run)]));
+  const allKeys = new Set([...candidateRuns, ...baselineRuns].flatMap((run) => [...violationKeys(run)]));
   const hasCandidateFailure = candidateRuns.some((run) => violationKeys(run).size > 0);
-  const baselineIsClean = baselineRuns.every((run) => violationKeys(run).size === 0);
   const candidateOnlyFailures = [...allKeys].filter((key) => (
-    candidateRuns.every((run) => violationKeys(run).has(key)) && baselineIsClean
+    candidateRuns.every((run) => violationKeys(run).has(key))
+      && baselineRuns.every((run) => !violationKeys(run).has(key))
   ));
   const sharedFailures = [...allKeys].filter((key) => (
     candidateRuns.every((run) => violationKeys(run).has(key))
@@ -147,7 +189,7 @@ export function classifyRuns(candidateRuns, baselineRuns) {
   if (candidateOnlyFailures.length > 0) {
     return {
       classification: "local-performance-regression",
-      reason: "the same candidate-only timing failure repeated in all three candidate runs",
+      reason: "the same candidate-only timing failure repeated in all three candidate runs and was absent from every trusted-base run",
       candidateOnlyFailures,
       sharedFailures,
       movingFailures,
@@ -194,6 +236,7 @@ function writeGateReport(report) {
 function gateReport({ candidateSha, branch, baseSha, candidateRuns, baselineRuns, decision }) {
   return {
     generatedAt: new Date().toISOString(),
+    timingSurface: "npm run test:performance (focused timing matrix from #219)",
     classification: decision.classification,
     reason: decision.reason,
     candidateSha,
@@ -225,10 +268,11 @@ function assertTimingOnly(runs) {
 function main() {
   const branch = git(["branch", "--show-current"]);
   const candidateSha = git(["rev-parse", "HEAD"]);
-  const candidateRuns = [measure(repoRoot, "candidate", 1)];
+  const candidateRuns = [measure(repoRoot, "candidate", 1, candidateSha)];
   const baselineRuns = [];
 
   if (candidateRuns[0].qualityViolations.length > 0 || candidateRuns[0].budgetViolations.length === 0) {
+    assertCandidateHead(repoRoot, candidateSha);
     assertTimingOnly(candidateRuns);
     if (candidateRuns[0].exitCode !== 0) throw new Error("candidate performance smoke failed without a comparable timing failure");
     const decision = classifyRuns(
@@ -261,7 +305,7 @@ function main() {
     if (runCommand(npmCommand, ["ci"], baselineRoot) !== 0) throw new Error("trusted-base npm ci failed");
     for (let index = 2; index <= RUN_COUNT; index += 1) {
       baselineRuns.push(measure(baselineRoot, "baseline", index - 1));
-      candidateRuns.push(measure(repoRoot, "candidate", index));
+      candidateRuns.push(measure(repoRoot, "candidate", index, candidateSha));
     }
     baselineRuns.push(measure(baselineRoot, "baseline", RUN_COUNT));
   } finally {
@@ -271,6 +315,7 @@ function main() {
     rmSync(tempRoot, { recursive: true, force: true });
   }
 
+  assertCandidateHead(repoRoot, candidateSha);
   assertTimingOnly([...candidateRuns, ...baselineRuns]);
   const decision = classifyRuns(candidateRuns, baselineRuns);
   const report = gateReport({ candidateSha, branch, baseSha, candidateRuns, baselineRuns, decision });

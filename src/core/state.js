@@ -2,6 +2,49 @@ import { runtime, expose } from "../runtime/shared.js";
 
 // Mutable game state and the serialized-field schema.
 
+const MAIN_TAB_IDS = Object.freeze([
+  "angle",
+  "infinity",
+  "eternity",
+  "challenges",
+  "automation",
+  "statistics",
+  "achievements",
+  "help",
+  "settings",
+]);
+
+const MAIN_TAB_DISCOVERY_IDS = Object.freeze([
+  "infinity",
+  "challenges",
+  "automation",
+  "eternity",
+  // Legacy Timeline discovery remains part of the save schema for nested access.
+  "timeline",
+]);
+
+function normalizeHiddenTabs(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((tab) => MAIN_TAB_IDS.includes(tab) && tab !== "settings"))];
+}
+
+function normalizeUnlockedMainTabs(value) {
+  const source = new Set(Array.isArray(value) ? value : []);
+  if (source.has("timeline")) source.add("eternity");
+  return MAIN_TAB_DISCOVERY_IDS.filter((tab) => source.has(tab));
+}
+
+function markMainTabsUnlocked(tabs) {
+  const current = normalizeUnlockedMainTabs(state.unlockedMainTabs);
+  const next = normalizeUnlockedMainTabs([
+    ...current,
+    ...(Array.isArray(tabs) ? tabs : [tabs]),
+  ]);
+  if (next.length === current.length && next.every((tab, index) => tab === current[index])) return false;
+  state.unlockedMainTabs = next;
+  return true;
+}
+
 const state = {
   score: 0,
   scoreLog10: -Infinity,
@@ -27,6 +70,11 @@ const state = {
   coreBoostCount: 0,
   infinityCount: 0,
   eternityCount: 0,
+  scoreTfClaims: 0,
+  ipTfClaims: 0,
+  eternityTfClaims: 0,
+  timelinePurchasedNodes: [],
+  timelineParallelSecondsSinceIc8Clear: 0,
   eternityMilestoneMask: 0,
   eternityMilestoneChoice: "",
   infinityPoints: 0,
@@ -72,6 +120,11 @@ const state = {
   fastestInfinityTime: 0,
   fastestInfinityRealTime: 0,
   lastInfinityRuns: [],
+  currentEternityRunTime: 0,
+  currentEternityRealTime: 0,
+  fastestEternityTime: 0,
+  fastestEternityRealTime: 0,
+  lastEternityRuns: [],
   bestInfinityCountPerSecond: 0,
   infinityCountRateRemainder: 0,
   offlineProgressEnabled: true,
@@ -85,7 +138,11 @@ const state = {
   autoBuySpeed: true,
   autoBuyVertex: true,
   autoBuyGain: true,
-  autoCompleteChallenges: false,
+  autoBuyInfinityUpgrades: false,
+  autoBuyInfiniteAngleSpeed: false,
+  autoBuyInfiniteAngleVertex: false,
+  autoBuyInfiniteAngleGain: false,
+  autoBuildTower: false,
   autoRunGeneration: false,
   autoGenerationScoreMultiplierThreshold: 2,
   autoGenerationCostMultiplierThreshold: 1,
@@ -108,6 +165,8 @@ const state = {
   timeUnit: "auto",
   topBarMode: "news",
   showTimeFluxQuickBar: true,
+  hiddenTabs: [],
+  unlockedMainTabs: [],
   floatingTexts: [],
   lastEarned: 0,
   lastEarnedLog10: -Infinity,
@@ -138,6 +197,11 @@ const SAVE_FIELDS = [
   "coreBoostCount",
   "infinityCount",
   "eternityCount",
+  "scoreTfClaims",
+  "ipTfClaims",
+  "eternityTfClaims",
+  "timelinePurchasedNodes",
+  "timelineParallelSecondsSinceIc8Clear",
   "eternityMilestoneMask",
   "eternityMilestoneChoice",
   "infinityPoints",
@@ -183,6 +247,11 @@ const SAVE_FIELDS = [
   "fastestInfinityTime",
   "fastestInfinityRealTime",
   "lastInfinityRuns",
+  "currentEternityRunTime",
+  "currentEternityRealTime",
+  "fastestEternityTime",
+  "fastestEternityRealTime",
+  "lastEternityRuns",
   "bestInfinityCountPerSecond",
   "infinityCountRateRemainder",
   "offlineProgressEnabled",
@@ -196,7 +265,11 @@ const SAVE_FIELDS = [
   "autoBuySpeed",
   "autoBuyVertex",
   "autoBuyGain",
-  "autoCompleteChallenges",
+  "autoBuyInfinityUpgrades",
+  "autoBuyInfiniteAngleSpeed",
+  "autoBuyInfiniteAngleVertex",
+  "autoBuyInfiniteAngleGain",
+  "autoBuildTower",
   "autoRunGeneration",
   "autoGenerationScoreMultiplierThreshold",
   "autoGenerationCostMultiplierThreshold",
@@ -219,6 +292,8 @@ const SAVE_FIELDS = [
   "timeUnit",
   "topBarMode",
   "showTimeFluxQuickBar",
+  "hiddenTabs",
+  "unlockedMainTabs",
   "lastEarned",
   "lastEarnedLog10",
 ];
@@ -228,4 +303,9 @@ function normalizeChoice(value, allowed, fallback) {
 }
 expose("state", () => state);
 expose("SAVE_FIELDS", () => SAVE_FIELDS);
+expose("MAIN_TAB_IDS", () => MAIN_TAB_IDS);
+expose("MAIN_TAB_DISCOVERY_IDS", () => MAIN_TAB_DISCOVERY_IDS);
+expose("normalizeHiddenTabs", () => normalizeHiddenTabs);
+expose("normalizeUnlockedMainTabs", () => normalizeUnlockedMainTabs);
+expose("markMainTabsUnlocked", () => markMainTabsUnlocked);
 expose("normalizeChoice", () => normalizeChoice, (value) => { normalizeChoice = value; });

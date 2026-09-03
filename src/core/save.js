@@ -535,6 +535,74 @@ function sanitizeChallengeTimes(value, count) {
   return Array.from({ length: count }, (_, index) => Math.max(0, runtime.sanitizeNumber(source[index], 0)));
 }
 
+function savedInfinityUpgradeOwned(data, id) {
+  const upgrade = runtime.INFINITY_UPGRADES?.find((entry) => entry.id === id);
+  if (!upgrade) return false;
+  const mask = Math.floor(runtime.sanitizeNumber(data.infinityUpgradeMask, runtime.state.infinityUpgradeMask));
+  return (mask & (1 << upgrade.bit)) !== 0;
+}
+
+function savedChallengeProgress(data) {
+  const completed = Math.floor(runtime.sanitizeNumber(data.completedChallenges, runtime.state.completedChallenges));
+  const active = Math.floor(runtime.sanitizeNumber(data.activeChallenge, runtime.state.activeChallenge));
+  const activeTime = runtime.sanitizeNumber(data.activeChallengeTime, runtime.state.activeChallengeTime);
+  const times = Array.isArray(data.fastestInfinityChallengeTimes)
+    ? data.fastestInfinityChallengeTimes
+    : runtime.state.fastestInfinityChallengeTimes;
+  return completed !== 0 || active > 0 || activeTime > 0 || times.some((time) => runtime.sanitizeNumber(time, 0) > 0);
+}
+
+function inferUnlockedMainTabs(data) {
+  const eternityCount = runtime.state.eternityCount;
+  const infinityCount = runtime.state.infinityCount;
+  const milestoneMask = runtime.state.eternityMilestoneMask;
+  const achievementMask = runtime.state.achievementMask;
+  const automationSettings = [
+    "automationEnabled",
+    "autoBuyInfinityUpgrades",
+    "autoBuyInfiniteAngleSpeed",
+    "autoBuyInfiniteAngleVertex",
+    "autoBuyInfiniteAngleGain",
+    "autoBuildTower",
+    "autoRunGeneration",
+    "autoRunCoreBoost",
+    "autoRunInfinity",
+  ];
+  const automationEvidence = automationSettings.some((key) => data[key] === true || runtime.state[key] === true);
+  const towerFloor = Math.max(0, Math.floor(runtime.sanitizeNumber(data.towerFloor, runtime.state.towerFloor)));
+  const tc4UnlockFloor = runtime.towerChallengeUnlockFloor?.(4) ?? 12;
+  const completedTowerChallenges = Math.floor(runtime.sanitizeNumber(
+    data.completedTowerChallenges,
+    runtime.state.completedTowerChallenges,
+  ));
+  const tc4Progress = Math.floor(runtime.sanitizeNumber(data.activeTowerChallenge, runtime.state.activeTowerChallenge)) === 4
+    || (completedTowerChallenges & (1 << 3)) !== 0
+    || runtime.state.tc4BaseGainLevel > 0
+    || runtime.state.tc4InfinityScoreVertexGainLevel > 0
+    || runtime.state.tc4FreeCoreBoostLevel > 0;
+  const discovered = [];
+
+  if (eternityCount > 0 || infinityCount > 0) discovered.push("infinity");
+  if (
+    eternityCount > 0
+    || savedInfinityUpgradeOwned(data, "4-1")
+    || savedChallengeProgress(data)
+  ) discovered.push("challenges");
+  if (
+    eternityCount > 0
+    || savedInfinityUpgradeOwned(data, "1-2")
+    || savedInfinityUpgradeOwned(data, "8-1")
+    || (milestoneMask & 1) !== 0
+    || eternityCount >= 20
+    || eternityCount >= 81
+    || (achievementMask & (1 << (19 - 1))) !== 0
+    || automationEvidence
+  ) discovered.push("automation");
+  if (eternityCount > 0 || towerFloor >= tc4UnlockFloor || tc4Progress) discovered.push("eternity");
+  if (eternityCount > 0) discovered.push("timeline");
+  runtime.markMainTabsUnlocked(discovered);
+}
+
 function cloneStateValue(value) {
   if (Array.isArray(value)) return value.map(cloneStateValue);
   if (value && typeof value === "object") {
@@ -596,8 +664,21 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.coreBoostCount = Math.floor(runtime.sanitizeNumber(data.coreBoostCount, 0));
   runtime.state.infinityCount = Math.floor(runtime.sanitizeNumber(data.infinityCount, 0));
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.sanitizeNumber(data.eternityCount, 0)));
+  runtime.state.scoreTfClaims = runtime.normalizeTimelineClaimCount?.(data.scoreTfClaims, 0) ?? 0;
+  runtime.state.ipTfClaims = runtime.normalizeTimelineClaimCount?.(data.ipTfClaims, 0) ?? 0;
+  runtime.state.eternityTfClaims = runtime.normalizeTimelineClaimCount?.(data.eternityTfClaims, 0) ?? 0;
+  runtime.state.timelinePurchasedNodes = runtime.normalizeTimelinePurchasedNodes?.(data.timelinePurchasedNodes) ?? [];
+  runtime.state.timelineParallelSecondsSinceIc8Clear = runtime.normalizeTimelineSeconds?.(
+    data.timelineParallelSecondsSinceIc8Clear,
+  ) ?? 0;
   runtime.state.eternityMilestoneMask = runtime.normalizeEternityMilestoneMask?.(data.eternityMilestoneMask) ?? 0;
   runtime.state.eternityMilestoneChoice = runtime.normalizeEternityMilestoneChoice?.(data.eternityMilestoneChoice) || "";
+  const infiniteAngleFreeLevel = runtime.eternityMilestoneActive?.("1-3") === true ? 5 : 0;
+  const legacyInfiniteAngleFreeLevel = saveVersion < 11 ? infiniteAngleFreeLevel : 0;
+  const normalizeInfiniteAngleLevel = (value) => Math.max(
+    0,
+    Math.floor(runtime.sanitizeNumber(value, 0)) - legacyInfiniteAngleFreeLevel,
+  );
   const infinityPoints = runtime.hydrateLogResource(data.infinityPoints, data.infinityPointsLog10, -Infinity, true);
   runtime.state.infinityPoints = infinityPoints.value;
   runtime.state.infinityPointsLog10 = infinityPoints.log;
@@ -629,12 +710,12 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
     || runtime.sanitizeNumber(data.infiniteAngleUpgradeLevel, 0) > 0
   );
   runtime.state.infiniteAngleUnlocked = runtime.sanitizeBoolean(data.infiniteAngleUnlocked, legacyInfiniteAngleUnlocked);
-  runtime.state.infiniteAngleSpeedLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleSpeedLevel, 0)));
+  runtime.state.infiniteAngleSpeedLevel = normalizeInfiniteAngleLevel(data.infiniteAngleSpeedLevel);
   runtime.state.infiniteAngleVertexLevel = Math.min(
-    runtime.MAX_RENDERED_VERTICES - 3,
-    Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleVertexLevel, 0))),
+    Math.max(0, runtime.MAX_RENDERED_VERTICES - 3 - infiniteAngleFreeLevel),
+    normalizeInfiniteAngleLevel(data.infiniteAngleVertexLevel),
   );
-  runtime.state.infiniteAngleGainLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.infiniteAngleGainLevel, 0)));
+  runtime.state.infiniteAngleGainLevel = normalizeInfiniteAngleLevel(data.infiniteAngleGainLevel);
   const infiniteAngleCurrentGain = runtime.hydrateLogResource(
     data.infiniteAngleCurrentGain,
     data.infiniteAngleCurrentGainLog10,
@@ -643,7 +724,8 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.infiniteAngleCurrentGain = infiniteAngleCurrentGain.value || 1;
   runtime.state.infiniteAngleCurrentGainLog10 = Math.max(0, infiniteAngleCurrentGain.log);
   runtime.state.infiniteAnglePointProgress = ((runtime.sanitizeNumber(data.infiniteAnglePointProgress, 0) % 1) + 1) % 1;
-  const infiniteAngleVertexCount = Math.max(3, runtime.state.infiniteAngleVertexLevel + 3);
+  const infiniteAngleVertexCount = runtime.infiniteAngleVertexCount?.()
+    ?? Math.max(3, runtime.state.infiniteAngleVertexLevel + 3);
   const loadedInfiniteAngleProgress = Math.max(
     0,
     runtime.sanitizeNumber(
@@ -728,6 +810,11 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.fastestInfinityTime = runtime.sanitizeNumber(data.fastestInfinityTime, 0);
   runtime.state.fastestInfinityRealTime = runtime.sanitizeNumber(data.fastestInfinityRealTime, 0);
   runtime.state.lastInfinityRuns = runtime.sanitizeInfinityRunRecords(data.lastInfinityRuns);
+  runtime.state.currentEternityRunTime = runtime.sanitizeNumber(data.currentEternityRunTime, 0);
+  runtime.state.currentEternityRealTime = runtime.sanitizeNumber(data.currentEternityRealTime, 0);
+  runtime.state.fastestEternityTime = runtime.sanitizeNumber(data.fastestEternityTime, 0);
+  runtime.state.fastestEternityRealTime = runtime.sanitizeNumber(data.fastestEternityRealTime, 0);
+  runtime.state.lastEternityRuns = runtime.sanitizeEternityRunRecords(data.lastEternityRuns);
   runtime.state.bestInfinityCountPerSecond = Math.max(
     0,
     runtime.sanitizeNumber(data.bestInfinityCountPerSecond, 0),
@@ -753,7 +840,11 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.autoBuySpeed = runtime.sanitizeBoolean(data.autoBuySpeed, true);
   runtime.state.autoBuyVertex = runtime.sanitizeBoolean(data.autoBuyVertex, true);
   runtime.state.autoBuyGain = runtime.sanitizeBoolean(data.autoBuyGain, true);
-  runtime.state.autoCompleteChallenges = runtime.sanitizeBoolean(data.autoCompleteChallenges, false);
+  runtime.state.autoBuyInfinityUpgrades = runtime.sanitizeBoolean(data.autoBuyInfinityUpgrades, false);
+  runtime.state.autoBuyInfiniteAngleSpeed = runtime.sanitizeBoolean(data.autoBuyInfiniteAngleSpeed, false);
+  runtime.state.autoBuyInfiniteAngleVertex = runtime.sanitizeBoolean(data.autoBuyInfiniteAngleVertex, false);
+  runtime.state.autoBuyInfiniteAngleGain = runtime.sanitizeBoolean(data.autoBuyInfiniteAngleGain, false);
+  runtime.state.autoBuildTower = runtime.sanitizeBoolean(data.autoBuildTower, false);
   runtime.state.autoRunGeneration = runtime.sanitizeBoolean(data.autoRunGeneration, false);
   const legacyScoreThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationScoreThreshold, 10));
   const legacyCostThreshold = Math.max(0, runtime.sanitizeNumber(data.autoGenerationCostThreshold, 1));
@@ -853,6 +944,9 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.timeUnit = runtime.normalizeChoice(data.timeUnit, ["auto", "seconds", "milliseconds"], "auto");
   runtime.state.topBarMode = runtime.normalizeChoice(data.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
   runtime.state.showTimeFluxQuickBar = data.showTimeFluxQuickBar !== false;
+  runtime.state.hiddenTabs = runtime.normalizeHiddenTabs(data.hiddenTabs);
+  runtime.state.unlockedMainTabs = runtime.normalizeUnlockedMainTabs(data.unlockedMainTabs);
+  inferUnlockedMainTabs(data);
   const lastEarned = runtime.hydrateLogResource(data.lastEarned, data.lastEarnedLog10);
   runtime.state.lastEarned = lastEarned.value;
   runtime.state.lastEarnedLog10 = lastEarned.log;
@@ -872,8 +966,10 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
 function serializeSaveData() {
   runtime.normalizeInfinityPointState();
   runtime.normalizeTowerChallenge4State?.();
+  runtime.normalizeTimelineState?.();
   runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
   runtime.state.achievementMaskHigh = ((Number(runtime.state.achievementMaskHigh) || 0) >>> 0);
+  runtime.state.unlockedMainTabs = runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs);
   const data = {};
   runtime.SAVE_FIELDS.forEach((field) => {
     data[field] = runtime.state[field];
@@ -1224,6 +1320,11 @@ function resetSave() {
     coreBoostCount: 0,
     infinityCount: 0,
     eternityCount: 0,
+    scoreTfClaims: 0,
+    ipTfClaims: 0,
+    eternityTfClaims: 0,
+    timelinePurchasedNodes: [],
+    timelineParallelSecondsSinceIc8Clear: 0,
     eternityMilestoneMask: 0,
     eternityMilestoneChoice: "",
     infinityPoints: 0,
@@ -1269,6 +1370,11 @@ function resetSave() {
     fastestInfinityTime: 0,
     fastestInfinityRealTime: 0,
     lastInfinityRuns: [],
+    currentEternityRunTime: 0,
+    currentEternityRealTime: 0,
+    fastestEternityTime: 0,
+    fastestEternityRealTime: 0,
+    lastEternityRuns: [],
     bestInfinityCountPerSecond: 0,
     infinityCountRateRemainder: 0,
     offlineProgressEnabled: true,
@@ -1282,7 +1388,11 @@ function resetSave() {
     autoBuySpeed: true,
     autoBuyVertex: true,
     autoBuyGain: true,
-    autoCompleteChallenges: false,
+    autoBuyInfinityUpgrades: false,
+    autoBuyInfiniteAngleSpeed: false,
+    autoBuyInfiniteAngleVertex: false,
+    autoBuyInfiniteAngleGain: false,
+    autoBuildTower: false,
     autoRunGeneration: false,
     autoGenerationScoreMultiplierThreshold: 2,
     autoGenerationCostMultiplierThreshold: 1,
@@ -1305,6 +1415,8 @@ function resetSave() {
     timeUnit: "auto",
     topBarMode: "news",
     showTimeFluxQuickBar: true,
+    hiddenTabs: [],
+    unlockedMainTabs: [],
     floatingTexts: [],
     lastEarned: 0,
     lastEarnedLog10: -Infinity,

@@ -87,54 +87,58 @@ function createTowerChallengeRows() {
 
     info.append(name, status, target, restriction, reward);
     row.append(info, button);
-    if (index === 4) {
-      const upgradeList = document.createElement("div");
-      upgradeList.className = "tc4-upgrade-list";
-      [
-        ["baseGain", "towerChallenge4UpgradeBaseGain", "towerChallenge4UpgradeBaseGainEffect"],
-        ["infinityScoreVertexGain", "towerChallenge4UpgradeInfinityScoreVertexGain", "towerChallenge4UpgradeInfinityScoreVertexGainEffect"],
-        ["freeCoreBoost", "towerChallenge4UpgradeFreeCoreBoost", "towerChallenge4UpgradeFreeCoreBoostEffect"],
-      ].forEach(([kind, labelKey, effectKey]) => {
-        const card = document.createElement("div");
-        card.className = "tc4-upgrade-card";
-        card.dataset.tc4Upgrade = kind;
-        const label = document.createElement("strong");
-        label.className = "tc4-upgrade-label";
-        const effect = document.createElement("small");
-        effect.className = "tc4-upgrade-effect";
-        const buy = document.createElement("button");
-        buy.className = "tc4-upgrade-button";
-        buy.type = "button";
-        buy.addEventListener("click", () => runtime.buyTowerChallenge4Upgrade(kind));
-        card.append(label, effect, buy);
-        card.dataset.labelKey = labelKey;
-        card.dataset.effectKey = effectKey;
-        upgradeList.append(card);
-      });
-      row.append(upgradeList);
-    }
     runtime.elements.towerChallengeList.append(row);
   }
 }
 
-function towerChallengeDisplayName(index) {
-  if (index !== 4) return runtime.towerChallengeName(index);
-  return runtime.state.language === "en"
-    ? "TC4 Substitute for Existing Products"
-    : "TC4 既存品の代替";
-}
-
-function towerChallenge4UpgradeEffectText(kind, effectKey, level) {
+function towerChallenge4UpgradeEffectText(kind, effectKey) {
   if (kind === "baseGain") {
-    return `${runtime.t(effectKey)}: +${runtime.tc4BaseGainPartsBonus().toFixed(2)} parts`;
+    return `${runtime.t(effectKey)}: +${runtime.tc4BaseGainPartsBonus().toFixed(2)}`;
   }
   if (kind === "infinityScoreVertexGain") {
-    return `${runtime.t(effectKey)}: +${(runtime.TC4_INFINITY_SCORE_VERTEX_GAIN_COEFFICIENT * level).toFixed(2)} × Infinity Score log10`;
+    const bonusLog10 = runtime.tc4InfinityScoreVertexGainBonusLog10(runtime.currentInfiniteScoreLog10());
+    return `${runtime.t(effectKey)}: ×${runtime.formatUiLogNumber(bonusLog10)}`;
   }
-  return `${runtime.t(effectKey)}: +${runtime.effectiveCoreBoostCount() - runtime.state.coreBoostCount} effective CB`;
+  return `${runtime.t(effectKey)}: +${Math.max(0, runtime.effectiveCoreBoostCount() - runtime.state.coreBoostCount)} ${runtime.t("coreBoost")}`;
+}
+
+function updateTowerChallenge4UpgradeRows() {
+  const tc4UpgradeList = runtime.elements.tc4UpgradeList;
+  if (!tc4UpgradeList || tc4UpgradeList.hidden) return;
+
+  tc4UpgradeList.querySelectorAll("[data-tc4-upgrade]").forEach((button) => {
+    const kind = button.dataset.tc4Upgrade;
+    const level = runtime.towerChallenge4UpgradeLevel(kind);
+    const label = runtime.t(button.dataset.labelKey);
+    const price = runtime.formatUiLogNumber(runtime.towerChallenge4UpgradePriceLog10(kind));
+    button.querySelector(".tc4-upgrade-label").textContent = label;
+    button.querySelector(".tc4-upgrade-effect").textContent = towerChallenge4UpgradeEffectText(kind, button.dataset.effectKey);
+    button.querySelector(".tc4-upgrade-level").textContent = `${runtime.t("level")} ${level}`;
+    button.querySelector(".tc4-upgrade-cost").textContent = `${runtime.t("towerChallenge4UpgradePrice")}: ${price}`;
+    const canBuy = runtime.canBuyTowerChallenge4Upgrade(kind);
+    const action = canBuy
+      ? runtime.t("upgradeActionBuy")
+      : runtime.t("upgradeActionUnavailable");
+    button.disabled = !canBuy;
+    button.setAttribute("aria-label", `${label} — ${button.querySelector(".tc4-upgrade-effect").textContent} — ${button.querySelector(".tc4-upgrade-cost").textContent} — ${action}`);
+  });
 }
 
 function updateTowerChallengeRows() {
+  const activeTc4 = runtime.state.activeTowerChallenge === 4;
+  const normalUpgradeList = runtime.elements.normalUpgradeList;
+  const tc4UpgradeList = runtime.elements.tc4UpgradeList;
+  if (normalUpgradeList) normalUpgradeList.hidden = activeTc4;
+  if (tc4UpgradeList) tc4UpgradeList.hidden = !activeTc4;
+  let completedCount = 0;
+  for (let index = 1; index <= runtime.TOWER_CHALLENGE_COUNT; index += 1) {
+    if (runtime.towerChallengeCompleted(index)) completedCount += 1;
+  }
+  if (runtime.elements.towerChallengeStatus) {
+    runtime.elements.towerChallengeStatus.textContent = runtime.state.activeTowerChallenge > 0
+      ? `${runtime.towerChallengeName(runtime.state.activeTowerChallenge)} ${runtime.t("challengeRunning")}`
+      : `${completedCount}/${runtime.TOWER_CHALLENGE_COUNT} ${runtime.t("completed")}`;
+  }
   const signature = [
     runtime.state.towerFloor,
     runtime.state.activeTowerChallenge,
@@ -143,6 +147,7 @@ function updateTowerChallengeRows() {
     runtime.state.language,
     runtime.state.numberFormat,
     runtime.currentScoreLog10(),
+    runtime.currentInfiniteScoreLog10(),
     ...Object.keys(runtime.TC4_UPGRADE_DEFINITIONS).map((kind) => [
       runtime.towerChallenge4UpgradeLevel(kind),
       runtime.towerChallenge4UpgradePriceStep(kind),
@@ -150,6 +155,7 @@ function updateTowerChallengeRows() {
   ].join("|");
   if (signature === lastTowerChallengeSignature) return;
   lastTowerChallengeSignature = signature;
+  updateTowerChallenge4UpgradeRows();
   runtime.elements.towerChallengeList.querySelectorAll(".tower-challenge-row").forEach((row) => {
     const index = Number(row.dataset.towerChallenge);
     const unlockFloor = runtime.towerChallengeUnlockFloor(index);
@@ -161,42 +167,24 @@ function updateTowerChallengeRows() {
     const button = row.querySelector("button");
     row.classList.toggle("is-completed", completed);
     row.classList.toggle("is-active", active);
-    row.querySelector(".challenge-name").textContent = towerChallengeDisplayName(index) || `TC${index}`;
+    row.querySelector(".challenge-name").textContent = runtime.towerChallengeName(index) || `TC${index}`;
     row.querySelector(".challenge-state").textContent = !implemented
       ? runtime.t("towerChallengeComingSoon")
       : active
-        ? runtime.t("towerChallengeRunning")
+        ? runtime.t("challengeRunning")
         : completed
-          ? runtime.t("towerChallengeCompleted")
+          ? runtime.t("challengeCompleted")
           : unlocked
             ? runtime.t("towerChallengeAvailable")
             : runtime.t("towerChallengeLocked").replace("{floor}", String(unlockFloor));
     row.querySelector(".challenge-target").textContent = Number.isFinite(targetLog10)
-      ? `${runtime.t("towerChallengeTarget")}: ${runtime.formatPowerOfTen(targetLog10)} Score`
+      ? `${runtime.t("towerChallengeTarget")}: ${runtime.formatUiLogNumber(targetLog10)} Score`
       : runtime.t("towerChallengeComingSoon");
     row.querySelector(".challenge-restriction").textContent = `${runtime.t("challengeRestrictionLabel")}: ${runtime.towerChallengeRestriction(index)}`;
     row.querySelector(".challenge-reward").textContent = `${runtime.t("challengeRewardLabel")}: ${runtime.towerChallengeReward(index)}${runtime.towerChallengeRewardUnlocked(index) ? ` (${runtime.t("towerChallengeRewardUnlocked")})` : ""}`;
-    button.textContent = active
-      ? runtime.t("towerChallengeStop")
-      : completed
-        ? runtime.t("towerChallengeReplay")
-        : runtime.t("towerChallengeStart");
+    button.textContent = active ? runtime.t("stopChallenge") : runtime.t("startChallenge");
     button.disabled = !implemented || !unlocked || (runtime.state.activeTowerChallenge > 0 && !active);
 
-    if (index === 4) {
-      row.querySelectorAll(".tc4-upgrade-card").forEach((card) => {
-        const kind = card.dataset.tc4Upgrade;
-        const level = runtime.towerChallenge4UpgradeLevel(kind);
-        const effectKey = card.dataset.effectKey;
-        card.querySelector(".tc4-upgrade-label").textContent = runtime.t(card.dataset.labelKey);
-        card.querySelector(".tc4-upgrade-effect").textContent = `${towerChallenge4UpgradeEffectText(kind, effectKey, level)} · ${runtime.t("level")} ${level} · ${runtime.t("towerChallenge4UpgradePrice")}: ${runtime.formatPowerOfTen(runtime.towerChallenge4UpgradePriceLog10(kind))}`;
-        const buy = card.querySelector(".tc4-upgrade-button");
-        buy.textContent = runtime.canBuyTowerChallenge4Upgrade(kind)
-          ? runtime.t("towerChallenge4UpgradeBuy")
-          : runtime.t("towerChallenge4UpgradeUnavailable");
-        buy.disabled = !active || !runtime.canBuyTowerChallenge4Upgrade(kind);
-      });
-    }
   });
 }
 

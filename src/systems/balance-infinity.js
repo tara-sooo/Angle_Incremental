@@ -11,31 +11,38 @@ function floorWithFloatingPointTolerance(value) {
   return Math.floor(value + Math.max(1, Math.abs(value)) * Number.EPSILON * 8);
 }
 
-function multiplyIpGainExactly(gain, multiplier) {
-  return gain > Number.MAX_VALUE / multiplier ? Number.MAX_VALUE : gain * multiplier;
-}
-
-function doubleIpGainExactly(gain) {
-  return multiplyIpGainExactly(gain, 2);
-}
-
-function balanceInfinityPointGain() {
+function baseInfinityPointGain() {
   if (!runtime.canInfinity()) return 0;
   const scoreLog10 = runtime.currentScoreLog10();
   let base;
   if (runtime.state.infiniteCapBroken) base = Math.floor(scoreLog10 / Math.log10(2) - 307);
   else if (runtime.hasInfinityUpgrade("9-1")) base = Math.floor(scoreLog10 / Math.log10(7) - 307);
   else base = Math.floor(scoreLog10 - 307);
-  const gained = Math.max(1, base);
-  let gainedWithExactMultipliers = gained;
-  if (runtime.isAchievementUnlocked(17)) gainedWithExactMultipliers = doubleIpGainExactly(gainedWithExactMultipliers);
-  if (runtime.isAchievementUnlocked(21)) gainedWithExactMultipliers = doubleIpGainExactly(gainedWithExactMultipliers);
-  if (runtime.isAchievementUnlocked(31)) gainedWithExactMultipliers = multiplyIpGainExactly(gainedWithExactMultipliers, 100);
-  const ic8MultiplierLog10 = generationIpMultiplierLog10();
-  if (ic8MultiplierLog10 === 0) return gainedWithExactMultipliers;
-  const gainValue = runtime.valueFromLog10(runtime.log10Value(gainedWithExactMultipliers) + ic8MultiplierLog10);
+  return Math.max(1, base);
+}
+
+function balanceInfinityPointGainRawLog10() {
+  const gained = baseInfinityPointGain();
+  if (gained <= 0) return -Infinity;
+  let gainLog10 = runtime.log10Value(gained);
+  if (runtime.isAchievementUnlocked(17)) gainLog10 += Math.log10(2);
+  if (runtime.isAchievementUnlocked(21)) gainLog10 += Math.log10(2);
+  if (runtime.isAchievementUnlocked(31)) gainLog10 += 2;
+  return gainLog10
+    + generationIpMultiplierLog10()
+    + (runtime.timelineIpGainMultiplierLog10?.() ?? 0);
+}
+
+function balanceInfinityPointGain() {
+  const gainLog10 = balanceInfinityPointGainRawLog10();
+  if (gainLog10 === -Infinity) return 0;
+  const gainValue = runtime.valueFromLog10(gainLog10);
   if (gainValue === Number.MAX_VALUE) return Number.MAX_VALUE;
   return Math.max(1, floorWithFloatingPointTolerance(gainValue));
+}
+
+function balanceInfinityPointGainLog10() {
+  return balanceInfinityPointGainRawLog10();
 }
 
 function balanceInfinityUpgradeCostExponent() {
@@ -51,4 +58,6 @@ function balanceInfinityUpgradeCostExponent() {
 }
 
 expose("balanceInfinityPointGain", () => balanceInfinityPointGain);
+expose("balanceInfinityPointGainLog10", () => balanceInfinityPointGainLog10);
+expose("balanceInfinityPointGainRawLog10", () => balanceInfinityPointGainRawLog10);
 expose("balanceInfinityUpgradeCostExponent", () => balanceInfinityUpgradeCostExponent);

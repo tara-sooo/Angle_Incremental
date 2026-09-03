@@ -15,6 +15,7 @@ function setPersistentFixture(state) {
   state.eternityCount = 12;
   state.eternityMilestoneMask = 5;
   state.eternityMilestoneChoice = "1-2";
+  state.autoBuyInfinityUpgrades = true;
   state.achievementMaskHigh = ACHIEVEMENT_38_TO_41_MASK;
   state.timeFlux = 321;
   state.timeFluxCapacityLevel = 2;
@@ -27,6 +28,7 @@ function assertPersistentFixture(state, runtime, messagePrefix) {
   assert.equal(state.eternityCount, 12, `${messagePrefix}: Eternity count should persist`);
   assert.equal(state.eternityMilestoneMask, 5, `${messagePrefix}: Milestone ownership should persist`);
   assert.equal(state.eternityMilestoneChoice, "1-2", `${messagePrefix}: legacy pending-choice data should remain safely readable`);
+  assert.equal(state.autoBuyInfinityUpgrades, true, `${messagePrefix}: Infinity Upgrade automation should persist`);
   assert.equal(runtime.firstTierMilestoneEntitlementCount(), 1, `${messagePrefix}: entitlement should derive from count and ownership`);
   assert.deepEqual(Array.from(runtime.availableEternityMilestoneChoices()), ["1-2"], `${messagePrefix}: legacy pending-choice data must not consume the remaining entitlement`);
   assert.equal(
@@ -50,6 +52,13 @@ async function testLegacyDefaults() {
   delete legacy.state.eternityMilestoneMask;
   delete legacy.state.eternityMilestoneChoice;
   delete legacy.state.achievementMaskHigh;
+  delete legacy.state.autoBuyInfinityUpgrades;
+  delete legacy.state.currentEternityRunTime;
+  delete legacy.state.currentEternityRealTime;
+  delete legacy.state.fastestEternityTime;
+  delete legacy.state.fastestEternityRealTime;
+  delete legacy.state.lastEternityRuns;
+  legacy.state.offlineProgressEnabled = false;
 
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(legacy)]]));
   assert.equal(loaded.debug.state.eternityCount, 0, "legacy saves should default Eternity count to zero");
@@ -57,7 +66,55 @@ async function testLegacyDefaults() {
   assert.equal(loaded.debug.state.eternityMilestoneChoice, "", "legacy saves should default the retired pending-choice field to empty");
   assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 0, "legacy saves without Eternities must not receive an acquisition entitlement");
   assert.equal(loaded.debug.state.achievementMaskHigh, 0, "legacy saves should default the high achievement mask safely");
-  assert.equal(loaded.runtime.SAVE_VERSION, 10, "derived entitlement should not require a speculative save-version bump");
+  assert.equal(loaded.debug.state.autoBuyInfinityUpgrades, false, "legacy saves should default Infinity Upgrade automation off");
+  assert.equal(loaded.debug.state.currentEternityRunTime, 0, "legacy saves should default current Eternity game time to zero");
+  assert.equal(loaded.debug.state.currentEternityRealTime, 0, "legacy saves should default current Eternity real time to zero");
+  assert.equal(loaded.debug.state.fastestEternityTime, 0, "legacy saves should default fastest Eternity game time to zero");
+  assert.equal(loaded.debug.state.fastestEternityRealTime, 0, "legacy saves should default fastest Eternity real time to zero");
+  assert.deepEqual(Array.from(loaded.debug.state.lastEternityRuns), [], "legacy saves should not derive Eternity history from the count");
+  assert.equal(loaded.runtime.SAVE_VERSION, 11, "Milestone 1-3 free-level semantics should use save version 11");
+}
+
+async function testInfiniteAngleFreeLevelSaveMigration() {
+  const source = await loadRuntime(candidatePath);
+  const { runtime } = source;
+  const baseSave = runtime.serializeSaveData();
+  baseSave.savedAt = Date.now();
+  baseSave.version = 10;
+  baseSave.state.eternityMilestoneMask = 4;
+  baseSave.state.infiniteAngleUnlocked = true;
+  baseSave.state.infiniteAngleSpeedLevel = 5;
+  baseSave.state.infiniteAngleVertexLevel = 8;
+  baseSave.state.infiniteAngleGainLevel = 4;
+
+  const migrated = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(baseSave)]]));
+  assert.equal(migrated.debug.state.infiniteAngleSpeedLevel, 0, "v10 Lv5 should migrate to purchased IA Speed Lv0");
+  assert.equal(migrated.debug.state.infiniteAngleVertexLevel, 3, "v10 Lv8 should migrate to purchased IA Vertex Lv3");
+  assert.equal(migrated.debug.state.infiniteAngleGainLevel, 0, "v10 IA Gain below the free baseline should clamp to purchased Lv0");
+  assert.equal(migrated.runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 5, "v10 IA Speed effective level should be preserved");
+  assert.equal(migrated.runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), 8, "v10 IA Vertex effective level should be preserved");
+  assert.equal(migrated.runtime.infiniteAngleEffectiveUpgradeLevel("gain"), 5, "v10 IA Gain effective level should clamp to the free baseline");
+
+  const withoutMilestone = structuredClone(baseSave);
+  withoutMilestone.state.eternityMilestoneMask = 0;
+  withoutMilestone.state.infiniteAngleSpeedLevel = 5;
+  withoutMilestone.state.infiniteAngleVertexLevel = 8;
+  withoutMilestone.state.infiniteAngleGainLevel = 4;
+  const preserved = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(withoutMilestone)]]));
+  assert.equal(preserved.debug.state.infiniteAngleSpeedLevel, 5, "v10 saves without 1-3 must preserve IA Speed levels");
+  assert.equal(preserved.debug.state.infiniteAngleVertexLevel, 8, "v10 saves without 1-3 must preserve IA Vertex levels");
+  assert.equal(preserved.debug.state.infiniteAngleGainLevel, 4, "v10 saves without 1-3 must preserve IA Gain levels");
+  assert.equal(preserved.runtime.infiniteAngleFreeUpgradeLevel("speed"), 0, "1-3-free migration must not apply without ownership");
+
+  const currentVersionSave = structuredClone(baseSave);
+  currentVersionSave.version = 11;
+  currentVersionSave.state.infiniteAngleSpeedLevel = 0;
+  currentVersionSave.state.infiniteAngleVertexLevel = 3;
+  currentVersionSave.state.infiniteAngleGainLevel = 0;
+  const loadedAgain = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(currentVersionSave)]]));
+  assert.equal(loadedAgain.debug.state.infiniteAngleSpeedLevel, 0, "v11 IA Speed must not be migrated a second time");
+  assert.equal(loadedAgain.debug.state.infiniteAngleVertexLevel, 3, "v11 IA Vertex must not be migrated a second time");
+  assert.equal(loadedAgain.debug.state.infiniteAngleGainLevel, 0, "v11 IA Gain must not be migrated a second time");
 }
 
 async function testCurrentRoundTripAndSanitization() {
@@ -69,6 +126,12 @@ async function testCurrentRoundTripAndSanitization() {
   debug.state.completedTowerChallenges = 0;
   debug.state.tc4BaseGainLevel = 4;
   debug.state.tc4BaseGainPriceStep = 5;
+  debug.state.currentEternityRunTime = 12.5;
+  debug.state.currentEternityRealTime = 8.25;
+  debug.state.fastestEternityTime = 3.25;
+  debug.state.fastestEternityRealTime = 4.5;
+  debug.state.lastEternityRuns = [{ time: 12.5, realTime: 8.25, infinityCount: 6 }];
+  debug.state.offlineProgressEnabled = false;
 
   const serialized = runtime.serializeSaveData();
   serialized.savedAt = Date.now();
@@ -79,6 +142,28 @@ async function testCurrentRoundTripAndSanitization() {
   assert.equal(loaded.debug.state.completedTowerChallenges, 0, "ordinary save/load must not invent TC completion during an active TC4 run");
   assert.equal(loaded.debug.state.tc4BaseGainLevel, 4, "ordinary save/load should round-trip TC4 local state inside an active TC4 run");
   assert.equal(loaded.debug.state.tc4BaseGainPriceStep, 5, "ordinary save/load should round-trip TC4 price state inside an active TC4 run");
+  assert.equal(loaded.debug.state.currentEternityRunTime, 12.5, "ordinary save/load should round-trip current Eternity game time");
+  assert.equal(loaded.debug.state.currentEternityRealTime, 8.25, "ordinary save/load should round-trip current Eternity real time");
+  assert.equal(loaded.debug.state.fastestEternityTime, 3.25, "ordinary save/load should round-trip fastest Eternity game time");
+  assert.equal(loaded.debug.state.fastestEternityRealTime, 4.5, "ordinary save/load should round-trip fastest Eternity real time");
+  assert.deepEqual(JSON.parse(JSON.stringify(loaded.debug.state.lastEternityRuns)), [{ time: 12.5, realTime: 8.25, infinityCount: 6 }], "ordinary save/load should round-trip Eternity history");
+
+  const malformed = structuredClone(serialized);
+  malformed.state.currentEternityRunTime = "not-a-number";
+  malformed.state.currentEternityRealTime = -1;
+  malformed.state.fastestEternityTime = "NaN";
+  malformed.state.fastestEternityRealTime = Infinity;
+  malformed.state.lastEternityRuns = [
+    { time: "bad", realTime: "bad", infinityCount: "4.9" },
+    ...Array.from({ length: 11 }, (_, index) => ({ time: index + 1, realTime: index + 1, infinityCount: index + 1 })),
+  ];
+  const sanitized = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(malformed)]]));
+  assert.equal(sanitized.debug.state.currentEternityRunTime, 0, "invalid current Eternity game time should fall back to zero");
+  assert.equal(sanitized.debug.state.currentEternityRealTime, 0, "invalid current Eternity real time should fall back to zero");
+  assert.equal(sanitized.debug.state.fastestEternityTime, 0, "invalid fastest Eternity game time should fall back to zero");
+  assert.equal(sanitized.debug.state.fastestEternityRealTime, 0, "invalid fastest Eternity real time should fall back to zero");
+  assert.equal(sanitized.debug.state.lastEternityRuns.length, 10, "invalid Eternity history should remain capped at ten records");
+  assert.deepEqual(JSON.parse(JSON.stringify(sanitized.debug.state.lastEternityRuns[0])), { time: 0, realTime: null, infinityCount: 4 }, "invalid Eternity record fields should use the Infinity-compatible defaults");
 
   loaded.runtime.applySaveData({
     eternityMilestoneMask: 255,
@@ -187,11 +272,85 @@ async function testEternityResetThenSaveLoad() {
   assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 1, "the cap of three earned first-tier slots should leave exactly one acquisition available");
 }
 
+async function testMainTabDiscoveryMigration() {
+  const source = await loadRuntime(candidatePath);
+  const { runtime } = source;
+  const baseSave = runtime.serializeSaveData();
+  const challengeUpgrade = runtime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "4-1");
+  const normalAutomationUpgrade = runtime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "1-2");
+
+  const legacySave = (overrides) => {
+    const save = structuredClone(baseSave);
+    delete save.state.unlockedMainTabs;
+    Object.assign(save.state, overrides);
+    save.savedAt = Date.now();
+    return save;
+  };
+  const loadLegacy = (overrides) => loadRuntime(
+    candidatePath,
+    new Map([[runtime.SAVE_KEY, JSON.stringify(legacySave(overrides))]]),
+  );
+
+  const postEternity = await loadLegacy({ eternityCount: 1, infinityCount: 0, towerFloor: 0 });
+  assert.deepEqual(
+    Array.from(postEternity.debug.state.unlockedMainTabs),
+    ["infinity", "challenges", "automation", "eternity", "timeline"],
+    "legacy saves with Eternity progress should retain every already-discovered progression tab",
+  );
+
+  const infinity = await loadLegacy({ infinityCount: 1, eternityCount: 0 });
+  assert.deepEqual(Array.from(infinity.debug.state.unlockedMainTabs), ["infinity"], "current Infinity count should migrate INF discovery");
+
+  const challenges = await loadLegacy({
+    infinityCount: 0,
+    eternityCount: 0,
+    infinityUpgradeMask: 1 << challengeUpgrade.bit,
+  });
+  assert.deepEqual(Array.from(challenges.debug.state.unlockedMainTabs), ["challenges"], "IU 4-1 ownership should migrate CHAL discovery");
+
+  const automation = await loadLegacy({
+    infinityCount: 0,
+    eternityCount: 0,
+    infinityUpgradeMask: 1 << normalAutomationUpgrade.bit,
+  });
+  assert.deepEqual(Array.from(automation.debug.state.unlockedMainTabs), ["automation"], "IU 1-2 ownership should migrate AUTO discovery");
+
+  const achievementAutomation = await loadLegacy({
+    infinityCount: 0,
+    eternityCount: 0,
+    achievementMask: 1 << (19 - 1),
+  });
+  assert.deepEqual(Array.from(achievementAutomation.debug.state.unlockedMainTabs), ["automation"], "Achievement 19 should migrate AUTO discovery");
+
+  const eternity = await loadLegacy({ infinityCount: 0, eternityCount: 0, towerFloor: 12 });
+  assert.deepEqual(Array.from(eternity.debug.state.unlockedMainTabs), ["eternity"], "Tower Floor 12 should migrate ETR discovery");
+
+  const normalized = await loadLegacy({
+    infinityCount: 0,
+    eternityCount: 0,
+    towerFloor: 0,
+    unlockedMainTabs: ["eternity", "unknown", "automation", "automation", "settings"],
+    hiddenTabs: ["eternity"],
+  });
+  assert.deepEqual(Array.from(normalized.debug.state.unlockedMainTabs), ["automation", "eternity"], "discovery migration should discard unknown and duplicate tab IDs");
+  assert.equal(normalized.debug.mainTabIsUnlocked("eternity"), true, "normalized ETR discovery should remain authoritative");
+  assert.equal(normalized.debug.mainTabIsVisible("eternity"), false, "migration must preserve hiddenTabs independently of discovery");
+
+  const roundTrip = await loadRuntime(candidatePath);
+  roundTrip.debug.state.unlockedMainTabs = ["infinity", "eternity"];
+  const serialized = roundTrip.runtime.serializeSaveData();
+  assert.deepEqual(Array.from(serialized.state.unlockedMainTabs), ["infinity", "eternity"], "save serialization should preserve normalized discovery history");
+  const reloaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(serialized)]]));
+  assert.deepEqual(Array.from(reloaded.debug.state.unlockedMainTabs), ["infinity", "eternity"], "save/load should preserve discovery history");
+}
+
 async function runEternitySaveMigrationModuleRuntimeTest() {
   await testLegacyDefaults();
+  await testInfiniteAngleFreeLevelSaveMigration();
   await testCurrentRoundTripAndSanitization();
   await testSaveCodeImportAndCheckpointRestore();
   await testEternityResetThenSaveLoad();
+  await testMainTabDiscoveryMigration();
   console.log("Eternity save and migration module runtime tests passed");
 }
 
