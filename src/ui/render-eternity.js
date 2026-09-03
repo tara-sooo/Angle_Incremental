@@ -1,5 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
-import "../data/eternity-i18n.js?v=0.12.2";
+import "../data/eternity-i18n.js?v=0.13.0";
 
 const FIRST_TIER_IDS = Object.freeze(["1-1", "1-2", "1-3"]);
 const MILESTONES = Object.freeze([
@@ -26,7 +26,7 @@ function installEternityStyles() {
   const link = document.createElement("link");
   link.id = "eternityUiStyles";
   link.rel = "stylesheet";
-  link.href = new URL("./eternity-ui.css?v=0.12.2", import.meta.url).href;
+  link.href = new URL("./eternity-ui.css?v=0.13.0", import.meta.url).href;
   document.head.append(link);
 }
 
