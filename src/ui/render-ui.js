@@ -569,7 +569,7 @@ function updateUi() {
   runtime.elements.infiniteScorePanel.textContent = runtime.formatHeldUiLogNumber(runtime.currentInfiniteScoreLog10());
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
-  runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`;
+  runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiLogNumber(runtime.infinityPointGainLog10())} IP`;
   runtime.elements.infinityButton.disabled = runtime.state.infinityCount === 0 || !runtime.canInfinity();
   runtime.updateInfinityUpgradeRows();
   const infiniteAngleUnlocked = runtime.state.infiniteAngleUnlocked;

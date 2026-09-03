@@ -577,6 +577,18 @@ try {
   assert.deepEqual(desktopAngleScrollOwnership.mainPanelsOverflow, ["hidden", "hidden"], "desktop ANGLE main panels should not own page scrolling");
   assert.equal(desktopAngleScrollOwnership.visibleSectionsBorderless, true, "desktop shared sections should avoid redundant frames");
   assert.equal(desktopAngleScrollOwnership.finalContentReachable, true, "desktop ANGLE final actions should remain reachable");
+  await page.setViewportSize({ width: 1280, height: 1200 });
+  const tallAngleComposition = await page.evaluate(() => {
+    const playfield = document.querySelector(".angle-panel .playfield-wrap")?.getBoundingClientRect();
+    const reset = document.querySelector(".stage-panel .reset-dock")?.getBoundingClientRect();
+    return {
+      gap: playfield && reset ? reset.top - playfield.bottom : Infinity,
+      playfieldHeight: playfield?.height ?? 0,
+    };
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  assert.ok(Math.abs(tallAngleComposition.gap) <= 1, "tall ANGLE reset controls should stay attached to the playfield");
+  assert.ok(tallAngleComposition.playfieldHeight <= 521, "tall ANGLE viewports should not stretch the canvas past its cap");
   const angleUpgradeContract = await page.evaluate(() => {
     const { state, runtime, switchMainTab } = window.__angleDebug;
     const originalState = structuredClone(state);
@@ -729,8 +741,25 @@ try {
     const shellRect = shell?.getBoundingClientRect();
     const settings = document.querySelector('[data-tab="settings"]');
     const visibleButtons = Array.from(document.querySelectorAll("[data-tab]")).filter((button) => !button.hidden);
+    const before = strip?.scrollLeft ?? 0;
+    if (strip) strip.scrollLeft = 0;
     const rects = visibleButtons.map((button) => button.getBoundingClientRect());
     const sortedRects = [...rects].sort((a, b) => a.left - b.left);
+    const stripRect = strip?.getBoundingClientRect();
+    const startLastRect = visibleButtons.at(-1)?.getBoundingClientRect();
+    const lastFillsAtStart = Boolean(
+      stripRect
+      && startLastRect
+      && Math.abs(startLastRect.right - stripRect.right) <= 1,
+    );
+    if (strip) strip.scrollLeft = strip.scrollWidth;
+    const endLastRect = visibleButtons.at(-1)?.getBoundingClientRect();
+    const lastReachableAtEnd = Boolean(
+      stripRect
+      && endLastRect
+      && endLastRect.right <= stripRect.right + 1,
+    );
+    if (strip) strip.scrollLeft = before;
     return {
       navDisplay: nav ? getComputedStyle(nav).display : "",
       navFlexWrap: nav ? getComputedStyle(nav).flexWrap : "",
@@ -753,12 +782,15 @@ try {
       activeHeight: active?.getBoundingClientRect().height ?? 0,
       stripClientWidth: strip?.clientWidth ?? 0,
       stripScrollWidth: strip?.scrollWidth ?? 0,
+      visibleTabs: visibleButtons.map((button) => button.dataset.tab),
       tabWidths: rects.map((rect) => rect.width),
       rows: rects.length > 0 ? Math.max(...rects.map((rect) => rect.top)) - Math.min(...rects.map((rect) => rect.top)) : Infinity,
       allVisibleInStrip: visibleButtons.every((button) => button.parentElement === strip),
       settingsInScrollHost: settings?.parentElement === strip,
       hasTabOverlap: sortedRects.some((rect, index) => sortedRects[index + 1] && rect.right > sortedRects[index + 1].left + 0.5),
       hasTabContentOverflow: visibleButtons.some((button) => button.scrollWidth > button.clientWidth + 1),
+      lastFillsAtStart,
+      lastReachableAtEnd,
     };
   });
   const measureSubtabRails = (targetPage) => targetPage.evaluate(() => {
@@ -772,10 +804,17 @@ try {
       switchMainTab(panel);
       const strip = document.querySelector(selector);
       const buttons = Array.from(strip?.querySelectorAll(":scope > .subtab") ?? []).filter((button) => !button.hidden);
+      const before = strip?.scrollLeft ?? 0;
+      if (strip) strip.scrollLeft = 0;
       const rects = buttons.map((button) => button.getBoundingClientRect());
       const sortedRects = [...rects].sort((a, b) => a.left - b.left);
       const stripRect = strip?.getBoundingClientRect();
-      const before = strip?.scrollLeft ?? 0;
+      const startLastRect = buttons.at(-1)?.getBoundingClientRect();
+      const lastFillsAtStart = Boolean(
+        stripRect
+        && startLastRect
+        && Math.abs(startLastRect.right - stripRect.right) <= 1,
+      );
       if (strip) strip.scrollLeft = strip.scrollWidth;
       const lastRect = buttons.at(-1)?.getBoundingClientRect();
       const endStripRect = strip?.getBoundingClientRect();
@@ -795,6 +834,7 @@ try {
         rows: rects.length > 0 ? Math.max(...rects.map((rect) => rect.top)) - Math.min(...rects.map((rect) => rect.top)) : Infinity,
         hasOverlap: sortedRects.some((rect, index) => sortedRects[index + 1] && rect.right > sortedRects[index + 1].left + 0.5),
         hasContentOverflow: buttons.some((button) => button.scrollWidth > button.clientWidth + 1),
+        lastFillsAtStart,
         lastReachableAtEnd,
       };
     });
@@ -918,6 +958,74 @@ try {
   assert.equal(endSettings.reachedEnd, true, "SET should be reachable at the end of the shared scrolling strip");
   assert.equal(endSettings.fullyVisible, true, "SET should be fully visible at the end of the shared scrolling strip");
   assert.equal(endSettings.inScrollHost, true, "SET should remain in the shared scrolling strip at its end");
+  const infinityGainSurface = await page.evaluate(() => {
+    const { state, runtime } = window.__angleDebug;
+    const originalState = structuredClone(state);
+    const originalTab = runtime.activeMainTab;
+    const originalGain = runtime.infinityPointGain;
+    const originalGainLog10 = runtime.infinityPointGainLog10;
+    const gains = [400, 1000].map((log10) => {
+      state.infinityCount = 1;
+      runtime.infinityPointGain = () => Number.MAX_VALUE;
+      runtime.infinityPointGainLog10 = () => log10;
+      runtime.updateUi();
+      const debug = JSON.parse(window.render_game_to_text()).infinity;
+      return {
+        summary: document.querySelector("#infinityPointGain")?.textContent?.trim() ?? "",
+        pointGain: debug.pointGain,
+        pointGainLog10: debug.pointGainLog10,
+      };
+    });
+    state.lastInfinityRuns = [{ time: 1, realTime: 1, scoreLog10: 400, ipGain: Number.MAX_VALUE, ipGainLog10: 1000, challenge: 0 }];
+    window.__angleDebug.switchMainTab("statistics");
+    runtime.updateUi();
+    const history = document.querySelector("#lastInfinityRuns")?.textContent?.trim() ?? "";
+    const copy = {};
+    for (const language of ["ja", "en"]) {
+      state.language = language;
+      runtime.updateUi();
+      copy[language] = {
+        gainLabel: document.querySelector('[data-i18n="infinityGain"]')?.textContent?.trim() ?? "",
+        angleBuyAll: document.querySelector("#buyAllUpgrade")?.textContent?.trim() ?? "",
+        iaBuyAll: document.querySelector("#infiniteAngleBuyAllUpgrade")?.textContent?.trim() ?? "",
+        angleHelper: Boolean(document.querySelector("#buyAllUpgrade small")),
+      };
+    }
+    runtime.infinityPointGain = originalGain;
+    runtime.infinityPointGainLog10 = originalGainLog10;
+    Object.assign(state, originalState);
+    window.__angleDebug.switchMainTab(originalTab);
+    runtime.updateUi();
+    return { gains, history, copy };
+  });
+  assert.deepEqual(
+    infinityGainSurface.gains.map((gain) => gain.summary),
+    ["+1.00e400 IP", "+1.00e1,000 IP"],
+    "Infinity summary should display e400/e1000 gains from log space",
+  );
+  assert.deepEqual(
+    infinityGainSurface.gains.map((gain) => gain.pointGain),
+    ["1.00e400", "1.00e1,000"],
+    "render_game_to_text should expose non-capped overflowing gains",
+  );
+  assert.deepEqual(
+    infinityGainSurface.gains.map((gain) => gain.pointGainLog10),
+    [400, 1000],
+    "render_game_to_text should expose raw Infinity gain logs",
+  );
+  assert.match(infinityGainSurface.history, /1\.00e1,000 IP/, "Statistics history should display the overflowing gain log");
+  assert.deepEqual(infinityGainSurface.copy.ja, {
+    gainLabel: "Infinity Point獲得",
+    angleBuyAll: "全購入",
+    iaBuyAll: "全購入",
+    angleHelper: false,
+  }, "Japanese Infinity Point and Buy All copy should be concise");
+  assert.deepEqual(infinityGainSurface.copy.en, {
+    gainLabel: "Infinity Point gain",
+    angleBuyAll: "Buy All",
+    iaBuyAll: "Buy All",
+    angleHelper: false,
+  }, "English Infinity Point and Buy All copy should be concise");
 
   const headerOriginal = await page.evaluate(() => ({
     infinityCount: window.__angleDebug.state.infinityCount,
@@ -2580,6 +2688,24 @@ try {
     assert.equal(mobileStartup.timeFluxPanel, false, "mobile startup should omit the dormant Time Flux panel");
     assert.equal(mobileStartup.timeFluxQuickBar, false, "mobile startup should omit the dormant Time Flux quick bar");
     assert.ok(mobileStartup.canvasWidth > 0, "the mobile Angle canvas should have a rendered width");
+    const issue321FitViewports = [
+      { width: 360, height: 844 },
+      { width: 390, height: 844 },
+      { width: 412, height: 915 },
+      { width: 430, height: 932 },
+      { width: 768, height: 1024 },
+    ];
+    const issue321FitNavigation = [];
+    for (const viewport of issue321FitViewports) {
+      await mobilePage.setViewportSize(viewport);
+      issue321FitNavigation.push({ viewport, layout: await measureMainTabBar(mobilePage) });
+    }
+    await mobilePage.setViewportSize({ width: 390, height: 844 });
+    for (const { viewport, layout } of issue321FitNavigation) {
+      assert.ok(layout.stripScrollWidth <= layout.stripClientWidth + 1, `${viewport.width}px fit navigation should not reserve unused horizontal space`);
+      assert.equal(layout.lastFillsAtStart, true, `${viewport.width}px fit navigation should fill through the last visible tab`);
+      assert.equal(layout.hasTabContentOverflow, false, `${viewport.width}px fit navigation should retain intrinsic tab content`);
+    }
     const mobileAngleSurface = await mobilePage.evaluate(() => {
       const { state, switchMainTab } = window.__angleDebug;
       state.language = "ja";
@@ -2662,6 +2788,36 @@ try {
       window.__angleDebug.switchMainTab("angle");
       window.advanceTime(0);
     });
+    const issue321RuntimeNavigation = [];
+    for (const viewport of issue321FitViewports) {
+      await mobilePage.setViewportSize(viewport);
+      issue321RuntimeNavigation.push({
+        viewport,
+        main: await measureMainTabBar(mobilePage),
+        subtabs: await measureSubtabRails(mobilePage),
+      });
+    }
+    await mobilePage.setViewportSize({ width: 390, height: 844 });
+    let runtimeNavigationOverflow = false;
+    for (const { viewport, main, subtabs } of issue321RuntimeNavigation) {
+      assert.equal(main.visibleTabs.includes("eternity"), true, `${viewport.width}px runtime navigation should retain the Eternity tab`);
+      assert.equal(main.hasTabContentOverflow, false, `${viewport.width}px runtime tabs should retain intrinsic content`);
+      if (main.stripScrollWidth > main.stripClientWidth + 1) {
+        runtimeNavigationOverflow = true;
+        assert.equal(main.lastReachableAtEnd, true, `${viewport.width}px overflowing runtime tabs should reach their end`);
+      } else {
+        assert.equal(main.lastFillsAtStart, true, `${viewport.width}px fitting runtime tabs should fill the strip`);
+      }
+      for (const rail of subtabs) {
+        assert.equal(rail.hasContentOverflow, false, `${viewport.width}px ${rail.panel} subtabs should retain intrinsic content`);
+        if (rail.scrollWidth > rail.clientWidth + 1) {
+          assert.equal(rail.lastReachableAtEnd, true, `${viewport.width}px overflowing ${rail.panel} subtabs should reach their end`);
+        } else {
+          assert.equal(rail.lastFillsAtStart, true, `${viewport.width}px fitting ${rail.panel} subtabs should fill the strip`);
+        }
+      }
+    }
+    assert.equal(runtimeNavigationOverflow, true, "runtime Eternity navigation should retain horizontal scrolling when the visible set overflows");
     const mobileTabBar = await measureMainTabBar(mobilePage);
     const mobileUiContract = await readUiContract(mobilePage);
     assert.equal(mobileUiContract.activePrimaryPageCount, 1, "mobile should expose one primary owner for the active page");

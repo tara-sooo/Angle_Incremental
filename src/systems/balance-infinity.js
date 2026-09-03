@@ -42,7 +42,7 @@ function balanceInfinityPointGain() {
 }
 
 function balanceInfinityPointGainLog10() {
-  return runtime.log10Value(balanceInfinityPointGain());
+  return balanceInfinityPointGainRawLog10();
 }
 
 function balanceInfinityUpgradeCostExponent() {

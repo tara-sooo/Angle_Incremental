@@ -12,7 +12,8 @@ function formatInfinityRunTime(value) {
 
 function infinityRunRecordText(record, index) {
   const challenge = record.challenge > 0 ? ` IC${record.challenge}` : "";
-  return `#${index + 1}${challenge} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.formatUiLogNumber(record.scoreLog10)} / +${runtime.formatUiNumber(record.ipGain)} IP`;
+  const gainLog10 = record.ipGainLog10 ?? runtime.log10Value(record.ipGain);
+  return `#${index + 1}${challenge} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.formatUiLogNumber(record.scoreLog10)} / +${runtime.formatUiLogNumber(gainLog10)} IP`;
 }
 
 function eternityRunRecordText(record, index) {
@@ -83,7 +84,7 @@ function infinityRunListSignature() {
     runtime.state.language,
     runtime.state.numberFormat,
     runtime.state.timeUnit,
-    records.map((record) => `${record.time}:${record.realTime}:${record.scoreLog10}:${record.ipGain}:${record.challenge}`).join(";"),
+    records.map((record) => `${record.time}:${record.realTime}:${record.scoreLog10}:${record.ipGain}:${record.ipGainLog10 ?? ""}:${record.challenge}`).join(";"),
   ].join("|");
 }
 

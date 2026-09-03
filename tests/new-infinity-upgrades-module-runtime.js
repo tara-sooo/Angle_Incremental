@@ -161,14 +161,24 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
 
     state.generationScoreMultiplierLog10 = 310;
     state.generationScoreMultiplier = Number.MAX_VALUE;
+    const hugeGainLog10 = runtime.infinityPointGainLog10();
     assert.equal(
       runtime.infinityPointGain(),
       Number.MAX_VALUE,
       "IC8 GR-derived IP multiplier must clamp huge IP gains to a finite value",
     );
+    assert.ok(
+      hugeGainLog10 > Math.log10(Number.MAX_VALUE),
+      "IC8 GR-derived IP gain log must retain the true value above the Number cap",
+    );
     assert.doesNotThrow(
       () => debug.runInfinity(),
       "huge finite IC8 IP gains must not crash Infinity reward payout",
+    );
+    assert.equal(
+      state.lastInfinityRuns[0].ipGainLog10,
+      hugeGainLog10,
+      "Infinity history must retain an overflowing IP gain log",
     );
   }
 
@@ -637,13 +647,41 @@ async function runNewInfinityUpgradesModuleRuntimeTest() {
     state.autoRunCoreBoost = false;
     state.infinityCount = 1;
     state.infiniteCapBroken = true;
-    setLogResource(state, "score", 700);
-    assert.ok(runtime.infinityPointGainLog10() < 400, "payable Infinity gain should remain below an over-cap threshold");
-    assert.equal(runtime.runLayerAutomation(), false, "over-cap Infinity thresholds must not trigger automation");
+    state.completedChallenges = 1 << (8 - 1);
+    state.generationScoreMultiplierLog10 = 510;
+    state.generationScoreMultiplier = Number.MAX_VALUE;
+    setLogResource(state, "score", 400);
+    assert.ok(runtime.infinityPointGainLog10() > 400, "payable Infinity gain must retain its true log above an e400 threshold");
+    assert.equal(runtime.runLayerAutomation(), true, "Infinity automation must compare the true gain above the Number cap");
+    assert.ok(state.infinityCount > 1, "true over-cap Infinity gain must trigger the reset automation");
 
     state.numberFormat = "scientific";
     assert.equal(runtime.formatUiLogNumber(100), "1.00e100", "scientific formatting should display Infinity thresholds as exponents");
     state.numberFormat = "compact";
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime, debug, storage } = instance;
+    const record = { time: 1, realTime: 1, scoreLog10: 400, ipGain: Number.MAX_VALUE, ipGainLog10: 1000, challenge: 0 };
+    debug.state.lastInfinityRuns = [record];
+    assert.match(
+      runtime.infinityRunRecordText(record, 0),
+      /1\.00e1,000 IP/,
+      "Infinity history text must use the raw overflowing IP gain log",
+    );
+    assert.equal(debug.saveGame("manual"), true, "Infinity history with a raw gain log should save");
+    const reloaded = await loadRuntime(candidatePath, storage);
+    assert.equal(
+      reloaded.debug.state.lastInfinityRuns[0].ipGainLog10,
+      1000,
+      "Infinity history raw gain logs must survive save and reload",
+    );
+    assert.equal(
+      reloaded.debug.state.lastInfinityRuns[0].ipGain,
+      Number.MAX_VALUE,
+      "Infinity history numeric compatibility caches must remain capped only as caches",
+    );
   }
 
   {

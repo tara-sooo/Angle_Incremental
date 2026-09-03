@@ -241,6 +241,7 @@ function recordInfinityRun(
   noGenerationCoreBoost = false,
   countGain = 0,
   towerChallenge = 0,
+  gainLog10 = null,
 ) {
   const elapsed = runtime.state.currentInfinityRunTime;
   const realElapsed = runtime.state.currentInfinityRealTime;
@@ -257,6 +258,7 @@ function recordInfinityRun(
     ipGain: gained,
     challenge,
   };
+  if (gainLog10 > runtime.log10Value(Number.MAX_VALUE)) record.ipGainLog10 = gainLog10;
   if (noGenerationCoreBoost) record.noGenerationCoreBoost = true;
   runtime.state.lastInfinityRuns.unshift(record);
   runtime.state.lastInfinityRuns = runtime.state.lastInfinityRuns.slice(0, 10);
@@ -329,6 +331,7 @@ function runInfinity(forced = false) {
   }
 
   const gained = runtime.infinityPointGain();
+  const gainedLog10 = runtime.infinityPointGainLog10();
   const canonicalBalanceGain = runtime.infinityPointGain === runtime.balanceInfinityPointGain;
   const countGain = infinityCountGain();
   runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + countGain);
@@ -344,6 +347,7 @@ function runInfinity(forced = false) {
     noGenerationOrCoreBoost,
     countGain,
     completedTowerChallenge,
+    gainedLog10,
   );
   runtime.checkAchievements(true);
   runtime.resetBelowInfinity();
