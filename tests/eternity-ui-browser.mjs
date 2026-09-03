@@ -393,6 +393,84 @@ try {
     parentOverflowY: "auto",
   }, "the nested Timeline should defer scrolling to the Eternity panel");
 
+  const readTimelineOverviewLayout = async (language, width) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.evaluate((nextLanguage) => {
+      const debug = window.__angleDebug;
+      debug.state.language = nextLanguage;
+      debug.runtime.appliedLanguage = "";
+      debug.runtime.updateUi();
+    }, language);
+    return page.evaluate(() => {
+      const labels = [
+        document.querySelector(".timeline-available span"),
+        ...Array.from(document.querySelectorAll(".timeline-summary span")),
+      ];
+      const rect = (node) => {
+        const bounds = node.getBoundingClientRect();
+        return {
+          bottom: bounds.bottom,
+          clientWidth: node.clientWidth,
+          height: bounds.height,
+          lineCount: (() => {
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            return new Set(Array.from(range.getClientRects(), (line) => line.y.toFixed(2))).size;
+          })(),
+          scrollWidth: node.scrollWidth,
+          text: node.textContent?.trim(),
+          top: bounds.top,
+        };
+      };
+      const overview = document.querySelector(".timeline-overview");
+      const summary = document.querySelector(".timeline-summary");
+      const respec = document.querySelector(".timeline-respec");
+      return {
+        labels: labels.map(rect),
+        overview: rect(overview),
+        summary: rect(summary),
+        respec: rect(respec),
+        tracks: Array.from(document.querySelectorAll(".timeline-track"), rect),
+      };
+    });
+  };
+  for (const [language, expectedLabels] of [
+    ["ja", ["使用可能TF", "獲得TF", "使用済みTF"]],
+    ["en", ["Available TF", "Earned TF", "Spent TF"]],
+  ]) {
+    for (const width of [1280, 1024, 900, 768, 390]) {
+      const overviewLayout = await readTimelineOverviewLayout(language, width);
+      assert.deepEqual(
+        overviewLayout.labels.map((label) => label.text),
+        expectedLabels,
+        `${language} Timeline labels should remain present at ${width}px`,
+      );
+      assert.ok(
+        overviewLayout.labels.every((label) => label.lineCount === 1),
+        `${language} Timeline labels should stay on one line at ${width}px`,
+      );
+      assert.ok(
+        overviewLayout.overview.scrollWidth <= overviewLayout.overview.clientWidth + 1,
+        `Timeline overview should not overflow horizontally at ${width}px`,
+      );
+      assert.ok(
+        overviewLayout.respec.top >= overviewLayout.summary.bottom - 1,
+        `Respec should follow the TF summary at ${width}px`,
+      );
+      assert.ok(
+        overviewLayout.tracks.every((track) => track.scrollWidth <= track.clientWidth + 1),
+        `TF claim rows should remain readable at ${width}px`,
+      );
+    }
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.language = "ja";
+    debug.runtime.appliedLanguage = "";
+    debug.runtime.updateUi();
+  });
+
   await page.click('[data-timeline-node="Parallel-BC16500"]');
   const selectedParallel = await page.evaluate(() => ({
     selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,

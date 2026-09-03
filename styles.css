@@ -736,7 +736,7 @@ canvas {
 
 .timeline-overview {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
   gap: 8px;
   align-items: stretch;
   margin-bottom: 8px;
@@ -1138,6 +1138,7 @@ canvas {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  grid-column: 1 / -1;
   margin-top: 0;
   padding: 6px 0 6px 10px;
   border-left: 1px solid rgba(255, 166, 89, 0.45);
@@ -2689,25 +2690,25 @@ canvas {
   }
 
   .timeline-overview {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 1fr;
     gap: 4px;
     margin-bottom: 6px;
   }
 
   .timeline-available {
     grid-column: 1;
-    grid-row: 1;
+    grid-row: auto;
   }
 
   .timeline-summary {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    grid-column: 1;
+    grid-row: auto;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .timeline-respec {
-    grid-column: 2;
-    grid-row: 1;
+    grid-column: 1;
+    grid-row: auto;
     align-items: center;
     flex-direction: row;
     padding: 0;
