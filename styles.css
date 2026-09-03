@@ -3410,7 +3410,8 @@ canvas {
 
 .stage-panel {
   display: grid;
-  grid-template-rows: auto minmax(180px, 1fr) auto;
+  grid-template-rows: auto minmax(180px, auto) auto;
+  align-content: start;
 }
 
 .stage-panel > .topbar > div:first-child {
@@ -3654,6 +3655,11 @@ canvas {
   .stage-panel {
     grid-template-rows: auto minmax(128px, auto) auto;
     overflow: visible;
+  }
+
+  .main-tab-scroll > .main-tab,
+  .ui-subtab-strip > .subtab {
+    flex: 1 0 auto;
   }
 
   .stage-panel .reset-dock {

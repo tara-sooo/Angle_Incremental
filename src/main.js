@@ -1655,6 +1655,8 @@ function renderGameToText() {
   const totalScoreLog = runtime.currentTotalScoreLog10();
   const generationScoreLog = runtime.currentGenerationScoreLog10();
   const infinityPointsLog = runtime.currentInfinityPointsLog10();
+  const infinityPointGain = runtime.infinityPointGain();
+  const infinityPointGainLog10 = runtime.infinityPointGainLog10();
   const infiniteScoreLog = runtime.currentInfiniteScoreLog10();
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   const infiniteAngleCostLogs = {
@@ -1736,7 +1738,10 @@ function renderGameToText() {
       count: runtime.state.infinityCount,
       points: runtime.formatHeldUiLogNumber(infinityPointsLog, runtime.state.infinityPointsExact),
       pointsLog10: Number.isFinite(infinityPointsLog) ? Number(infinityPointsLog.toPrecision(6)) : null,
-      pointGain: runtime.infinityPointGain(),
+      pointGain: infinityPointGainLog10 > runtime.log10Value(Number.MAX_VALUE)
+        ? runtime.formatUiLogNumber(infinityPointGainLog10)
+        : infinityPointGain,
+      pointGainLog10: Number.isFinite(infinityPointGainLog10) ? Number(infinityPointGainLog10.toPrecision(6)) : null,
       infiniteScore: runtime.formatHeldUiLogNumber(infiniteScoreLog),
       infiniteScoreLog10: Number.isFinite(infiniteScoreLog) ? Number(infiniteScoreLog.toPrecision(6)) : null,
       infiniteAngleBoost: Number(runtime.infiniteAngleBoost().toFixed(2)),
