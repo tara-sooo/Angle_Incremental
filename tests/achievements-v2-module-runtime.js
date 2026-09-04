@@ -19,8 +19,8 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { state } = instance.debug;
     const { runtime } = instance;
 
-    assert.equal(runtime.ACHIEVEMENT_COUNT, 41, "achievement total should be derived from the 41 definitions");
-    assert.equal(runtime.ACHIEVEMENTS.length, 41, "achievement definition array should contain 41 entries");
+    assert.equal(runtime.ACHIEVEMENT_COUNT, 44, "achievement total should be derived from the 44 definitions");
+    assert.equal(runtime.ACHIEVEMENTS.length, 44, "achievement definition array should contain 44 entries");
 
     state.achievementMask = 0;
     state.gainLevel = 10;
@@ -139,6 +139,21 @@ async function runAchievementV2ModuleRuntimeTest() {
         before: (state) => { state.eternityCount = 0; },
         after: (state) => { state.eternityCount = 1; },
       },
+      {
+        id: 42,
+        before: (state) => { state.eternityMilestoneMask = 0; },
+        after: (state) => { state.eternityMilestoneMask = 1 << 1; },
+      },
+      {
+        id: 43,
+        before: (state) => { state.timelinePurchasedNodes = []; },
+        after: (state) => { state.timelinePurchasedNodes = [{ id: "Real-BC16500" }]; },
+      },
+      {
+        id: 44,
+        before: (state) => { state.timelinePurchasedNodes = []; },
+        after: (state) => { state.timelinePurchasedNodes = [{ id: "Parallel-BC16500" }]; },
+      },
     ];
     for (const testCase of cases) {
       const instance = await loadRuntime(candidatePath);
@@ -183,6 +198,31 @@ async function runAchievementV2ModuleRuntimeTest() {
     const { runtime } = instance;
 
     state.achievementMask = 0;
+    state.achievementMaskHigh = 0;
+    state.eternityCount = 1;
+    state.scoreTfClaims = 1;
+    runtime.updateUi();
+
+    assert.equal(runtime.purchaseTimelineNode("Real-BC16500", { save: false, update: false }), true, "Real route purchase should succeed");
+    runtime.checkAchievements(false);
+    assert.equal(runtime.isAchievementUnlocked(43), true, "purchasing Real should unlock achievement 43");
+    assert.equal(runtime.isAchievementUnlocked(44), false, "Parallel achievement should stay locked before Parallel purchase");
+
+    assert.equal(runtime.respecTimeline({ save: false, update: false }), true, "Timeline Respec should succeed between route purchases");
+    assert.equal(runtime.isAchievementUnlocked(43), true, "Timeline Respec must not revoke achievement 43");
+    assert.equal(runtime.purchaseTimelineNode("Parallel-BC16500", { save: false, update: false }), true, "Parallel route purchase should succeed after Respec");
+    runtime.checkAchievements(false);
+    assert.equal(runtime.isAchievementUnlocked(43), true, "achievement 43 should remain permanently unlocked");
+    assert.equal(runtime.isAchievementUnlocked(44), true, "purchasing Parallel should unlock achievement 44");
+    assert.equal(state.timelinePurchasedNodes[0].id, "Parallel-BC16500", "the route should switch to Parallel after Respec");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { state } = instance.debug;
+    const { runtime } = instance;
+
+    state.achievementMask = 0;
     state.achievementMaskHigh = 0b1111111111;
     assert.equal(runtime.isAchievementUnlocked(1), false, "high achievement bits must not unlock achievement 1");
     assert.equal(runtime.isAchievementUnlocked(2), false, "high achievement bits must not unlock achievement 2");
@@ -197,9 +237,12 @@ async function runAchievementV2ModuleRuntimeTest() {
     assert.equal(runtime.isAchievementUnlocked(32), false, "low achievement bits must not unlock achievement 32");
 
     state.achievementMask = 0x7fffffff;
-    state.achievementMaskHigh = 0b1111111111;
-    assert.equal(runtime.achievementCount(), 41, "all 41 achievements should be counted across both masks");
-    assertNearlyEqual(runtime.achievementGainMultiplier(), Math.pow(1.01, 41), "all 41 achievements should apply the shared multiplier");
+    state.achievementMaskHigh = (1 << 13) - 1;
+    [42, 43, 44].forEach((id) => {
+      assert.equal(runtime.isAchievementUnlocked(id), true, `achievement ${id} should use its high-mask bit`);
+    });
+    assert.equal(runtime.achievementCount(), 44, "all 44 achievements should be counted across both masks");
+    assertNearlyEqual(runtime.achievementGainMultiplier(), Math.pow(1.01, 44), "all 44 achievements should apply the shared multiplier");
   }
 
   {
@@ -434,7 +477,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     runtime.updateAchievementRows();
 
     const rows = runtime.elements.achievementList.querySelectorAll(".achievement-row");
-    assert.equal(rows.length, 41, "achievement rows should be rendered in the module runtime");
+    assert.equal(rows.length, 44, "achievement rows should be rendered in the module runtime");
 
     const firstReward = rows[0].querySelector(".achievement-reward");
     assert.equal(firstReward.textContent, "", "achievements without individual rewards should not repeat the shared reward");
@@ -471,6 +514,9 @@ async function runAchievementV2ModuleRuntimeTest() {
       ["とうに越した先に", "TC3をクリア", true],
       ["挑戦権、そして時空の片道切符", "TC4をクリア", true],
       ["Time is generative", "初回Eternityを実行", true],
+      ["初回はこれがおすすめ", "Eternity Milestone 1-2を取得", true],
+      ["現実主義", "Timeline-Realを購入", true],
+      ["1+多元のそれぞれの宇宙", "Timeline-Parallelを購入", true],
     ];
     japaneseDefinitions.forEach(([title, condition, rewardHidden], offset) => {
       const row = rows[31 + offset];
@@ -492,6 +538,9 @@ async function runAchievementV2ModuleRuntimeTest() {
       ["Far Beyond", "Complete TC3."],
       ["The Right to Challenge, and a One-Way Ticket Through Spacetime", "Complete TC4."],
       ["Time is generative", "Perform Eternity for the first time."],
+      ["Recommended for Your First Eternity", "Obtain Eternity Milestone 1-2."],
+      ["Realist", "Purchase Timeline-Real."],
+      ["The Respective Universes of 1+Many", "Purchase Timeline-Parallel."],
     ];
     state.language = "en";
     runtime.updateAchievementRows();
