@@ -197,7 +197,6 @@ function offlineCoreHitPlan(trackName, coreHits, onlineExactLimit, onlineApproxi
       };
   }
   if (!offlineWorkLedger) beginOfflineWorkBudget();
-  const track = offlineWorkLedger.tracks[trackName];
   const smallLimit = Math.max(0, Math.floor(runtime.OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT));
   if (hits <= smallLimit && offlineWorkAvailable(trackName, "small") >= hits) {
     consumeOfflineWork(trackName, "small", hits);
@@ -257,6 +256,29 @@ function offlineWorkStatsSnapshot() {
       infiniteAngle: copyTrack(offlineWorkLedger.tracks.infiniteAngle),
     },
   };
+}
+
+function offlineBulkSimulationAllowed() {
+  const state = runtime.state;
+  return state.infinityCount > 0
+    && !state.automationEnabled
+    && state.activeChallenge <= 0
+    && state.activeTowerChallenge <= 0
+    && (!Array.isArray(state.timelinePurchasedNodes) || state.timelinePurchasedNodes.length === 0);
+}
+
+function offlineBulkTickLimit(tickSeconds, remainingTicks) {
+  if (!offlineBulkSimulationAllowed()) return 1;
+  const timeUntilAchievement = 5 * 60 * 60 - runtime.state.totalPlayTime;
+  if (
+    runtime.isAchievementUnlocked?.(11) !== true
+    && timeUntilAchievement > 0
+    && Number.isFinite(tickSeconds)
+    && tickSeconds > 0
+  ) {
+    return Math.max(1, Math.min(remainingTicks, Math.ceil(timeUntilAchievement / tickSeconds)));
+  }
+  return remainingTicks;
 }
 
 function setOfflineProcessing(value) {
@@ -1208,6 +1230,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     let processedTicks = 0;
     let requestedTicks = 0;
     let processingMilliseconds = 0;
+    let simulationIterations = 0;
+    let bulkIterations = 0;
+    let bulkProcessedTicks = 0;
     let precisionReduced = false;
 
     if (!clockAnomaly) {
@@ -1240,6 +1265,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           processedTicks: 0,
           requestedTicks,
           processingMilliseconds: 0,
+          simulationIterations: 0,
+          bulkIterations: 0,
+          bulkProcessedTicks: 0,
           precisionReduced,
           capped: simulatedSeconds + 1e-9 < elapsed,
           offlineProgressEnabled: runtime.state.offlineProgressEnabled,
@@ -1277,14 +1305,18 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             const currentBatchTicks = Math.min(
               batchTicks,
               remainingTicks,
+              offlineBulkTickLimit(tickSeconds, remainingTicks),
               clockHasNotAdvanced
                 ? Math.max(1, OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT - zeroClockTicksSinceYield)
                 : remainingTicks,
             );
             const batchEnd = processedTicks + currentBatchTicks;
-            while (processedTicks < batchEnd) {
-              update(tickSeconds, true);
-              processedTicks += 1;
+            update(tickSeconds * currentBatchTicks, true);
+            processedTicks = batchEnd;
+            simulationIterations += 1;
+            if (currentBatchTicks > 1) {
+              bulkIterations += 1;
+              bulkProcessedTicks += currentBatchTicks;
             }
             precisionReduced = Boolean(runtime.offlinePrecisionReduced);
             const batchFinishedAt = monotonicClockNow();
@@ -1322,6 +1354,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             }
             lastBatchFinishedAt = batchFinishedAt;
             progressReport.processedTicks = processedTicks;
+            progressReport.simulationIterations = simulationIterations;
+            progressReport.bulkIterations = bulkIterations;
+            progressReport.bulkProcessedTicks = bulkProcessedTicks;
             progressReport.precisionReduced = precisionReduced;
             const progressElapsed = batchFinishedAt - lastProgressUiAt;
             const zeroClockFallback = zeroClockTicksSinceYield >= OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT;
@@ -1386,6 +1421,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       processedTicks,
       requestedTicks,
       processingMilliseconds,
+      simulationIterations,
+      bulkIterations,
+      bulkProcessedTicks,
       precisionReduced,
       capped: effectiveElapsedSeconds + 1e-9 < elapsed,
       offlineProgressEnabled: runtime.state.offlineProgressEnabled,

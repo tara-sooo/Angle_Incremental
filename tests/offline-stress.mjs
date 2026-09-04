@@ -9,7 +9,7 @@ const budgets = Object.freeze({
   offlineAutoInfinityUiUpdates: 2,
   offlineCoreHitWallMs: 250,
   offlineCoreHitErrorLog10: 0.001,
-  offlineLongResumeWallMs: 120000,
+  offlineLongResumeWallMs: 5000,
 });
 
 function collectViolations(report) {
@@ -45,6 +45,11 @@ function collectViolations(report) {
   for (const [name, resume] of Object.entries(report.offlineStress.longResumeWork)) {
     if (resume.wallMilliseconds > budgets.offlineLongResumeWallMs) {
       violations.push(`offline ${name} long-resume wall ${resume.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineLongResumeWallMs}ms`);
+    }
+  }
+  for (const [ticks, resume] of Object.entries(report.offlineStress.quietResume)) {
+    if (resume.wallMilliseconds > budgets.offlineLongResumeWallMs) {
+      violations.push(`offline quiet ${ticks}-tick resume wall ${resume.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineLongResumeWallMs}ms`);
     }
   }
   return violations;
@@ -261,6 +266,9 @@ async function measureOfflineStress(page) {
         return {
           requestedTicks: report?.requestedTicks ?? 0,
           processedTicks: report?.processedTicks ?? 0,
+          simulationIterations: report?.simulationIterations ?? 0,
+          bulkIterations: report?.bulkIterations ?? 0,
+          bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
           precisionReduced: report?.precisionReduced ?? false,
           work: runtime.offlineWorkStats,
           wallMilliseconds: performance.now() - startedAt,
@@ -270,6 +278,70 @@ async function measureOfflineStress(page) {
         four: await measure(4, "performance-four-hit-offline-work"),
         eight: await measure(8, "performance-eight-hit-offline-work"),
         high: await measure(16, "performance-high-load-offline-work"),
+      };
+    }
+    async function measureQuietOfflineResume(requestedTicks) {
+      resetScenario(3);
+      state.activeTowerChallenge = 0;
+      state.automationEnabled = false;
+      state.autoRunInfinity = false;
+      state.autoRunGeneration = false;
+      state.autoRunCoreBoost = false;
+      state.infinityCount = 1;
+      state.infiniteAngleUnlocked = false;
+      state.offlineProgressEnabled = true;
+      state.offlineTickCount = requestedTicks;
+      state.timelinePurchasedNodes = [];
+      state.totalPlayTime = 0;
+      state.currentInfinityRunTime = 0;
+      state.currentEternityRunTime = 0;
+      state.currentGenerationRunTime = 0;
+      const startedAt = performance.now();
+      const report = await debug.processOfflineElapsed(
+        requestedTicks * runtime.MAX_SIMULATION_STEP_SECONDS,
+        `performance-quiet-${requestedTicks}`,
+        { clockSource: "server" },
+      );
+      return {
+        requestedTicks: report?.requestedTicks ?? 0,
+        processedTicks: report?.processedTicks ?? 0,
+        simulationIterations: report?.simulationIterations ?? 0,
+        bulkIterations: report?.bulkIterations ?? 0,
+        bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+        wallMilliseconds: performance.now() - startedAt,
+      };
+    }
+    async function measureTimelineOfflineResume() {
+      const requestedTicks = 10000;
+      resetScenario(720);
+      state.activeTowerChallenge = 0;
+      state.automationEnabled = false;
+      state.autoRunInfinity = false;
+      state.autoRunGeneration = false;
+      state.autoRunCoreBoost = false;
+      state.infinityCount = 1;
+      state.eternityCount = 1;
+      state.completedChallenges = 1 << (8 - 1);
+      state.timelinePurchasedNodes = [{ id: "Parallel-BC16500" }];
+      state.timelineParallelSecondsSinceIc8Clear = 0;
+      state.offlineProgressEnabled = true;
+      state.offlineTickCount = requestedTicks;
+      const tickSeconds = runtime.MAX_SIMULATION_STEP_SECONDS;
+      const startedAt = performance.now();
+      const report = await debug.processOfflineElapsed(
+        tickSeconds * requestedTicks,
+        "performance-timeline",
+        { clockSource: "server" },
+      );
+      return {
+        requestedTicks: report?.requestedTicks ?? 0,
+        processedTicks: report?.processedTicks ?? 0,
+        simulationIterations: report?.simulationIterations ?? 0,
+        bulkIterations: report?.bulkIterations ?? 0,
+        bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+        timelineSeconds: state.timelineParallelSecondsSinceIc8Clear,
+        expectedTimelineSeconds: tickSeconds * requestedTicks,
+        wallMilliseconds: performance.now() - startedAt,
       };
     }
     async function measureAutoInfinityStress() {
@@ -307,6 +379,9 @@ async function measureOfflineStress(page) {
         return {
           requestedTicks: report?.requestedTicks ?? 0,
           processedTicks: report?.processedTicks ?? 0,
+          simulationIterations: report?.simulationIterations ?? 0,
+          bulkIterations: report?.bulkIterations ?? 0,
+          bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
           infinityCountGain: report?.normalInfinityCountGain ?? 0,
           processingMilliseconds: report?.processingMilliseconds ?? NaN,
           wallMilliseconds: performance.now() - startedAt,
@@ -344,11 +419,16 @@ async function measureOfflineStress(page) {
     state.autoRunCoreBoost = false;
     state.activeChallenge = 0;
     state.activeTowerChallenge = 0;
+    state.infinityCount = 1;
+    state.timelinePurchasedNodes = [];
     const offlineStartedAt = performance.now();
     const offlineReport = await debug.processOfflineElapsed(100000 / 30, "performance", { clockSource: "server" });
     const offlineProcessing = {
       requestedTicks: offlineReport?.requestedTicks ?? 0,
       processedTicks: offlineReport?.processedTicks ?? 0,
+      simulationIterations: offlineReport?.simulationIterations ?? 0,
+      bulkIterations: offlineReport?.bulkIterations ?? 0,
+      bulkProcessedTicks: offlineReport?.bulkProcessedTicks ?? 0,
       processingMilliseconds: offlineReport?.processingMilliseconds ?? NaN,
       wallMilliseconds: performance.now() - offlineStartedAt,
     };
@@ -362,6 +442,13 @@ async function measureOfflineStress(page) {
         },
         infiniteAngleExactWork: measureInfiniteAngleExactWorkBudget(),
         longResumeWork: await measureLongOfflineResumeWork(),
+        quietResume: {
+          1000: await measureQuietOfflineResume(1000),
+          10000: await measureQuietOfflineResume(10000),
+          100000: await measureQuietOfflineResume(100000),
+          1000000: await measureQuietOfflineResume(1000000),
+        },
+        timelineResume: await measureTimelineOfflineResume(),
       },
     };
   });
@@ -387,7 +474,7 @@ try {
       viewport: { name: "desktop", width: 1280, height: 800 },
       deviceScaleFactor: 1,
       preparation: "unmeasured 3/720/10000 Angle and Infinite Angle updates prime the progressed achievement state used by the original boundary coverage",
-      scenarios: ["offline-processing", "auto-infinity", "core-hit-boundary", "infinite-angle-exact-work", "long-resume"],
+      scenarios: ["offline-processing", "auto-infinity", "core-hit-boundary", "infinite-angle-exact-work", "long-resume", "quiet-resume-scale", "timeline-enabled"],
     },
     budgets,
     ...data,
@@ -412,11 +499,21 @@ try {
       && report.offlineProcessing.wallMilliseconds >= 0,
     "the real offline path should report a finite wall duration",
   );
+  assert.ok(report.offlineProcessing.bulkIterations > 0, "the real quiet offline path should use bulk iterations");
+  assert.equal(
+    report.offlineProcessing.processedTicks,
+    report.offlineProcessing.bulkProcessedTicks
+      + report.offlineProcessing.simulationIterations
+      - report.offlineProcessing.bulkIterations,
+    "the real quiet offline path should account for bulk and single-tick iterations",
+  );
 
   const autoInfinity = report.offlineStress.autoInfinity;
   assert.equal(autoInfinity.requestedTicks, 10000, "Auto Infinity stress should request 10000 ticks");
   assert.equal(autoInfinity.processedTicks, 10000, "Auto Infinity stress should process 10000 ticks exactly");
   assert.equal(autoInfinity.infinityCountGain, 10000, "Auto Infinity stress should run once per tick");
+  assert.equal(autoInfinity.simulationIterations, 10000, "Auto Infinity should retain one simulation iteration per reset event");
+  assert.equal(autoInfinity.bulkIterations, 0, "Auto Infinity should not use bulk iterations across reset events");
   for (const [track, boundary] of Object.entries(report.offlineStress.coreHitBoundary)) {
     assert.equal(boundary.coreHits, 48000, `${track} boundary should use 48000 core hits`);
     assert.equal(boundary.requestedTicks, 1, `${track} boundary should fit in one offline tick`);
@@ -442,18 +539,25 @@ try {
   for (const [name, resume] of Object.entries(longResumeWork)) {
     assert.equal(resume.requestedTicks, 1000000, `${name} long resume should request the maximum tick count`);
     assert.equal(resume.processedTicks, 1000000, `${name} long resume should process the maximum tick count`);
+    assert.ok(resume.simulationIterations < resume.requestedTicks, `${name} long resume should reduce full update iterations`);
+    assert.ok(resume.bulkIterations > 0, `${name} long resume should use bulk iterations`);
+    assert.equal(
+      resume.processedTicks,
+      resume.bulkProcessedTicks + resume.simulationIterations - resume.bulkIterations,
+      `${name} long resume should account for bulk and single-tick iterations`,
+    );
     assert.ok(resume.work.totalIterations <= resume.work.hardCap, `${name} offline work must stay within its hard cap`);
     assert.ok(Number.isFinite(resume.wallMilliseconds), `${name} long resume should report finite wall time`);
   }
-  assert.equal(longResumeWork.four.precisionReduced, false, "four-hit offline batches should remain exact");
-  assert.equal(longResumeWork.eight.precisionReduced, false, "eight-hit offline batches should remain exact");
+  assert.equal(longResumeWork.four.precisionReduced, true, "four-hit million-tick batches should report bounded approximation");
+  assert.equal(longResumeWork.eight.precisionReduced, true, "eight-hit million-tick batches should report bounded approximation");
   for (const name of ["four", "eight"]) {
     assert.ok(
       longResumeWork[name].work.tracks.angle.exactIterations > 0
         && longResumeWork[name].work.tracks.infiniteAngle.exactIterations > 0
-        && longResumeWork[name].work.tracks.angle.approximationIterations === 0
-        && longResumeWork[name].work.tracks.infiniteAngle.approximationIterations === 0,
-      `${name}-hit batches on both tracks should remain exact within the long-resume budget`,
+        && longResumeWork[name].work.tracks.angle.approximationIterations > 0
+        && longResumeWork[name].work.tracks.infiniteAngle.approximationIterations > 0,
+      `${name}-hit batches on both tracks should use exact work before bounded approximation`,
     );
   }
   assert.equal(longResumeWork.high.precisionReduced, true, "high-load offline batches should report bounded approximation after the bulk reserve");
@@ -468,6 +572,28 @@ try {
     longResumeWork.high.work.tracks.angle.fallbackIterations <= 1000000
       && longResumeWork.high.work.tracks.infiniteAngle.fallbackIterations <= 1000000,
     "high-load fallback work should stay bounded by the resume length",
+  );
+  const quietResume = report.offlineStress.quietResume;
+  for (const [ticks, resume] of Object.entries(quietResume)) {
+    assert.equal(resume.requestedTicks, Number(ticks), `quiet ${ticks}-tick resume should request its configured ticks`);
+    assert.equal(resume.processedTicks, Number(ticks), `quiet ${ticks}-tick resume should process its configured ticks`);
+    assert.ok(resume.simulationIterations < resume.requestedTicks, `quiet ${ticks}-tick resume should use fewer full updates`);
+    assert.ok(resume.bulkIterations > 0, `quiet ${ticks}-tick resume should use bulk iterations`);
+    assert.equal(
+      resume.processedTicks,
+      resume.bulkProcessedTicks + resume.simulationIterations - resume.bulkIterations,
+      `quiet ${ticks}-tick resume should account for bulk and single-tick iterations`,
+    );
+    assert.ok(Number.isFinite(resume.wallMilliseconds), `quiet ${ticks}-tick resume should report finite wall time`);
+  }
+  const timelineResume = report.offlineStress.timelineResume;
+  assert.equal(timelineResume.requestedTicks, 10000, "Timeline resume should request 10000 ticks");
+  assert.equal(timelineResume.processedTicks, 10000, "Timeline resume should process 10000 ticks");
+  assert.equal(timelineResume.simulationIterations, 10000, "Timeline effects should retain per-tick simulation");
+  assert.equal(timelineResume.bulkIterations, 0, "Timeline effects should not be bulked across changing production state");
+  assert.ok(
+    Math.abs(timelineResume.timelineSeconds - timelineResume.expectedTimelineSeconds) < 1e-9,
+    "Timeline elapsed state should preserve the full offline duration",
   );
   assert.deepEqual(violations, [], `offline stress budget violations:\n${violations.join("\n")}`);
 } finally {
