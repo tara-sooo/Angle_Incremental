@@ -943,6 +943,7 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.numberFormat = runtime.normalizeChoice(data.numberFormat, ["compact", "scientific", "detailed"], data.detailedNumbers ? "detailed" : "compact");
   runtime.state.timeUnit = runtime.normalizeChoice(data.timeUnit, ["auto", "seconds", "milliseconds"], "auto");
   runtime.state.topBarMode = runtime.normalizeChoice(data.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
+  runtime.state.mainTabPosition = runtime.normalizeChoice(data.mainTabPosition, ["right", "bottom"], "right");
   runtime.state.showTimeFluxQuickBar = data.showTimeFluxQuickBar !== false;
   runtime.state.hiddenTabs = runtime.normalizeHiddenTabs(data.hiddenTabs);
   runtime.state.unlockedMainTabs = runtime.normalizeUnlockedMainTabs(data.unlockedMainTabs);
@@ -1414,6 +1415,7 @@ function resetSave() {
     numberFormat: "compact",
     timeUnit: "auto",
     topBarMode: "news",
+    mainTabPosition: "right",
     showTimeFluxQuickBar: true,
     hiddenTabs: [],
     unlockedMainTabs: [],

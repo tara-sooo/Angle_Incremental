@@ -493,6 +493,7 @@ function updateUi() {
   const discoveredMainTabs = runtime.discoverMainTabs?.() === true;
   if (unlockedAchievementsNow.length > 0 || discoveredMainTabs) runtime.saveGame("manual");
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
+  runtime.elements.shell.classList.toggle("main-tabs-right", runtime.state.mainTabPosition !== "bottom");
   applyLanguage();
   runtime.updateHelpUi?.();
   runtime.updateMainTabVisibility?.();
@@ -656,6 +657,7 @@ function updateUi() {
   syncFormControl(runtime.elements.numberFormatSelect, runtime.state.numberFormat);
   syncFormControl(runtime.elements.timeUnitSelect, runtime.state.timeUnit);
   syncFormControl(runtime.elements.topBarModeSelect, runtime.state.topBarMode);
+  syncFormControl(runtime.elements.mainTabPositionSelect, runtime.state.mainTabPosition);
   syncFormControl(runtime.elements.offlineProgressToggle, runtime.state.offlineProgressEnabled);
   syncFormControl(runtime.elements.offlineTickInput, runtime.state.offlineTickCount);
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);
