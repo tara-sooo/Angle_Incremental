@@ -1911,6 +1911,7 @@ function renderGameToText() {
       language: runtime.state.language,
       numberFormat: runtime.state.numberFormat,
       timeUnit: runtime.state.timeUnit,
+      mainTabPosition: runtime.state.mainTabPosition,
       showTimeFluxQuickBar: runtime.state.showTimeFluxQuickBar,
       hiddenTabs: runtime.normalizeHiddenTabs(runtime.state.hiddenTabs),
       unlockedMainTabs: runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs),
