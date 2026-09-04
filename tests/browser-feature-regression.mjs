@@ -1266,9 +1266,9 @@ try {
     };
   });
   assert.equal(achievementUi.panelActive, true, "the Achievements panel should activate on desktop");
-  assert.equal(achievementUi.count, 41, "the desktop Achievements panel should render 41 rows");
-  assert.equal(achievementUi.japaneseSummary, "41/41 実績", "the desktop Japanese Achievements summary should show 41 achievements");
-  assert.equal(achievementUi.englishSummary, "41/41 Achievements", "the desktop English Achievements summary should show 41 achievements");
+  assert.equal(achievementUi.count, 44, "the desktop Achievements panel should render 44 rows");
+  assert.equal(achievementUi.japaneseSummary, "41/44 実績", "the desktop Japanese Achievements summary should show 41 of 44 achievements");
+  assert.equal(achievementUi.englishSummary, "41/44 Achievements", "the desktop English Achievements summary should show 41 of 44 achievements");
   assert.deepEqual(achievementUi.japanese, [
     { title: "不吉だという前提は置いておいて", condition: "所持IPがe44に到達", rewardHidden: true },
     { title: "バベルも土台から", condition: "Towerを建設", rewardHidden: true },
@@ -1280,6 +1280,9 @@ try {
     { title: "とうに越した先に", condition: "TC3をクリア", rewardHidden: true },
     { title: "挑戦権、そして時空の片道切符", condition: "TC4をクリア", rewardHidden: true },
     { title: "Time is generative", condition: "初回Eternityを実行", rewardHidden: true },
+    { title: "初回はこれがおすすめ", condition: "Eternity Milestone 1-2を取得", rewardHidden: true },
+    { title: "現実主義", condition: "Timeline-Realを購入", rewardHidden: true },
+    { title: "1+多元のそれぞれの宇宙", condition: "Timeline-Parallelを購入", rewardHidden: true },
   ], "the desktop Japanese achievement definitions should be exact");
   assert.deepEqual(achievementUi.english, [
     { title: "Assuming It Is Unlucky", condition: "Hold at least 1e44 IP." },
@@ -1292,6 +1295,9 @@ try {
     { title: "Far Beyond", condition: "Complete TC3." },
     { title: "The Right to Challenge, and a One-Way Ticket Through Spacetime", condition: "Complete TC4." },
     { title: "Time is generative", condition: "Perform Eternity for the first time." },
+    { title: "Recommended for Your First Eternity", condition: "Obtain Eternity Milestone 1-2." },
+    { title: "Realist", condition: "Purchase Timeline-Real." },
+    { title: "The Respective Universes of 1+Many", condition: "Purchase Timeline-Parallel." },
   ], "the desktop English achievement definitions should be exact");
   assert.ok(achievementUi.listWidth > 0, "the desktop achievement list should have a visible layout");
   const desktopUiChanges = await page.evaluate(() => {
@@ -3048,8 +3054,8 @@ try {
       };
     });
     assert.equal(mobileAchievements.panelActive, true, "the Achievements panel should activate on mobile");
-    assert.equal(mobileAchievements.count, 41, "the mobile Achievements panel should render 41 rows");
-    assert.equal(mobileAchievements.lastTitle, "Time is generative", "the mobile Achievements panel should keep the final row visible");
+    assert.equal(mobileAchievements.count, 44, "the mobile Achievements panel should render 44 rows");
+    assert.equal(mobileAchievements.lastTitle, "1+多元のそれぞれの宇宙", "the mobile Achievements panel should keep the final row visible");
     assert.ok(mobileAchievements.listWidth > 0, "the mobile achievement list should have a visible layout");
 
     const mobileVertexGainDisplay = await mobilePage.evaluate(() => {

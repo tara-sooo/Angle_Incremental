@@ -250,6 +250,24 @@ const ACHIEVEMENTS = [
     reward: { ja: "", en: "" },
     isUnlocked: () => runtime.state.eternityCount > 0,
   },
+  {
+    title: { ja: "初回はこれがおすすめ", en: "Recommended for Your First Eternity" },
+    condition: { ja: "Eternity Milestone 1-2を取得", en: "Obtain Eternity Milestone 1-2." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.eternityMilestoneActive("1-2"),
+  },
+  {
+    title: { ja: "現実主義", en: "Realist" },
+    condition: { ja: "Timeline-Realを購入", en: "Purchase Timeline-Real." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.timelineRealOwned(),
+  },
+  {
+    title: { ja: "1+多元のそれぞれの宇宙", en: "The Respective Universes of 1+Many" },
+    condition: { ja: "Timeline-Parallelを購入", en: "Purchase Timeline-Parallel." },
+    reward: { ja: "", en: "" },
+    isUnlocked: () => runtime.timelineParallelOwned(),
+  },
 ];
 
 let cachedAchievementSignature = null;
