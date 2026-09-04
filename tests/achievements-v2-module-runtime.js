@@ -325,7 +325,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     [15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27, 28, 29, 30, 31].forEach((id) => {
       assert.equal(runtime.isAchievementUnlocked(id), true, `achievement ${id} should unlock from its condition`);
     });
-    assert.equal(runtime.ACHIEVEMENTS[23].title.ja, "以前はlog10(score)-307でした", "achievement 24 should be the IU9-1 achievement");
+    assert.equal(runtime.ACHIEVEMENTS[23].title.ja, "かつてのスコア上限", "achievement 24 should be the IU9-1 achievement");
     assert.equal(runtime.ACHIEVEMENTS[29].title.ja, "SDGsよりは簡単な課題", "achievement 30 should be the all-IC achievement");
     assert.equal(runtime.ACHIEVEMENTS[30].title.ja, "六兆年と一夜の付き合い", "achievement 31 should be the IA unlock achievement");
   }
@@ -452,7 +452,7 @@ async function runAchievementV2ModuleRuntimeTest() {
     assert.equal(achievement21Reward.textContent, "報酬: IP獲得量がさらに×2", "achievement 21 should advertise the extra IP multiplier");
     assert.equal(achievement21Reward.hidden, false, "achievement 21 reward should be visible");
 
-    assert.equal(rows[23].querySelector(".achievement-title").textContent, "以前はlog10(score)-307でした", "achievement 24 row should use the new order");
+    assert.equal(rows[23].querySelector(".achievement-title").textContent, "かつてのスコア上限", "achievement 24 row should use the new order");
     assert.equal(rows[29].querySelector(".achievement-title").textContent, "SDGsよりは簡単な課題", "achievement 30 row should use the new order");
 
     const achievement31Reward = rows[30].querySelector(".achievement-reward");

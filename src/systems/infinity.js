@@ -127,6 +127,14 @@ function addInfinityPoints(amount) {
   runtime.syncInfinityPointCachesFromExact(current + added);
 }
 
+function addInfinityPointsLog10(amountLog10) {
+  const normalizedLog10 = runtime.sanitizeLog10(amountLog10, -Infinity);
+  if (normalizedLog10 === -Infinity) return;
+  const current = runtime.currentExactInfinityPoints();
+  const added = runtime.exactInfinityPointsFromLog10(normalizedLog10);
+  if (added > 0n) runtime.syncInfinityPointCachesFromExact(current + added);
+}
+
 function spendInfinityPoints(costLog10) {
   if (!canSpendInfinityPoints(costLog10)) return false;
   const current = runtime.currentExactInfinityPoints();
@@ -137,13 +145,6 @@ function spendInfinityPoints(costLog10) {
 
 function canBreakInfiniteCap() {
   return !runtime.state.infiniteCapBroken && runtime.currentScoreLog10() >= runtime.BREAK_CAP_REQUIREMENT_LOG10;
-}
-
-function completeChallengeIfReady() {
-  if (!runtime.state.autoCompleteChallenges || runtime.state.activeChallenge <= 0 || !canInfinity()) return false;
-  if (runtime.state.activeTowerChallenge > 0 && !runtime.towerChallengeCanComplete()) return false;
-  runInfinity(false);
-  return true;
 }
 
 function updateChallengeTimers(dt) {
@@ -240,6 +241,7 @@ function recordInfinityRun(
   noGenerationCoreBoost = false,
   countGain = 0,
   towerChallenge = 0,
+  gainLog10 = null,
 ) {
   const elapsed = runtime.state.currentInfinityRunTime;
   const realElapsed = runtime.state.currentInfinityRealTime;
@@ -256,6 +258,7 @@ function recordInfinityRun(
     ipGain: gained,
     challenge,
   };
+  if (gainLog10 > runtime.log10Value(Number.MAX_VALUE)) record.ipGainLog10 = gainLog10;
   if (noGenerationCoreBoost) record.noGenerationCoreBoost = true;
   runtime.state.lastInfinityRuns.unshift(record);
   runtime.state.lastInfinityRuns = runtime.state.lastInfinityRuns.slice(0, 10);
@@ -290,6 +293,8 @@ function runInfinity(forced = false) {
 
   const scoreLogBeforeReset = runtime.currentScoreLog10();
   const completedChallenge = runtime.state.activeChallenge;
+  const completedChallengeWasAlreadyComplete = completedChallenge > 0
+    && isChallengeCompleted(completedChallenge);
   const completedChallengeTime = runtime.state.activeChallengeTime;
   const completedTowerChallenge = runtime.towerChallengeCanComplete()
     ? runtime.state.activeTowerChallenge
@@ -313,6 +318,7 @@ function runInfinity(forced = false) {
   if (completedChallenge > 0) {
     recordInfinityChallengeTime(completedChallenge, completedChallengeTime);
     runtime.state.completedChallenges |= 1 << (completedChallenge - 1);
+    if (completedChallenge === 8 && !completedChallengeWasAlreadyComplete) runtime.markTimelineIc8Clear?.();
     runtime.state.activeChallenge = 0;
     runtime.state.activeChallengeTime = 0;
     runtime.checkAchievements(true);
@@ -325,9 +331,15 @@ function runInfinity(forced = false) {
   }
 
   const gained = runtime.infinityPointGain();
+  const gainedLog10 = runtime.infinityPointGainLog10();
+  const canonicalBalanceGain = runtime.infinityPointGain === runtime.balanceInfinityPointGain;
   const countGain = infinityCountGain();
   runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + countGain);
-  addInfinityPoints(gained);
+  if (canonicalBalanceGain && runtime.balanceInfinityPointGainRawLog10) {
+    addInfinityPointsLog10(runtime.balanceInfinityPointGainRawLog10());
+  } else {
+    addInfinityPoints(gained);
+  }
   recordInfinityRun(
     scoreLogBeforeReset,
     gained,
@@ -335,6 +347,7 @@ function runInfinity(forced = false) {
     noGenerationOrCoreBoost,
     countGain,
     completedTowerChallenge,
+    gainedLog10,
   );
   runtime.checkAchievements(true);
   runtime.resetBelowInfinity();
@@ -345,15 +358,33 @@ function runInfinity(forced = false) {
   runtime.saveGame("manual");
 }
 
-function buyInfinityUpgrade(id) {
+function buyInfinityUpgrade(id, { refresh = true, save = true } = {}) {
   const upgrade = infinityUpgradeById(id);
   if (!upgrade || !canBuyInfinityUpgrade(id)) return false;
   if (!spendInfinityPoints(runtime.log10Value(upgrade.cost))) return false;
   runtime.state.infinityUpgradeMask |= 1 << upgrade.bit;
   if (id === "10-1") applyStartingCoreBoosts();
-  runtime.updateUi();
-  runtime.saveGame("manual");
+  if (refresh) runtime.updateUi();
+  if (save) runtime.saveGame("manual");
   return true;
+}
+
+function buyAllInfinityUpgrades({ refresh = true, save = true } = {}) {
+  if (runtime.infinityUpgradeAutomationUnlocked?.() !== true) return 0;
+  let purchased = 0;
+  let changed = true;
+  while (changed && purchased < runtime.INFINITY_UPGRADES.length) {
+    changed = false;
+    for (const upgrade of runtime.INFINITY_UPGRADES) {
+      if (buyInfinityUpgrade(upgrade.id, { refresh: false, save: false })) {
+        purchased += 1;
+        changed = true;
+      }
+    }
+  }
+  if (purchased > 0 && refresh) runtime.updateUi();
+  if (purchased > 0 && save) runtime.saveGame("manual");
+  return purchased;
 }
 
 function toggleInfinityChallenge(index = nextChallengeIndex()) {
@@ -411,9 +442,9 @@ expose("infinityPointGain", () => infinityPointGain, (value) => { infinityPointG
 expose("infinityPointGainLog10", () => infinityPointGainLog10, (value) => { infinityPointGainLog10 = value; });
 expose("canSpendInfinityPoints", () => canSpendInfinityPoints, (value) => { canSpendInfinityPoints = value; });
 expose("addInfinityPoints", () => addInfinityPoints, (value) => { addInfinityPoints = value; });
+expose("addInfinityPointsLog10", () => addInfinityPointsLog10, (value) => { addInfinityPointsLog10 = value; });
 expose("spendInfinityPoints", () => spendInfinityPoints, (value) => { spendInfinityPoints = value; });
 expose("canBreakInfiniteCap", () => canBreakInfiniteCap, (value) => { canBreakInfiniteCap = value; });
-expose("completeChallengeIfReady", () => completeChallengeIfReady, (value) => { completeChallengeIfReady = value; });
 expose("updateChallengeTimers", () => updateChallengeTimers, (value) => { updateChallengeTimers = value; });
 expose("recordInfinityChallengeTime", () => recordInfinityChallengeTime, (value) => { recordInfinityChallengeTime = value; });
 expose("resetBelowInfinity", () => resetBelowInfinity, (value) => { resetBelowInfinity = value; });
@@ -423,5 +454,6 @@ expose("infinityCountGain", () => infinityCountGain, (value) => { infinityCountG
 expose("addAggregatedInfinityCount", () => addAggregatedInfinityCount, (value) => { addAggregatedInfinityCount = value; });
 expose("runInfinity", () => runInfinity, (value) => { runInfinity = value; });
 expose("buyInfinityUpgrade", () => buyInfinityUpgrade, (value) => { buyInfinityUpgrade = value; });
+expose("buyAllInfinityUpgrades", () => buyAllInfinityUpgrades, (value) => { buyAllInfinityUpgrades = value; });
 expose("toggleInfinityChallenge", () => toggleInfinityChallenge, (value) => { toggleInfinityChallenge = value; });
 expose("breakInfiniteCap", () => breakInfiniteCap, (value) => { breakInfiniteCap = value; });

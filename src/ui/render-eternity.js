@@ -1,5 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
-import "../data/eternity-i18n.js?v=0.12.2";
+import "../data/eternity-i18n.js?v=0.13.0";
 
 const FIRST_TIER_IDS = Object.freeze(["1-1", "1-2", "1-3"]);
 const MILESTONES = Object.freeze([
@@ -10,6 +10,11 @@ const MILESTONES = Object.freeze([
   Object.freeze({ id: "3", count: 8, nameKey: "eternityMilestone3Name", effectKey: "eternityMilestone3Effect", choice: false }),
   Object.freeze({ id: "4", count: 12, nameKey: "eternityMilestone4Name", effectKey: "eternityMilestone4Effect", choice: false }),
   Object.freeze({ id: "5", count: 20, nameKey: "eternityMilestone5Name", effectKey: "eternityMilestone5Effect", choice: false }),
+  Object.freeze({ id: "6", count: 27, nameKey: "eternityMilestone6Name", effectKey: "eternityMilestone6Effect", choice: false }),
+  Object.freeze({ id: "7", count: 44, nameKey: "eternityMilestone7Name", effectKey: "eternityMilestone7Effect", choice: false }),
+  Object.freeze({ id: "8", count: 81, nameKey: "eternityMilestone8Name", effectKey: "eternityMilestone8Effect", choice: false }),
+  Object.freeze({ id: "9", count: 108, nameKey: "eternityMilestone9Name", effectKey: "eternityMilestone9Effect", choice: false }),
+  Object.freeze({ id: "10", count: 128, nameKey: "eternityMilestone10Name", effectKey: "eternityMilestone10Effect", choice: false }),
 ]);
 
 let eternityRoot = null;
@@ -21,7 +26,7 @@ function installEternityStyles() {
   const link = document.createElement("link");
   link.id = "eternityUiStyles";
   link.rel = "stylesheet";
-  link.href = new URL("./eternity-ui.css?v=0.12.2", import.meta.url).href;
+  link.href = new URL("./eternity-ui.css?v=0.13.0", import.meta.url).href;
   document.head.append(link);
 }
 
@@ -56,29 +61,32 @@ function installEternityUi() {
   if (!mainTabs || !mainPanels) return null;
 
   installEternityStyles();
+  const mainTabHost = mainTabs.querySelector(".main-tab-scroll") || mainTabs;
 
   document.querySelector(".infinity-subtabs")?.classList.remove("has-eternity");
   document.querySelector('[data-infinity-tab="eternity"]')?.remove();
   document.querySelector('[data-infinity-panel="eternity"]')?.remove();
 
-  eternityTab = mainTabs.querySelector('[data-tab="eternity"]');
+  eternityTab = mainTabHost.querySelector('[data-tab="eternity"]');
   if (!eternityTab) {
     eternityTab = document.createElement("button");
-    eternityTab.className = "eternity-main-tab";
+    eternityTab.className = "main-tab";
     eternityTab.type = "button";
+    eternityTab.setAttribute("role", "tab");
     eternityTab.dataset.tab = "eternity";
     eternityTab.setAttribute("aria-selected", "false");
     eternityTab.innerHTML = '<span class="tab-icon">E</span><span class="tab-code">ETR</span><small data-i18n="eternityTab">Eternity</small>';
-    const infinityTab = mainTabs.querySelector('[data-tab="infinity"]');
+    const infinityTab = mainTabHost.querySelector('[data-tab="infinity"]');
     if (infinityTab) infinityTab.after(eternityTab);
-    else mainTabs.append(eternityTab);
+    else mainTabHost.append(eternityTab);
   }
 
   eternityRoot = mainPanels.querySelector('[data-panel="eternity"]');
   if (!eternityRoot) {
     eternityRoot = document.createElement("section");
-    eternityRoot.className = "main-panel eternity-page";
+    eternityRoot.className = "main-panel eternity-page ui-page";
     eternityRoot.dataset.panel = "eternity";
+    eternityRoot.dataset.scrollOwner = "primary";
     eternityRoot.setAttribute("aria-label", "Eternity");
     eternityRoot.innerHTML = `
       <header class="page-heading">
@@ -93,45 +101,56 @@ function installEternityUi() {
           <strong id="eternityHeadingCount">Eternity 0</strong>
         </div>
         <div class="eternity-panel">
-          <section class="eternity-overview" aria-label="Eternity status">
-            <div>
-              <span data-i18n="eternityCountLabel"></span>
-              <strong id="eternityCountValue">0</strong>
-            </div>
-            <div>
-              <span data-i18n="eternityRequirementTc4"></span>
-              <strong id="eternityTc4Requirement" class="eternity-requirement-status"></strong>
-            </div>
-            <div>
-              <span data-i18n="eternityRequirementIp"></span>
-              <strong id="eternityIpRequirement" class="eternity-requirement-status"></strong>
-            </div>
+          <div class="eternity-summary dense-summary" aria-label="Eternity status">
+            <p class="eternity-requirement" data-i18n="eternityRequirementCompact"></p>
             <div>
               <span data-i18n="eternityCurrentIp"></span>
               <strong id="eternityCurrentIp">0 IP</strong>
             </div>
-            <div>
-              <span data-i18n="eternityRequirement"></span>
-              <strong id="eternityRequirementState"></strong>
-            </div>
-          </section>
-          <div class="eternity-action-row">
-            <p id="eternityForcedNote" class="eternity-forced-note" data-i18n="eternityForcedNotice"></p>
+          </div>
+          <div class="eternity-action-row dense-action-row ui-action-row">
             <button id="eternityPerformButton" class="eternity-perform-button" type="button" data-eternity-action="perform"></button>
           </div>
-          <section class="eternity-choice-panel" aria-label="First-tier Eternity Milestone choice">
-            <h2 data-i18n="eternityFirstTierChoice"></h2>
-            <p class="eternity-choice-hint" data-i18n="eternityFirstTierHint"></p>
-            <p id="eternityChoiceEntitlement" class="eternity-choice-entitlement"></p>
-            <p id="eternityChoiceAllOwned" class="eternity-choice-all-owned" data-i18n="eternityChoiceAllOwned" hidden></p>
-          </section>
-          <h2 class="eternity-milestones-heading" data-i18n="eternityMilestones"></h2>
-          <section class="eternity-milestone-grid" aria-label="Eternity Milestones">
-            ${MILESTONES.map(milestoneMarkup).join("")}
-          </section>
+          <nav class="eternity-subtabs ui-subtab-strip ui-scroll-x" role="tablist" data-scroll-owner="horizontal" aria-label="Eternity sub tabs">
+            <button class="subtab eternity-subtab is-active" type="button" data-eternity-tab="milestone" aria-controls="eternityMilestoneSubpanel" aria-selected="true">
+              <span>MS</span>
+              <strong data-i18n="eternityMilestoneTab">Milestone</strong>
+            </button>
+            <button class="subtab eternity-subtab" type="button" data-eternity-tab="timeline" aria-controls="eternityTimelineSubpanel" aria-selected="false">
+              <span>TL</span>
+              <strong data-i18n="timelineTab">Timeline</strong>
+            </button>
+          </nav>
+          <div class="eternity-subpanels">
+            <section id="eternityMilestoneSubpanel" class="eternity-subpanel is-active" data-eternity-panel="milestone">
+              <section class="eternity-choice-panel" aria-label="First-tier Eternity Milestone choice">
+                <h2 data-i18n="eternityFirstTierChoice"></h2>
+                <p class="eternity-choice-hint" data-i18n="eternityFirstTierHint"></p>
+                <p id="eternityChoiceEntitlement" class="eternity-choice-entitlement"></p>
+                <p id="eternityChoiceAllOwned" class="eternity-choice-all-owned" data-i18n="eternityChoiceAllOwned" hidden></p>
+              </section>
+              <h2 class="eternity-milestones-heading" data-i18n="eternityMilestones"></h2>
+              <section class="eternity-milestone-grid" aria-label="Eternity Milestones">
+                ${MILESTONES.map(milestoneMarkup).join("")}
+              </section>
+            </section>
+          </div>
         </div>
       </section>`;
     mainPanels.append(eternityRoot);
+  }
+
+  const timelinePanel = mainPanels.querySelector('[data-panel="timeline"]');
+  const eternitySubpanels = eternityRoot.querySelector(".eternity-subpanels");
+  if (timelinePanel && eternitySubpanels) {
+    timelinePanel.classList.remove("main-panel", "ui-page");
+    timelinePanel.classList.add("eternity-subpanel");
+    timelinePanel.removeAttribute("data-panel");
+    timelinePanel.removeAttribute("data-scroll-owner");
+    timelinePanel.dataset.eternityPanel = "timeline";
+    timelinePanel.id = "eternityTimelineSubpanel";
+    timelinePanel.hidden = true;
+    eternitySubpanels.append(timelinePanel);
   }
 
   const existingMainTabs = Array.from(document.querySelectorAll(".main-tab"));
@@ -141,6 +160,8 @@ function installEternityUi() {
   }
   runtime.elements.mainTabs = existingMainTabs;
   runtime.elements.mainPanels = Array.from(document.querySelectorAll(".main-panel"));
+  runtime.elements.eternitySubtabs = Array.from(eternityRoot.querySelectorAll(".eternity-subtab"));
+  runtime.elements.eternitySubpanels = Array.from(eternityRoot.querySelectorAll(".eternity-subpanel"));
   runtime.elements.infinitySubtabs = Array.from(document.querySelectorAll(".infinity-subtab"));
   runtime.elements.infinitySubpanels = Array.from(document.querySelectorAll(".infinity-subpanel"));
   runtime.elements.i18nNodes = Array.from(document.querySelectorAll("[data-i18n]"));
@@ -163,13 +184,6 @@ function installEternityUi() {
     });
   }
   return eternityRoot;
-}
-
-function setRequirementState(element, met) {
-  if (!element) return;
-  element.textContent = runtime.t(met ? "eternityRequirementMet" : "eternityRequirementMissing");
-  element.classList.toggle("is-met", met);
-  element.classList.toggle("is-missing", !met);
 }
 
 function updateMilestoneCard(milestone, availableChoices) {
@@ -214,35 +228,36 @@ function updateMilestoneCard(milestone, availableChoices) {
 function updateEternityUi() {
   if (!installEternityUi()) return;
   const count = Math.max(0, Math.floor(Number(runtime.state.eternityCount) || 0));
-  const tc4Met = runtime.towerChallenge4CompletedForEternity?.() === true;
-  const ipMet = runtime.eternityIpThresholdMet?.() === true;
   const ready = runtime.canEternity?.() === true;
   const entitlementCount = Math.max(0, Math.floor(Number(runtime.firstTierMilestoneEntitlementCount?.()) || 0));
   const availableChoices = new Set(runtime.availableEternityMilestoneChoices?.() || []);
 
   const headingCount = eternityRoot.querySelector("#eternityHeadingCount");
-  const countValue = eternityRoot.querySelector("#eternityCountValue");
   const currentIp = eternityRoot.querySelector("#eternityCurrentIp");
-  const requirementState = eternityRoot.querySelector("#eternityRequirementState");
-  const forcedNote = eternityRoot.querySelector("#eternityForcedNote");
   const performButton = eternityRoot.querySelector("#eternityPerformButton");
   const entitlement = eternityRoot.querySelector("#eternityChoiceEntitlement");
   const allOwned = eternityRoot.querySelector("#eternityChoiceAllOwned");
+  const requirement = eternityRoot.querySelector(".eternity-requirement");
+  if (requirement) {
+    requirement.textContent = runtime.t("eternityRequirementCompact")
+      .replace("{ip}", runtime.formatUiLogNumber(runtime.ETERNITY_REQUIREMENT_LOG10));
+  }
 
   if (headingCount) headingCount.textContent = `Eternity ${runtime.formatUiNumber(count)}`;
-  if (countValue) countValue.textContent = runtime.formatUiNumber(count);
-  setRequirementState(eternityRoot.querySelector("#eternityTc4Requirement"), tc4Met);
-  setRequirementState(eternityRoot.querySelector("#eternityIpRequirement"), ipMet);
-  if (currentIp) currentIp.textContent = `${runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10())} IP`;
-  if (requirementState) {
-    requirementState.textContent = runtime.t(ready ? "eternityRequirementReady" : "eternityRequirementWaiting");
-    requirementState.classList.toggle("is-met", ready);
-    requirementState.classList.toggle("is-missing", !ready);
+  if (currentIp) {
+    currentIp.textContent = `${runtime.formatHeldUiLogNumber(
+      runtime.currentInfinityPointsLog10(),
+      runtime.state.infinityPointsExact,
+    )} IP`;
   }
-  forcedNote?.classList.toggle("is-ready", ready);
   if (performButton) {
     performButton.disabled = !ready;
     performButton.textContent = runtime.t(ready ? "eternityPerform" : "eternityPerformUnavailable");
+  }
+  const timelineSubtab = eternityRoot.querySelector('[data-eternity-tab="timeline"]');
+  if (timelineSubtab) {
+    timelineSubtab.hidden = false;
+    timelineSubtab.disabled = false;
   }
   if (entitlement) {
     entitlement.textContent = entitlementCount > 0

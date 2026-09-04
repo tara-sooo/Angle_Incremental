@@ -43,6 +43,7 @@ UI またはゲームプレイに影響する変更では、ブラウザでの�
 - `src/ui/` — DOM、描画、入力、画面更新
 - `angle-incremental-spec.md` — 開発者向けのゲーム仕様と数式
 - `angle-incremental-guide.md` — 初心者向けのプレイガイド
+- `docs/ui-contract.md` — 0.13.0 canonical UI roles and ownership contract
 - `CONTRIBUTING.md` — 開発・検証・ブランチ運用の手順
 - `progress.md` — 開発メモと今後の TODO
 

@@ -8,6 +8,7 @@ const INFINITE_ANGLE_UPGRADES = Object.freeze({
   vertex: Object.freeze({ base: 2.4e20, growth: 1.50, scalingStartsAfter: 25, scalingLogScale: 0.0010 }),
   gain: Object.freeze({ base: 3.6e20, growth: 1.45, scalingStartsAfter: 25, scalingLogScale: 0.0005 }),
 });
+const INFINITE_ANGLE_FREE_LEVEL = 5;
 
 // The shared coefficients soften the early curve while retaining the role-specific
 // base prices and post-level scaling ratios. This value is runtime-only and is not
@@ -27,8 +28,33 @@ function setInfiniteAngleCostCurve(value) {
   });
 }
 
+function infiniteAnglePurchasedUpgradeLevel(kind) {
+  if (kind === "speed") return Math.max(0, Math.floor(runtime.state.infiniteAngleSpeedLevel));
+  if (kind === "vertex") return Math.max(0, Math.floor(runtime.state.infiniteAngleVertexLevel));
+  if (kind === "gain") return Math.max(0, Math.floor(runtime.state.infiniteAngleGainLevel));
+  return 0;
+}
+
+function infiniteAngleFreeUpgradeLevel(kind) {
+  return ["speed", "vertex", "gain"].includes(kind)
+    && runtime.eternityMilestoneActive?.("1-3") === true
+    ? INFINITE_ANGLE_FREE_LEVEL
+    : 0;
+}
+
+function infiniteAngleEffectiveUpgradeLevel(kind) {
+  return infiniteAnglePurchasedUpgradeLevel(kind) + infiniteAngleFreeUpgradeLevel(kind);
+}
+
+function infiniteAngleMaximumPurchasedVertexLevel() {
+  return Math.max(
+    0,
+    runtime.MAX_RENDERED_VERTICES - 3 - infiniteAngleFreeUpgradeLevel("vertex"),
+  );
+}
+
 function infiniteAngleVertexCount() {
-  const level = Math.max(0, Math.floor(runtime.state.infiniteAngleVertexLevel));
+  const level = infiniteAngleEffectiveUpgradeLevel("vertex");
   return Math.min(runtime.MAX_RENDERED_VERTICES, 3 + level);
 }
 
@@ -53,12 +79,12 @@ function addInfiniteAngleCurrentGain(amount) {
 }
 
 function infiniteAngleGainIncrease() {
-  return 0.011 + Math.max(0, Math.floor(runtime.state.infiniteAngleGainLevel)) * 0.011;
+  return 0.011 + infiniteAngleEffectiveUpgradeLevel("gain") * 0.011;
 }
 
 function infiniteAngleRawLapSpeedLog10() {
   return runtime.clampLog10(
-    Math.max(0, Math.floor(runtime.state.infiniteAngleSpeedLevel)) * runtime.log10Value(1.22),
+    infiniteAngleEffectiveUpgradeLevel("speed") * runtime.log10Value(1.22),
   );
 }
 
@@ -105,17 +131,10 @@ function addInfiniteAngleScoreLog(amountLog10) {
   runtime.state.infiniteScore = runtime.valueFromLog10(runtime.state.infiniteScoreLog10);
 }
 
-function infiniteAngleUpgradeLevel(kind) {
-  if (kind === "speed") return Math.max(0, Math.floor(runtime.state.infiniteAngleSpeedLevel));
-  if (kind === "vertex") return Math.max(0, Math.floor(runtime.state.infiniteAngleVertexLevel));
-  if (kind === "gain") return Math.max(0, Math.floor(runtime.state.infiniteAngleGainLevel));
-  return 0;
-}
-
 function infiniteAngleUpgradeCostLog10(kind) {
   const definition = INFINITE_ANGLE_UPGRADES[kind];
   if (!definition) return Infinity;
-  const level = infiniteAngleUpgradeLevel(kind);
+  const level = infiniteAnglePurchasedUpgradeLevel(kind);
   const rawLog = runtime.log10Value(definition.base)
     + level * runtime.log10Value(definition.growth) * infiniteAngleCostCurve.growthPower;
   const excess = Math.max(0, level - definition.scalingStartsAfter);
@@ -162,8 +181,8 @@ function canBuyInfiniteAngleUpgrade(kind) {
   return runtime.state.infiniteAngleUnlocked
     && Boolean(INFINITE_ANGLE_UPGRADES[kind])
     && runtime.towerChallenge4AllowsInfiniteAngleUpgrade(kind)
-    && (kind !== "vertex" || infiniteAngleUpgradeLevel("vertex") < runtime.MAX_RENDERED_VERTICES - 3)
-    && costLog10 <= maximumCostLog10
+    && (kind !== "vertex" || infiniteAngleEffectiveUpgradeLevel("vertex") < runtime.MAX_RENDERED_VERTICES - 3)
+    && (!runtime.infinityPointCapActive() || costLog10 <= maximumCostLog10)
     && runtime.canSpendInfinityPoints(costLog10);
 }
 
@@ -173,8 +192,8 @@ function purchaseInfiniteAngleUpgrade(kind) {
   if (kind === "speed") runtime.state.infiniteAngleSpeedLevel += 1;
   if (kind === "vertex") {
     runtime.state.infiniteAngleVertexLevel = Math.min(
-      runtime.MAX_RENDERED_VERTICES - 3,
-      runtime.state.infiniteAngleVertexLevel + 1,
+      infiniteAngleMaximumPurchasedVertexLevel(),
+      infiniteAnglePurchasedUpgradeLevel("vertex") + 1,
     );
     resetInfiniteAnglePosition();
   }
@@ -334,6 +353,9 @@ expose("infiniteAngleEffectiveLapSpeedLog10", () => infiniteAngleEffectiveLapSpe
 expose("infiniteAngleLapSpeedMultiplier", () => infiniteAngleLapSpeedMultiplier);
 expose("infiniteAngleLapDuration", () => infiniteAngleLapDuration);
 expose("infiniteAngleGainExpressionParts", () => infiniteAngleGainExpressionParts);
+expose("infiniteAnglePurchasedUpgradeLevel", () => infiniteAnglePurchasedUpgradeLevel);
+expose("infiniteAngleFreeUpgradeLevel", () => infiniteAngleFreeUpgradeLevel);
+expose("infiniteAngleEffectiveUpgradeLevel", () => infiniteAngleEffectiveUpgradeLevel);
 expose("infiniteAngleScoreGainLog10", () => infiniteAngleScoreGainLog10);
 expose("infiniteAngleUpgradeCostLog10", () => infiniteAngleUpgradeCostLog10);
 expose("DEFAULT_INFINITE_ANGLE_COST_CURVE", () => DEFAULT_INFINITE_ANGLE_COST_CURVE);

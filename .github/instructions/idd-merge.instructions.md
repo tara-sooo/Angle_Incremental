@@ -1,348 +1,50 @@
-# IDD — Merge Execution Phase (F3–F5)
+# IDD — Merge, completion, and cleanup
 
-Read only after `idd-merge-handoff.instructions.md` routes the current
-claim to the autonomous merge path. Covers executing the merge (F3),
-cleanup (F4), and looping back to discover (F5).
+Read this file after `idd-pre-merge.instructions.md` and the branch-policy
+handoff pass. The final live gate must have produced a current head SHA.
 
-The final merge-gate timing defaults are named in
-[IDD policy constants](../../docs/policy-constants.md); the merge logic
-itself stays here.
+## Merge
 
-Before any mutating action in F3, apply the
-[shared claim revalidation gate](idd-overview-core.instructions.md#claim-revalidation-gate).
+Revalidate the Issue claim, PR base, head SHA, CI, review state, mergeability,
+cwd, branch, and lock immediately before the command. If the head changed or
+any condition is unknown, return to the final live gate.
 
-## F3 — Merge
+For an autonomous `next` PR, use a merge commit bound to that exact SHA:
 
-1. Confirm the claim is still yours: the **active claim** must still use
-   your current `{claim-id}`. If it is missing, released, or held by a
-   different `{claim-id}` (even under the same agent ID), the claim was
-   lost — report and stop.
-2. Defensive branch-aware route check: run
-   `node scripts/verify-human-merge-boundary.mjs --repo OWNER/REPO --pr
-   {pr-number}` and use the live base branch. Continue only when it
-   reports `route: "autonomous"` for exact `next`; route `main`,
-   `release/**`, transition PRs, unknown bases, and any verifier failure
-   to `idd-merge-handoff.instructions.md` and stop. Then re-read the
-   recorded global merge policy (missing → `fully_autonomous_merge`, the
-   distributed default): `fully_autonomous_merge` may continue on this
-   explicit `next` route; `separate_merge_agent` still requires the
-   designated actor; `human_merge` or unknown policy stops.
-3. Immediately before executing the merge command, do one final live
-   fetch using the **exact same activity-universe scope as E1 Step 1**
-   (all review threads, review bodies, and regular PR comments,
-   excluding trusted agent operational marker comments), and compare it
-   against the F2 snapshot carried forward from
-   `idd-pre-merge.instructions.md`. When helper runtime is enabled,
-   prefer the documented merge-gate helper reference in
-   [`docs/idd-helper-scripts.md`](../../docs/idd-helper-scripts.md#stable-helper-evidence-outputs)
-   to collect the snapshot tuple and broader `pre-merge-readiness` JSON
-   report. Both helpers remain read-only evidence collectors only: if
-   execution fails, output is invalid JSON, required sections are
-   missing, or live GitHub state disagrees with it, discard helper
-   output and run the live fetch directly — the written gate rules
-   remain canonical. Return to E1 if any of F2's Review-currency
-   return-to-E1 triggers apply, substituting the carried F2-snapshot
-   fields for F2's own stored watermark fields: `{f2-head-SHA}` for
-   `{head-SHA}`, `{f2-max-activity-updatedAt}` for
-   `{max-activity-updatedAt}`, `{f2-total-item-count}` for
-   `{total-item-count}`, and `{f2-latest-ci-completed-at}` for
-   `{latest-ci-completed-at}` — this final fetch is the live side of
-   each comparison, exactly as F2's own live snapshot was.
+```sh
+gh pr merge <pr-number> --merge --match-head-commit "<validated-head-sha>"
+```
 
-   From that same final fetch, compute `F3_UNRESOLVED_ACTIONABLE_COUNT`
-   using the exact F2 unresolved-thread rule and exceptions
-   (non-awaiting-reviewer unresolved threads only; awaiting-reviewer
-   classification must follow F2 verbatim, including AMD exclusion and
-   conversation-resolution exception handling). If
-   `F3_UNRESOLVED_ACTIONABLE_COUNT > 0`, stop and return to E1 — do not
-   execute `gh pr merge` in this pass.
+Do not squash, rebase, or retry with `--admin`. A plain merge failure is a
+hold with the GitHub error and the maintainer resume condition.
 
-   If the carried F2 evidence includes helper-side
-   `dispositionEvidence`, require `dispositionEvidence.route ==
-   "proceed"` and `dispositionEvidence.blockingCount == 0` before merge.
-   If either check fails, stop and return to E1/E4 with the reported
-   missing thread/comment disposition items. Use only the carried
-   `pre-merge-readiness` `dispositionEvidence` shape here; E7 verifier
-   fields (`passed`, `items[]`) are not merge-gate substitutes.
+## Completion evidence
 
-   Execute the merge immediately after this final fetch **and the claim
-   re-validation below**, with no other
-   actions in between. Re-validate claim: re-read the issue and confirm
-   the active claim still uses your current `{claim-id}` — if not, the
-   claim was lost, report and stop.
+After a successful merge, re-fetch the PR and Issue. For a `next` PR whose
+base differs from the repository default branch, verify `mergedAt`, the full
+merge SHA, visible `Refs #N`, exactly one
+`<!-- idd-claimed-issue: N -->` marker, and an empty closing association.
+Revalidate the claim, then close the Issue as completed:
 
-   If the optional helper output disagrees with the live fetch above,
-   follow the live fetch and the written gate rules.
+```sh
+gh issue close <issue-number> --reason completed
+```
 
-4. Merge the PR using a **merge commit**, binding to the validated SHA
-   to prevent a race where a new push lands between the F3 freshness
-   check and the merge itself.
+After confirming it is closed, post and verify one completion comment such as:
 
-   **Preferred path (helper runtime enabled)**: run the F3 merge helper
-   documented in
-   [`docs/idd-helper-scripts.md`](../../docs/idd-helper-scripts.md#merge-execution-f3).
-   First run it in dry-run (no `--apply`) and confirm `ready: true` with
-   an empty `blockers[]` — it wraps the read-only `pre-merge-readiness`
-   gate and adds no new authority. Then re-run with `--apply`: when
-   `ready`, it re-fetches the head SHA and re-validates the claim
-   immediately before merging, fails closed (no merge) on head drift or
-   lost claim, and runs the merge commit bound to the validated head
-   (never squash/rebase). On a plain-merge failure, this repository's
-   recorded `hold-and-report` decision applies: no helper or worker path
-   may retry with `--admin`. The gate checklist and decision table below
-   stay canonical: if the helper is unavailable, its output is invalid,
-   or its evidence conflicts with live GitHub state, discard it and use
-   the manual gate + merge steps in this section.
+```markdown
+<!-- idd-next-issue-completion: N -->
+Completed by PR #P (merge {merge-sha}).
+```
 
-   **Gate checklist** — confirm every field before merging; all must
-   hold, and any unmet or unknown field is a NO-GO (fail closed — stop,
-   do not merge):
+If closing or evidence fails, record the exact reconciliation failure and
+resume from live state. Never undo a successful merge or reopen the Issue.
 
-   - current HEAD SHA **equals** the carried F2-snapshot head
-     (`{f2-head-SHA}`);
-   - review-currency route is `proceed`;
-   - `F3_UNRESOLVED_ACTIONABLE_COUNT` is `0`;
-   - all required CI checks pass for the current head;
-   - claim ownership still uses your `{claim-id}`.
+## Cleanup
 
-   For the head-SHA field, use this **copy-paste-safe, fail-closed**
-   check — both operands fully quoted, no glob, abort on mismatch —
-   rather than re-deriving it ad hoc (a stray glob or unquoted operand
-   can silently mis-gate this safety-sensitive step). `F2_HEAD_SHA` is
-   the carried `{f2-head-SHA}`; `PR_HEAD_SHA_F3` is step 3's re-fetch:
-
-   ```sh
-   F2_HEAD_SHA="{f2-head-SHA}"   # the head recorded in the F2 snapshot
-   if [ "$PR_HEAD_SHA_F3" != "$F2_HEAD_SHA" ]; then
-     echo "F3 abort: head moved ${F2_HEAD_SHA} -> ${PR_HEAD_SHA_F3}" >&2
-     exit 1  # do not merge — return to E1 per the freshness rules above
-   fi
-   ```
-
-   Then merge, binding `--match-head-commit` to the **freshly validated**
-   `${PR_HEAD_SHA_F3}` (never a stale, hardcoded, or unbound SHA), never
-   squash or rebase:
-
-   ```sh
-   gh pr merge {pr-number} --merge --match-head-commit "${PR_HEAD_SHA_F3}"
-   ```
-
-   After the merge succeeds and claim ownership is re-validated, upsert
-   the digest with `Phase: F3 merged`, `Open blockers: none`,
-   `Next action: F4 cleanup then F5 discover`, and `Authoritative by`
-   pointing to the merge commit and matched head SHA — not a merge
-   gate, and must not happen before the successful merge command.
-
-### Next integration issue completion
-
-Run this section only after a successful merge command and only when the
-live PR base is exactly `next` while the live repository default branch is
-not `next`. Default-base PRs use GitHub's verified closing set; `main`,
-`release/**`, transition, and unknown routes never use this worker path.
-
-1. Re-fetch the merged PR, repository default branch, and issue. Confirm
-   all of the following from the same live read:
-   - `baseRefName == next` and `next != defaultBranch`;
-   - `mergedAt` is non-null and `mergeCommit.oid` is a full merge SHA;
-   - the body contains a visible `Refs #N` and exactly one
-     `<!-- idd-claimed-issue: N -->` marker; unrelated neutral `Refs #M`
-     references are allowed;
-   - `closingIssuesReferences` is empty and the issue is still open.
-2. Run the read-only `scripts/idd-issue-association.mjs` evaluator in
-   `reconcile` mode with those values. It must report `ready: true`; any
-   missing, changed, or unknown value is a fail-closed reconciliation
-   stop. The merge is not undone.
-3. Revalidate the active claim immediately before the close mutation. Only
-   then run `gh issue close N --reason completed`. Never close an issue
-   before the merge evidence above exists.
-4. Re-fetch the issue to confirm it is closed, then revalidate the claim
-   before posting a completion comment containing the PR URL/number and
-   merge SHA. Use the direct JSON comment path so the machine-readable
-   evidence is preserved, for example:
-
-   ```sh
-   printf '%s' '{"body":"<!-- idd-next-issue-completion: N -->\\nCompleted by PR #<pr-number> (merge <merge-sha>)."}' |
-     gh api repos/OWNER/REPO/issues/N/comments --method POST --input -
-   ```
-
-   Re-fetch the issue comments and run the evaluator in `completion` mode.
-   It must report `ready: true`; otherwise record a reconciliation failure
-   without reopening or re-merging.
-
-5. If the close or evidence comment fails, record a reconciliation failure
-   in the digest/issue and stop for resume. Do not undo the merge and do
-   not claim completion from a stale digest. A later resume must re-fetch
-   the merged PR, marker, current claim, and issue state before retrying.
-   If the issue is already closed, resume through the evidence-repair route:
-   post only missing or invalid completion evidence, then verify it; do not
-   reopen or close it again.
-6. If merge fails:
-   - `gh pr merge --merge` fails with "the base branch policy
-     prohibits the merge" despite a passing Gate checklist and a
-     configured pull-request-only bypass actor → that scoped bypass
-     alone may not clear a solo-maintainer self-approval deadlock (see
-     `docs/permissions.md`'s "Pull-request-only ruleset bypass"). Check
-     `mergeGate.soloCodeownerAdminFallback` in `.github/idd/config.json`:
-     - `"hold-and-report"` (opt-in) → keep the pre-#1521 behavior: do
-       not retry the plain command or add `--admin`; post a hold
-       comment with the GitHub error text and stop for a maintainer
-       decision (kurone-kito/idd-skill#1493).
-   - This repository records `"hold-and-report"`; never retry with
-     `--admin`. Any plain merge failure is reported to the maintainer and
-     stops. Other repositories may retain the distributed default, but
-     that is not this repository's authorization.
-   - Any other value, including the distributed `"auto-admin-retry"`
-     default, is not authorized by this repository's branch-aware policy.
-     Never invoke `--admin`; post a hold with the GitHub error and stop for
-     a maintainer decision.
-   - Base branch updated or conflict → return to
-     `idd-pre-merge.instructions.md` F1
-   - CI condition no longer met → return to
-     `idd-pr-submit.instructions.md` D4 (CI wait)
-   - Review condition no longer met → return to
-     `idd-review-snapshot.instructions.md` E1
-   - Conversation resolution required and unresolved threads remain →
-     for each: **(a)** new reviewer activity (not awaiting-reviewer) →
-     return to E1; **(b)** awaiting-reviewer thread whose latest reply
-     is from an IDD agent without `**Awaiting maintainer decision**` →
-     resolve it directly, then **restart `idd-pre-merge.instructions.md`
-     F2** (to re-run the final freshness fetch); **(c)**
-     awaiting-reviewer thread whose latest reply is from the PR author
-     (not IDD agent) → post a brief acknowledgement reply, resolve it
-     directly, then **restart `idd-pre-merge.instructions.md` F2**;
-     **(d)** thread with `**Awaiting maintainer decision**` reply →
-     post a hold comment and stop. Cases **(b)**-**(c)** together are
-     the **F3 awaiting-reviewer restart-F2 path** cited elsewhere.
-
-   When a merge failure routes to F1, D4, E1, or a hold, update the
-   digest after recording the failure evidence: `Phase` to
-   `F3 blocked`, the GitHub merge error or unresolved-thread class in
-   `Open blockers`, `Next action` to the routed phase or maintainer
-   action. If the path instead resolves/acknowledges awaiting-reviewer
-   threads and restarts F2, do not update the digest before
-   restarting — that activity would invalidate the restart and force an
-   E1 snapshot even though E1 intentionally has no actionable
-   awaiting-reviewer item; let the restarted F2 pass record blockers if
-   it finds one.
-
-## F4 — Cleanup
-
-1. Confirm the post-merge digest update above exists or repair it after
-   re-validating the claim. Do not minimize the digest as an
-   operational marker unless a future cleanup policy explicitly
-   supports digest retirement.
-2. Run merged-PR comment cleanup (must not run before F3 succeeds).
-   Re-validate the active claim before each GitHub minimization
-   mutation.
-
-   Apply the following cleanup policy rules when evaluating candidates:
-
-   - Feedback or review parent comments may be minimized as `RESOLVED`
-     only after every actionable child review comment/thread under that
-     parent is accepted or rejected, replied to as required, and
-     resolved.
-   - Known review-bot regular PR comments may be minimized only after
-     merge, with a clear completed-review or stale-notification signal
-     (a CodeRabbit no-action summary, a summary/review-trigger
-     acknowledgement with a matching later IDD disposition, or — for
-     CodeRabbit summaries specifically — once all its review threads
-     are resolved with fresh IDD dispositions).
-   - Bot review parent bodies without associated review threads
-     (including automated-review error bodies) are skipped by default
-     unless a future policy narrows a safe cleanup class for them.
-   - Trusted IDD operational marker comments may be minimized as
-     `OUTDATED` only after merge, once the marker is no longer needed
-     for resume or review-currency checks. Candidate prefixes:
-     `<!-- review-watermark:` and `<!-- review-baseline:`.
-   - Do not minimize comments with unresolved maintainer decisions,
-     active holds, failed-CI context maintainers still need,
-     non-operational human discussion, or content still in active F2/F3
-     gates.
-
-   **Mandatory apply decision tree** — follow this sequence; no path
-   may exit without a recorded reason when cleanup candidates exist. In
-   the idd-skill source repository, run the helper in dry-run mode
-   first; in adopter repositories, skip to the GraphQL fallback below
-   unless the helper scripts were explicitly installed.
-
-   ```sh
-   node scripts/audit-pr-cleanup.mjs --pr <pr-number> --dry-run --format table
-   ```
-
-   **Duplicate-success-record skip rule**: before posting any evidence
-   comment below, skip it if the PR already carries a
-   `<!-- idd-cleanup-evidence:` comment recording a successful outcome
-   (`applied` or `clean`) **whose author is a trusted marker actor**
-   (`github-actions[bot]`, the identity `post-merge-cleanup.yml` posts
-   under, or a configured `trustedMarkerActors` login) — for example one
-   the `post-merge-cleanup` workflow posted within seconds of the merge —
-   to avoid a duplicate success record. An untrusted commenter's
-   marker-prefixed comment never counts as evidence and must not suppress
-   this post — the same trust-scoping every other IDD operational marker
-   already applies (see the shared
-   [Trusted marker actors](idd-overview-core.instructions.md#trusted-marker-actors)
-   rule). Otherwise post (a fresh success record, or a correction of an
-   existing `failed` / `incomplete` / `permission-blocked` record, or a
-   correction of an untrusted-author record).
-
-   Evaluate the dry-run `status` field (this is a dry-run status; apply
-   mode emits different values and is never invoked unless dry-run
-   shows `needs-apply`):
-
-   - **`clean`**: no candidates and no permission-blocked items.
-     Proceed to step 3.
-
-   - **`needs-apply`**: eligible candidates exist and the viewer can
-     minimize them. Apply is mandatory. Re-validate the active claim,
-     then run:
-
-     ```sh
-     node scripts/audit-pr-cleanup.mjs --pr <pr-number> --apply \
-       --claim-issue <issue-number> --claim-id <claim-id> --format table
-     ```
-
-     After apply, record the outcome by the apply `status`. See
-     `docs/idd-comment-minimization.md` for the exact formats:
-
-     If the apply `status` is `applied` (residual candidates minimized)
-     or `clean` (no-op, nothing left to minimize): apply the
-     duplicate-success-record skip rule above; otherwise post the
-     evidence comment (`status`, `applied`, `failed`, `skipped`,
-     `viewer-cannot-minimize` counts for `applied`, or a converged
-     `clean` record) so this run's work is recorded. Proceed to step 3.
-
-     If the apply `status` is `failed` or `incomplete`: post the
-     cleanup-failure comment format instead, including the
-     `viewer-cannot-minimize` count when non-zero. Explicit evidence,
-     not a merge gate — the merge already succeeded. Proceed to step 3.
-
-   - **`permission-blocked`**: skipped items exist with
-     `viewerCanMinimize: false` and no apply-eligible candidates found.
-     Post a cleanup-permission-blocked comment listing the blocked
-     candidates and the count, then proceed to step 3.
-
-   For the GraphQL fallback (helper unavailable): check
-   `viewerCanMinimize` and `isMinimized` before minimizing; skip
-   already-minimized comments and ones the viewer cannot minimize.
-   Re-validate the active claim before each mutation. Afterward, apply
-   the duplicate-success-record skip rule above; otherwise post an
-   evidence comment summarizing the outcome (status, applied/skipped
-   counts with reasons). If the viewer cannot minimize any detected
-   candidates, post a cleanup-permission-blocked comment instead of
-   exiting silently.
-
-   See `docs/idd-comment-minimization.md` for the evidence comment
-   format, cleanup-failure comment format, permission-blocked comment
-   format, and fallback GraphQL commands.
-3. Delete the local worktree and local branch.
-4. Update the local `next` branch.
-5. If GitHub auto-delete is disabled: delete the remote branch too.
-   (Worktrunk may be used for steps 3–5.)
-
-## F5 — Loop
-
-Return to `idd-discover.instructions.md` and pick the next issue.
-F4-complete/F5 is the **safe session-exit boundary**: under context
-pressure, exit here for a fresh Discover session rather than looping
-in-process — see the autopilot operating model in
-[`docs/idd-workflow.md`](../../docs/idd-workflow.md).
+After merge and completion evidence are verified, revalidate ownership and
+remove only this session's sibling worktree and local branch. Update the
+primary worktree to `next`, delete the remote issue branch when policy allows,
+and verify the PR is merged and the Issue is closed. Preserve other worktrees,
+branches, and human discussion. Cosmetic comment cleanup is optional and
+never a merge condition.

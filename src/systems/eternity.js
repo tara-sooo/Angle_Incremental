@@ -11,6 +11,11 @@ const COUNT_MILESTONE_REQUIREMENTS = Object.freeze({
   3: 8,
   4: 12,
   5: 20,
+  6: 27,
+  7: 44,
+  8: 81,
+  9: 108,
+  10: 128,
 });
 
 const FIRST_TIER_MILESTONE_MASK = Object.values(FIRST_TIER_MILESTONE_BITS)
@@ -61,7 +66,6 @@ function acquireEternityMilestone(id) {
     runtime.state.eternityMilestoneMask,
   ) | bit;
   runtime.state.eternityMilestoneChoice = "";
-  applyEternityMilestoneStartingLevels();
   return true;
 }
 
@@ -71,10 +75,6 @@ function selectEternityMilestone(id) {
 
 function eternityMilestoneNormalUpgradeBonusLevel() {
   return eternityMilestoneActive("1-2") ? normalizedEternityCount() * 10 : 0;
-}
-
-function eternityMilestoneIc7RewardActive() {
-  return eternityMilestoneActive("2");
 }
 
 function eternityMilestonePreservesGenerationReset() {
@@ -94,18 +94,15 @@ function normalAutomationUnlocked() {
 }
 
 function infinityAutomationUnlocked() {
-  return runtime.hasInfinityUpgrade("8-1") || eternityMilestoneActive("5");
+  return runtime.hasInfinityUpgrade("8-1");
 }
 
-function applyEternityMilestoneStartingLevels() {
-  if (!eternityMilestoneActive("1-3")) return;
-  runtime.state.infiniteAngleSpeedLevel = Math.max(5, Math.floor(runtime.state.infiniteAngleSpeedLevel));
-  runtime.state.infiniteAngleVertexLevel = Math.max(5, Math.floor(runtime.state.infiniteAngleVertexLevel));
-  runtime.state.infiniteAngleGainLevel = Math.max(5, Math.floor(runtime.state.infiniteAngleGainLevel));
+function infinityUpgradeAutomationUnlocked() {
+  return eternityMilestoneActive("5");
 }
 
 function eternityRequirementExact() {
-  return runtime.exactInfinityPointsFromLog10(runtime.ETERNITY_REQUIREMENT_LOG10);
+  return runtime.MAX_EXACT_INFINITY_POINTS;
 }
 
 function eternityIpThresholdMet() {
@@ -119,6 +116,24 @@ function canEternity() {
 
 function shouldForceEternity() {
   return false;
+}
+
+function recordEternityRun() {
+  const elapsed = runtime.sanitizeNumber(runtime.state.currentEternityRunTime, 0);
+  const realElapsed = runtime.sanitizeNumber(runtime.state.currentEternityRealTime, 0);
+  const record = {
+    time: elapsed > 0 ? Math.max(elapsed, runtime.MIN_RECORDED_INFINITY_SECONDS) : 0,
+    realTime: realElapsed > 0 ? Math.max(realElapsed, runtime.MIN_RECORDED_INFINITY_SECONDS) : 0,
+    infinityCount: Math.max(0, Math.floor(runtime.sanitizeNumber(runtime.state.infinityCount, 0))),
+  };
+  runtime.state.lastEternityRuns.unshift(record);
+  runtime.state.lastEternityRuns = runtime.state.lastEternityRuns.slice(0, 10);
+  if (record.time > 0 && (runtime.state.fastestEternityTime <= 0 || record.time < runtime.state.fastestEternityTime)) {
+    runtime.state.fastestEternityTime = record.time;
+  }
+  if (record.realTime > 0 && (runtime.state.fastestEternityRealTime <= 0 || record.realTime < runtime.state.fastestEternityRealTime)) {
+    runtime.state.fastestEternityRealTime = record.realTime;
+  }
 }
 
 function resetEternityProgression() {
@@ -158,11 +173,14 @@ function resetEternityProgression() {
     infiniteCapBroken: false,
     currentInfinityRunTime: 0,
     currentInfinityRealTime: 0,
+    currentEternityRunTime: 0,
+    currentEternityRealTime: 0,
     bestInfinityCountPerSecond: 0,
     infinityCountRateRemainder: 0,
     ic8VertexDecayElapsed: 0,
     currentInfinityRunHadGeneration: false,
     currentInfinityRunHadCoreBoost: false,
+    timelineParallelSecondsSinceIc8Clear: 0,
     lastEarned: 0,
     lastEarnedLog10: -Infinity,
   });
@@ -171,14 +189,30 @@ function resetEternityProgression() {
   runtime.normalizeTowerChallenge4State?.();
 }
 
+function applyEternityMilestoneCompletionState() {
+  if (eternityMilestoneActive("2")) {
+    runtime.state.completedChallenges |= 1 << (7 - 1);
+  }
+  if (eternityMilestoneActive("6")) {
+    runtime.state.completedChallenges = (1 << runtime.INFINITY_CHALLENGE_COUNT) - 1;
+  }
+}
+
+function applyEternityRunStartState() {
+  applyEternityMilestoneCompletionState();
+  if (eternityMilestoneActive("9")) runtime.syncInfinityPointCachesFromExact(1000n);
+}
+
 function performEternity(options = {}) {
   if (!canEternity()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-eternity", { force: true })) return false;
+  recordEternityRun();
   resetEternityProgression();
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.state.eternityCount)) + 1;
+  runtime.markMainTabsUnlocked?.(["timeline"]);
+  applyEternityRunStartState();
   runtime.state.eternityMilestoneChoice = "";
   runtime.checkAchievements(true);
-  applyEternityMilestoneStartingLevels();
   if (options.update !== false) runtime.updateUi?.();
   if (options.save !== false) runtime.saveGame?.("manual");
   return true;
@@ -199,15 +233,16 @@ expose("availableEternityMilestoneChoices", () => availableEternityMilestoneChoi
 expose("acquireEternityMilestone", () => acquireEternityMilestone);
 expose("selectEternityMilestone", () => selectEternityMilestone);
 expose("eternityMilestoneNormalUpgradeBonusLevel", () => eternityMilestoneNormalUpgradeBonusLevel);
-expose("eternityMilestoneIc7RewardActive", () => eternityMilestoneIc7RewardActive);
 expose("eternityMilestonePreservesGenerationReset", () => eternityMilestonePreservesGenerationReset);
 expose("eternityMilestonePreservesCoreBoostReset", () => eternityMilestonePreservesCoreBoostReset);
 expose("eternityMilestoneCoreBoostRequirementLog10", () => eternityMilestoneCoreBoostRequirementLog10);
 expose("normalAutomationUnlocked", () => normalAutomationUnlocked);
 expose("infinityAutomationUnlocked", () => infinityAutomationUnlocked);
-expose("applyEternityMilestoneStartingLevels", () => applyEternityMilestoneStartingLevels);
+expose("infinityUpgradeAutomationUnlocked", () => infinityUpgradeAutomationUnlocked);
 expose("canEternity", () => canEternity);
 expose("shouldForceEternity", () => shouldForceEternity);
+expose("recordEternityRun", () => recordEternityRun, (value) => { recordEternityRun = value; });
 expose("resetEternityProgression", () => resetEternityProgression);
+expose("applyEternityRunStartState", () => applyEternityRunStartState);
 expose("performEternity", () => performEternity);
 expose("maybeForceEternity", () => maybeForceEternity);

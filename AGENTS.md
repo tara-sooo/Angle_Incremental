@@ -68,4 +68,4 @@ Before editing, check `git status --short --branch`. Do not overwrite user chang
 
 This project uses Issue-Driven Development (IDD) with explicit issue targets. Start with [docs/idd-workflow.md](docs/idd-workflow.md) for the cross-agent entry path and phase routing.
 
-Before starting IDD work, open `.github/instructions/idd-overview-core.instructions.md`. Open the routed phase file manually when the current step changes. Repository-specific policy is recorded in [docs/idd-policy.md](docs/idd-policy.md).
+Before starting IDD work, open `.github/instructions/idd-overview-core.instructions.md` and `.github/instructions/idd-experience.instructions.md`. Use the experience instruction to route through `docs/idd-experience/index.md` and load only experience relevant to the current Issue. Open the routed phase file manually when the current step changes. Repository-specific policy is recorded in [docs/idd-policy.md](docs/idd-policy.md).

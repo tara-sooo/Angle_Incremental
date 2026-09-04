@@ -182,9 +182,7 @@ function ic8VertexGainMultiplier() {
 
 function scoreDisplay() {
   const scoreLog = currentScoreLog10();
-  if (runtime.state.numberFormat === "scientific" && scoreLog > -Infinity) return runtime.formatScientificLog(scoreLog);
-  if (scoreLog >= (runtime.state.numberFormat === "detailed" ? 3 : 18)) return runtime.formatLogNumber(scoreLog);
-  return runtime.formatNumber(runtime.valueFromLog10(scoreLog));
+  return runtime.formatHeldUiLogNumber(scoreLog);
 }
 
 function applyInfinitySoftcap(rawLog10) {
@@ -506,7 +504,7 @@ function canBuyNormalUpgrade(kind) {
 
 function spendNormalUpgrade(kind) {
   if (!runtime.towerChallenge4AllowsNormalUpgrade(kind) || !canBuyNormalUpgrade(kind)) return false;
-  if (runtime.isChallengeCompleted(7) || runtime.eternityMilestoneIc7RewardActive?.()) return true;
+  if (runtime.isChallengeCompleted(7)) return true;
   return spendLog(upgradeCostLog(kind));
 }
 

@@ -4,7 +4,7 @@ const failureReportPath = path.join(__dirname, "regression-failure.txt");
 
 async function main() {
   await require("./tests/runtime-invariants-module-runtime.js").runRuntimeInvariantTests();
-  await require("./tests/vertex-gain-display-module-runtime.js").runVertexGainDisplayModuleRuntimeTest();
+  await require("./tests/display-formatting-module-runtime.js").runDisplayFormattingModuleRuntimeTest();
   await require("./tests/ic7-price-cap-module-runtime.js").runIc7PriceCapModuleRuntimeTest();
   await require("./tests/achievements-v2-module-runtime.js").runAchievementV2ModuleRuntimeTest();
   await require("./tests/numeric-stability-module-runtime.js").runNumericStabilityModuleRuntimeTest();
@@ -14,6 +14,7 @@ async function main() {
   await require("./tests/tower-module-runtime.js").runTowerModuleRuntimeTest();
   await require("./tests/eternity-module-runtime.js").runEternityModuleRuntimeTest();
   await require("./tests/eternity-save-migration-module-runtime.js").runEternitySaveMigrationModuleRuntimeTest();
+  await require("./tests/timeline-module-runtime.js").runTimelineModuleRuntimeTest();
   await require("./tests/save-recovery-module-runtime.js").runSaveRecoveryModuleRuntimeTest();
   await require("./tests/time-flux-module-runtime.js").runTimeFluxModuleRuntimeTest();
   await require("./tests/version-consistency-module-runtime.js").runVersionConsistencyModuleRuntimeTest();

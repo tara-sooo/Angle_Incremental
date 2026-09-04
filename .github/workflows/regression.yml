@@ -31,22 +31,64 @@ jobs:
         run: npm run check:idd-policy
       - name: Run ESM regression suite
         run: npm run test:regression
-      - name: Install Chromium for browser smoke test
+      - name: Install Chromium for browser validation
         timeout-minutes: 5
         run: npx playwright install chromium
-      - name: Run browser ESM smoke test
+      - name: Run browser smoke and feature tests
         run: npm run test:browser
       - name: Test local performance gate classifier
         run: npm run test:local-performance-gate
-      - name: Run performance smoke test
-        run: npm run test:performance
-      - name: Upload test diagnostics
+      - name: Upload regression diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-diagnostics
+          name: regression-diagnostics
           path: |
             browser-smoke-report.json
-            output/performance-smoke.json
+            output/render-regression.json
             regression-failure.txt
+          if-no-files-found: warn
+
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium for performance smoke test
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Run hosted performance smoke test
+        run: npm run test:performance
+      - name: Upload performance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-diagnostics
+          path: output/performance-smoke.json
+          if-no-files-found: warn
+
+  offline-stress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium for offline stress test
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Run offline stress test
+        run: npm run test:offline-stress
+      - name: Upload offline stress diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-stress-diagnostics
+          path: output/offline-stress.json
           if-no-files-found: warn

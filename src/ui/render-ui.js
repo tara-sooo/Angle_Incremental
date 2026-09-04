@@ -8,6 +8,7 @@ let renderedRecoveryNumberFormat = "";
 let renderedLoadRecoveryMode = false;
 let renderedSaveConflictMode = false;
 let renderedSaveConflictCheckpointReady = false;
+let selectedTimelineNodeId = "";
 
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
@@ -61,6 +62,22 @@ function formatRecoveryTimestamp(timestamp) {
   }
 }
 
+function formatInfiniteAngleLevel(kind) {
+  const level = runtime.infiniteAngleEffectiveUpgradeLevel(kind);
+  const freeLevel = runtime.infiniteAngleFreeUpgradeLevel(kind);
+  return `Lv ${level}${freeLevel > 0 ? ` (+${freeLevel})` : ""}`;
+}
+
+function formatNormalUpgradeTotal(level) {
+  return level < 1000 ? runtime.formatSmallDecimal(level) : runtime.formatUiNumber(level);
+}
+
+function formatNormalUpgradeLevel(rawLevel, effectiveLevel, freeLevel) {
+  return freeLevel > 0
+    ? `Lv ${formatNormalUpgradeTotal(effectiveLevel)} (+${freeLevel})`
+    : formatEffectiveLevel(rawLevel, effectiveLevel);
+}
+
 function recoveryReasonText(reason) {
   const reasonKeys = {
     periodic: "checkpointReasonPeriodic",
@@ -73,6 +90,7 @@ function recoveryReasonText(reason) {
     "pre-infinite-angle": "checkpointReasonPreInfiniteAngle",
     "pre-tower-build": "checkpointReasonPreTowerBuild",
     "pre-tower-challenge": "checkpointReasonPreTowerChallenge",
+    "pre-timeline-respec": "checkpointReasonPreTimelineRespec",
     "pre-restore": "checkpointReasonPreRestore",
   };
   return runtime.t(reasonKeys[reason] || "checkpointReasonOther");
@@ -106,7 +124,7 @@ function recoveryStateSummary(entry) {
   );
   return [
     `${runtime.t("recoveryInfinity")}: ${runtime.formatUiNumber(state.infinityCount || 0)}`,
-    `${runtime.t("recoveryIp")}: ${runtime.formatUiLogNumber(infinityPointsLog10)}`,
+    `${runtime.t("recoveryIp")}: ${runtime.formatHeldUiLogNumber(infinityPointsLog10, state.infinityPointsExact)}`,
     `${runtime.t("recoveryChallenges")}: ${countBits(state.completedChallenges)}/${runtime.INFINITY_CHALLENGE_COUNT}`,
     `${runtime.t("recoveryAchievements")}: ${countAchievementBits(state)}/${runtime.ACHIEVEMENT_COUNT}`,
     `${runtime.t("recoveryIa")}: ${state.infiniteAngleUnlocked ? runtime.t("recoveryUnlocked") : runtime.t("recoveryLocked")}`,
@@ -128,6 +146,17 @@ function updateSaveRecoveryUi() {
     && renderedSaveConflictCheckpointReady === Boolean(runtime.saveConflictCheckpointReady)
   ) return;
   const recovery = runtime.recoveryEntries();
+  if (
+    elements.saveRecoveryDetails
+    && (recovery.loadFailure
+      || runtime.loadRecoveryMode
+      || runtime.saveConflictMode
+      || recovery.quarantine
+      || recovery.preImport
+      || recovery.undo)
+  ) {
+    elements.saveRecoveryDetails.open = true;
+  }
   elements.preImportBackupStatus.textContent = recovery.preImport
     ? `${runtime.t("preImportBackupAvailable")} ${formatRecoveryTimestamp(recovery.preImport.backedUpAt)}`
     : runtime.t("noPreImportBackup");
@@ -204,40 +233,308 @@ function formatVertexGainIncrease(log10Value) {
   return runtime.formatUiLogNumber(log10Value);
 }
 
+function formatTimelineEternityRequirement() {
+  const claims = runtime.timelineTrackClaimCount("eternity");
+  const requirement = runtime.timelineEternityRequirement();
+  return requirement !== null && requirement <= 1000000n
+    ? requirement.toString()
+    : `2^${claims + 1}`;
+}
+
+function localizedTimelineText(value) {
+  if (!value || typeof value !== "object") return "";
+  return value[runtime.state.language] || value.en || value.ja || "";
+}
+
+function timelineNodeDescriptionText(node) {
+  return localizedTimelineText(node.description).replace("{softcap}", runtime.formatUiLogNumber(10));
+}
+
+function timelineNodeStatusText(availability) {
+  switch (availability.reason) {
+    case "owned":
+      return runtime.t("timelineNodePurchased");
+    case "timeline-locked":
+      return runtime.t("timelineNodeLocked");
+    case "missing-prerequisites":
+      return runtime.t("timelineNodeMissingPrerequisites").replace(
+        "{nodes}",
+        availability.missingPrerequisites.join(", "),
+      );
+    case "route-conflict":
+      return runtime.t("timelineNodeAlternativeLocked");
+    case "insufficient-tf":
+      return runtime.t("timelineNodeNotEnoughTf").replace(
+        "{cost}",
+        String(availability.node.costTF),
+      );
+    default:
+      return runtime.t("timelineNodeAvailable");
+  }
+}
+
+function timelineNodeCurrentEffectText(node, availability) {
+  if (availability.reason !== "owned") return runtime.t("timelineNodeInactive");
+  if (node.id === "Real-BC16500") {
+    return runtime.t("timelineRealCurrentEffect")
+      .replace("{multiplier}", formatMultiplierLog(runtime.timelineIpGainMultiplierLog10?.() ?? 0));
+  }
+  if (node.id === "Parallel-BC16500") {
+    const effectiveLog10 = runtime.timelineParallelEffectiveLog10?.() ?? 0;
+    return runtime.t("timelineParallelCurrentEffect")
+      .replace("{multiplier}", formatMultiplierLog(effectiveLog10))
+      .replace("{time}", runtime.formatLongDuration(runtime.timelineParallelSecondsSinceIc8Clear?.() ?? 0));
+  }
+  return runtime.t("timelineNodeInactive");
+}
+
+function timelineNodeRouteClass(route) {
+  return route === "Parallel" ? "timeline-node-route-parallel" : "timeline-node-route-real";
+}
+
+function createTimelineNodeCard(node) {
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "timeline-node ui-tree-node";
+  card.dataset.timelineNode = node.id;
+  card.dataset.route = node.route || "";
+  card.setAttribute("aria-controls", "timelineNodeDetail");
+
+  const heading = document.createElement("span");
+  heading.className = "timeline-node-heading";
+  const identity = document.createElement("span");
+  identity.className = "timeline-node-identity";
+  const era = document.createElement("span");
+  era.className = "timeline-node-era";
+  const name = document.createElement("strong");
+  name.className = "timeline-node-name";
+  const route = document.createElement("span");
+  route.className = `timeline-node-route ${timelineNodeRouteClass(node.route)}`;
+  identity.append(era, name);
+  heading.append(identity, route);
+
+  const meta = document.createElement("span");
+  meta.className = "timeline-node-compact-meta";
+  const cost = document.createElement("span");
+  cost.className = "timeline-node-cost";
+  const status = document.createElement("span");
+  status.className = "timeline-node-status";
+  meta.append(cost, status);
+  card.append(heading, meta);
+  return card;
+}
+
+function renderTimelineNodeTree(nodes) {
+  const host = runtime.elements.timelineNodeGrid;
+  if (!host) return;
+  const signature = nodes.map((node) => `${node.id}:${node.era}:${node.route}`).join("|");
+  if (host.dataset.timelineSignature !== signature) {
+    clearElement(host);
+    const eras = new Map();
+    nodes.forEach((node) => {
+      if (!eras.has(node.era)) eras.set(node.era, []);
+      eras.get(node.era).push(node);
+    });
+    eras.forEach((eraNodes, era) => {
+      const eraSection = document.createElement("section");
+      eraSection.className = "timeline-era";
+      eraSection.dataset.timelineEra = era;
+      const eraHeading = document.createElement("h3");
+      eraHeading.className = "timeline-era-heading";
+      eraHeading.textContent = era;
+      const grid = document.createElement("div");
+      grid.className = "timeline-node-grid";
+      eraNodes
+        .slice()
+        .sort((left, right) => (left.route === "Parallel" ? 1 : 0) - (right.route === "Parallel" ? 1 : 0))
+        .forEach((node) => grid.append(createTimelineNodeCard(node)));
+      eraSection.append(eraHeading, grid);
+      host.append(eraSection);
+    });
+    host.dataset.timelineSignature = signature;
+  }
+  runtime.elements.timelineNodeCards = Array.from(host.querySelectorAll(".timeline-node"));
+}
+
+function updateTimelineNodeCard(card, node, availability) {
+  const name = card.querySelector(".timeline-node-name");
+  const era = card.querySelector(".timeline-node-era");
+  const route = card.querySelector(".timeline-node-route");
+  const cost = card.querySelector(".timeline-node-cost");
+  const status = card.querySelector(".timeline-node-status");
+  const selected = node.id === selectedTimelineNodeId;
+  const costText = `${runtime.t("timelineNodeCost")}: ${runtime.formatUiNumber(node.costTF)} TF`;
+  const statusText = timelineNodeStatusText(availability);
+  if (name) name.textContent = localizedTimelineText(node.name);
+  if (era) era.textContent = node.era;
+  if (route) {
+    route.textContent = node.route;
+    route.classList.toggle("timeline-node-route-real", node.route === "Real");
+    route.classList.toggle("timeline-node-route-parallel", node.route === "Parallel");
+  }
+  if (cost) cost.textContent = costText;
+  if (status) status.textContent = statusText;
+  card.dataset.state = availability.reason;
+  card.dataset.route = node.route || "";
+  card.classList.toggle("is-available", availability.canPurchase);
+  card.classList.toggle("is-owned", availability.reason === "owned");
+  card.classList.toggle("is-locked", !availability.canPurchase && availability.reason !== "owned");
+  card.classList.toggle("is-conflict", availability.reason === "route-conflict");
+  card.classList.toggle("is-selected", selected);
+  card.setAttribute("aria-pressed", String(selected));
+  card.setAttribute("aria-label", `${localizedTimelineText(node.name)}, ${node.era}, ${node.route}, ${costText}, ${statusText}`);
+}
+
+function updateTimelineNodeDetail(node, availability) {
+  const detail = runtime.elements.timelineNodeDetail;
+  if (!detail) return;
+  if (!node) {
+    detail.hidden = true;
+    return;
+  }
+  detail.hidden = false;
+  detail.dataset.timelineNode = node.id;
+  detail.dataset.state = availability.reason;
+  detail.classList.toggle("is-available", availability.canPurchase);
+  detail.classList.toggle("is-owned", availability.reason === "owned");
+  detail.classList.toggle("is-locked", !availability.canPurchase && availability.reason !== "owned");
+  detail.classList.toggle("is-conflict", availability.reason === "route-conflict");
+  const prerequisites = Array.isArray(node.prerequisites) ? node.prerequisites : [];
+  if (runtime.elements.timelineNodeDetailHeading) runtime.elements.timelineNodeDetailHeading.textContent = localizedTimelineText(node.name);
+  if (runtime.elements.timelineNodeDetailDescription) runtime.elements.timelineNodeDetailDescription.textContent = timelineNodeDescriptionText(node);
+  if (runtime.elements.timelineNodeDetailCurrentEffect) runtime.elements.timelineNodeDetailCurrentEffect.textContent = timelineNodeCurrentEffectText(node, availability);
+  if (runtime.elements.timelineNodeDetailPrerequisites) runtime.elements.timelineNodeDetailPrerequisites.textContent = prerequisites.length > 0
+    ? prerequisites.join(", ")
+    : runtime.t("timelineNoPrerequisites");
+  if (runtime.elements.timelineNodePurchaseButton) {
+    runtime.elements.timelineNodePurchaseButton.dataset.timelineNodePurchase = node.id;
+    runtime.elements.timelineNodePurchaseButton.hidden = !availability.canPurchase;
+    runtime.elements.timelineNodePurchaseButton.disabled = !availability.canPurchase;
+    runtime.elements.timelineNodePurchaseButton.textContent = runtime.t("timelinePurchase");
+  }
+}
+
+function selectTimelineNode(nodeId) {
+  const node = runtime.timelineNode?.(nodeId);
+  if (!node) return false;
+  selectedTimelineNodeId = node.id;
+  updateTimelineTreeUi();
+  return true;
+}
+
+function updateTimelineTreeUi() {
+  if (typeof runtime.timelineNodeAvailability !== "function" || typeof runtime.timelineNodes !== "function") return;
+  const nodes = runtime.timelineNodes();
+  renderTimelineNodeTree(nodes);
+  if (!nodes.some((node) => node.id === selectedTimelineNodeId)) selectedTimelineNodeId = nodes[0]?.id || "";
+  const selectedNode = runtime.timelineNode?.(selectedTimelineNodeId);
+  runtime.elements.timelineNodeCards.forEach((card) => {
+    const node = runtime.timelineNode?.(card.dataset.timelineNode);
+    if (node) updateTimelineNodeCard(card, node, runtime.timelineNodeAvailability(node.id));
+  });
+  updateTimelineNodeDetail(
+    selectedNode,
+    selectedNode ? runtime.timelineNodeAvailability(selectedNode.id) : null,
+  );
+}
+
+function updateTimelineUi() {
+  if (!runtime.elements.timelineEarnedTf || typeof runtime.timelineEarnedTf !== "function") return;
+  runtime.normalizeTimelineState?.();
+  const earned = runtime.timelineEarnedTf();
+  const available = runtime.timelineAvailableTf();
+  const spent = runtime.timelineSpentTf();
+  runtime.elements.timelineEarnedTf.textContent = `${runtime.formatUiNumber(earned)} TF`;
+  runtime.elements.timelineAvailableTf.textContent = `${runtime.formatUiNumber(available)} TF`;
+  runtime.elements.timelineSpentTf.textContent = `${runtime.formatUiNumber(spent)} TF`;
+
+  const tracks = [
+    {
+      id: "score",
+      claims: runtime.elements.timelineScoreClaims,
+      requirement: runtime.elements.timelineScoreRequirement,
+      button: runtime.elements.timelineScoreClaimButton,
+      requirementText: `${runtime.formatUiLogNumber(runtime.timelineScoreRequirementLog10())} Score`,
+    },
+    {
+      id: "ip",
+      claims: runtime.elements.timelineIpClaims,
+      requirement: runtime.elements.timelineIpRequirement,
+      button: runtime.elements.timelineIpClaimButton,
+      requirementText: `${runtime.formatUiLogNumber(runtime.timelineIpRequirementLog10())} IP`,
+    },
+    {
+      id: "eternity",
+      claims: runtime.elements.timelineEternityClaims,
+      requirement: runtime.elements.timelineEternityRequirement,
+      button: runtime.elements.timelineEternityClaimButton,
+      requirementText: formatTimelineEternityRequirement(),
+    },
+  ];
+  tracks.forEach((track) => {
+    if (track.claims) track.claims.textContent = runtime.formatUiNumber(runtime.timelineTrackClaimCount(track.id));
+    if (track.requirement) track.requirement.textContent = track.requirementText;
+    if (track.button) {
+      track.button.disabled = !runtime.canClaimTimelineTf(track.id);
+      track.button.textContent = runtime.t("timelineClaim");
+    }
+  });
+
+  if (runtime.elements.timelineRespecButton) {
+    runtime.elements.timelineRespecButton.disabled = runtime.timelineDiscovered?.() !== true;
+  }
+  updateTimelineTreeUi();
+}
+
 function updateUi() {
   if (runtime.offlineProcessing) return;
   const currentCostLogs = runtime.costLogs();
   const unlockedAchievementsNow = runtime.checkAchievements(true);
-  if (unlockedAchievementsNow.length > 0) runtime.saveGame("manual");
+  const discoveredMainTabs = runtime.discoverMainTabs?.() === true;
+  if (unlockedAchievementsNow.length > 0 || discoveredMainTabs) runtime.saveGame("manual");
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
   applyLanguage();
+  runtime.updateHelpUi?.();
+  runtime.updateMainTabVisibility?.();
   runtime.updateTopBar();
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());
   const vertexGainIncreaseLog10 = runtime.vertexGainIncreaseLog10();
   runtime.elements.vertexGainValue.textContent = `+${formatVertexGainIncrease(vertexGainIncreaseLog10)}`;
   runtime.elements.lapValue.textContent = runtime.formatDuration(runtime.lapDuration());
-  runtime.elements.lapSpeedValue.textContent = runtime.isLapSpeedSoftcapped()
-    ? `${formatMultiplierLog(runtime.effectiveLapSpeedLog10())} ${runtime.t("lapSpeedSoftcapped")} / raw ${formatMultiplierLog(runtime.rawLapSpeedLog10())}`
-    : formatMultiplierLog(runtime.effectiveLapSpeedLog10());
-  runtime.elements.speedLevel.textContent = formatEffectiveLevel(
+  runtime.elements.lapSpeedValue.textContent = formatMultiplierLog(runtime.effectiveLapSpeedLog10());
+  if (runtime.isLapSpeedSoftcapped()) runtime.elements.lapSpeedValue.textContent += " " + runtime.t("lapSpeedSoftcapped");
+  const freeNormalUpgradeLevel = runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0;
+  const effectiveSpeedLevel = runtime.effectiveSpeedLevel();
+  const effectiveVertexCount = runtime.effectiveVertexCount();
+  const effectiveGainLevel = runtime.effectiveGainLevel();
+  runtime.elements.speedLevel.textContent = formatNormalUpgradeLevel(
     runtime.state.speedLevel,
-    runtime.effectiveSpeedLevel(),
+    effectiveSpeedLevel,
+    freeNormalUpgradeLevel,
   );
-  runtime.elements.vertexCount.textContent = runtime.effectiveVertexCount() === runtime.state.vertices
-    ? `${runtime.state.vertices} ${runtime.t("vertices")}`
-    : `${runtime.effectiveVertexCount()} ${runtime.t("vertices")} (${runtime.state.vertices} + ${runtime.effectiveVertexCount() - runtime.state.vertices})`;
-  runtime.elements.gainLevel.textContent = formatEffectiveLevel(
+  runtime.elements.vertexCount.textContent = freeNormalUpgradeLevel > 0
+    ? `${formatNormalUpgradeTotal(effectiveVertexCount)} ${runtime.t("vertices")} (+${freeNormalUpgradeLevel})`
+    : effectiveVertexCount === runtime.state.vertices
+      ? `${runtime.state.vertices} ${runtime.t("vertices")}`
+      : `${effectiveVertexCount} ${runtime.t("vertices")} (${runtime.state.vertices} + ${effectiveVertexCount - runtime.state.vertices})`;
+  runtime.elements.gainLevel.textContent = formatNormalUpgradeLevel(
     runtime.state.gainLevel,
-    runtime.effectiveGainLevel(),
+    effectiveGainLevel,
+    freeNormalUpgradeLevel,
   );
   runtime.elements.speedCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.speed)}`;
   runtime.elements.vertexCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.vertex)}`;
   runtime.elements.gainCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.gain)}`;
-  runtime.elements.speedUpgrade.disabled = !runtime.canBuyNormalUpgrade("speed");
-  runtime.elements.vertexUpgrade.disabled = !runtime.canBuyNormalUpgrade("vertex");
-  runtime.elements.gainUpgrade.disabled = !runtime.canBuyNormalUpgrade("gain");
-  runtime.elements.buyAllUpgrade.disabled = !runtime.canBuyNormalUpgrade("speed") && !runtime.canBuyNormalUpgrade("vertex") && !runtime.canBuyNormalUpgrade("gain");
+  const canBuyNormal = {
+    speed: runtime.canBuyNormalUpgrade("speed"),
+    vertex: runtime.canBuyNormalUpgrade("vertex"),
+    gain: runtime.canBuyNormalUpgrade("gain"),
+  };
+  runtime.elements.speedUpgrade.disabled = !canBuyNormal.speed;
+  runtime.elements.vertexUpgrade.disabled = !canBuyNormal.vertex;
+  runtime.elements.gainUpgrade.disabled = !canBuyNormal.gain;
+  runtime.elements.buyAllUpgrade.disabled = !canBuyNormal.speed && !canBuyNormal.vertex && !canBuyNormal.gain;
 
   const ready = runtime.canRunGeneration();
   runtime.elements.generationButton.disabled = !ready;
@@ -251,8 +548,7 @@ function updateUi() {
   runtime.elements.generationCostFactor.textContent = formatMultiplierPreview(runtime.generationCostFactorEffect(), nextGeneration.costFactor);
 
   runtime.elements.coreBoostCount.textContent = String(runtime.state.coreBoostCount);
-  runtime.elements.coreBoostRequirement.textContent = runtime.formatPowerOfTen(runtime.coreBoostRequirementLog10());
-  runtime.elements.coreBoostRequirementGrowthPowerRaw.textContent = `^${runtime.coreBoostRequirementRawGrowthPower().toFixed(3)}`;
+  runtime.elements.coreBoostRequirement.textContent = runtime.formatUiLogNumber(runtime.coreBoostRequirementLog10());
   runtime.elements.coreBoostRequirementGrowthPower.textContent = `^${runtime.coreBoostRequirementGrowthPower().toFixed(3)}`;
   const nextCoreBoost = runtime.nextCoreBoostValues();
   runtime.elements.coreBoostGainBoost.textContent = formatMultiplierPreview(runtime.coreBoostGainIncreaseMultiplier(), nextCoreBoost.gainMultiplier);
@@ -263,15 +559,17 @@ function updateUi() {
   const infinityReady = runtime.canInfinity();
   const infinityUnlocked = runtime.state.infinityCount > 0;
   runtime.elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";
-  runtime.elements.infinityTabBadge.classList.toggle("is-visible", infinityReady);
   runtime.elements.infinityUnlockNote.hidden = infinityUnlocked;
-  runtime.elements.infinityPoints.textContent = runtime.formatUiLogNumber(runtime.currentInfinityPointsLog10());
-  runtime.elements.infiniteScore.textContent = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
-  runtime.elements.infiniteScorePanel.textContent = runtime.formatUiLogNumber(runtime.currentInfiniteScoreLog10());
+  runtime.elements.infinityUnlockNote.textContent = runtime.t("infinityUnlockNote")
+    .replace("{score}", runtime.formatUiLogNumber(runtime.INFINITY_REQUIREMENT_LOG10));
+  runtime.elements.infinityPoints.textContent = runtime.formatHeldUiLogNumber(
+    runtime.currentInfinityPointsLog10(),
+    runtime.state.infinityPointsExact,
+  );
+  runtime.elements.infiniteScorePanel.textContent = runtime.formatHeldUiLogNumber(runtime.currentInfiniteScoreLog10());
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
-  runtime.elements.infiniteAngleBoost.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
-  runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiNumber(runtime.infinityPointGain())} IP`;
+  runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiLogNumber(runtime.infinityPointGainLog10())} IP`;
   runtime.elements.infinityButton.disabled = runtime.state.infinityCount === 0 || !runtime.canInfinity();
   runtime.updateInfinityUpgradeRows();
   const infiniteAngleUnlocked = runtime.state.infiniteAngleUnlocked;
@@ -291,15 +589,20 @@ function updateUi() {
   runtime.elements.infiniteAngleVertexCount.textContent = `${runtime.infiniteAngleVertexCount()} ${runtime.t("infiniteAngleVertices")}`;
   runtime.elements.infiniteAngleCurrentGain.textContent = runtime.formatUiLogNumber(runtime.infiniteAngleCurrentGainLog10());
   runtime.elements.infiniteAngleLap.textContent = runtime.formatDuration(runtime.infiniteAngleLapDuration());
-  runtime.elements.infiniteAngleSpeedLevel.textContent = `${runtime.t("level")} ${runtime.state.infiniteAngleSpeedLevel}`;
-  runtime.elements.infiniteAngleVertexLevel.textContent = `${runtime.t("level")} ${runtime.state.infiniteAngleVertexLevel}`;
-  runtime.elements.infiniteAngleGainLevel.textContent = `${runtime.t("level")} ${runtime.state.infiniteAngleGainLevel}`;
+  runtime.elements.infiniteAngleSpeedLevel.textContent = formatInfiniteAngleLevel("speed");
+  runtime.elements.infiniteAngleVertexLevel.textContent = formatInfiniteAngleLevel("vertex");
+  runtime.elements.infiniteAngleGainLevel.textContent = formatInfiniteAngleLevel("gain");
   runtime.elements.infiniteAngleSpeedCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.speed)} IP`;
   runtime.elements.infiniteAngleVertexCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.vertex)} IP`;
   runtime.elements.infiniteAngleGainCost.textContent = `${runtime.t("infinityUpgradeCost")} ${runtime.formatUiLogNumber(infiniteAngleUpgradeCosts.gain)} IP`;
-  runtime.elements.infiniteAngleSpeedUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("speed");
-  runtime.elements.infiniteAngleVertexUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("vertex");
-  runtime.elements.infiniteAngleGainUpgrade.disabled = !runtime.canBuyInfiniteAngleUpgrade("gain");
+  const canBuyInfiniteAngle = {
+    speed: runtime.canBuyInfiniteAngleUpgrade("speed"),
+    vertex: runtime.canBuyInfiniteAngleUpgrade("vertex"),
+    gain: runtime.canBuyInfiniteAngleUpgrade("gain"),
+  };
+  runtime.elements.infiniteAngleSpeedUpgrade.disabled = !canBuyInfiniteAngle.speed;
+  runtime.elements.infiniteAngleVertexUpgrade.disabled = !canBuyInfiniteAngle.vertex;
+  runtime.elements.infiniteAngleGainUpgrade.disabled = !canBuyInfiniteAngle.gain;
   const completed = runtime.completedChallengeCount();
   runtime.elements.challengeStatus.textContent = runtime.state.activeChallenge > 0
     ? `${runtime.challengeName(runtime.state.activeChallenge)} ${runtime.t("challengeRunning")}`
@@ -315,17 +618,12 @@ function updateUi() {
   const towerGate = runtime.towerGateForFloor(nextTowerFloor);
   const towerGateReady = runtime.towerCanBuildNextFloor();
   const maximumInfinityPointLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
-  const towerCostAffordable = nextTowerCostLog10 <= maximumInfinityPointLog10
+  const towerCostAffordable = (!runtime.infinityPointCapActive() || nextTowerCostLog10 <= maximumInfinityPointLog10)
     && runtime.canSpendInfinityPoints(nextTowerCostLog10);
   runtime.elements.towerFloorHeading.textContent = `Floor ${currentTowerFloor}`;
   runtime.elements.towerFloorValue.textContent = String(currentTowerFloor);
   runtime.elements.towerScoreExponentValue.textContent = `^${runtime.towerScoreExponent().toFixed(2)}`;
-  const towerChallenge1ScorePowerBase = runtime.hasInfinityUpgrade("13-1") ? 0.5 : runtime.INFINITE_ANGLE_SCORE_POWER;
-  const towerChallenge1ScorePowerBonus = runtime.towerChallenge1InfinityScorePowerBonus();
-  const towerChallenge1ScorePowerTotal = runtime.infiniteAngleScorePower();
-  runtime.elements.towerChallenge1ScorePowerBase.textContent = `^${towerChallenge1ScorePowerBase.toFixed(3)}`;
-  runtime.elements.towerChallenge1ScorePowerBonus.textContent = `+^${towerChallenge1ScorePowerBonus.toFixed(3)}`;
-  runtime.elements.towerChallenge1ScorePowerTotal.textContent = `^${towerChallenge1ScorePowerTotal.toFixed(3)}`;
+  runtime.elements.towerChallenge1ScorePower.textContent = `^${runtime.infiniteAngleScorePower().toFixed(3)}`;
   runtime.elements.towerNextCost.textContent = `${runtime.formatUiLogNumber(nextTowerCostLog10)} IP`;
   runtime.elements.towerGateStatus.textContent = !towerGateReady
     ? runtime.t("towerNeedChallenge").replace("{index}", String(towerGate))
@@ -333,7 +631,7 @@ function updateUi() {
       ? runtime.t("towerNeedIp")
       : runtime.t("towerBuildReady");
   runtime.elements.towerBuildButton.disabled = !runtime.canBuildTower();
-  const breakCapRequirement = runtime.formatPowerOfTen(runtime.BREAK_CAP_REQUIREMENT_LOG10);
+  const breakCapRequirement = runtime.formatUiLogNumber(runtime.BREAK_CAP_REQUIREMENT_LOG10);
   runtime.elements.breakCapRequirement.textContent = runtime.state.infiniteCapBroken
     ? runtime.t("breakCapBroken")
     : runtime.t("breakCapRequirement").replace("{score}", breakCapRequirement);
@@ -343,6 +641,7 @@ function updateUi() {
   runtime.updateAutomationUi();
   runtime.updateStatisticsUi();
   runtime.updateOfflineReportUi();
+  updateTimelineUi();
 
   const unlockedAchievements = runtime.achievementCount();
   runtime.elements.achievementTabState.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT}`;
@@ -452,6 +751,8 @@ expose("updateSaveRecoveryUi", () => updateSaveRecoveryUi, (value) => { updateSa
 expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
 expose("formatVertexGainIncrease", () => formatVertexGainIncrease, (value) => { formatVertexGainIncrease = value; });
+expose("updateTimelineUi", () => updateTimelineUi);
+expose("selectTimelineNode", () => selectTimelineNode);
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });
 expose("setSaveStatus", () => setSaveStatus, (value) => { setSaveStatus = value; });
 expose("gainExpressionConfig", () => gainExpressionConfig, (value) => { gainExpressionConfig = value; });

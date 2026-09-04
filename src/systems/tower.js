@@ -80,8 +80,8 @@ const TOWER_CHALLENGES = Object.freeze([
       en: "Core Boost is sealed, GR's score multiplier is raised to ^0.1, and its cost factor has a hard floor of x0.90.",
     },
     reward: {
-      ja: "Core Boost要求量増加指数を強化。Floor 5以降の追加階層で生指数を下げ、1.50未満ではソフトキャップする",
-      en: "Improves Core Boost requirement growth. Additional floors after Floor 5 lower the raw power, with a soft cap below 1.50.",
+      ja: "Core Boost要求量増加指数を強化。Floor 5以降の追加階層で指数を下げ、1.50未満ではソフトキャップする",
+      en: "Improves Core Boost requirement growth. Additional floors after Floor 5 lower the growth exponent, with a soft cap below 1.50.",
     },
     implemented: true,
   },
@@ -104,7 +104,7 @@ const TOWER_CHALLENGES = Object.freeze([
     index: 4,
     unlockFloor: 12,
     targetLog10: TC4_COMPLETION_TARGET_LOG10,
-    name: { ja: "TC4", en: "TC4" },
+    name: { ja: "TC4 既存品の代替", en: "TC4 Substitute for Existing Products" },
     restriction: {
       ja: "通常強化とIA強化はレベル1を超えて購入できず、TC4専用強化で1e7777 Scoreを目指す",
       en: "Normal and Infinite Angle upgrades stop at level 1; use the TC4 upgrades to reach 1e7777 Score.",
@@ -181,13 +181,29 @@ function towerChallengeUnlockFloor(index) {
   return TOWER_CHALLENGES[normalizedIndex]?.unlockFloor || Infinity;
 }
 
+function applyEternityMilestoneSevenCompletion(index) {
+  const definition = towerChallengeDefinition(index);
+  if (
+    !definition?.implemented
+    || runtime.eternityMilestoneActive?.("7") !== true
+    || towerFloor() < definition.unlockFloor
+  ) return false;
+  const bit = 1 << (definition.index - 1);
+  if ((runtime.state.completedTowerChallenges & bit) !== 0) return false;
+  runtime.state.completedTowerChallenges |= bit;
+  return true;
+}
+
 function towerChallengeUnlocked(index) {
-  return towerFloor() >= towerChallengeUnlockFloor(index);
+  const unlocked = towerFloor() >= towerChallengeUnlockFloor(index);
+  if (unlocked) applyEternityMilestoneSevenCompletion(index);
+  return unlocked;
 }
 
 function towerChallengeCompleted(index) {
   const normalizedIndex = Math.floor(index);
   if (normalizedIndex < 1 || normalizedIndex > runtime.TOWER_CHALLENGE_COUNT) return false;
+  applyEternityMilestoneSevenCompletion(normalizedIndex);
   return (runtime.state.completedTowerChallenges & (1 << (normalizedIndex - 1))) !== 0;
 }
 
@@ -466,17 +482,18 @@ function canBuildTower() {
   const costLog10 = towerNextFloorCostLog10();
   const maximumCostLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
   return towerCanBuildNextFloor()
-    && costLog10 <= maximumCostLog10
+    && (!runtime.infinityPointCapActive() || costLog10 <= maximumCostLog10)
     && runtime.canSpendInfinityPoints(costLog10);
 }
 
-function buildTower() {
+function buildTower(options = {}) {
+  if (typeof Event !== "undefined" && options instanceof Event) options = {};
   if (!canBuildTower()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-tower-build", { force: true })) return false;
   if (!runtime.spendInfinityPoints(towerNextFloorCostLog10())) return false;
   runtime.state.towerFloor = towerNextFloor();
-  runtime.updateUi();
-  runtime.saveGame("manual");
+  if (options.refresh !== false) runtime.updateUi();
+  if (options.save !== false) runtime.saveGame("manual");
   return true;
 }
 

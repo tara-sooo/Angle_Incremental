@@ -1,51 +1,13 @@
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
-import { readFile, stat } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
-
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const contentTypes = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-};
 const ACHIEVEMENT_38_TO_41_MASK = [38, 39, 40, 41]
   .reduce((mask, id) => mask | (1 << (id - 32)), 0);
+import { openGamePage, startGameTest } from "./browser-harness.mjs";
 
-function resolveRequestPath(requestUrl) {
-  const parsed = new URL(requestUrl, "http://127.0.0.1");
-  const requested = decodeURIComponent(parsed.pathname === "/" ? "/index.html" : parsed.pathname);
-  const relative = path.normalize(requested.replace(/^\/+/, ""));
-  if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
-  return path.join(root, relative);
-}
-
-const server = createServer(async (request, response) => {
-  const filePath = resolveRequestPath(request.url || "/");
-  if (!filePath) {
-    response.writeHead(403).end();
-    return;
-  }
-  try {
-    const metadata = await stat(filePath);
-    if (!metadata.isFile()) throw new Error("not a file");
-    response.writeHead(200, { "content-type": contentTypes[path.extname(filePath)] || "application/octet-stream" });
-    response.end(await readFile(filePath));
-  } catch {
-    response.writeHead(404).end();
-  }
+const gameTest = await startGameTest();
+const { context, page } = await openGamePage(gameTest.browser, gameTest.origin, {
+  viewport: { width: 1280, height: 900 },
 });
-
-await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-const address = server.address();
-if (!address || typeof address === "string") throw new Error("failed to bind Eternity release E2E server");
-
-const browser = await chromium.launch({ headless: true, args: ["--use-gl=disabled"] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-const url = `http://127.0.0.1:${address.port}/`;
+const url = `${gameTest.origin}/`;
 
 async function waitForGame() {
   await page.evaluate(() => window.__angleDebug.ready);
@@ -130,22 +92,27 @@ async function performQualifiedEternityThroughUi() {
   await page.evaluate(() => {
     const debug = window.__angleDebug;
     debug.runtime.syncInfinityPointCachesFromExact(debug.runtime.MAX_EXACT_INFINITY_POINTS);
+    debug.switchMainTab("eternity");
     debug.runtime.updateUi();
   });
-  await openEternityThroughUi();
   const ready = await page.evaluate(() => ({
+    activeMainTab: window.__angleDebug.runtime.activeMainTab,
     canEternity: window.__angleDebug.canEternity(),
     legacyForced: window.__angleDebug.maybeForceEternity({ save: false, update: false }),
+    actionText: document.getElementById("eternityPerformButton")?.textContent?.trim(),
     buttonDisabled: document.getElementById("eternityPerformButton")?.disabled,
+    globalActionSurface: Boolean(document.getElementById("prestigeActionSurface")),
   }));
+  assert.equal(ready.activeMainTab, "eternity", "qualified Eternity should remain on its own page");
   assert.equal(ready.canEternity, true, "TC4 completion plus 1.80e308 IP should make Eternity available");
   assert.equal(ready.legacyForced, false, "qualified state must not trigger Eternity through the legacy automatic hook");
+  assert.equal(ready.actionText, "Eternityする", "the local Eternity action should expose its ready label");
   assert.equal(ready.buttonDisabled, false, "the player-facing Eternity button should enable when qualified");
+  assert.equal(ready.globalActionSurface, false, "the dual global prestige surface should remain absent");
   await page.click("#eternityPerformButton");
 }
 
 try {
-  await page.goto(url, { waitUntil: "networkidle" });
   await waitForGame();
 
   await page.evaluate(() => {
@@ -156,6 +123,7 @@ try {
     debug.state.eternityMilestoneMask = 0;
     debug.state.eternityMilestoneChoice = "";
     debug.state.achievementMaskHigh = (1 << (38 - 32)) | (1 << (39 - 32));
+    debug.state.towerFloor = 12;
     debug.state.timeFlux = 246;
     debug.state.timeFluxCapacityLevel = 2;
     debug.state.timeFluxGainLevel = 3;
@@ -316,15 +284,29 @@ try {
   assert.equal(thresholdBefore.canEternity, true, "the controlled threshold fixture should qualify for manual Eternity");
   assert.equal(thresholdBefore.forced, false, "the threshold fixture must remain stable until the player acts");
 
-  await openEternityThroughUi();
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.switchMainTab("eternity");
+    debug.runtime.updateUi();
+  });
+  const thresholdAction = await page.evaluate(() => ({
+    activeMainTab: window.__angleDebug.runtime.activeMainTab,
+    button: document.getElementById("eternityPerformButton")?.textContent?.trim(),
+    disabled: document.getElementById("eternityPerformButton")?.disabled,
+  }));
+  assert.equal(thresholdAction.activeMainTab, "eternity", "the threshold Eternity action should remain on the Eternity page");
+  assert.equal(thresholdAction.button, "Eternityする", "the local Eternity action should keep its ready label");
+  assert.equal(thresholdAction.disabled, false, "the local Eternity action should be enabled at the threshold fixture");
   await page.click("#eternityPerformButton");
   const thresholdState = await page.evaluate(() => ({
+    completedIc7: (window.__angleDebug.state.completedChallenges & (1 << 6)) !== 0,
     count: window.__angleDebug.state.eternityCount,
     mask: window.__angleDebug.state.eternityMilestoneMask,
     entitlement: window.__angleDebug.runtime.firstTierMilestoneEntitlementCount(),
     milestone2: window.__angleDebug.runtime.eternityMilestoneActive("2"),
   }));
   assert.equal(thresholdState.count, 5, "the threshold fixture should advance to Eternity count 5 through the manual transition");
+  assert.equal(thresholdState.completedIc7, true, "the fifth Eternity should start with IC7 completed");
   assert.equal(thresholdState.mask, 3, "the threshold Eternity should not auto-acquire the remaining first-tier Milestone");
   assert.equal(thresholdState.entitlement, 1, "the unused third first-tier acquisition should remain available");
   assert.equal(thresholdState.milestone2, true, "Milestone 2 should activate at Eternity count 5");
@@ -350,12 +332,13 @@ try {
   const english = await page.evaluate(() => ({
     missingKeys: Array.from(document.querySelectorAll('[data-panel="eternity"] [data-i18n]'))
       .filter((element) => !element.textContent.trim()).map((element) => element.dataset.i18n),
+    compactRequirement: document.querySelector('[data-i18n="eternityRequirementCompact"]')?.textContent || "",
     manual: document.getElementById("eternityForcedNote")?.textContent || "",
     panelText: document.querySelector('[data-panel="eternity"]')?.textContent || "",
   }));
   assert.deepEqual(english.missingKeys, [], "English Eternity release UI should not contain missing/placeholder i18n strings");
-  assert.match(english.manual, /manually/, "English release copy should explain manual Eternity");
-  assert.doesNotMatch(english.manual, /performed automatically/, "English release copy must not describe forced Eternity");
+  assert.equal(english.compactRequirement, "TC4 clear + 1.80e308 IP", "English release UI should keep one compact Eternity requirement");
+  assert.equal(english.manual, "", "English release UI should remove the repeated manual-execution warning");
   assert.equal(english.panelText.includes("Eternity Point"), false, "English release UI must not introduce an Eternity Point surface");
 
   await page.evaluate(() => {
@@ -370,6 +353,6 @@ try {
 
   console.log("Eternity release E2E passed");
 } finally {
-  await browser.close();
-  await new Promise((resolve) => server.close(resolve));
+  await context.close();
+  await gameTest.close();
 }

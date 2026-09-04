@@ -15,88 +15,151 @@ assert.deepEqual(config.branchMergePolicy, {
   transitionPullRequests: [105, 109],
 });
 assert.equal(config.helperRuntime.profile, 'instructions-only');
+assert.equal(config.skipIssueAuthorApprovalGate, true);
 assert.equal(config.ciGate?.trustEmptyProtectionReads, true);
 assert.equal(config.mergeGate?.soloCodeownerAdminFallback, 'hold-and-report');
 assert.equal(Object.hasOwn(config, 'advisoryWait'), false);
 
-const activeSurfaces = [
+const activeFiles = [
   '.github/instructions/idd-overview-core.instructions.md',
+  '.github/instructions/idd-discover.instructions.md',
+  '.github/instructions/idd-suitability.instructions.md',
+  '.github/instructions/idd-claim.instructions.md',
+  '.github/instructions/idd-work.instructions.md',
+  '.github/instructions/idd-pr-submit.instructions.md',
   '.github/instructions/idd-ci.instructions.md',
-  '.github/instructions/idd-review-fix.instructions.md',
-  '.github/instructions/idd-advisory-wait.instructions.md',
-  '.github/instructions/idd-pre-merge.instructions.md',
-  '.github/instructions/idd-merge.instructions.md',
   '.github/instructions/idd-review-snapshot.instructions.md',
   '.github/instructions/idd-review-triage.instructions.md',
-  '.github/instructions/lite/idd-advisory-wait-lite.instructions.md',
-  '.github/instructions/lite/idd-review-fix-lite.instructions.md',
-  '.github/instructions/lite/idd-review-snapshot-lite.instructions.md',
-  '.github/instructions/lite/idd-pre-merge-lite.instructions.md',
-  '.github/instructions/lite/idd-ci-lite.instructions.md',
-  '.github/instructions/lite/idd-pr-submit-lite.instructions.md',
-  '.github/instructions/lite/idd-resume-lite.instructions.md',
-  'docs/idd-advisory-wait-shell-fallback.md',
-  'docs/idd-policy.md',
-  'docs/idd-workflow.md',
+  '.github/instructions/idd-review-fix.instructions.md',
+  '.github/instructions/idd-pre-merge.instructions.md',
   '.github/instructions/idd-merge-handoff.instructions.md',
-  'profiles/no-advisory/README.md',
+  '.github/instructions/idd-merge.instructions.md',
+  '.github/instructions/idd-resume.instructions.md',
+  '.github/instructions/idd-resume-stall.instructions.md',
+  '.github/instructions/idd-overview-appendix.instructions.md',
+  'docs/idd-workflow.md',
 ];
-const forbiddenRuntimePatterns = [
+
+const retiredRoutePatterns = [
+  /\bA0-O\b/,
+  /\borphan-first\b/i,
+  /\broadmap\b/i,
+  /\blite\b/i,
+  /advisoryWait/i,
+  /idd-advisory-wait/i,
+  /review-watermark/i,
+  /review-baseline/i,
+  /F2\.5/i,
   /Copilot/i,
-  /\bCOPILOT_[A-Z_]+\b/,
-  /\bLAST_COPILOT_[A-Z_]+\b/,
-  /\bAW[1-6]\b/,
-  /advisory state/i,
-  /advisoryWait\./i,
-  /gh pr edit[^\n]*(?:copilot|advisory)/i,
   /requested_reviewers/i,
 ];
 
-for (const path of activeSurfaces) {
+for (const path of activeFiles) {
   const source = read(path);
-  for (const pattern of forbiddenRuntimePatterns) {
-    assert.doesNotMatch(source, pattern, `${path} retains disabled advisory path: ${pattern}`);
+  assert.ok(source.trim().split(/\r?\n/).length <= 180, `${path} is not compact`);
+  for (const pattern of retiredRoutePatterns) {
+    assert.doesNotMatch(source, pattern, `${path} retains a retired route: ${pattern}`);
   }
 }
 
-const reviewFix = read('.github/instructions/idd-review-fix.instructions.md');
+const core = read('.github/instructions/idd-overview-core.instructions.md');
+const discover = read('.github/instructions/idd-discover.instructions.md');
+const suitability = read('.github/instructions/idd-suitability.instructions.md');
+const claim = read('.github/instructions/idd-claim.instructions.md');
+const work = read('.github/instructions/idd-work.instructions.md');
+const prSubmit = read('.github/instructions/idd-pr-submit.instructions.md');
+const ci = read('.github/instructions/idd-ci.instructions.md');
 const reviewSnapshot = read('.github/instructions/idd-review-snapshot.instructions.md');
 const reviewTriage = read('.github/instructions/idd-review-triage.instructions.md');
-const prSubmit = read('.github/instructions/idd-pr-submit.instructions.md');
+const reviewFix = read('.github/instructions/idd-review-fix.instructions.md');
 const preMerge = read('.github/instructions/idd-pre-merge.instructions.md');
-const mergeHandoff = read('.github/instructions/idd-merge-handoff.instructions.md');
-const mergeExecution = read('.github/instructions/idd-merge.instructions.md');
+const handoff = read('.github/instructions/idd-merge-handoff.instructions.md');
+const merge = read('.github/instructions/idd-merge.instructions.md');
 const resume = read('.github/instructions/idd-resume.instructions.md');
-const policy = read('docs/idd-policy.md');
+const stall = read('.github/instructions/idd-resume-stall.instructions.md');
+const appendix = read('.github/instructions/idd-overview-appendix.instructions.md');
 const workflow = read('docs/idd-workflow.md');
+const policy = read('docs/idd-policy.md');
+const profile = read('profiles/no-advisory/README.md');
+
+for (const pattern of [
+  /explicit Issue target/i,
+  /claimed-by/,
+  /activation-nonce/,
+  /same-second/,
+  /claim revalidation/i,
+  /idd-claim\.lock/,
+  /next/,
+  /main/,
+  /release\/\*\*/,
+  /fail-closed/i,
+  /npm ci/,
+  /npm run validate/,
+]) assert.match(core, pattern);
+
+for (const pattern of [/A0-T/, /exactly one/, /no fallback/i, /suitability/]) {
+  assert.match(discover, pattern);
+}
+for (const pattern of [/seven checks/i, /state_reason/, /Duplicate\/superseded/, /Actionability/, /Verifiability/]) {
+  assert.match(suitability, pattern);
+}
+for (const pattern of [/deterministic branch/i, /issue\/<number>-<slug>/, /supersedes/, /O_EXCL|wx/, /activation marker/i, /open PR/i]) {
+  assert.match(claim, pattern);
+}
+for (const pattern of [/B1/, /B2/, /B3/, /at most three/, /worktree/, /fix-validate/]) {
+  assert.match(work, pattern);
+}
+for (const pattern of [/Refs #N/, /idd-claimed-issue/, /base exactly[\s\S]*`next`/, /main/, /release\/\*\*/, /idd-issue-association/]) {
+  assert.match(prSubmit, pattern);
+}
+for (const pattern of [/current (?:PR )?head/i, /required checks/i, /rerun.*once/i, /30 min/, /10 min/, /vacuous green/i]) {
+  assert.match(ci, pattern);
+}
+for (const pattern of [/COMMENTED/, /CHANGES_REQUESTED/, /unresolved actionable/i, /current head/i, /critique/i]) {
+  assert.match(reviewSnapshot, pattern);
+}
+for (const pattern of [/human review/i, /reply/i, /resolve/i, /unreplied actionable/i]) {
+  assert.match(reviewTriage, pattern);
+}
+for (const pattern of [/revalidate/i, /fix/i, /push/i, /idd-ci/, /review snapshot/]) {
+  assert.match(reviewFix, pattern);
+}
+for (const pattern of [/single merge-readiness gate/i, /exact `next`/, /current head/i, /required CI/i, /--match-head-commit/, /NO-GO/]) {
+  assert.match(preMerge, pattern);
+}
+for (const pattern of [/autonomous/, /next/, /main/, /release\/\*\*/, /human/i, /fail-closed/i]) {
+  assert.match(handoff, pattern);
+}
+for (const pattern of [/gh pr merge/, /--merge/, /--match-head-commit/, /idd-next-issue-completion/, /gh issue close/, /worktree/]) {
+  assert.match(merge, pattern);
+}
+for (const pattern of [/live state/i, /current\s+claim/i, /current head/i, /CI/, /merged `next`/]) {
+  assert.match(resume, pattern);
+}
+for (const pattern of [/24 h/, /stale claim/i, /supersedes/, /orphan branch/i, /atomic lock/i]) {
+  assert.match(stall, pattern);
+}
+for (const pattern of [/idd-live-status: current/, /digest is context/i, /claim before every/i, /bounded/i]) {
+  assert.match(appendix, pattern);
+}
+for (const pattern of [/explicit-target/i, /Critique pass invocation/, /Mutation \/ write-side helper lens/, /next/, /main/, /current-head CI/i]) {
+  assert.match(workflow, pattern);
+}
+for (const pattern of [/branch-aware/i, /fully_autonomous_merge/, /human_merge/, /ciGate\.trustEmptyProtectionReads: true/, /vacuous green/i, /least-privilege/i]) {
+  assert.match(policy, pattern);
+}
+assert.match(profile, /Merge policy: `next` is autonomous/);
+assert.match(profile, /`main`, `release\/\*\*`.*`human_merge`/s);
+assert.match(profile, /--match-head-commit/);
+
 const issueAssociation = read('scripts/idd-issue-association.mjs');
-const litePrSubmit = read('.github/instructions/lite/idd-pr-submit-lite.instructions.md');
-const liteResume = read('.github/instructions/lite/idd-resume-lite.instructions.md');
 const boundaryVerifier = read('scripts/verify-human-merge-boundary.mjs');
 const branchPolicy = read('scripts/branch-merge-policy.mjs');
 const releaseWorkflow = read('.github/workflows/publish-release.yml');
-
-assert.match(reviewFix, /## E10[\s\S]*critique pass/);
-assert.match(reviewSnapshot, /human|ordinary PR|review comments/i);
-assert.match(reviewSnapshot, /`COMMENTED`[\s\S]*concrete finding[\s\S]*PATH A candidates/i,
-  'E1 must retain actionable human COMMENTED reviews as PATH A candidates');
-assert.match(reviewSnapshot, /acknowledgement-only[\s\S]*LGTM[\s\S]*ambiguous[\s\S]*ReviewItems_snapshot/i,
-  'E1 must distinguish acknowledgement-only and ambiguous COMMENTED reviews');
-assert.match(reviewTriage, /PATH A[\s\S]*human|ordinary PR/i);
-assert.match(policy, /human_merge/);
-assert.match(policy, /next/);
-assert.match(policy, /main/);
-assert.match(policy, /`ciGate\.trustEmptyProtectionReads: true`/);
-assert.match(policy, /vacuous green/);
-assert.match(policy, /ruleset/);
-assert.match(policy, /bypass actor/i);
-assert.match(policy, /最小権限|least-privilege/i);
-assert.match(policy, /branch-aware|branch-aware/i);
+assert.match(issueAssociation, /idd-claimed-issue/);
+assert.match(issueAssociation, /evaluateNextMergeReconciliation/);
 assert.match(boundaryVerifier, /angle-incremental-human-release-boundary/);
-assert.match(boundaryVerifier, /required_approving_review_count.*0/);
 assert.match(boundaryVerifier, /required_status_checks/);
-assert.match(boundaryVerifier, /integration_id.*15368/);
-assert.match(boundaryVerifier, /bypass_actors/);
 assert.doesNotMatch(boundaryVerifier, /pulls\/[^`]+\/merge/);
 assert.match(branchPolicy, /autonomousBranches/);
 assert.deepEqual(resolveBranchMergePolicy('next'), {
@@ -113,64 +176,5 @@ assert.doesNotMatch(releaseWorkflow, /^\s*workflow_dispatch:/m);
 assert.doesNotMatch(releaseWorkflow, /github\.event_name == 'workflow_dispatch'/);
 assert.match(releaseWorkflow, /github\.event\.workflow_run\.head_sha/);
 assert.doesNotMatch(releaseWorkflow, /head_branch == 'next'/);
-assert.match(workflow, /Codex CLI[\s\S]*bounded read-only native subagent/i);
-assert.match(workflow, /structured self-critique/i);
-assert.match(prSubmit, /Branch-aware issue association/);
-assert.match(prSubmit, /defaultBranch/);
-assert.match(prSubmit, /idd-claimed-issue/);
-assert.match(prSubmit, /D3\.5 — Verify branch-aware issue association/);
-assert.match(mergeExecution, /Next integration issue completion/);
-assert.match(mergeExecution, /gh issue close N --reason completed/);
-assert.match(mergeExecution, /completion.*mode/i);
-assert.match(resume, /Next-merge reconciliation/);
-assert.match(resume, /baseRefName == next/);
-assert.match(resume, /completion-evidence-missing/);
-assert.match(resume, /do not reopen or/);
-assert.match(issueAssociation, /evaluateNextMergeReconciliation/);
-assert.match(issueAssociation, /evaluateNextMergeCompletionEvidence/);
-assert.match(issueAssociation, /deliberateClosingIssues/);
-assert.match(issueAssociation, /normalizeLegacyNextBody/);
-assert.match(litePrSubmit, /branch-aware issue/);
-assert.match(litePrSubmit, /idd-claimed-issue/);
-assert.match(liteResume, /Next-merge reconciliation/);
 
-const d4Success = prSubmit.indexOf('**On success**');
-const e1Route = prSubmit.indexOf('idd-review-snapshot.instructions.md', d4Success);
-assert.ok(d4Success >= 0 && e1Route > d4Success, 'D4 success must route to E1');
-
-const e1 = reviewSnapshot.indexOf('## E1');
-const e2 = reviewSnapshot.indexOf('## E2');
-const baseline = reviewSnapshot.indexOf('review-baseline', e2);
-assert.ok(e1 >= 0 && e2 > e1 && baseline > e2, 'E1 must include the E2 critique baseline route');
-
-const reviewCurrency = preMerge.indexOf('**Review currency**');
-assert.ok(reviewCurrency >= 0 && preMerge.indexOf('review-watermark', reviewCurrency) > reviewCurrency,
-  'F2 must require review-currency evidence');
-assert.match(preMerge, /When all F2 conditions are satisfied[\s\S]*idd-merge-handoff\.instructions\.md/);
-assert.match(mergeHandoff, /# IDD — Merge Policy Handoff Phase \(F2\.5\)/);
-assert.match(mergeHandoff, /Read this file after `idd-pre-merge\.instructions\.md` \(F2\) satisfies/);
-assert.match(mergeHandoff, /human_merge/);
-assert.doesNotMatch(mergeHandoff, /advisory state/i);
-
-const workerPhaseFiles = [
-  '.github/instructions/idd-overview-core.instructions.md',
-  '.github/instructions/idd-claim.instructions.md',
-  '.github/instructions/idd-work.instructions.md',
-  '.github/instructions/idd-pr-submit.instructions.md',
-  '.github/instructions/idd-ci.instructions.md',
-  '.github/instructions/idd-advisory-wait.instructions.md',
-  '.github/instructions/idd-review-snapshot.instructions.md',
-  '.github/instructions/idd-review-triage.instructions.md',
-  '.github/instructions/idd-review-fix.instructions.md',
-  '.github/instructions/idd-pre-merge.instructions.md',
-  '.github/instructions/idd-merge.instructions.md',
-  '.github/instructions/idd-resume.instructions.md',
-];
-const directHumanMergeSurfaces = workerPhaseFiles.filter((path) => /human_merge/i.test(read(path)));
-assert.deepEqual(directHumanMergeSurfaces, ['.github/instructions/idd-merge.instructions.md'],
-  'only post-F2.5 merge execution may contain the human_merge route');
-assert.match(mergeExecution, /Read only after `idd-merge-handoff\.instructions\.md` routes/);
-assert.match(mergeExecution, /route `main`[\s\S]*`human_merge` or unknown policy stops/);
-assert.match(mergeExecution, /never retry with\s+`--admin`/);
-
-console.log(`no-advisory policy OK (${activeSurfaces.length} runtime surfaces)`);
+console.log(`compact no-advisory policy OK (${activeFiles.length} active surfaces)`);

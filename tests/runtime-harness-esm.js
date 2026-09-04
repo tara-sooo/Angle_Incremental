@@ -132,7 +132,7 @@ function createContext(initialStorage = new Map()) {
     },
     querySelectorAll: (selector) => {
       const values = selector === ".main-tab" || selector === ".main-panel"
-        ? ["angle", "infinity", "challenges", "timeFlux", "automation", "statistics", "achievements", "help", "settings"]
+        ? ["angle", "infinity", "timeline", "challenges", "timeFlux", "automation", "statistics", "achievements", "help", "settings"]
         : selector === ".infinity-subtab" || selector === ".infinity-subpanel"
           ? ["upgrades", "angle", "tower"]
           : selector === ".challenge-subtab" || selector === ".challenge-subpanel"
