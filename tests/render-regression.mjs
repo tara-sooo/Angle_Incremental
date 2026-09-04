@@ -5,6 +5,7 @@ import { openGamePage, root, startGameTest, writeReport } from "./browser-harnes
 const reportPath = path.join(root, "output", "render-regression.json");
 const contexts = Object.freeze([
   Object.freeze({ name: "desktop", width: 1280, height: 800, deviceScaleFactor: 1 }),
+  Object.freeze({ name: "short-desktop", width: 1536, height: 720, deviceScaleFactor: 1 }),
   Object.freeze({ name: "tablet", width: 768, height: 900, deviceScaleFactor: 2 }),
   Object.freeze({ name: "mobile", width: 390, height: 844, deviceScaleFactor: 3 }),
   Object.freeze({ name: "wide-mobile", width: 412, height: 915, deviceScaleFactor: 3 }),
@@ -69,6 +70,16 @@ function collectGeometryViolations(result) {
   for (const [phase, geometry] of Object.entries(result.geometry ?? {})) {
     const isMobile = geometry.viewport.width <= 820;
     violations.push(...collectPlayfieldViolations(prefix, `${phase}/angle`, geometry, geometry.angle, isMobile));
+    if (
+      geometry.angle?.wrapper
+      && geometry.angleResetDock
+      && geometry.angle.wrapper.bottom > geometry.angleResetDock.top + 1
+    ) {
+      violations.push(
+        `${prefix}/${phase}/angle reset dock overlaps playfield: `
+        + `${geometry.angle.wrapper.bottom.toFixed(1)} > ${geometry.angleResetDock.top.toFixed(1)}`,
+      );
+    }
     violations.push(...collectPlayfieldViolations(prefix, `${phase}/infinite-angle`, geometry, geometry.infiniteAngle, isMobile));
   }
   return violations;
@@ -172,6 +183,7 @@ async function captureGeometry(page) {
     debug.switchMainTab("angle");
     window.advanceTime(0);
     const angle = playfieldSnapshot(".playfield-wrap", "#gameCanvas");
+    const angleResetDock = rectSnapshot(document.querySelector(".angle-panel .reset-dock"));
     debug.switchMainTab("infinity");
     debug.switchInfinitySubtab("angle");
     window.advanceTime(0);
@@ -181,6 +193,7 @@ async function captureGeometry(page) {
       devicePixelRatio: window.devicePixelRatio,
       qualityDevicePixelRatio: debug.renderQualityState().devicePixelRatio,
       angle,
+      angleResetDock,
       infiniteAngle,
       cache: debug.canvasCacheStats(),
     };
