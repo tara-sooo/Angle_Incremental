@@ -92,7 +92,7 @@ async function runSmoke() {
     assert.match(modalCopy.summary, /Timeline/);
     assert.match(modalCopy.resetDock, /BC16500/);
     assert.match(modalCopy.canvas, /Timeline/);
-    assert.match(modalCopy.note, /セーブ形式11/);
+    assert.match(modalCopy.note, /10から11/);
     const desktopButtonInteraction = await page.evaluate(() => {
       const selectors = ["[data-tab=angle]", "#speedUpgrade"];
       return selectors.map((selector) => {
