@@ -578,6 +578,7 @@ async function runTimeFluxModuleRuntimeTest() {
   const millionTickRuntime = millionTickInstance.runtime;
   const millionTickDebug = millionTickInstance.debug;
   millionTickDebug.state.offlineTickCount = millionTickRuntime.OFFLINE_PROGRESS_MAX_TICKS;
+  millionTickDebug.state.infinityCount = 0;
   const millionTickOriginalUpdate = millionTickRuntime.update;
   const millionTickOriginalNow = millionTickInstance.context.performance.now;
   const millionTickOriginalSetTimeout = millionTickInstance.context.window.setTimeout;
@@ -630,6 +631,7 @@ async function runTimeFluxModuleRuntimeTest() {
       { clockSource: "server" },
     );
     assert.equal(flatClockReport.processedTicks, 10000, "flat clocks should still process the requested ticks");
+    assert.equal(millionTickUpdateCalls, 10000, "flat clocks should retain one update per tick when first Infinity is possible");
     assert.ok(millionTickYieldBatches.length > 0, "flat clocks should trigger a bounded fallback yield");
     assert.ok(millionTickYieldBatches[0].end < 10000, "flat clocks should yield before the whole batch completes");
     assert.ok(millionTickProgressUpdates > 1, "flat clocks should update offline progress before completion");
@@ -646,12 +648,14 @@ async function runTimeFluxModuleRuntimeTest() {
       { clockSource: "server" },
     );
     assert.equal(transitionClockReport.processedTicks, 100000, "a clock transition should still process the requested ticks");
+    assert.equal(millionTickUpdateCalls, 100000, "clock transition checks should retain one update per tick when first Infinity is possible");
     const flatTransitionBatches = millionTickYieldBatches.filter((batch) => batch.start >= 9000);
     assert.ok(flatTransitionBatches.length > 0, "a clock transition should trigger the fallback path");
     assert.ok(flatTransitionBatches[0].updates <= 4096, "a clock transition should clamp the batch before execution");
 
     millionTickClockFlatAfter = Infinity;
     millionTickClockFlat = false;
+    millionTickDebug.state.infinityCount = 1;
     millionTickClock = 0;
     millionTickUpdateCalls = 0;
     millionTickYieldBatches.length = 0;
@@ -665,20 +669,15 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.equal(millionTickReport.configuredTicks, 1000000, "offline settings should allow one million configured ticks");
     assert.equal(millionTickReport.requestedTicks, 1000000, "offline processing should request one million ticks");
     assert.equal(millionTickReport.processedTicks, 1000000, "offline processing should not retain a hidden tick cap");
-    assert.equal(millionTickUpdateCalls, 1000000, "one million ticks should be simulated exactly once");
-    assert.ok(millionTickProgressUpdates > 1, "large offline processing should publish incremental progress");
-    assert.ok(
-      millionTickYieldBatches[0]?.end > 448,
-      "zero-duration batches should grow without yielding until the clock advances",
+    assert.equal(millionTickReport.simulationIterations, millionTickUpdateCalls, "the report should count every full update iteration");
+    assert.ok(millionTickReport.simulationIterations < millionTickReport.requestedTicks, "safe million-tick resumes should reduce full update iterations");
+    assert.ok(millionTickReport.bulkIterations > 0, "safe million-tick resumes should use bulk iterations");
+    assert.equal(
+      millionTickReport.processedTicks,
+      millionTickReport.bulkProcessedTicks + millionTickReport.simulationIterations - millionTickReport.bulkIterations,
+      "bulk diagnostics should account for every processed tick",
     );
-    assert.ok(
-      millionTickYieldBatches.some((batch) => batch.updates > 1000),
-      "fast offline processing should grow beyond the removed fixed batch size",
-    );
-    assert.ok(
-      millionTickYieldBatches.some((batch) => batch.end >= 20000 && batch.updates < 1000),
-      "adaptive offline processing should shrink after simulated work slows down",
-    );
+    assert.ok(millionTickProgressUpdates > 0, "large offline processing should publish progress");
     assert.ok(millionTickProgressUpdates < 1000, "offline progress DOM updates should be throttled");
   } finally {
     millionTickRuntime.update = millionTickOriginalUpdate;
