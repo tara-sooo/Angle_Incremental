@@ -82,6 +82,56 @@ async function runSmoke() {
     await page.waitForFunction(() => document.querySelector("#updateModal")?.hidden === true);
     assert.equal(await updateModal.isVisible(), false, "closing the update modal should remove it from the rendered page");
 
+    const modalCopy = await page.evaluate(() => ({
+      summary: document.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
+      resetDock: document.querySelector("[data-i18n=updateResetDock]")?.textContent?.trim() ?? "",
+      canvas: document.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
+      note: document.querySelector("[data-i18n=updateModalNote]")?.textContent?.trim() ?? "",
+    }));
+    assert.match(modalCopy.summary, /Eternity/);
+    assert.match(modalCopy.summary, /Timeline/);
+    assert.match(modalCopy.resetDock, /Break Eternity/);
+    assert.match(modalCopy.canvas, /Timeline/);
+    assert.match(modalCopy.note, /10から11/);
+    const desktopButtonInteraction = await page.evaluate(() => {
+      const selectors = ["[data-tab=angle]", "#speedUpgrade"];
+      return selectors.map((selector) => {
+        const button = document.querySelector(selector);
+        const styles = getComputedStyle(button);
+        return {
+          selector,
+          transitionDurations: styles.transitionDuration.split(",").map((value) => value.trim()),
+          touchAction: styles.touchAction,
+          hoverCapable: window.matchMedia("(hover: hover)").matches,
+          finePointer: window.matchMedia("(pointer: fine)").matches,
+        };
+      });
+    });
+    assert.ok(
+      desktopButtonInteraction.every((button) => button.hoverCapable && button.finePointer),
+      "the desktop smoke context should expose a fine hover pointer",
+    );
+    assert.ok(
+      desktopButtonInteraction.every((button) => button.transitionDurations.every((duration) => duration === "0.12s")),
+      "desktop buttons should retain their 120ms transitions",
+    );
+    assert.ok(
+      desktopButtonInteraction.every((button) => button.touchAction === "manipulation"),
+      "desktop buttons should still use touch-action manipulation",
+    );
+    const manifestVersion = await page.evaluate(async () => (await fetch("version.json", { cache: "no-store" })).json());
+    assert.equal(manifestVersion.appVersion, expectedAppVersion, "version.json should match the asset version");
+    const serverClockProbe = await page.evaluate(async () => {
+      const response = await fetch(`version.json?clock-smoke=${Date.now()}`, { cache: "no-store" });
+      return {
+        date: response.headers.get("date"),
+        available: window.__angleDebug.serverClockAvailable(),
+        source: window.__angleDebug.serverClockSource(),
+      };
+    });
+    assert.ok(Date.parse(serverClockProbe.date) > 0, "the static host should expose a parseable HTTP Date header");
+    assert.equal(serverClockProbe.available, true, "the browser should accept the static host server clock");
+    assert.equal(serverClockProbe.source, "server", "the active clock source should be the server");
     const snapshot = await page.evaluate(() => JSON.parse(window.render_game_to_text()));
     assert.equal(snapshot.vertices, 3);
     assert.equal(snapshot.infinity.count, 0);
