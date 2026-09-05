@@ -1,0 +1,13 @@
+# Gameplay experience
+
+### EXP-GAME-001 — Resolve project terminology to canonical mechanics before research or implementation
+
+- Status: active
+- Scope: gameplay specification, balance research, localization, and research-to-production handoff; Timeline Real/Parallel effects; canonical Infinity/IP gain semantics
+- Learned from: Issue #217; Issue #237; Issue #245; Issue #273; PR #236; PR #253; PR #283
+- Context: Real-BC16500 used the Japanese term `Infinity獲得量`, while Parallel-BC16500 used `IP獲得量`. Existing Infinity Challenge 6 copy already established `Infinity獲得量` as `Infinity count gain`, but #217 normalized Real to `IP gain × (1 + log10(current IP))`. The research simulator and checkpoint study then measured that interpretation, #245 promoted it to an approved production formula, and PR #253 implemented/tests it through the Infinity Point gain path. #273 later restored the original Japanese wording while preserving the implemented formula, leaving Japanese terminology inconsistent with the English copy and production mechanic.
+- Cause: a project-specific gameplay term was translated and normalized before it was mapped to the existing canonical mechanic. The resulting research assumption was later treated as production authority without re-checking the original source wording and established bilingual terminology. A copy-only scope then preserved the behavior instead of surfacing the semantic conflict for follow-up.
+- Reusable lesson: before converting gameplay prose into English, formulas, research hooks, or implementation targets, map each domain term to its canonical state/action/function using existing code and bilingual examples. Do not infer that nearby terms such as `Infinity獲得量` and `IP獲得量` mean the same mechanic. Research parameters are evidence, not production authority: when promoting research into a production Issue, re-check the original design wording and canonical mechanic. If player-facing/spec wording conflicts with current behavior, surface the mismatch even when changing behavior is outside the current Issue's scope.
+- Verification: for a gameplay effect, search existing Japanese/English pairs and the canonical runtime functions before fixing the target mechanic; for Infinity-related effects, distinguish `infinityCountGain()` from `infinityPointGain()`. Before a research result becomes a production specification, compare its nouns, target resource, and formula back to the original design wording. During copy-only work, treat a source-wording/implementation mismatch as a blocker or follow-up candidate instead of silently making the wording conform to the implementation.
+- Authoritative at: not yet promoted
+- Last verified: 2026-09-05
