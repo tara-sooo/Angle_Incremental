@@ -157,6 +157,148 @@ try {
     const panel = document.querySelector("#offlineReportPanel");
     if (panel && !panel.hidden) document.querySelector("#offlineReportClose")?.click();
   });
+  const readMainTabPlacement = () => page.evaluate(() => {
+    const rect = (selector) => {
+      const node = document.querySelector(selector);
+      const box = node?.getBoundingClientRect();
+      return box ? {
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+        width: box.width,
+        height: box.height,
+      } : null;
+    };
+    const shell = document.querySelector(".shell");
+    const nav = document.querySelector(".main-tabs");
+    const strip = document.querySelector(".main-tab-scroll");
+    const active = document.querySelector(".main-tab.is-active");
+    const visibleTabs = Array.from(document.querySelectorAll(".main-tab")).filter((tab) => !tab.hidden);
+    const navRect = rect(".main-tabs");
+    const panelsRect = rect(".main-panels");
+    const playfieldRect = rect(".angle-panel .playfield-wrap");
+    const resetDockRect = rect(".angle-panel .reset-dock");
+    return {
+      state: window.__angleDebug.state.mainTabPosition,
+      saved: JSON.parse(localStorage.getItem("angle-incremental-save") || "null")?.state?.mainTabPosition,
+      serialized: window.__angleDebug.runtime.serializeSaveData().state.mainTabPosition,
+      select: document.querySelector("#mainTabPositionSelect")?.value ?? "",
+      label: document.querySelector('label[for="mainTabPositionSelect"] [data-i18n="mainTabPosition"]')?.textContent?.trim() ?? "",
+      hint: document.querySelector('[data-i18n="mainTabPositionHint"]')?.textContent?.trim() ?? "",
+      options: Array.from(document.querySelectorAll("#mainTabPositionSelect option"), (option) => option.value),
+      shellRightClass: shell?.classList.contains("main-tabs-right") ?? false,
+      navDirection: nav ? getComputedStyle(nav).flexDirection : "",
+      stripDirection: strip ? getComputedStyle(strip).flexDirection : "",
+      stripOverflow: strip ? [getComputedStyle(strip).overflowY, getComputedStyle(strip).overflowX] : [],
+      navRect,
+      panelsRect,
+      settingsInNav: (() => {
+        const settings = rect('[data-tab="settings"]');
+        return Boolean(settings && navRect && settings.left >= navRect.left - 1 && settings.right <= navRect.right + 1 && settings.top >= navRect.top - 1 && settings.bottom <= navRect.bottom + 1);
+      })(),
+      visibleTabsInNav: visibleTabs.every((tab) => {
+        const tabRect = tab.getBoundingClientRect();
+        return Boolean(navRect && tabRect.left >= navRect.left - 1 && tabRect.right <= navRect.right + 1 && tabRect.top >= navRect.top - 1 && tabRect.bottom <= navRect.bottom + 1);
+      }),
+      activeBorderLeftWidth: active ? getComputedStyle(active).borderLeftWidth : "",
+      activeAriaSelected: active?.getAttribute("aria-selected") ?? "",
+      playfieldRect,
+      resetDockRect,
+      resetDockFollowsPlayfield: Boolean(playfieldRect && resetDockRect && resetDockRect.top >= playfieldRect.bottom - 1),
+    };
+  });
+  const defaultMainTabPlacement = await readMainTabPlacement();
+  assert.equal(defaultMainTabPlacement.state, "right", "eligible desktop should default to the right tab rail");
+  assert.equal(defaultMainTabPlacement.serialized, "right", "default tab position should be included in serialized saves");
+  assert.equal(defaultMainTabPlacement.select, "right", "Tab position should default to Right");
+  assert.equal(defaultMainTabPlacement.label, "デスクトップのタブ位置", "Settings should describe the saved preference as a desktop tab position");
+  assert.equal(defaultMainTabPlacement.hint, "モバイル・縦画面では下部に固定されます", "Settings should explain the forced mobile and portrait placement");
+  assert.deepEqual(defaultMainTabPlacement.options, ["right", "bottom"], "Tab position should expose Right and Bottom");
+  assert.equal(defaultMainTabPlacement.shellRightClass, true, "default desktop layout should expose the right-rail shell class");
+  assert.equal(defaultMainTabPlacement.stripDirection, "column", "right navigation should stack the compact tabs vertically");
+  assert.deepEqual(defaultMainTabPlacement.stripOverflow, ["auto", "hidden"], "right navigation should own vertical scrolling");
+  assert.ok(defaultMainTabPlacement.navRect.left >= defaultMainTabPlacement.panelsRect.right - 1, "right navigation should stay outside the main panels");
+  assert.equal(defaultMainTabPlacement.settingsInNav, true, "SET should remain reachable in the right rail");
+  assert.equal(defaultMainTabPlacement.visibleTabsInNav, true, "visible tabs should remain inside the right rail");
+  assert.equal(defaultMainTabPlacement.activeBorderLeftWidth, "2px", "right active indication should use the rail edge");
+  assert.equal(defaultMainTabPlacement.activeAriaSelected, "true", "right active indication should retain aria-selected");
+  assert.equal(defaultMainTabPlacement.resetDockFollowsPlayfield, true, "right placement should keep ANGLE reset controls below the playfield");
+
+  await page.locator('[data-tab="settings"]').click();
+  const mainTabPositionSelect = page.locator("#mainTabPositionSelect");
+  await mainTabPositionSelect.selectOption("bottom");
+  const selectedBottom = await readMainTabPlacement();
+  assert.equal(selectedBottom.state, "bottom", "Settings should select Bottom for the desktop preference");
+  assert.equal(selectedBottom.saved, "bottom", "Bottom selection should save immediately");
+  assert.equal(selectedBottom.shellRightClass, false, "Bottom selection should remove the right-rail shell class");
+  assert.equal(selectedBottom.stripDirection, "row", "Bottom selection should retain the horizontal navigation");
+
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
+  await page.evaluate(() => window.__angleDebug.ready);
+  const reloadedBottom = await readMainTabPlacement();
+  assert.equal(reloadedBottom.state, "bottom", "Bottom preference should survive reload");
+  assert.equal(reloadedBottom.select, "bottom", "reloaded Settings should show Bottom");
+
+  const legacySaveWithoutPosition = await page.evaluate(() => {
+    const save = JSON.parse(localStorage.getItem("angle-incremental-save") || "null");
+    delete save.state.mainTabPosition;
+    localStorage.setItem("angle-incremental-save", JSON.stringify(save));
+    return JSON.parse(localStorage.getItem("angle-incremental-save") || "null").state.mainTabPosition;
+  });
+  assert.equal(legacySaveWithoutPosition, undefined, "legacy fixture should omit the new preference");
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
+  await page.evaluate(() => window.__angleDebug.ready);
+  const legacyDefault = await readMainTabPlacement();
+  assert.equal(legacyDefault.state, "right", "old saves should default the desktop preference to Right");
+  assert.equal(legacyDefault.shellRightClass, true, "old saves should restore the eligible desktop right rail");
+
+  await page.evaluate(() => {
+    window.__angleDebug.applySetting("mainTabPosition", "right");
+    window.__angleDebug.switchMainTab("angle");
+    window.advanceTime(0);
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileForcedBottom = await readMainTabPlacement();
+  assert.equal(mobileForcedBottom.state, "right", "mobile layout should not rewrite the desktop preference");
+  assert.equal(mobileForcedBottom.shellRightClass, true, "mobile should retain the saved desktop preference in state");
+  assert.equal(mobileForcedBottom.stripDirection, "row", "mobile should force the bottom navigation");
+  assert.equal(mobileForcedBottom.hint, "モバイル・縦画面では下部に固定されます", "mobile Settings should explain why the saved desktop preference is not applied");
+  assert.ok(mobileForcedBottom.navRect.top >= mobileForcedBottom.panelsRect.bottom - 1, "mobile navigation should stay below the main panels");
+  await page.setViewportSize({ width: 768, height: 900 });
+  const portraitForcedBottom = await readMainTabPlacement();
+  assert.equal(portraitForcedBottom.state, "right", "portrait constrained layout should preserve the desktop preference");
+  assert.equal(portraitForcedBottom.stripDirection, "row", "portrait constrained layout should use the bottom navigation");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const restoredDesktopRight = await readMainTabPlacement();
+  assert.equal(restoredDesktopRight.state, "right", "desktop should restore the saved Right preference after resize");
+  assert.equal(restoredDesktopRight.stripDirection, "column", "desktop resize should restore the right rail");
+  assert.equal(restoredDesktopRight.settingsInNav, true, "SET should remain reachable after responsive restoration");
+
+  const rightVisibility = await page.evaluate(() => {
+    const { state, applySetting, setMainTabVisibility, switchMainTab } = window.__angleDebug;
+    state.hiddenTabs = [];
+    applySetting("mainTabPosition", "right");
+    switchMainTab("angle");
+    window.advanceTime(0);
+    setMainTabVisibility("help", false);
+    const help = document.querySelector('[data-tab="help"]');
+    const hidden = {
+      hidden: help?.hidden ?? false,
+      display: help ? getComputedStyle(help).display : "",
+      hiddenTabs: [...state.hiddenTabs],
+      position: state.mainTabPosition,
+    };
+    setMainTabVisibility("help", true);
+    return hidden;
+  });
+  assert.equal(rightVisibility.hidden, true, "right placement should preserve hidden-tab behavior");
+  assert.equal(rightVisibility.display, "none", "hidden tabs should leave the right rail");
+  assert.deepEqual(rightVisibility.hiddenTabs, ["help"], "right placement should keep hiddenTabs independent");
+  assert.equal(rightVisibility.position, "right", "hidden-tab changes should not change tab position");
+  await page.evaluate(() => window.__angleDebug.applySetting("mainTabPosition", "bottom"));
   await page.locator('[data-tab="settings"]').click();
   const helpVisibilityToggle = page.locator('#tabVisibilityList input[data-main-tab-visibility="help"]');
   const settingsVisibilityToggle = page.locator('#tabVisibilityList input[data-main-tab-visibility="settings"]');
@@ -1129,9 +1271,9 @@ try {
     };
   });
   assert.equal(achievementUi.panelActive, true, "the Achievements panel should activate on desktop");
-  assert.equal(achievementUi.count, 41, "the desktop Achievements panel should render 41 rows");
-  assert.equal(achievementUi.japaneseSummary, "41/41 実績", "the desktop Japanese Achievements summary should show 41 achievements");
-  assert.equal(achievementUi.englishSummary, "41/41 Achievements", "the desktop English Achievements summary should show 41 achievements");
+  assert.equal(achievementUi.count, 44, "the desktop Achievements panel should render 44 rows");
+  assert.equal(achievementUi.japaneseSummary, "41/44 実績", "the desktop Japanese Achievements summary should show 41 of 44 achievements");
+  assert.equal(achievementUi.englishSummary, "41/44 Achievements", "the desktop English Achievements summary should show 41 of 44 achievements");
   assert.deepEqual(achievementUi.japanese, [
     { title: "不吉だという前提は置いておいて", condition: "所持IPがe44に到達", rewardHidden: true },
     { title: "バベルも土台から", condition: "Towerを建設", rewardHidden: true },
@@ -1143,6 +1285,9 @@ try {
     { title: "とうに越した先に", condition: "TC3をクリア", rewardHidden: true },
     { title: "挑戦権、そして時空の片道切符", condition: "TC4をクリア", rewardHidden: true },
     { title: "Time is generative", condition: "初回Eternityを実行", rewardHidden: true },
+    { title: "初回はこれがおすすめ", condition: "Eternity Milestone 1-2を取得", rewardHidden: true },
+    { title: "現実主義", condition: "Timeline-Realを購入", rewardHidden: true },
+    { title: "1+多元のそれぞれの宇宙", condition: "Timeline-Parallelを購入", rewardHidden: true },
   ], "the desktop Japanese achievement definitions should be exact");
   assert.deepEqual(achievementUi.english, [
     { title: "Assuming It Is Unlucky", condition: "Hold at least 1e44 IP." },
@@ -1155,6 +1300,9 @@ try {
     { title: "Far Beyond", condition: "Complete TC3." },
     { title: "The Right to Challenge, and a One-Way Ticket Through Spacetime", condition: "Complete TC4." },
     { title: "Time is generative", condition: "Perform Eternity for the first time." },
+    { title: "Recommended for Your First Eternity", condition: "Obtain Eternity Milestone 1-2." },
+    { title: "Realist", condition: "Purchase Timeline-Real." },
+    { title: "The Respective Universes of 1+Many", condition: "Purchase Timeline-Parallel." },
   ], "the desktop English achievement definitions should be exact");
   assert.ok(achievementUi.listWidth > 0, "the desktop achievement list should have a visible layout");
   const desktopUiChanges = await page.evaluate(() => {
@@ -2567,7 +2715,7 @@ try {
   assert.equal(desktopSettingsDensity.denseSectionCount, 2, "Settings should use section surfaces for options and tabs");
   assert.equal(desktopSettingsDensity.headingCount, 4, "Settings should expose display, progress, interface, and tab headings");
   assert.equal(desktopSettingsDensity.dividerCount, 2, "Settings should separate option groups with dividers");
-  assert.equal(desktopSettingsDensity.rowCount, 9, "Settings should retain every setting row");
+  assert.equal(desktopSettingsDensity.rowCount, 10, "Settings should retain every setting row");
 
   await page.locator('[data-tab="statistics"]').click();
   const desktopStatisticsDensity = await page.evaluate(() => ({
@@ -2911,8 +3059,8 @@ try {
       };
     });
     assert.equal(mobileAchievements.panelActive, true, "the Achievements panel should activate on mobile");
-    assert.equal(mobileAchievements.count, 41, "the mobile Achievements panel should render 41 rows");
-    assert.equal(mobileAchievements.lastTitle, "Time is generative", "the mobile Achievements panel should keep the final row visible");
+    assert.equal(mobileAchievements.count, 44, "the mobile Achievements panel should render 44 rows");
+    assert.equal(mobileAchievements.lastTitle, "1+多元のそれぞれの宇宙", "the mobile Achievements panel should keep the final row visible");
     assert.ok(mobileAchievements.listWidth > 0, "the mobile achievement list should have a visible layout");
 
     const mobileVertexGainDisplay = await mobilePage.evaluate(() => {

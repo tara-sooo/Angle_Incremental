@@ -1,7 +1,7 @@
 import { runtime, expose } from "../runtime/shared.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.13.0";
-import "./render-eternity.js?v=0.13.0";
+import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.13.1";
+import "./render-eternity.js?v=0.13.1";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
@@ -189,6 +189,7 @@ function applySetting(key, value) {
   if (key === "numberFormat") runtime.state.numberFormat = runtime.normalizeChoice(value, ["compact", "scientific", "detailed"], "compact");
   if (key === "timeUnit") runtime.state.timeUnit = runtime.normalizeChoice(value, ["auto", "seconds", "milliseconds"], "auto");
   if (key === "topBarMode") runtime.state.topBarMode = runtime.normalizeChoice(value, ["news", "resources", "progress", "blank", "hidden"], "news");
+  if (key === "mainTabPosition") runtime.state.mainTabPosition = runtime.normalizeChoice(value, ["right", "bottom"], "right");
   if (key === "offlineProgressEnabled") {
     runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(value, true);
     runtime.offlineReport = null;
@@ -327,6 +328,7 @@ function bindEvents() {
   runtime.elements.numberFormatSelect.addEventListener("change", () => applySetting("numberFormat", runtime.elements.numberFormatSelect.value));
   runtime.elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", runtime.elements.timeUnitSelect.value));
   runtime.elements.topBarModeSelect.addEventListener("change", () => applySetting("topBarMode", runtime.elements.topBarModeSelect.value));
+  runtime.elements.mainTabPositionSelect.addEventListener("change", () => applySetting("mainTabPosition", runtime.elements.mainTabPositionSelect.value));
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);

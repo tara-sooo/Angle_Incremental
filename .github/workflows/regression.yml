@@ -19,8 +19,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
       - name: Install dependencies
-        run: npm ci
+        timeout-minutes: 5
+        run: npm ci --prefer-offline --no-audit --no-fund
       - name: Verify ESM entrypoint order
         run: npm run check:runtime-order
       - name: Check syntax
@@ -56,8 +59,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
       - name: Install dependencies
-        run: npm ci
+        timeout-minutes: 5
+        run: npm ci --prefer-offline --no-audit --no-fund
       - name: Install Chromium for performance smoke test
         timeout-minutes: 5
         run: npx playwright install chromium
@@ -78,8 +84,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
       - name: Install dependencies
-        run: npm ci
+        timeout-minutes: 5
+        run: npm ci --prefer-offline --no-audit --no-fund
       - name: Install Chromium for offline stress test
         timeout-minutes: 5
         run: npx playwright install chromium

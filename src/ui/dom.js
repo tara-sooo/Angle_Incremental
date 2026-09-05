@@ -139,6 +139,7 @@ const elements = {
   numberFormatSelect: document.getElementById("numberFormatSelect"),
   timeUnitSelect: document.getElementById("timeUnitSelect"),
   topBarModeSelect: document.getElementById("topBarModeSelect"),
+  mainTabPositionSelect: document.getElementById("mainTabPositionSelect"),
   offlineProgressToggle: document.getElementById("offlineProgressToggle"),
   offlineTickInput: document.getElementById("offlineTickInput"),
   tabVisibilityList: document.getElementById("tabVisibilityList"),

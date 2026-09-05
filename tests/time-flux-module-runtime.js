@@ -578,6 +578,7 @@ async function runTimeFluxModuleRuntimeTest() {
   const millionTickRuntime = millionTickInstance.runtime;
   const millionTickDebug = millionTickInstance.debug;
   millionTickDebug.state.offlineTickCount = millionTickRuntime.OFFLINE_PROGRESS_MAX_TICKS;
+  millionTickDebug.state.infinityCount = 0;
   const millionTickOriginalUpdate = millionTickRuntime.update;
   const millionTickOriginalNow = millionTickInstance.context.performance.now;
   const millionTickOriginalSetTimeout = millionTickInstance.context.window.setTimeout;
@@ -630,6 +631,7 @@ async function runTimeFluxModuleRuntimeTest() {
       { clockSource: "server" },
     );
     assert.equal(flatClockReport.processedTicks, 10000, "flat clocks should still process the requested ticks");
+    assert.equal(millionTickUpdateCalls, 10000, "flat clocks should retain one update per tick when first Infinity is possible");
     assert.ok(millionTickYieldBatches.length > 0, "flat clocks should trigger a bounded fallback yield");
     assert.ok(millionTickYieldBatches[0].end < 10000, "flat clocks should yield before the whole batch completes");
     assert.ok(millionTickProgressUpdates > 1, "flat clocks should update offline progress before completion");
@@ -646,12 +648,14 @@ async function runTimeFluxModuleRuntimeTest() {
       { clockSource: "server" },
     );
     assert.equal(transitionClockReport.processedTicks, 100000, "a clock transition should still process the requested ticks");
+    assert.equal(millionTickUpdateCalls, 100000, "clock transition checks should retain one update per tick when first Infinity is possible");
     const flatTransitionBatches = millionTickYieldBatches.filter((batch) => batch.start >= 9000);
     assert.ok(flatTransitionBatches.length > 0, "a clock transition should trigger the fallback path");
     assert.ok(flatTransitionBatches[0].updates <= 4096, "a clock transition should clamp the batch before execution");
 
     millionTickClockFlatAfter = Infinity;
     millionTickClockFlat = false;
+    millionTickDebug.state.infinityCount = 1;
     millionTickClock = 0;
     millionTickUpdateCalls = 0;
     millionTickYieldBatches.length = 0;
@@ -665,20 +669,15 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.equal(millionTickReport.configuredTicks, 1000000, "offline settings should allow one million configured ticks");
     assert.equal(millionTickReport.requestedTicks, 1000000, "offline processing should request one million ticks");
     assert.equal(millionTickReport.processedTicks, 1000000, "offline processing should not retain a hidden tick cap");
-    assert.equal(millionTickUpdateCalls, 1000000, "one million ticks should be simulated exactly once");
-    assert.ok(millionTickProgressUpdates > 1, "large offline processing should publish incremental progress");
-    assert.ok(
-      millionTickYieldBatches[0]?.end > 448,
-      "zero-duration batches should grow without yielding until the clock advances",
+    assert.equal(millionTickReport.simulationIterations, millionTickUpdateCalls, "the report should count every full update iteration");
+    assert.ok(millionTickReport.simulationIterations < millionTickReport.requestedTicks, "safe million-tick resumes should reduce full update iterations");
+    assert.ok(millionTickReport.bulkIterations > 0, "safe million-tick resumes should use bulk iterations");
+    assert.equal(
+      millionTickReport.processedTicks,
+      millionTickReport.bulkProcessedTicks + millionTickReport.simulationIterations - millionTickReport.bulkIterations,
+      "bulk diagnostics should account for every processed tick",
     );
-    assert.ok(
-      millionTickYieldBatches.some((batch) => batch.updates > 1000),
-      "fast offline processing should grow beyond the removed fixed batch size",
-    );
-    assert.ok(
-      millionTickYieldBatches.some((batch) => batch.end >= 20000 && batch.updates < 1000),
-      "adaptive offline processing should shrink after simulated work slows down",
-    );
+    assert.ok(millionTickProgressUpdates > 0, "large offline processing should publish progress");
     assert.ok(millionTickProgressUpdates < 1000, "offline progress DOM updates should be throttled");
   } finally {
     millionTickRuntime.update = millionTickOriginalUpdate;
@@ -759,6 +758,51 @@ async function runTimeFluxModuleRuntimeTest() {
   rateRuntime.runInfinity(false);
   assert.equal(rateState.bestInfinityCountPerSecond, 30, "Infinity rate should use the one-thirtieth-second minimum");
 
+  const realRateInstance = await loadRuntime(candidatePath);
+  const realRateRuntime = realRateInstance.runtime;
+  const realRateState = realRateInstance.debug.state;
+  realRateRuntime.updateUi = () => {};
+  realRateRuntime.saveGame = () => true;
+  realRateRuntime.createCheckpoint = () => true;
+  realRateState.eternityCount = 1;
+  realRateState.infinityCount = 1;
+  realRateState.completedChallenges = 0;
+  realRateState.achievementMask = 0;
+  realRateState.achievementMaskHigh = 0;
+  realRateState.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+  realRateState.score = Number.MAX_VALUE;
+  realRateState.scoreLog10 = 309;
+  realRateState.currentInfinityRealTime = 0.01;
+  realRateRuntime.syncInfinityPointCachesFromExact(100n);
+  realRateRuntime.runInfinity(false);
+  assert.equal(realRateState.bestInfinityCountPerSecond, 90, "Real count gain should be recorded once in Infinity rate");
+
+  const offlineRealInstance = await loadRuntime(candidatePath);
+  const offlineRealRuntime = offlineRealInstance.runtime;
+  const offlineRealState = offlineRealInstance.debug.state;
+  offlineRealRuntime.updateUi = () => {};
+  offlineRealRuntime.saveGame = () => true;
+  offlineRealRuntime.createCheckpoint = () => true;
+  const offlineRealUpgrade = offlineRealRuntime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "8-1");
+  offlineRealState.eternityCount = 1;
+  offlineRealState.infinityCount = 1;
+  offlineRealState.completedChallenges = 0;
+  offlineRealState.achievementMask = 0;
+  offlineRealState.achievementMaskHigh = 0;
+  offlineRealState.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+  offlineRealState.infinityUpgradeMask = 1 << offlineRealUpgrade.bit;
+  offlineRealState.automationEnabled = true;
+  offlineRealState.autoRunInfinity = true;
+  offlineRealState.autoInfinityPointThresholdLog10 = 0;
+  offlineRealState.offlineTickCount = 1;
+  offlineRealState.score = Number.MAX_VALUE;
+  offlineRealState.scoreLog10 = 309;
+  offlineRealRuntime.syncInfinityPointCachesFromExact(100n);
+  const offlineRealReport = await offlineRealInstance.debug.processOfflineElapsed(1, "test", { clockSource: "server" });
+  assert.equal(offlineRealReport.normalInfinityCountGain, 3, "offline Auto Infinity should use Real count gain once");
+  assert.equal(offlineRealReport.totalInfinityCountGain, 3, "offline Auto Infinity should not double-apply Real count gain");
+  assert.equal(offlineRealState.infinityCount, 4, "offline Auto Infinity should add the Real count gain");
+
   const aggregationInstance = await loadRuntime(candidatePath);
   const aggregationRuntime = aggregationInstance.runtime;
   const aggregationState = aggregationInstance.debug.state;
@@ -804,6 +848,27 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.equal(mixedReport.aggregatedInfinityCountGain, 15, "aggregation should subtract simulated Infinity gain");
     assert.equal(aggregationState.infinityCount, 21, "normal and aggregate Infinity gains should not double count");
 
+    aggregationState.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+    aggregationRuntime.syncInfinityPointCachesFromExact(100n);
+    aggregationState.bestInfinityCountPerSecond = 6;
+    aggregationState.infinityCount = 1;
+    aggregationState.infinityCountRateRemainder = 0;
+    let realNormalGainApplied = false;
+    aggregationRuntime.update = () => {
+      if (!realNormalGainApplied) {
+        aggregationState.infinityCount += 6;
+        realNormalGainApplied = true;
+      }
+    };
+    const realAggregateReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });
+    assert.equal(realAggregateReport.normalInfinityCountGain, 6, "aggregation should see the corrected Real count rate");
+    assert.equal(realAggregateReport.aggregatedInfinityCountGain, 54, "aggregation should add only the missing Real count gain");
+    assert.equal(realAggregateReport.totalInfinityCountGain, 60, "Real count rate and aggregation should apply once each");
+    assert.equal(aggregationState.infinityCount, 61, "Real aggregation should not double count normal Infinity gain");
+
+    aggregationState.timelinePurchasedNodes = [];
+    aggregationState.bestInfinityCountPerSecond = 2;
+    aggregationRuntime.syncInfinityPointCachesFromExact(100n);
     aggregationState.infinityCount = 1;
     aggregationState.infinityCountRateRemainder = 0;
     let overshootGainApplied = false;

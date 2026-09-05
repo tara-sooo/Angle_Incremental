@@ -736,7 +736,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(debug.createCheckpoint("format-test", { force: true }), true);
     runtime.updateUi();
     const compactSummary = runtime.elements.saveCheckpointList.children[0].children[0].children[2].textContent;
-    assert.match(compactSummary, /実績: 41\/41/, "recovery summaries should count achievements from both masks");
+    assert.match(compactSummary, /実績: 41\/44/, "recovery summaries should count achievements from both masks");
     state.numberFormat = "scientific";
     runtime.updateUi();
     const scientificSummary = runtime.elements.saveCheckpointList.children[0].children[0].children[2].textContent;

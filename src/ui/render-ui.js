@@ -277,7 +277,9 @@ function timelineNodeCurrentEffectText(node, availability) {
   if (availability.reason !== "owned") return runtime.t("timelineNodeInactive");
   if (node.id === "Real-BC16500") {
     return runtime.t("timelineRealCurrentEffect")
-      .replace("{multiplier}", formatMultiplierLog(runtime.timelineIpGainMultiplierLog10?.() ?? 0));
+      .replace("{multiplier}", formatMultiplierLog(
+        runtime.log10Value(runtime.timelineRealInfinityCountGainMultiplier?.() ?? 1),
+      ));
   }
   if (node.id === "Parallel-BC16500") {
     const effectiveLog10 = runtime.timelineParallelEffectiveLog10?.() ?? 0;
@@ -493,6 +495,7 @@ function updateUi() {
   const discoveredMainTabs = runtime.discoverMainTabs?.() === true;
   if (unlockedAchievementsNow.length > 0 || discoveredMainTabs) runtime.saveGame("manual");
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
+  runtime.elements.shell.classList.toggle("main-tabs-right", runtime.state.mainTabPosition !== "bottom");
   applyLanguage();
   runtime.updateHelpUi?.();
   runtime.updateMainTabVisibility?.();
@@ -656,6 +659,7 @@ function updateUi() {
   syncFormControl(runtime.elements.numberFormatSelect, runtime.state.numberFormat);
   syncFormControl(runtime.elements.timeUnitSelect, runtime.state.timeUnit);
   syncFormControl(runtime.elements.topBarModeSelect, runtime.state.topBarMode);
+  syncFormControl(runtime.elements.mainTabPositionSelect, runtime.state.mainTabPosition);
   syncFormControl(runtime.elements.offlineProgressToggle, runtime.state.offlineProgressEnabled);
   syncFormControl(runtime.elements.offlineTickInput, runtime.state.offlineTickCount);
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);

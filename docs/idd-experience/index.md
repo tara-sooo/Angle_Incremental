@@ -7,7 +7,7 @@ Use this file only to choose relevant topic files. The index is deliberately sma
 | workflow | IDD phases, claims, review/CI routing, branch/merge authority, agent execution behavior | [`workflow.md`](workflow.md) |
 | ci | GitHub Actions, validation failures, check registration, CI-only failure modes | create `ci.md` on the first qualifying lesson |
 | save-system | serialization, migration, import/export, persistence compatibility | create `save-system.md` on the first qualifying lesson |
-| gameplay | formulas, progression invariants, balance implementation traps | create `gameplay.md` on the first qualifying lesson |
+| gameplay | formulas, progression invariants, balance implementation traps | [`gameplay.md`](gameplay.md) |
 | ui | DOM/layout/rendering/mobile interaction and browser-only behavior | create `ui.md` on the first qualifying lesson |
 | architecture | module boundaries, runtime ordering, non-obvious dependencies | create `architecture.md` on the first qualifying lesson |
 

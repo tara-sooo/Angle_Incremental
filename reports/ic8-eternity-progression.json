@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "issue": 237,
   "title": "Evaluate first Timeline-node balance from representative post-IC8 checkpoints",
   "studyType": "representative-post-IC8-checkpoint-study",
@@ -44,9 +44,10 @@
     {
       "id": "real-bc16500",
       "family": "Real-BC16500",
-      "formula": "normal IP gain × (1 + log10(current IP))",
+      "formula": "Historical (superseded) IP-gain interpretation: normal IP gain × (1 + log10(current IP))",
       "curve": null,
-      "postSoftcapPower": null
+      "postSoftcapPower": null,
+      "semanticStatus": "superseded"
     },
     {
       "id": "parallel-bc16500-root",
@@ -2802,7 +2803,8 @@
         "towerFloor": 0,
         "completedTowerChallenges": 0,
         "canEternity": false
-      }
+      },
+      "semanticStatus": "superseded"
     },
     {
       "checkpointId": "post-ic8-pre-ia",
@@ -4574,7 +4576,8 @@
         "towerFloor": 0,
         "completedTowerChallenges": 0,
         "canEternity": false
-      }
+      },
+      "semanticStatus": "superseded"
     },
     {
       "checkpointId": "ia-pre-tower",
@@ -6340,7 +6343,8 @@
         "towerFloor": 3,
         "completedTowerChallenges": 0,
         "canEternity": false
-      }
+      },
+      "semanticStatus": "superseded"
     },
     {
       "checkpointId": "early-tower-tc1",
@@ -8103,7 +8107,8 @@
         "towerFloor": 5,
         "completedTowerChallenges": 1,
         "canEternity": false
-      }
+      },
+      "semanticStatus": "superseded"
     },
     {
       "checkpointId": "mid-tower-tc2",
@@ -9866,7 +9871,8 @@
         "towerFloor": 8,
         "completedTowerChallenges": 3,
         "canEternity": false
-      }
+      },
+      "semanticStatus": "superseded"
     },
     {
       "checkpointId": "tc3-era",
@@ -11629,7 +11635,8 @@
         "towerFloor": 12,
         "completedTowerChallenges": 7,
         "canEternity": false
-      }
+      },
+      "semanticStatus": "superseded"
     },
     {
       "checkpointId": "late-tower-tc4",
@@ -13392,7 +13399,8 @@
         "towerFloor": 12,
         "completedTowerChallenges": 15,
         "canEternity": true
-      }
+      },
+      "semanticStatus": "superseded"
     },
     {
       "checkpointId": "final-eternity",
@@ -14655,8 +14663,8 @@
     "reason": "seven isolated Timeline candidates were measured at seven representative checkpoints; no authoritative IC8-to-Eternity duration is claimed"
   },
   "interpretation": {
-    "leastDisruptiveMeasuredCandidate": "real-bc16500",
-    "realReading": "Real-BC16500 adds a state-dependent gain while preserving the measured IP and score gates at the default local probe horizon.",
+    "leastDisruptiveMeasuredCandidate": null,
+    "realReading": "SUPERSEDED: Real-BC16500 IP-gain probes use a historical semantic interpretation and are not current production evidence; the production effect is Infinity count gain.",
     "parallelReading": "The new 1/32 and 1/64 power candidates suppress the original root/fourth-root controls substantially. The logarithmic curve is stronger than both new powers at the minute samples through 10m, then grows more slowly; at 1h it is below 1/64 and far below 1/32.",
     "scoreGateCollapseCounts": {
       "parallel-bc16500-root": 4,
@@ -14690,6 +14698,7 @@
       }
     },
     "provisionalRange": "For a later balance decision, carry 1/64 as the slower power comparison and logarithmic as the stronger minute-scale comparison; keep 1/32 as a stronger-boundary control. This evidence does not select a production softcap.",
-    "productionDecision": "none"
+    "productionDecision": "none",
+    "semanticStatus": "superseded"
   }
 }
