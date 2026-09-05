@@ -2088,6 +2088,18 @@ canvas {
   font-weight: 900;
 }
 
+.setting-label-with-note {
+  display: grid;
+  gap: 2px;
+}
+
+.setting-label-with-note small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
 .setting-row input {
   justify-self: end;
   width: 20px;
