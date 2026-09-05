@@ -473,9 +473,6 @@ function restorePreImportSave() {
     runtime.setSaveStatus(runtime.t("recoveryInvalid"));
     return false;
   }
-  if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(runtime.t("restorePreImportConfirm"))) {
-    return false;
-  }
   return restoreRecoveryEntry(entry);
 }
 
@@ -486,9 +483,6 @@ function restoreCheckpoint(index) {
     runtime.setSaveStatus(runtime.t("recoveryInvalid"));
     return false;
   }
-  if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(runtime.t("restoreCheckpointConfirm"))) {
-    return false;
-  }
   return restoreRecoveryEntry(entry);
 }
 
@@ -496,9 +490,6 @@ function restoreUndoSave() {
   const entry = readRecoveryEntry(runtime.SAVE_RESTORE_UNDO_KEY);
   if (!entry) {
     runtime.setSaveStatus(runtime.t("recoveryInvalid"));
-    return false;
-  }
-  if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(runtime.t("restoreUndoConfirm"))) {
     return false;
   }
   return restoreRecoveryEntry(entry, "recoveryUndoRestored");
@@ -1251,11 +1242,6 @@ async function restoreQuarantineSave() {
     runtime.setSaveStatus(runtime.t("recoveryInvalid"));
     return false;
   }
-  if (
-    typeof window !== "undefined"
-    && typeof window.confirm === "function"
-    && !window.confirm(runtime.t("restoreQuarantineConfirm"))
-  ) return false;
   if (!backupCurrentSave("pre-quarantine-restore", runtime.SAVE_RESTORE_UNDO_KEY)) return false;
   try {
     localStorage.setItem(runtime.SAVE_KEY, entry.raw);
@@ -1278,8 +1264,6 @@ async function restoreQuarantineSave() {
 
 function resetSave() {
   if (runtime.offlineProcessing) return;
-  const confirmed = window.confirm(runtime.t("resetConfirm"));
-  if (!confirmed) return;
   if (!createCheckpoint("pre-reset", { force: true, allowDuringLoadRecovery: true })) return;
   loadRecoveryMode = false;
   clearLoadFailure();

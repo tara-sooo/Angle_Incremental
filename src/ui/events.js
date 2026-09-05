@@ -19,6 +19,39 @@ const MAIN_TAB_UNLOCKS = Object.freeze({
 
 let mainTabVisibilitySignature = "";
 let helpContextMainTab = "angle";
+let pendingConfirmationAction = null;
+let confirmationReturnFocus = null;
+
+function closeConfirmation(confirmed = false) {
+  const modal = runtime.elements.confirmationModal;
+  const action = pendingConfirmationAction;
+  const returnFocus = confirmationReturnFocus;
+  pendingConfirmationAction = null;
+  confirmationReturnFocus = null;
+  if (modal?.open && typeof modal.close === "function") modal.close();
+  else modal?.removeAttribute?.("open");
+  let result;
+  try {
+    if (confirmed) result = action?.();
+  } finally {
+    if (returnFocus && returnFocus.isConnected !== false) returnFocus.focus?.();
+  }
+  return result;
+}
+
+function requestConfirmation(messageKey, action) {
+  const modal = runtime.elements.confirmationModal;
+  const message = runtime.elements.confirmationModalMessage;
+  if (!modal || !message || typeof action !== "function") return false;
+  if (pendingConfirmationAction) closeConfirmation();
+  pendingConfirmationAction = action;
+  confirmationReturnFocus = document.activeElement;
+  message.textContent = runtime.t(messageKey);
+  if (typeof modal.showModal === "function") modal.showModal();
+  else modal.setAttribute("open", "");
+  runtime.elements.confirmationCancelButton?.focus();
+  return true;
+}
 
 function hasPositiveValue(values) {
   return Array.isArray(values) && values.some((value) => Number(value) > 0);
@@ -241,6 +274,17 @@ function isEditableKeyboardTarget(target) {
 
 function bindEvents() {
   installNumericStabilityFixes();
+  if (runtime.elements.confirmationModal) {
+    runtime.elements.confirmationModal.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      closeConfirmation();
+    });
+    runtime.elements.confirmationModal.addEventListener("close", () => {
+      if (pendingConfirmationAction) closeConfirmation();
+    });
+  }
+  runtime.elements.confirmationCancelButton?.addEventListener("click", () => closeConfirmation());
+  runtime.elements.confirmationConfirmButton?.addEventListener("click", () => closeConfirmation(true));
   runtime.elements.speedUpgrade.addEventListener("click", runtime.buySpeed);
   runtime.elements.vertexUpgrade.addEventListener("click", runtime.buyVertex);
   runtime.elements.gainUpgrade.addEventListener("click", runtime.buyGain);
@@ -274,8 +318,7 @@ function bindEvents() {
     if (nodeId) runtime.purchaseTimelineNode?.(nodeId);
   });
   runtime.elements.timelineRespecButton?.addEventListener("click", () => {
-    if (typeof window.confirm === "function" && !window.confirm(runtime.t("timelineRespecConfirm"))) return;
-    runtime.respecTimeline?.();
+    requestConfirmation("timelineRespecConfirm", () => runtime.respecTimeline?.());
   });
   runtime.elements.offlineTickInput.addEventListener("change", () => applySetting(
     "offlineTickCount",
@@ -289,7 +332,9 @@ function bindEvents() {
     runtime.offlineReport = null;
     runtime.updateUi();
   });
-  runtime.elements.resetSaveButton.addEventListener("click", runtime.resetSave);
+  runtime.elements.resetSaveButton.addEventListener("click", () => {
+    requestConfirmation("resetConfirm", () => runtime.resetSave());
+  });
   runtime.elements.mainTabs.forEach((button) => {
     button.addEventListener("click", () => switchMainTab(button.dataset.tab));
   });
@@ -339,16 +384,22 @@ function bindEvents() {
     });
   });
   if (runtime.elements.restoreQuarantineButton) runtime.elements.restoreQuarantineButton.addEventListener("click", () => {
-    Promise.resolve(runtime.restoreQuarantineSave()).finally(() => {
-      runtime.updateUi();
-      runtime.draw();
+    requestConfirmation("restoreQuarantineConfirm", () => {
+      Promise.resolve(runtime.restoreQuarantineSave()).finally(() => {
+        runtime.updateUi();
+        runtime.draw();
+      });
     });
   });
-  if (runtime.elements.restorePreImportButton) runtime.elements.restorePreImportButton.addEventListener("click", runtime.restorePreImportSave);
-  if (runtime.elements.restoreUndoButton) runtime.elements.restoreUndoButton.addEventListener("click", runtime.restoreUndoSave);
+  if (runtime.elements.restorePreImportButton) runtime.elements.restorePreImportButton.addEventListener("click", () => {
+    requestConfirmation("restorePreImportConfirm", () => runtime.restorePreImportSave());
+  });
+  if (runtime.elements.restoreUndoButton) runtime.elements.restoreUndoButton.addEventListener("click", () => {
+    requestConfirmation("restoreUndoConfirm", () => runtime.restoreUndoSave());
+  });
   if (runtime.elements.saveCheckpointList) runtime.elements.saveCheckpointList.addEventListener("click", (event) => {
     const button = event.target?.closest?.("[data-checkpoint-index]");
-    if (button) runtime.restoreCheckpoint(button.dataset.checkpointIndex);
+    if (button) requestConfirmation("restoreCheckpointConfirm", () => runtime.restoreCheckpoint(button.dataset.checkpointIndex));
   });
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
@@ -371,6 +422,7 @@ function bindEvents() {
       return;
     }
     if (updateModalVisible) return;
+    if (runtime.elements.confirmationModal?.open) return;
     if (
       !event.defaultPrevented
       && !event.isComposing
