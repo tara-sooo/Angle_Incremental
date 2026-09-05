@@ -272,7 +272,9 @@ function recordInfinityRun(
 }
 
 function infinityCountGain() {
-  return (isChallengeCompleted(6) ? 2 : 1) * (runtime.isAchievementUnlocked(38) ? 2 : 1);
+  const baseGain = (isChallengeCompleted(6) ? 2 : 1)
+    * (runtime.isAchievementUnlocked(38) ? 2 : 1);
+  return Math.floor(baseGain * (runtime.timelineRealInfinityCountGainMultiplier?.() ?? 1));
 }
 
 function addAggregatedInfinityCount(amount) {

@@ -16,7 +16,6 @@ const {
   installResearchEffect,
   parallelLogarithmicMultiplierLog10,
   parallelMultiplierLog10,
-  realMultiplierLog10,
 } = require("../scripts/simulate-ic8-eternity-progression.js");
 
 const RUNTIME_PATH = path.resolve(__dirname, "..", "src", "main.js");
@@ -36,9 +35,9 @@ async function testResearchBoundaryFeedback() {
   const baselineGain = runtime.infinityPointGain();
   const clock = { nowSeconds: 0, ic8ClearAtSeconds: null };
   const restore = installResearchEffect(runtime, CANDIDATES[1], clock);
-  assert.equal(runtime.infinityPointGain(), 9);
+  assert.equal(runtime.infinityPointGain(), 3, "superseded Real research must not change IP gain");
   debug.runInfinity(false);
-  assert.equal(runtime.currentExactInfinityPoints(), 109n);
+  assert.equal(runtime.currentExactInfinityPoints(), 103n);
   restore();
   assert.equal(baselineGain, 3);
 
@@ -52,9 +51,6 @@ async function testResearchBoundaryFeedback() {
 }
 
 function testCurve() {
-  assert.equal(realMultiplierLog10(-Infinity), 0);
-  assert.equal(realMultiplierLog10(0), 0);
-  assert.equal(realMultiplierLog10(2), Math.log10(3));
   assert.equal(parallelMultiplierLog10(0, 0.5), 0);
   assert.equal(parallelMultiplierLog10(10 / Math.log10(3), 0.5), 10);
   assert.equal(parallelMultiplierLog10(20 / Math.log10(3), 0.5), 15);
@@ -137,7 +133,7 @@ async function runIc8EternityProgressionSimulationTest() {
   const second = await createReport({ writeReports: false });
   assert.equal(JSON.stringify(first), JSON.stringify(second), "checkpoint output must be deterministic");
   assert.equal(first.issue, 237);
-  assert.equal(first.schemaVersion, 7);
+  assert.equal(first.schemaVersion, 8);
   assert.equal(first.researchOnly, true);
   assert.equal(first.noProductionChanges, true);
   assert.equal(first.studyType, "representative-post-IC8-checkpoint-study");
@@ -147,11 +143,13 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.equal(first.cases.length, 49);
   assert.deepEqual(first.options.localProbeElapsedSeconds, [...CURVE_SAMPLE_SECONDS]);
   assert.deepEqual(first.researchEffects.map(({ id }) => id), CANDIDATES.map(({ id }) => id));
+  assert.equal(first.researchEffects.find(({ id }) => id === "real-bc16500").semanticStatus, "superseded");
   assert.equal(first.productionPredicates.towerChallengeTargets[3].targetLog10, 7777);
   assert.equal(first.productionPredicates.tc3RelaxationReferenceCount, 600000);
   assert.match(first.productionPredicates.tc3EntryRule, /no Infinity-count prerequisite/);
   assert.equal(first.excludedEvidence.balanceConclusionEligible, false);
-  assert.equal(first.interpretation.leastDisruptiveMeasuredCandidate, "real-bc16500");
+  assert.equal(first.interpretation.leastDisruptiveMeasuredCandidate, null);
+  assert.match(first.interpretation.realReading, /SUPERSEDED/);
   assert.equal(first.interpretation.scoreGateCollapseCounts["parallel-bc16500-root"], 4);
   assert.equal(first.interpretation.scoreGateCollapseCounts["parallel-bc16500-fourth-root"], 4);
   assert.equal(first.interpretation.scoreGateCollapseCounts["parallel-bc16500-1-32"], 0);
@@ -165,6 +163,14 @@ async function runIc8EternityProgressionSimulationTest() {
     assert.equal(entry.effectIsolation, true);
     assert.equal(entry.probes.length, CURVE_SAMPLE_SECONDS.length);
     assert.ok(Object.prototype.hasOwnProperty.call(entry, "firstSampledCollapseOrSkip"));
+  });
+  const realCases = first.cases.filter(({ candidateId }) => candidateId === "real-bc16500");
+  assert.equal(realCases.length, CHECKPOINT_DEFINITIONS.length);
+  realCases.forEach((entry) => {
+    assert.equal(entry.semanticStatus, "superseded");
+    entry.probes.forEach((probe) => {
+      assert.equal(probe.candidateGainLog10, probe.normalGainLog10, "superseded Real probes must preserve IP gain");
+    });
   });
   const postIc8Root = first.cases.find((entry) => (
     entry.checkpointId === "post-ic8-pre-ia"
@@ -204,7 +210,8 @@ async function runIc8EternityProgressionSimulationTest() {
   assert.match(markdown, /tc3-era/);
   assert.match(markdown, /600000/);
   assert.match(markdown, /excluded from balance conclusions/);
-  assert.match(markdown, /least disruptive measured reference/);
+  assert.match(markdown, /SUPERSEDED/);
+  assert.match(markdown, /Semantic status/);
   assert.match(markdown, /1\/32/);
   assert.match(markdown, /First sampled collapse\/skip/);
   const candidateRows = markdown.split("\n").filter((line) => (
@@ -216,14 +223,23 @@ async function runIc8EternityProgressionSimulationTest() {
 
   const committed = JSON.parse(fs.readFileSync(REPORT_PATH, "utf8"));
   assert.equal(committed.issue, 237);
-  assert.equal(committed.schemaVersion, 7);
+  assert.equal(committed.schemaVersion, 8);
   assert.equal(committed.validation.status, "passed");
   assert.equal(committed.outcome.status, "measured");
   assert.equal(committed.checkpoints.length, 7);
   assert.equal(committed.cases.length, 49);
+  assert.equal(committed.researchEffects.find(({ id }) => id === "real-bc16500").semanticStatus, "superseded");
+  assert.equal(committed.interpretation.leastDisruptiveMeasuredCandidate, null);
+  assert.match(committed.interpretation.realReading, /SUPERSEDED/);
+  assert.equal(committed.cases.filter(({ candidateId, semanticStatus }) => (
+    candidateId === "real-bc16500" && semanticStatus === "superseded"
+  )).length, CHECKPOINT_DEFINITIONS.length);
   assert.deepEqual(committed.options.localProbeElapsedSeconds, [...CURVE_SAMPLE_SECONDS]);
   assert.equal(committed.checkpoints.find(({ id }) => id === "tc3-era").consistency.tc3EntryWithout600000, true);
-  assert.match(fs.readFileSync(MARKDOWN_PATH, "utf8"), /No production Timeline formula/);
+  const committedMarkdown = fs.readFileSync(MARKDOWN_PATH, "utf8");
+  assert.match(committedMarkdown, /No production Timeline formula/);
+  assert.match(committedMarkdown, /SUPERSEDED/);
+  assert.match(committedMarkdown, /Semantic status/);
 
   await testResearchBoundaryFeedback();
 

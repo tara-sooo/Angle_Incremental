@@ -1860,6 +1860,7 @@ function renderGameToText() {
       parallelRawLog10: runtime.timelineParallelRawLog10(),
       parallelEffectiveLog10: runtime.timelineParallelEffectiveLog10(),
       ipGainMultiplierLog10: runtime.timelineIpGainMultiplierLog10(),
+      realInfinityCountGainMultiplier: runtime.timelineRealInfinityCountGainMultiplier?.() ?? 1,
       claims: {
         score: runtime.timelineTrackClaimCount("score"),
         ip: runtime.timelineTrackClaimCount("ip"),
@@ -2097,6 +2098,7 @@ window.__angleDebug = {
   timelineParallelSecondsSinceIc8Clear: runtime.timelineParallelSecondsSinceIc8Clear,
   timelineParallelRawLog10: runtime.timelineParallelRawLog10,
   timelineParallelEffectiveLog10: runtime.timelineParallelEffectiveLog10,
+  timelineRealInfinityCountGainMultiplier: runtime.timelineRealInfinityCountGainMultiplier,
   timelineIpGainMultiplierLog10: runtime.timelineIpGainMultiplierLog10,
   advanceTimelineRunTime: runtime.advanceTimelineRunTime,
   timelineNodes: runtime.timelineNodes,

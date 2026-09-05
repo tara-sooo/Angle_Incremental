@@ -277,7 +277,9 @@ function timelineNodeCurrentEffectText(node, availability) {
   if (availability.reason !== "owned") return runtime.t("timelineNodeInactive");
   if (node.id === "Real-BC16500") {
     return runtime.t("timelineRealCurrentEffect")
-      .replace("{multiplier}", formatMultiplierLog(runtime.timelineIpGainMultiplierLog10?.() ?? 0));
+      .replace("{multiplier}", formatMultiplierLog(
+        runtime.log10Value(runtime.timelineRealInfinityCountGainMultiplier?.() ?? 1),
+      ));
   }
   if (node.id === "Parallel-BC16500") {
     const effectiveLog10 = runtime.timelineParallelEffectiveLog10?.() ?? 0;

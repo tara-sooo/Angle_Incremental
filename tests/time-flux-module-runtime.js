@@ -758,6 +758,51 @@ async function runTimeFluxModuleRuntimeTest() {
   rateRuntime.runInfinity(false);
   assert.equal(rateState.bestInfinityCountPerSecond, 30, "Infinity rate should use the one-thirtieth-second minimum");
 
+  const realRateInstance = await loadRuntime(candidatePath);
+  const realRateRuntime = realRateInstance.runtime;
+  const realRateState = realRateInstance.debug.state;
+  realRateRuntime.updateUi = () => {};
+  realRateRuntime.saveGame = () => true;
+  realRateRuntime.createCheckpoint = () => true;
+  realRateState.eternityCount = 1;
+  realRateState.infinityCount = 1;
+  realRateState.completedChallenges = 0;
+  realRateState.achievementMask = 0;
+  realRateState.achievementMaskHigh = 0;
+  realRateState.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+  realRateState.score = Number.MAX_VALUE;
+  realRateState.scoreLog10 = 309;
+  realRateState.currentInfinityRealTime = 0.01;
+  realRateRuntime.syncInfinityPointCachesFromExact(100n);
+  realRateRuntime.runInfinity(false);
+  assert.equal(realRateState.bestInfinityCountPerSecond, 90, "Real count gain should be recorded once in Infinity rate");
+
+  const offlineRealInstance = await loadRuntime(candidatePath);
+  const offlineRealRuntime = offlineRealInstance.runtime;
+  const offlineRealState = offlineRealInstance.debug.state;
+  offlineRealRuntime.updateUi = () => {};
+  offlineRealRuntime.saveGame = () => true;
+  offlineRealRuntime.createCheckpoint = () => true;
+  const offlineRealUpgrade = offlineRealRuntime.INFINITY_UPGRADES.find((upgrade) => upgrade.id === "8-1");
+  offlineRealState.eternityCount = 1;
+  offlineRealState.infinityCount = 1;
+  offlineRealState.completedChallenges = 0;
+  offlineRealState.achievementMask = 0;
+  offlineRealState.achievementMaskHigh = 0;
+  offlineRealState.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+  offlineRealState.infinityUpgradeMask = 1 << offlineRealUpgrade.bit;
+  offlineRealState.automationEnabled = true;
+  offlineRealState.autoRunInfinity = true;
+  offlineRealState.autoInfinityPointThresholdLog10 = 0;
+  offlineRealState.offlineTickCount = 1;
+  offlineRealState.score = Number.MAX_VALUE;
+  offlineRealState.scoreLog10 = 309;
+  offlineRealRuntime.syncInfinityPointCachesFromExact(100n);
+  const offlineRealReport = await offlineRealInstance.debug.processOfflineElapsed(1, "test", { clockSource: "server" });
+  assert.equal(offlineRealReport.normalInfinityCountGain, 3, "offline Auto Infinity should use Real count gain once");
+  assert.equal(offlineRealReport.totalInfinityCountGain, 3, "offline Auto Infinity should not double-apply Real count gain");
+  assert.equal(offlineRealState.infinityCount, 4, "offline Auto Infinity should add the Real count gain");
+
   const aggregationInstance = await loadRuntime(candidatePath);
   const aggregationRuntime = aggregationInstance.runtime;
   const aggregationState = aggregationInstance.debug.state;
@@ -803,6 +848,27 @@ async function runTimeFluxModuleRuntimeTest() {
     assert.equal(mixedReport.aggregatedInfinityCountGain, 15, "aggregation should subtract simulated Infinity gain");
     assert.equal(aggregationState.infinityCount, 21, "normal and aggregate Infinity gains should not double count");
 
+    aggregationState.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+    aggregationRuntime.syncInfinityPointCachesFromExact(100n);
+    aggregationState.bestInfinityCountPerSecond = 6;
+    aggregationState.infinityCount = 1;
+    aggregationState.infinityCountRateRemainder = 0;
+    let realNormalGainApplied = false;
+    aggregationRuntime.update = () => {
+      if (!realNormalGainApplied) {
+        aggregationState.infinityCount += 6;
+        realNormalGainApplied = true;
+      }
+    };
+    const realAggregateReport = await aggregationInstance.debug.processOfflineElapsed(10, "test", { clockSource: "server" });
+    assert.equal(realAggregateReport.normalInfinityCountGain, 6, "aggregation should see the corrected Real count rate");
+    assert.equal(realAggregateReport.aggregatedInfinityCountGain, 54, "aggregation should add only the missing Real count gain");
+    assert.equal(realAggregateReport.totalInfinityCountGain, 60, "Real count rate and aggregation should apply once each");
+    assert.equal(aggregationState.infinityCount, 61, "Real aggregation should not double count normal Infinity gain");
+
+    aggregationState.timelinePurchasedNodes = [];
+    aggregationState.bestInfinityCountPerSecond = 2;
+    aggregationRuntime.syncInfinityPointCachesFromExact(100n);
     aggregationState.infinityCount = 1;
     aggregationState.infinityCountRateRemainder = 0;
     let overshootGainApplied = false;

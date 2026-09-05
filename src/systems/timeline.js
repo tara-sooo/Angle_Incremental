@@ -181,13 +181,13 @@ function timelineParallelEffectiveLog10(seconds = timelineParallelSecondsSinceIc
     + 10 * Math.log10(1 + (rawLog10 - PARALLEL_RAW_SOFTCAP_LOG10) / 10);
 }
 
+function timelineRealInfinityCountGainMultiplier() {
+  if (!timelineRealOwned()) return 1;
+  const currentIpLog10 = runtime.currentInfinityPointsLog10?.() ?? -Infinity;
+  return Number.isFinite(currentIpLog10) ? Math.max(1, 1 + currentIpLog10) : 1;
+}
+
 function timelineIpGainMultiplierLog10() {
-  if (timelineRealOwned()) {
-    const currentIpLog10 = runtime.currentInfinityPointsLog10?.() ?? -Infinity;
-    return Number.isFinite(currentIpLog10) && currentIpLog10 > 0
-      ? Math.log10(1 + currentIpLog10)
-      : 0;
-  }
   return timelineParallelOwned() && runtime.isChallengeCompleted?.(8) === true
     ? timelineParallelEffectiveLog10()
     : 0;
@@ -351,6 +351,7 @@ expose("timelineParallelOwned", () => timelineParallelOwned);
 expose("timelineParallelSecondsSinceIc8Clear", () => timelineParallelSecondsSinceIc8Clear);
 expose("timelineParallelRawLog10", () => timelineParallelRawLog10);
 expose("timelineParallelEffectiveLog10", () => timelineParallelEffectiveLog10);
+expose("timelineRealInfinityCountGainMultiplier", () => timelineRealInfinityCountGainMultiplier);
 expose("timelineIpGainMultiplierLog10", () => timelineIpGainMultiplierLog10);
 expose("advanceTimelineRunTime", () => advanceTimelineRunTime);
 expose("markTimelineIc8Clear", () => markTimelineIc8Clear);

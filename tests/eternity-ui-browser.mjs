@@ -540,7 +540,7 @@ try {
   assert.equal(realPurchased.purchaseHidden, true, "owned nodes should not render a redundant disabled purchase action");
   assert.equal(realPurchased.purchaseDisabled, true);
   assert.equal(realPurchased.purchasedSummary, false);
-  assert.match(realPurchased.realCurrentEffect || "", /現在のIP倍率/);
+  assert.match(realPurchased.realCurrentEffect || "", /現在のInfinity数獲得倍率/);
   assert.equal(realPurchased.parallelStatus, "別ルート選択済み");
 
   assert.equal(
@@ -816,6 +816,22 @@ try {
   assert.equal(english.purchasedSummary, false, "English Timeline should not render a purchased-node summary");
   assert.equal(english.trackStatusCount, 0, "English claim rows should not repeat button state as prose");
   assert.equal(english.manual, "", "Eternity should not show the repeated manual-execution warning");
+
+  const englishReal = await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+    debug.runtime.selectTimelineNode?.("Real-BC16500");
+    debug.runtime.updateUi();
+    return {
+      description: document.getElementById("timelineNodeDetailDescription")?.textContent,
+      currentEffect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
+      timeline: JSON.parse(window.render_game_to_text()).timeline,
+    };
+  });
+  assert.equal(englishReal.description, "Infinity count gain is strengthened based on current IP (original gain × (1 + log10(IP))).");
+  assert.match(englishReal.currentEffect || "", /Current Infinity count multiplier/);
+  assert.equal(englishReal.timeline.ipGainMultiplierLog10, 0, "Real should not expose an IP multiplier in debug text");
+  assert.ok(englishReal.timeline.realInfinityCountGainMultiplier >= 1, "debug text should expose the Real count multiplier");
 
   await page.setViewportSize({ width: 412, height: 915 });
   await page.click('[data-eternity-tab="timeline"]');
