@@ -1,5 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
-import { TIMELINE_NODES } from "../data/timeline-tree.js?v=0.13.1";
+import { TIMELINE_NODES } from "../data/timeline-tree.js?v=0.13.2";
 
 const MAX_TIMELINE_COUNT = Number.MAX_SAFE_INTEGER;
 const MAX_ETERNITY_REQUIREMENT_EXPONENT = 1024;
