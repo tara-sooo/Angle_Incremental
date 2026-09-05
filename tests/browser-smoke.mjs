@@ -92,7 +92,10 @@ async function runSmoke() {
     assert.match(modalCopy.summary, /Timeline/);
     assert.match(modalCopy.resetDock, /Offline Progress/);
     assert.match(modalCopy.canvas, /実績42〜44/);
-    assert.match(modalCopy.note, /セーブ形式は11/);
+    assert.match(modalCopy.canvas, /Eternity Milestone 1-2/);
+    assert.match(modalCopy.note, /Real-BC16500/);
+    assert.match(modalCopy.note, /Infinity数獲得量/);
+    assert.doesNotMatch(modalCopy.note, /セーブ形式/);
     const desktopButtonInteraction = await page.evaluate(() => {
       const selectors = ["[data-tab=angle]", "#speedUpgrade"];
       return selectors.map((selector) => {
