@@ -11,7 +11,7 @@ const TIMELINE_NODES = Object.freeze([
     }),
     description: Object.freeze({
       ja: "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）",
-      en: "Infinity Point gain is strengthened based on current IP (original gain × (1 + log10(IP))).",
+      en: "Infinity count gain is strengthened based on current IP (original gain × (1 + log10(IP))).",
     }),
   }),
   Object.freeze({

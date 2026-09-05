@@ -163,7 +163,8 @@ const CANDIDATES = Object.freeze([
   Object.freeze({
     id: "real-bc16500",
     family: "Real-BC16500",
-    formula: "normal IP gain × (1 + log10(current IP))",
+    formula: "Historical (superseded) IP-gain interpretation: normal IP gain × (1 + log10(current IP))",
+    semanticStatus: "superseded",
     curve: null,
     postSoftcapPower: null,
   }),
@@ -727,25 +728,19 @@ function parallelCandidateMultiplierLog10(seconds, candidate) {
   return 0;
 }
 
-function realMultiplierLog10(ipLog10) {
-  if (!Number.isFinite(ipLog10) || ipLog10 <= 0) return 0;
-  return Math.log10(1 + ipLog10);
-}
-
 function researchElapsedSeconds(clock) {
   if (clock.nowSeconds === undefined || clock.ic8ClearAtSeconds === null) return null;
   return Math.max(0, clock.nowSeconds - clock.ic8ClearAtSeconds);
 }
 
 function installResearchEffect(runtime, candidate, clock) {
+  if (candidate.semanticStatus === "superseded") return () => {};
   const original = runtime.infinityPointGain;
   runtime.infinityPointGain = () => {
     const baseGain = original();
     if (!(baseGain > 0)) return baseGain;
     let multiplierLog10 = 0;
-    if (candidate.id === "real-bc16500") {
-      multiplierLog10 = realMultiplierLog10(currentIpLog10(runtime));
-    } else if (candidate.family === "Parallel-BC16500") {
+    if (candidate.family === "Parallel-BC16500") {
       multiplierLog10 = parallelCandidateMultiplierLog10(
         researchElapsedSeconds(clock),
         candidate,
@@ -935,6 +930,7 @@ async function runCheckpointCandidate(checkpoint, candidate, options = DEFAULT_O
     checkpointId: checkpoint.id,
     checkpointLabel: checkpoint.label,
     candidateId: candidate.id,
+    semanticStatus: candidate.semanticStatus || "current",
     status: "measured",
     initialStateDigest: initialDigest,
     finalStateDigest: finalDigest,
@@ -1031,6 +1027,16 @@ function validateCheckpointReport(report) {
     if (!Object.prototype.hasOwnProperty.call(entry, "firstSampledCollapseOrSkip")) {
       errors.push(entry.checkpointId + "/" + entry.candidateId + " is missing first sampled risk evidence");
     }
+    if (entry.candidateId === "real-bc16500" && entry.semanticStatus !== "superseded") {
+      errors.push(entry.checkpointId + "/real-bc16500 is missing superseded status");
+    }
+    if (entry.semanticStatus === "superseded") {
+      entry.probes.forEach((probe) => {
+        if (probe.candidateGainLog10 !== probe.normalGainLog10) {
+          errors.push(entry.checkpointId + "/" + entry.candidateId + " changed IP gain despite superseded status");
+        }
+      });
+    }
   });
   report.checkpoints.forEach((checkpoint) => {
     const candidates = grouped.get(checkpoint.id) || [];
@@ -1112,8 +1118,9 @@ function buildInterpretation(report) {
   const oneHour = 60 * 60;
   const tenMinutes = 10 * 60;
   return {
-    leastDisruptiveMeasuredCandidate: "real-bc16500",
-    realReading: "Real-BC16500 adds a state-dependent gain while preserving the measured IP and score gates at the default local probe horizon.",
+    leastDisruptiveMeasuredCandidate: null,
+    realReading: "SUPERSEDED: Real-BC16500 IP-gain probes use a historical semantic interpretation and are not current production evidence; the production effect is Infinity count gain.",
+    semanticStatus: "superseded",
     parallelReading: "The new 1/32 and 1/64 power candidates suppress the original root/fourth-root controls substantially. The logarithmic curve is stronger than both new powers at the minute samples through 10m, then grows more slowly; at 1h it is below 1/64 and far below 1/32.",
     scoreGateCollapseCounts: {
       ...scoreGateCollapseCounts,
@@ -1140,7 +1147,7 @@ async function createReport(rawOptions = {}) {
   const fixture = await createRepresentativeFixture();
   const checkpointSet = await createCheckpointFixtures();
   const report = {
-    schemaVersion: 7,
+    schemaVersion: 8,
     issue: ISSUE,
     title: "Evaluate first Timeline-node balance from representative post-IC8 checkpoints",
     studyType: "representative-post-IC8-checkpoint-study",
@@ -1226,8 +1233,8 @@ function formatMarkdown(report) {
       + report.parallelCurve.rawSoftcapSeconds.toFixed(2) + "s**. The curve does not select a production softcap.",
     "- Local probes are instantaneous production-runtime IP-gain comparisons at Infinity threshold + "
       + report.options.probeScoreOffsetLog10 + " log10 Score and are bounded to the next local gate.",
-    "- Reading: **" + report.interpretation.leastDisruptiveMeasuredCandidate
-      + "** is the least disruptive measured reference. " + report.interpretation.parallelReading + " No production candidate is selected.",
+    "- Real-BC16500 rows and the prior Real conclusion are **SUPERSEDED historical IP-gain evidence**; the current production effect is Infinity count gain and is not evaluated by this IP-only study.",
+    "- Reading: " + report.interpretation.realReading + " " + report.interpretation.parallelReading + " No production candidate is selected.",
     "- Follow-up range: " + report.interpretation.provisionalRange,
     "- Power formula after raw x1e10: **effective = 1e10 × (raw / 1e10)^p**, with **p = 1/32** and **p = 1/64**; logarithmic formula: **effectiveLog = 10 + 10 × log10(1 + (rawLog - 10) / 10)**.",
     "- Prior astronomical/one-year autonomous-route output is explicitly **excluded from balance conclusions**.",
@@ -1270,8 +1277,8 @@ function formatMarkdown(report) {
     "",
     "## Candidate probes",
     "",
-    "| Checkpoint | Candidate | Next gate | Normal gain | Candidate gain | 1h projected IP | Gate at 1h | First sampled collapse/skip | Latest risk |",
-    "| --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
+    "| Checkpoint | Candidate | Semantic status | Next gate | Normal gain | Candidate gain | 1h projected IP | Gate at 1h | First sampled collapse/skip | Latest risk |",
+    "| --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | --- |",
   );
   report.cases.forEach((entry) => {
     const first = entry.probes[0];
@@ -1283,6 +1290,7 @@ function formatMarkdown(report) {
     lines.push(
       "| " + entry.checkpointId
       + " | " + entry.candidateId
+      + " | " + (entry.semanticStatus || "current")
       + " | " + entry.nextLocalGate.id
       + " | " + formatLog10(first.normalGainLog10)
       + " | " + formatLog10(first.candidateGainLog10)
@@ -1299,6 +1307,7 @@ function formatMarkdown(report) {
     "",
     "- Checkpoint/candidate cases: **" + report.cases.length + "**; validation: **" + report.validation.status + "**.",
     "- Every case starts and ends with the same exact state digest; the research effect is restored after each probe.",
+    "- Real-BC16500 cases are retained as superseded historical IP-gain probes and must not be used as current balance evidence.",
     "- The TC3-era checkpoint uses Infinity count **" + report.checkpoints.find(({ id }) => id === "tc3-era").infinityCount
       + "** and enters the production TC3 toggle path; **" + TC3_RELAXATION_REFERENCE_COUNT
       + "** is recorded only as the relaxation reference point, not an entry gate.",
@@ -1354,7 +1363,6 @@ module.exports = {
   parallelLogarithmicMultiplierLog10,
   parallelMultiplierLog10,
   productionPredicateReport,
-  realMultiplierLog10,
   runCheckpointCandidate,
   stateDigest,
   writeReports,

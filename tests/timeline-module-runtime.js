@@ -283,15 +283,46 @@ async function testTimelineEffectsAndTimer() {
   assert.equal(runtime.infinityPointGain(), 3, "the unmodified balance IP gain should remain canonical");
 
   state.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
-  assertClose(
-    runtime.timelineIpGainMultiplierLog10(),
-    Math.log10(3),
-    1e-12,
-    "Real should use 1 + log10(current IP)",
-  );
-  assert.equal(runtime.infinityPointGain(), 9, "Real should multiply the canonical IP gain");
+  assert.equal(runtime.timelineIpGainMultiplierLog10(), 0, "Real must not multiply IP gain");
+  assert.equal(runtime.timelineRealInfinityCountGainMultiplier(), 3, "Real should use 1 + log10(current IP) for count gain");
+  assert.equal(runtime.infinityPointGain(), 3, "Real must preserve the canonical IP gain");
+  assert.equal(runtime.infinityCountGain(), 3, "Real should multiply the canonical Infinity count gain");
+
+  for (const [ip, expectedMultiplier] of [
+    [0n, 1],
+    [1n, 1],
+    [10n, 2],
+    [100n, 3],
+    [100000n, 6],
+    [10n ** 100n, 101],
+  ]) {
+    runtime.syncInfinityPointCachesFromExact(ip);
+    assert.equal(runtime.timelineRealInfinityCountGainMultiplier(), expectedMultiplier, `Real multiplier at ${ip} IP`);
+    assert.equal(runtime.infinityCountGain(), expectedMultiplier, `Real count gain at ${ip} IP`);
+    assert.equal(runtime.infinityPointGain(), 3, `Real IP gain at ${ip} IP`);
+  }
+  setIpLog(state, 100);
+  assert.equal(runtime.timelineRealInfinityCountGainMultiplier(), 101, "Real should use the log-backed current IP cache");
+  runtime.syncInfinityPointCachesFromExact(100n);
+  state.completedChallenges = 1 << (6 - 1);
+  state.achievementMaskHigh = 1 << (38 - 32);
+  assert.equal(runtime.infinityCountGain(), 12, "Real should compose once with IC6 and Achievement 38");
+  state.completedChallenges = 0;
+  state.achievementMaskHigh = 0;
+
+  runtime.syncInfinityPointCachesFromExact(10n);
+  state.infinityCount = 1;
+  debug.runInfinity(false);
+  assert.equal(state.infinityCount, 3, "manual Infinity should use the Real count gain once");
+  assert.equal(runtime.currentExactInfinityPoints(), 13n, "manual Infinity should preserve the Real IP gain separation");
 
   state.timelinePurchasedNodes = [{ id: "Parallel-BC16500", era: "BC16500", route: "Parallel", costTF: 1 }];
+  runtime.syncInfinityPointCachesFromExact(100n);
+  state.scoreLog10 = 310;
+  state.score = Number.MAX_VALUE;
+  assert.equal(runtime.timelineRealInfinityCountGainMultiplier(), 1, "Parallel must not expose the Real count multiplier");
+  assert.equal(runtime.infinityCountGain(), 1, "Parallel must not multiply Infinity count gain");
+  assert.equal(runtime.infinityPointGain(), 3, "Parallel without IC8 must not change IP gain");
   assertClose(
     runtime.timelineParallelEffectiveLog10(0),
     0,
@@ -372,6 +403,13 @@ async function testTimelineEffectsAndTimer() {
   serialized.state.offlineProgressEnabled = false;
   const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(serialized)]]));
   assertClose(loaded.debug.state.timelineParallelSecondsSinceIc8Clear, 65, 1e-9, "the timer should survive save/load");
+
+  state.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+  runtime.syncInfinityPointCachesFromExact(10n);
+  const realSerialized = runtime.serializeSaveData();
+  const loadedReal = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(realSerialized)]]));
+  assert.equal(loadedReal.debug.state.timelinePurchasedNodes[0].id, "Real-BC16500", "save/load should preserve Real ownership");
+  assert.equal(loadedReal.runtime.timelineRealInfinityCountGainMultiplier(), 2, "save/load should preserve the active Real count effect");
 }
 
 async function testTimelineResetSemantics() {
