@@ -184,6 +184,8 @@ try {
       saved: JSON.parse(localStorage.getItem("angle-incremental-save") || "null")?.state?.mainTabPosition,
       serialized: window.__angleDebug.runtime.serializeSaveData().state.mainTabPosition,
       select: document.querySelector("#mainTabPositionSelect")?.value ?? "",
+      label: document.querySelector('label[for="mainTabPositionSelect"] [data-i18n="mainTabPosition"]')?.textContent?.trim() ?? "",
+      hint: document.querySelector('[data-i18n="mainTabPositionHint"]')?.textContent?.trim() ?? "",
       options: Array.from(document.querySelectorAll("#mainTabPositionSelect option"), (option) => option.value),
       shellRightClass: shell?.classList.contains("main-tabs-right") ?? false,
       navDirection: nav ? getComputedStyle(nav).flexDirection : "",
@@ -210,6 +212,8 @@ try {
   assert.equal(defaultMainTabPlacement.state, "right", "eligible desktop should default to the right tab rail");
   assert.equal(defaultMainTabPlacement.serialized, "right", "default tab position should be included in serialized saves");
   assert.equal(defaultMainTabPlacement.select, "right", "Tab position should default to Right");
+  assert.equal(defaultMainTabPlacement.label, "デスクトップのタブ位置", "Settings should describe the saved preference as a desktop tab position");
+  assert.equal(defaultMainTabPlacement.hint, "モバイル・縦画面では下部に固定されます", "Settings should explain the forced mobile and portrait placement");
   assert.deepEqual(defaultMainTabPlacement.options, ["right", "bottom"], "Tab position should expose Right and Bottom");
   assert.equal(defaultMainTabPlacement.shellRightClass, true, "default desktop layout should expose the right-rail shell class");
   assert.equal(defaultMainTabPlacement.stripDirection, "column", "right navigation should stack the compact tabs vertically");
@@ -261,6 +265,7 @@ try {
   assert.equal(mobileForcedBottom.state, "right", "mobile layout should not rewrite the desktop preference");
   assert.equal(mobileForcedBottom.shellRightClass, true, "mobile should retain the saved desktop preference in state");
   assert.equal(mobileForcedBottom.stripDirection, "row", "mobile should force the bottom navigation");
+  assert.equal(mobileForcedBottom.hint, "モバイル・縦画面では下部に固定されます", "mobile Settings should explain why the saved desktop preference is not applied");
   assert.ok(mobileForcedBottom.navRect.top >= mobileForcedBottom.panelsRect.bottom - 1, "mobile navigation should stay below the main panels");
   await page.setViewportSize({ width: 768, height: 900 });
   const portraitForcedBottom = await readMainTabPlacement();
