@@ -88,11 +88,11 @@ async function runSmoke() {
       canvas: document.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
       note: document.querySelector("[data-i18n=updateModalNote]")?.textContent?.trim() ?? "",
     }));
-    assert.match(modalCopy.summary, /Eternity/);
+    assert.match(modalCopy.summary, /Offline Progress/);
     assert.match(modalCopy.summary, /Timeline/);
-    assert.match(modalCopy.resetDock, /Break Eternity/);
-    assert.match(modalCopy.canvas, /Timeline/);
-    assert.match(modalCopy.note, /10から11/);
+    assert.match(modalCopy.resetDock, /Offline Progress/);
+    assert.match(modalCopy.canvas, /実績42〜44/);
+    assert.match(modalCopy.note, /セーブ形式は11/);
     const desktopButtonInteraction = await page.evaluate(() => {
       const selectors = ["[data-tab=angle]", "#speedUpgrade"];
       return selectors.map((selector) => {
