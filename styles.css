@@ -2524,6 +2524,64 @@ canvas {
   background: linear-gradient(180deg, #3d9a61, #226d42);
 }
 
+.confirmation-modal {
+  width: min(460px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100svh - 24px);
+  padding: 0;
+  color: var(--ink);
+  background: linear-gradient(180deg, rgba(23, 36, 59, 0.98), rgba(8, 14, 26, 0.98));
+  border: 2px solid var(--accent);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.46), inset 0 -4px 0 var(--accent);
+}
+
+.confirmation-modal::backdrop {
+  background: rgba(3, 8, 17, 0.72);
+}
+
+.confirmation-modal-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.confirmation-modal-card h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.confirmation-modal-message {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.confirmation-modal-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.confirmation-modal-actions button {
+  min-height: 44px;
+}
+
+.confirmation-cancel-button {
+  background: transparent;
+}
+
+.confirmation-confirm-button {
+  min-height: 44px;
+  border: 2px solid #df7a7a;
+  color: white;
+  background: linear-gradient(180deg, #b54d4d, #7d2828);
+  font-weight: 900;
+  cursor: pointer;
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;

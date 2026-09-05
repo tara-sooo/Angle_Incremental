@@ -200,7 +200,6 @@ async function testSaveCodeImportAndCheckpointRestore() {
   debug.state.timeFlux = 0;
   const checkpointIndex = debug.recoveryEntries().checkpoints
     .findIndex((entry) => entry.reason === "eternity-save-migration");
-  context.window.confirm = () => true;
   assert.notEqual(checkpointIndex, -1, "the Eternity checkpoint should be discoverable");
   assert.equal(debug.restoreCheckpoint(checkpointIndex), true, "checkpoint recovery should use the same Eternity hydration semantics");
   assertPersistentFixture(debug.state, runtime, "checkpoint recovery");

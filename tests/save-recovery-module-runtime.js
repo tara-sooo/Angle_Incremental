@@ -23,7 +23,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
 
   {
     const instance = await loadRuntime(candidatePath);
-    const { context, debug, runtime, storage } = instance;
+    const { debug, runtime, storage } = instance;
     const { state } = debug;
     state.generationCount = 7;
     state.previousGenerationScore = 1e12;
@@ -40,7 +40,6 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(backup.reason, "pre-import", "a successful import should retain its reason");
     assert.equal(backup.state.generationCount, 99, "the backup should contain the state immediately before import");
 
-    context.window.confirm = () => true;
     assert.equal(debug.restorePreImportSave(), true, "the pre-import state should be restorable");
     assert.equal(state.generationCount, 99, "restoring should recover the state immediately before import");
     assert.ok(storage.has(runtime.SAVE_RESTORE_UNDO_KEY), "restoring should keep an undo snapshot");
@@ -299,7 +298,6 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(debug.createCheckpoint("periodic", { force: true }), true, "IU14-1 state should be checkpointed");
     debug.state.infinityUpgradeMask = 0;
     const checkpointIndex = debug.recoveryEntries().checkpoints.findIndex((entry) => entry.reason === "periodic");
-    instance.context.window.confirm = () => true;
     assert.equal(debug.restoreCheckpoint(checkpointIndex), true, "IU14-1 checkpoint state should be restorable");
     assert.equal(debug.state.infinityUpgradeMask, purchasedMask, "checkpoint restore must recover IU14-1");
     assert.equal(debug.restoreUndoSave(), true, "checkpoint restore should expose an undo path for IU14-1");
@@ -395,7 +393,6 @@ async function runSaveRecoveryModuleRuntimeTest() {
     } finally {
       runtime.applySaveData = originalApply;
     }
-    context.window.confirm = () => true;
     assert.equal(
       debug.restoreCheckpoint(checkpointIndex),
       true,
@@ -761,8 +758,7 @@ async function runSaveRecoveryModuleRuntimeTest() {
     const instance = await loadRuntime(candidatePath, new Map([
       ["angle-incremental-save-checkpoints", JSON.stringify([legacyCheckpoint])],
     ]));
-    const { context, debug } = instance;
-    context.window.confirm = () => true;
+    const { debug } = instance;
     assert.equal(debug.restoreCheckpoint(0), true, "a legacy checkpoint should be restorable");
     assert.equal(debug.state.infinityCount, 2, "legacy checkpoint state should be migrated before restore");
     assert.equal(debug.state.towerFloor, 0, "legacy checkpoint migration should supply newer defaults");
