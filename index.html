@@ -962,6 +962,17 @@
       </div>
     </div>
 
-    <script type="module" src="src/main.js?v=0.13.1"></script>
+    <dialog id="confirmationModal" class="confirmation-modal" aria-labelledby="confirmationModalTitle" aria-describedby="confirmationModalMessage">
+      <div class="confirmation-modal-card">
+        <h2 id="confirmationModalTitle" data-i18n="confirmationTitle">確認</h2>
+        <p id="confirmationModalMessage" class="confirmation-modal-message"></p>
+        <div class="confirmation-modal-actions">
+          <button id="confirmationCancelButton" class="reset-button confirmation-cancel-button" type="button" data-i18n="confirmationCancel">キャンセル</button>
+          <button id="confirmationConfirmButton" class="confirmation-confirm-button" type="button" data-i18n="confirmationConfirm">実行</button>
+        </div>
+      </div>
+    </dialog>
+
+    <script type="module" src="src/main.js?v=0.13.1"></script>    <script type="module" src="src/main.js?v=0.13.1"></script>
   </body>
 </html>
