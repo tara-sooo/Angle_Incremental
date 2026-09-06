@@ -762,6 +762,7 @@ function runLayerAutomation() {
   if (!runtime.state.automationEnabled) return false;
   const infinityAutomationUnlocked = runtime.infinityAutomationUnlocked?.() || false;
   const generationCoreAutomationUnlocked = runtime.isAchievementUnlocked(19);
+  const milestoneEightAutomationRan = runEternityMilestoneEightAutomation();
 
   if (
     infinityAutomationUnlocked
@@ -791,8 +792,7 @@ function runLayerAutomation() {
     return true;
   }
 
-  if (runEternityMilestoneEightAutomation()) return true;
-  return false;
+  return milestoneEightAutomationRan;
 }
 
 function runEternityMilestoneEightAutomation() {
