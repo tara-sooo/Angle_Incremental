@@ -297,6 +297,47 @@ async function testMilestoneThresholdsAndEffects() {
   );
 }
 
+async function testMilestoneEightCoexistsWithLayerAutomation() {
+  for (const competitor of ["infinity", "coreBoost", "generation"]) {
+    const { debug, runtime } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.eternityCount = 81;
+    state.automationEnabled = true;
+    state.autoRunInfinity = competitor === "infinity";
+    state.autoRunCoreBoost = competitor === "coreBoost";
+    state.autoRunGeneration = competitor === "generation";
+    state.autoInfinityPointThresholdLog10 = 0;
+    state.autoGenerationScoreMultiplierThreshold = 0;
+    state.autoGenerationCostMultiplierThreshold = 0;
+    state.autoGenerationMinimumSeconds = 0;
+    state.infinityUpgradeMask = 1 << 12;
+    state.achievementMask = 1 << (19 - 1);
+    state.infinityCount = 1;
+    state.scoreLog10 = 1000;
+    state.score = Number.MAX_VALUE;
+    state.generationCount = 1;
+    state.generationScoreLog10 = 100;
+    state.generationScore = Number.MAX_VALUE;
+    state.previousGenerationScoreLog10 = 10;
+    state.previousGenerationScore = 1e10;
+    state.infiniteAngleUnlocked = true;
+    state.autoBuyInfiniteAngleSpeed = true;
+    state.autoBuyInfiniteAngleVertex = true;
+    state.autoBuyInfiniteAngleGain = true;
+    state.autoBuildTower = true;
+    runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
+
+    assert.equal(runtime.runLayerAutomation(), true, `${competitor} automation should run`);
+    assert.ok(state.infiniteAngleSpeedLevel > 0, `${competitor} must not starve IA Speed automation`);
+    assert.ok(state.infiniteAngleVertexLevel > 0, `${competitor} must not starve IA Vertex automation`);
+    assert.ok(state.infiniteAngleGainLevel > 0, `${competitor} must not starve IA Gain automation`);
+    assert.ok(state.towerFloor > 0, `${competitor} must not starve Tower automation`);
+    if (competitor === "infinity") assert.ok(state.infinityCount > 1, "Auto Infinity should still run after Milestone 8 automation");
+    if (competitor === "coreBoost") assert.ok(state.coreBoostCount > 0, "Auto Core Boost should still run after Milestone 8 automation");
+    if (competitor === "generation") assert.ok(state.generationCount > 1, "Auto Generation should still run after Milestone 8 automation");
+  }
+}
+
 async function testMilestoneTwoCompletionState() {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
@@ -831,6 +872,7 @@ async function runEternityModuleRuntimeTest() {
   await testEternityRunStatistics();
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
+  await testMilestoneEightCoexistsWithLayerAutomation();
   await testMilestoneTwoCompletionState();
   await testMilestoneFiveInfinityUpgradeAutomation();
   await testMilestoneSixCompletionState();
