@@ -223,6 +223,9 @@ function applySetting(key, value) {
   if (key === "timeUnit") runtime.state.timeUnit = runtime.normalizeChoice(value, ["auto", "seconds", "milliseconds"], "auto");
   if (key === "topBarMode") runtime.state.topBarMode = runtime.normalizeChoice(value, ["news", "resources", "progress", "blank", "hidden"], "news");
   if (key === "mainTabPosition") runtime.state.mainTabPosition = runtime.normalizeChoice(value, ["right", "bottom"], "right");
+  if (key === "skipTimelineRespecConfirmation") {
+    runtime.state.skipTimelineRespecConfirmation = runtime.sanitizeBoolean(value, false);
+  }
   if (key === "offlineProgressEnabled") {
     runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(value, true);
     runtime.offlineReport = null;
@@ -318,6 +321,10 @@ function bindEvents() {
     if (nodeId) runtime.purchaseTimelineNode?.(nodeId);
   });
   runtime.elements.timelineRespecButton?.addEventListener("click", () => {
+    if (runtime.state.skipTimelineRespecConfirmation) {
+      runtime.respecTimeline?.();
+      return;
+    }
     requestConfirmation("timelineRespecConfirm", () => runtime.respecTimeline?.());
   });
   runtime.elements.offlineTickInput.addEventListener("change", () => applySetting(
@@ -374,6 +381,10 @@ function bindEvents() {
   runtime.elements.timeUnitSelect.addEventListener("change", () => applySetting("timeUnit", runtime.elements.timeUnitSelect.value));
   runtime.elements.topBarModeSelect.addEventListener("change", () => applySetting("topBarMode", runtime.elements.topBarModeSelect.value));
   runtime.elements.mainTabPositionSelect.addEventListener("change", () => applySetting("mainTabPosition", runtime.elements.mainTabPositionSelect.value));
+  runtime.elements.skipTimelineRespecConfirmationToggle.addEventListener("change", () => applySetting(
+    "skipTimelineRespecConfirmation",
+    runtime.elements.skipTimelineRespecConfirmationToggle.checked,
+  ));
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
