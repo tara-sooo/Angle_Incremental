@@ -88,13 +88,13 @@ async function runSmoke() {
       canvas: document.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
       note: document.querySelector("[data-i18n=updateModalNote]")?.textContent?.trim() ?? "",
     }));
-    assert.match(modalCopy.summary, /確認ダイアログ/);
-    assert.match(modalCopy.summary, /重要操作/);
-    assert.match(modalCopy.resetDock, /Timelineリスペック/);
-    assert.match(modalCopy.resetDock, /ゲーム内確認画面/);
-    assert.match(modalCopy.canvas, /セーブデータ/);
-    assert.match(modalCopy.canvas, /チェックポイント/);
-    assert.match(modalCopy.note, /JavaScriptダイアログ/);
+    assert.match(modalCopy.summary, /Eternity Milestone 8/);
+    assert.match(modalCopy.summary, /自動化/);
+    assert.match(modalCopy.resetDock, /IAとTower/);
+    assert.match(modalCopy.resetDock, /Auto Infinity/);
+    assert.match(modalCopy.canvas, /Timelineリスペック/);
+    assert.match(modalCopy.canvas, /オフ/);
+    assert.match(modalCopy.note, /既存のセーブデータ/);
     assert.match(modalCopy.note, /セーブ形式は11/);
     const desktopButtonInteraction = await page.evaluate(() => {
       const selectors = ["[data-tab=angle]", "#speedUpgrade"];
