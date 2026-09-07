@@ -89,13 +89,12 @@ async function runSmoke() {
       note: document.querySelector("[data-i18n=updateModalNote]")?.textContent?.trim() ?? "",
     }));
     assert.match(modalCopy.summary, /Eternity Milestone 8/);
-    assert.match(modalCopy.summary, /自動化/);
-    assert.match(modalCopy.resetDock, /IAとTower/);
-    assert.match(modalCopy.resetDock, /Auto Infinity/);
-    assert.match(modalCopy.canvas, /Timelineリスペック/);
-    assert.match(modalCopy.canvas, /オフ/);
-    assert.match(modalCopy.note, /既存のセーブデータ/);
-    assert.match(modalCopy.note, /セーブ形式は11/);
+    assert.match(modalCopy.summary, /自動化修正/);
+    assert.match(modalCopy.resetDock, /IA・Tower/);
+    assert.match(modalCopy.resetDock, /Auto Infinity・CB・GR/);
+    assert.match(modalCopy.canvas, /Timelineリスペックの確認をスキップ/);
+    assert.match(modalCopy.note, /初期状態はオフ/);
+    assert.match(modalCopy.note, /Timelineリスペックだけ/);
     const desktopButtonInteraction = await page.evaluate(() => {
       const selectors = ["[data-tab=angle]", "#speedUpgrade"];
       return selectors.map((selector) => {
