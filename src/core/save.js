@@ -936,6 +936,10 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.topBarMode = runtime.normalizeChoice(data.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
   runtime.state.mainTabPosition = runtime.normalizeChoice(data.mainTabPosition, ["right", "bottom"], "right");
   runtime.state.showTimeFluxQuickBar = data.showTimeFluxQuickBar !== false;
+  runtime.state.skipTimelineRespecConfirmation = runtime.sanitizeBoolean(
+    data.skipTimelineRespecConfirmation,
+    false,
+  );
   runtime.state.hiddenTabs = runtime.normalizeHiddenTabs(data.hiddenTabs);
   runtime.state.unlockedMainTabs = runtime.normalizeUnlockedMainTabs(data.unlockedMainTabs);
   inferUnlockedMainTabs(data);
@@ -1401,6 +1405,7 @@ function resetSave() {
     topBarMode: "news",
     mainTabPosition: "right",
     showTimeFluxQuickBar: true,
+    skipTimelineRespecConfirmation: false,
     hiddenTabs: [],
     unlockedMainTabs: [],
     floatingTexts: [],

@@ -140,6 +140,7 @@ const elements = {
   timeUnitSelect: document.getElementById("timeUnitSelect"),
   topBarModeSelect: document.getElementById("topBarModeSelect"),
   mainTabPositionSelect: document.getElementById("mainTabPositionSelect"),
+  skipTimelineRespecConfirmationToggle: document.getElementById("skipTimelineRespecConfirmationToggle"),
   offlineProgressToggle: document.getElementById("offlineProgressToggle"),
   offlineTickInput: document.getElementById("offlineTickInput"),
   tabVisibilityList: document.getElementById("tabVisibilityList"),

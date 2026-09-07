@@ -660,6 +660,10 @@ function updateUi() {
   syncFormControl(runtime.elements.timeUnitSelect, runtime.state.timeUnit);
   syncFormControl(runtime.elements.topBarModeSelect, runtime.state.topBarMode);
   syncFormControl(runtime.elements.mainTabPositionSelect, runtime.state.mainTabPosition);
+  syncFormControl(
+    runtime.elements.skipTimelineRespecConfirmationToggle,
+    runtime.state.skipTimelineRespecConfirmation,
+  );
   syncFormControl(runtime.elements.offlineProgressToggle, runtime.state.offlineProgressEnabled);
   syncFormControl(runtime.elements.offlineTickInput, runtime.state.offlineTickCount);
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);

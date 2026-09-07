@@ -22,6 +22,7 @@ function setPersistentFixture(state) {
   state.timeFluxGainLevel = 3;
   state.timeFluxSpeed = 5;
   state.timeFluxCustomSpeed = 6;
+  state.skipTimelineRespecConfirmation = true;
 }
 
 function assertPersistentFixture(state, runtime, messagePrefix) {
@@ -41,6 +42,7 @@ function assertPersistentFixture(state, runtime, messagePrefix) {
   assert.equal(state.timeFluxGainLevel, 3, `${messagePrefix}: Time Flux gain should persist`);
   assert.equal(state.timeFluxSpeed, 5, `${messagePrefix}: Time Flux speed should persist`);
   assert.equal(state.timeFluxCustomSpeed, 6, `${messagePrefix}: custom Time Flux speed should persist`);
+  assert.equal(state.skipTimelineRespecConfirmation, true, `${messagePrefix}: Timeline confirmation skip should persist`);
 }
 
 async function testLegacyDefaults() {
@@ -48,6 +50,7 @@ async function testLegacyDefaults() {
   const { runtime } = source;
   const legacy = runtime.serializeSaveData();
   legacy.savedAt = Date.now();
+  delete legacy.state.skipTimelineRespecConfirmation;
   delete legacy.state.eternityCount;
   delete legacy.state.eternityMilestoneMask;
   delete legacy.state.eternityMilestoneChoice;
@@ -67,6 +70,7 @@ async function testLegacyDefaults() {
   assert.equal(loaded.runtime.firstTierMilestoneEntitlementCount(), 0, "legacy saves without Eternities must not receive an acquisition entitlement");
   assert.equal(loaded.debug.state.achievementMaskHigh, 0, "legacy saves should default the high achievement mask safely");
   assert.equal(loaded.debug.state.autoBuyInfinityUpgrades, false, "legacy saves should default Infinity Upgrade automation off");
+  assert.equal(loaded.debug.state.skipTimelineRespecConfirmation, false, "legacy saves should keep Timeline confirmation enabled");
   assert.equal(loaded.debug.state.currentEternityRunTime, 0, "legacy saves should default current Eternity game time to zero");
   assert.equal(loaded.debug.state.currentEternityRealTime, 0, "legacy saves should default current Eternity real time to zero");
   assert.equal(loaded.debug.state.fastestEternityTime, 0, "legacy saves should default fastest Eternity game time to zero");

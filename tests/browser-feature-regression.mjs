@@ -177,6 +177,8 @@ async function runConfirmationRegression(browser, origin, httpFailures) {
       nativeConfirmCalls: window.__nativeConfirmCalls,
       timelineNodes: window.__angleDebug.state.timelinePurchasedNodes.length,
       generationCount: window.__angleDebug.state.generationCount,
+      currentEternityRunTime: window.__angleDebug.state.currentEternityRunTime,
+      currentEternityRealTime: window.__angleDebug.state.currentEternityRealTime,
     }));
     const timelineButton = confirmationPage.locator("#timelineRespecButton");
     assert.equal(await timelineButton.isEnabled(), true, "Timeline Respec should be enabled for the confirmation test");
@@ -199,6 +201,79 @@ async function runConfirmationRegression(browser, origin, httpFailures) {
     assert.equal(timelineConfirmed.open, false, "confirmed Timeline Respec should close the dialog");
     assert.equal(timelineConfirmed.timelineNodes, 0, "confirmed Timeline Respec should use the canonical respec action");
     assert.equal(timelineConfirmed.nativeConfirmCalls, 0, "confirmed Timeline Respec must not call native confirm");
+
+    await confirmationPage.evaluate(() => {
+      const { switchMainTab } = window.__angleDebug;
+      switchMainTab("settings");
+      window.advanceTime(0);
+    });
+    const skipTimelineRespecToggle = confirmationPage.locator("#skipTimelineRespecConfirmationToggle");
+    assert.equal(await skipTimelineRespecToggle.isVisible(), true, "Timeline confirmation skip should be exposed in Settings");
+    assert.equal(await skipTimelineRespecToggle.isChecked(), false, "Timeline confirmation skip should default off");
+    assert.equal(
+      (await confirmationPage.locator('label[for="skipTimelineRespecConfirmationToggle"]').textContent())?.trim(),
+      "Timelineリスペックの確認をスキップ",
+      "Timeline confirmation skip should use the requested Japanese label",
+    );
+    await skipTimelineRespecToggle.check();
+    await confirmationPage.reload({ waitUntil: "networkidle" });
+    await confirmationPage.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
+    await confirmationPage.evaluate(() => window.__angleDebug.ready);
+    await confirmationPage.evaluate(() => {
+      window.__nativeConfirmCalls = 0;
+      window.confirm = () => {
+        window.__nativeConfirmCalls += 1;
+        return false;
+      };
+      window.__angleDebug.runtime.closeUpdateModal?.();
+      const offlineReport = document.querySelector("#offlineReportPanel");
+      if (offlineReport && !offlineReport.hidden) document.querySelector("#offlineReportClose")?.click();
+    });
+    assert.equal(await skipTimelineRespecToggle.isChecked(), true, "Timeline confirmation skip should survive save/load");
+    assert.equal(
+      await confirmationPage.evaluate(() => window.__angleDebug.state.skipTimelineRespecConfirmation),
+      true,
+      "loaded state should keep Timeline confirmation skip enabled",
+    );
+    await confirmationPage.evaluate(() => {
+      const { state, switchMainTab, switchEternitySubtab } = window.__angleDebug;
+      state.eternityCount = 1;
+      state.scoreTfClaims = 1;
+      state.timelinePurchasedNodes = [{ id: "Real-BC16500", costTF: 1 }];
+      state.currentEternityRunTime = 12;
+      state.currentEternityRealTime = 7;
+      switchMainTab("eternity");
+      switchEternitySubtab("timeline");
+      window.advanceTime(0);
+    });
+    await timelineButton.click();
+    const skippedTimelineRespec = await readConfirmation();
+    assert.equal(skippedTimelineRespec.open, false, "enabled Timeline confirmation skip should not open the dialog");
+    assert.equal(skippedTimelineRespec.timelineNodes, 0, "enabled Timeline confirmation skip should run respec immediately");
+    assert.ok(skippedTimelineRespec.currentEternityRunTime < 0.1, "skipped respec should preserve the canonical Eternity reset");
+    assert.ok(skippedTimelineRespec.currentEternityRealTime < 0.1, "skipped respec should preserve the canonical real-time reset");
+    assert.equal(skippedTimelineRespec.nativeConfirmCalls, 0, "skipped Timeline respec must not call native confirm");
+
+    await confirmationPage.evaluate(() => {
+      const { switchMainTab } = window.__angleDebug;
+      switchMainTab("settings");
+      window.advanceTime(0);
+    });
+    await skipTimelineRespecToggle.uncheck();
+    await confirmationPage.evaluate(() => {
+      const { state, switchMainTab, switchEternitySubtab } = window.__angleDebug;
+      state.timelinePurchasedNodes = [{ id: "Real-BC16500", costTF: 1 }];
+      state.currentEternityRunTime = 12;
+      state.currentEternityRealTime = 7;
+      switchMainTab("eternity");
+      switchEternitySubtab("timeline");
+      window.advanceTime(0);
+    });
+    await timelineButton.click();
+    const restoredTimelineConfirmation = await readConfirmation();
+    assert.equal(restoredTimelineConfirmation.open, true, "turning Timeline confirmation skip off should restore the dialog");
+    assert.equal(restoredTimelineConfirmation.timelineNodes, 1, "restored confirmation should not respec before confirmation");
+    await confirmationPage.locator("#confirmationCancelButton").click();
 
     await confirmationPage.evaluate(() => {
       const { state, runtime, createCheckpoint, switchMainTab } = window.__angleDebug;
@@ -2859,7 +2934,7 @@ try {
   assert.equal(desktopSettingsDensity.denseSectionCount, 2, "Settings should use section surfaces for options and tabs");
   assert.equal(desktopSettingsDensity.headingCount, 4, "Settings should expose display, progress, interface, and tab headings");
   assert.equal(desktopSettingsDensity.dividerCount, 2, "Settings should separate option groups with dividers");
-  assert.equal(desktopSettingsDensity.rowCount, 10, "Settings should retain every setting row");
+  assert.equal(desktopSettingsDensity.rowCount, 11, "Settings should retain every setting row");
 
   await page.locator('[data-tab="statistics"]').click();
   const desktopStatisticsDensity = await page.evaluate(() => ({
