@@ -34,6 +34,7 @@ function createInfinityUpgradeRows() {
       button.type = "button";
       button.dataset.upgrade = upgrade.id;
       button.addEventListener("click", () => runtime.selectInfinityUpgrade(upgrade.id));
+      button.addEventListener("dblclick", () => runtime.buyInfinityUpgrade(upgrade.id));
       const name = document.createElement("strong");
       name.className = "infinity-upgrade-name";
       const meta = document.createElement("span");
