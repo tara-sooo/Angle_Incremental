@@ -466,6 +466,95 @@ async function testMilestoneSixCompletionState() {
   assert.equal(loaded.debug.state.completedChallenges, allChallengesMask, "later Eternity resets should restore all IC completion directly");
 }
 
+async function testMilestoneFiveAndSixAutomationBoundaries() {
+  {
+    const { debug, runtime } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.eternityCount = 19;
+    runtime.syncInfinityPointCachesFromExact(10n ** 20n);
+    debug.update(0, true);
+    assert.equal(state.infiniteAngleUnlocked, false, "EM5 must not automate IA before Eternity 20");
+    assert.equal(debug.unlockInfiniteAngle({ refresh: false, save: false }), true, "IA must remain manually unlockable before EM5");
+    assert.equal(runtime.currentExactInfinityPoints(), 0n, "manual IA unlock must still spend its normal cost before EM5");
+  }
+
+  {
+    const { debug, runtime } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.eternityCount = 20;
+    runtime.syncInfinityPointCachesFromExact(10n ** 20n - 1n);
+    debug.update(0, true);
+    assert.equal(state.infiniteAngleUnlocked, false, "EM5 must keep IA locked below the normal IP threshold");
+    runtime.syncInfinityPointCachesFromExact(10n ** 20n);
+    debug.update(0, true);
+    assert.equal(state.infiniteAngleUnlocked, true, "EM5 must unlock IA at the normal IP threshold");
+    assert.equal(runtime.currentExactInfinityPoints(), 10n ** 20n, "EM5 must not spend the IA unlock cost");
+  }
+
+  {
+    const { debug, runtime } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.eternityCount = 19;
+    markEternityReady(runtime, state);
+    assert.equal(debug.performEternity({ save: false, update: false }), true, "the threshold Eternity should execute");
+    assert.equal(state.eternityCount, 20, "the threshold Eternity should activate EM5");
+    assert.equal(state.infiniteAngleUnlocked, false, "EM5 must not grant IA at the start of a new run");
+    assert.equal(runtime.currentExactInfinityPoints(), 0n, "a new EM5 run should still start below the IA threshold");
+    debug.update(0, true);
+    assert.equal(state.infiniteAngleUnlocked, false, "EM5 must remain inactive below the normal IA threshold");
+  }
+
+  {
+    const { debug, runtime } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.eternityCount = 26;
+    setScore(state, 350);
+    debug.update(0, true);
+    assert.equal(state.infiniteCapBroken, false, "EM6 must not automate Break Infinite Cap before Eternity 27");
+    assert.equal(debug.breakInfiniteCap({ refresh: false, save: false }), true, "Break Infinite Cap must remain manually available before EM6");
+  }
+
+  {
+    const { debug } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.eternityCount = 27;
+    setScore(state, 349.99);
+    debug.update(0, true);
+    assert.equal(state.infiniteCapBroken, false, "EM6 must keep the cap intact below its normal Score threshold");
+    setScore(state, 350);
+    debug.update(0, true);
+    assert.equal(state.infiniteCapBroken, true, "EM6 must automatically break the cap at its normal Score threshold");
+  }
+
+  {
+    const { debug, runtime } = await loadRuntime(candidatePath);
+    const { state } = debug;
+    state.eternityCount = 27;
+    state.infiniteAngleUnlocked = true;
+    state.infiniteCapBroken = true;
+    markEternityReady(runtime, state);
+    assert.equal(debug.performEternity({ save: false, update: false }), true, "ordinary Eternity should reset EM5/EM6 run state");
+    assert.equal(state.infiniteAngleUnlocked, false, "ordinary Eternity must reset IA before its threshold is reached again");
+    assert.equal(state.infiniteCapBroken, false, "ordinary Eternity must reset Break Infinite Cap before its threshold is reached again");
+    runtime.syncInfinityPointCachesFromExact(10n ** 20n);
+    setScore(state, 350);
+    debug.update(0, true);
+    assert.equal(state.infiniteAngleUnlocked, true, "EM5 should re-trigger after an ordinary reset reaches its threshold");
+    assert.equal(state.infiniteCapBroken, true, "EM6 should re-trigger after an ordinary reset reaches its threshold");
+
+    state.infiniteAngleUnlocked = true;
+    state.infiniteCapBroken = true;
+    assert.equal(debug.respecTimeline({ save: false, update: false }), true, "Timeline respec should reuse the Eternity reset path");
+    assert.equal(state.infiniteAngleUnlocked, false, "Timeline respec must reset IA before its threshold is reached again");
+    assert.equal(state.infiniteCapBroken, false, "Timeline respec must reset Break Infinite Cap before its threshold is reached again");
+    runtime.syncInfinityPointCachesFromExact(10n ** 20n);
+    setScore(state, 350);
+    debug.update(0, true);
+    assert.equal(state.infiniteAngleUnlocked, true, "EM5 should re-trigger after Timeline respec reaches its threshold");
+    assert.equal(state.infiniteCapBroken, true, "EM6 should re-trigger after Timeline respec reaches its threshold");
+  }
+}
+
 async function testMilestoneFreeLevelsAndSaveLoad() {
   const source = await loadRuntime(candidatePath);
   const { debug, runtime } = source;
@@ -876,6 +965,7 @@ async function runEternityModuleRuntimeTest() {
   await testMilestoneTwoCompletionState();
   await testMilestoneFiveInfinityUpgradeAutomation();
   await testMilestoneSixCompletionState();
+  await testMilestoneFiveAndSixAutomationBoundaries();
   await testMilestoneFreeLevelsAndSaveLoad();
   await testThresholdAndResetBoundary();
   await testInfinityCompletionMakesEternityAvailable();

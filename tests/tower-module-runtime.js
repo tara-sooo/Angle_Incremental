@@ -172,6 +172,7 @@ async function runTowerModuleRuntimeTest() {
     const { state } = debug;
     const unlockFloors = Array.from(runtime.TOWER_CHALLENGE_UNLOCK_FLOORS);
 
+    assert.equal(runtime.ETERNITY_MILESTONE_SEVEN_MAX_TOWER_CHALLENGE, 4, "EM7 auto-completion must have an explicit TC4 upper bound");
     state.eternityCount = 43;
     state.towerFloor = 12;
     state.completedTowerChallenges = 0;
@@ -227,6 +228,16 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(runtime.canEternity(), true, "auto-completed TC4 plus the IP threshold should make manual Eternity available");
     assert.equal(runtime.maybeForceEternity({ save: false, update: false }), false, "Milestone 7 must not force Eternity automatically");
     assert.equal(state.eternityCount, 44, "checking Milestone 7 must not perform Eternity");
+
+    const respec = await loadRuntime(candidatePath);
+    respec.debug.state.eternityCount = 44;
+    respec.debug.state.towerFloor = 12;
+    respec.debug.state.completedTowerChallenges = 15;
+    assert.equal(respec.debug.respecTimeline({ save: false, update: false }), true, "Timeline respec should reuse the Eternity reset path for EM7");
+    assert.equal(respec.debug.state.completedTowerChallenges, 0, "Timeline respec must clear current-run TC completion");
+    respec.debug.state.towerFloor = 3;
+    assert.equal(respec.runtime.towerChallengeUnlocked(1), true, "EM7 should auto-complete TC1 again after respec at its normal floor");
+    assert.equal(respec.debug.state.completedTowerChallenges, 1, "EM7 should preserve its explicit TC1-4 scope after respec");
 
     state.activeTowerChallenge = 0;
     debug.saveGame("manual");

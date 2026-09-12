@@ -20,6 +20,7 @@ const TOWER_FLOOR_COST_LOG10 = Object.freeze({
 });
 
 const TOWER_CHALLENGE_UNLOCK_FLOORS = Object.freeze([3, 5, 8, 12]);
+const ETERNITY_MILESTONE_SEVEN_MAX_TOWER_CHALLENGE = 4;
 const TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP = 0.077;
 const TOWER_CHALLENGE_3_RELAXATION_COUNT = 600000;
 const TOWER_CHALLENGE_3_INFINITY_SCORE_SOFTCAP_SPAN = 750000;
@@ -186,6 +187,7 @@ function applyEternityMilestoneSevenCompletion(index) {
   if (
     !definition?.implemented
     || runtime.eternityMilestoneActive?.("7") !== true
+    || definition.index > ETERNITY_MILESTONE_SEVEN_MAX_TOWER_CHALLENGE
     || towerFloor() < definition.unlockFloor
   ) return false;
   const bit = 1 << (definition.index - 1);
@@ -499,6 +501,7 @@ function buildTower(options = {}) {
 
 expose("TOWER_FLOOR_COST_LOG10", () => TOWER_FLOOR_COST_LOG10);
 expose("TOWER_CHALLENGE_UNLOCK_FLOORS", () => TOWER_CHALLENGE_UNLOCK_FLOORS);
+expose("ETERNITY_MILESTONE_SEVEN_MAX_TOWER_CHALLENGE", () => ETERNITY_MILESTONE_SEVEN_MAX_TOWER_CHALLENGE);
 expose("TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP", () => TOWER_CHALLENGE_1_INFINITY_SCORE_POWER_STEP);
 expose("TOWER_CHALLENGE_3_RELAXATION_COUNT", () => TOWER_CHALLENGE_3_RELAXATION_COUNT);
 expose("TOWER_CHALLENGE_3_SCORE_GAIN_POWER_START", () => TOWER_CHALLENGE_3_SCORE_GAIN_POWER_START);

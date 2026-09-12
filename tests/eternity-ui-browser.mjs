@@ -197,9 +197,9 @@ try {
     "IC7は最初からクリアされた状態になる",
     "GRとCBは何もリセットしない",
     "核増幅に必要なコストを^0.9",
-    "IUの自動化を解放",
-    "ICは全て最初からクリアされた状態になる",
-    "TCは解放された瞬間にクリアされる",
+    "IUの自動化を解放し、IAは自動で解放される",
+    "ICは全て最初からクリアされた状態になり、Break Infinite Capは自動で解放される",
+    "4までのTCは解放された瞬間にクリアされる",
     "IAの自動購入とTowerの自動建設を解放",
     "最初からIPを1000持った状態で開始される",
     "Break Eternityを実行",
@@ -643,7 +643,7 @@ try {
     effect: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-effect')?.textContent,
   }));
   assert.equal(milestoneSix.status, "有効", "Milestone 6 should become active at Eternity 27");
-  assert.equal(milestoneSix.effect, "ICは全て最初からクリアされた状態になる", "Milestone 6 should explain the all-completed IC state");
+  assert.equal(milestoneSix.effect, "ICは全て最初からクリアされた状態になり、Break Infinite Capは自動で解放される", "Milestone 6 should explain the all-completed IC and automatic cap state");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -667,7 +667,7 @@ try {
     effect: document.querySelector('[data-eternity-milestone="7"] .eternity-milestone-effect')?.textContent,
   }));
   assert.equal(milestoneSeven.status, "有効", "Milestone 7 should become active at Eternity 44");
-  assert.equal(milestoneSeven.effect, "TCは解放された瞬間にクリアされる", "Milestone 7 should explain auto-completion at unlock");
+  assert.equal(milestoneSeven.effect, "4までのTCは解放された瞬間にクリアされる", "Milestone 7 should explain TC1-TC4 auto-completion at unlock");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -794,9 +794,10 @@ try {
   assert.equal(english.title11, "1-1 Spirit of QoL", "Milestone names should have English copy");
   assert.equal(english.title6, "6 Finite Infinity Challenges", "Milestone 6 should have English copy");
   assert.equal(english.effect2, "Start with IC7 already cleared", "Milestone 2 English copy should describe the direct IC7 completion state");
-  assert.equal(english.milestoneEffects[7], "Start with all ICs already cleared", "Milestone 6 English copy should describe the completed IC state");
+  assert.equal(english.milestoneEffects[6], "Unlock IU automation and automatically unlock IA at its normal requirement", "Milestone 5 English copy should describe IA automation");
   assert.equal(english.title7, "7 One-Point Challenges", "Milestone 7 should have English copy");
-  assert.equal(english.milestoneEffects[8], "Clear each TC when it unlocks", "Milestone 7 English copy should describe completion at unlock");
+  assert.equal(english.milestoneEffects[7], "Start with all ICs already cleared and automatically break Infinite Cap at its normal requirement", "Milestone 6 English copy should describe cap automation");
+  assert.equal(english.milestoneEffects[8], "Automatically clear TC1–TC4 as they unlock", "Milestone 7 English copy should describe its explicit completion scope");
   assert.equal(english.title8, "8 Babel of Infinite", "Milestone 8 should have English copy");
   assert.equal(english.milestoneEffects[9], "Unlock IA autobuy and Tower auto-build", "Milestone 8 English copy should describe IA and Tower automation");
   assert.equal(english.title9, "9 Worldly Desires", "Milestone 9 should have English copy");

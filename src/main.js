@@ -758,8 +758,23 @@ function shouldAutoRunGeneration() {
     : checks.every(Boolean);
 }
 
+function runEternityMilestoneAutomation({ refresh = false, save = true } = {}) {
+  let changed = false;
+  if (
+    runtime.eternityMilestoneActive?.("5") === true
+    && runtime.unlockInfiniteAngle?.({ refresh, save: false }) === true
+  ) changed = true;
+  if (
+    runtime.eternityMilestoneActive?.("6") === true
+    && runtime.breakInfiniteCap?.({ refresh, save: false }) === true
+  ) changed = true;
+  if (changed && save) runtime.saveGame("manual");
+  return changed;
+}
+
 function runLayerAutomation() {
-  if (!runtime.state.automationEnabled) return false;
+  const milestoneAutomationRan = runEternityMilestoneAutomation();
+  if (!runtime.state.automationEnabled) return milestoneAutomationRan;
   const infinityAutomationUnlocked = runtime.infinityAutomationUnlocked?.() || false;
   const generationCoreAutomationUnlocked = runtime.isAchievementUnlocked(19);
   const milestoneEightAutomationRan = runEternityMilestoneEightAutomation();
@@ -792,7 +807,7 @@ function runLayerAutomation() {
     return true;
   }
 
-  return milestoneEightAutomationRan;
+  return milestoneEightAutomationRan || milestoneAutomationRan;
 }
 
 function runEternityMilestoneEightAutomation() {
@@ -2053,6 +2068,7 @@ expose("checkForRemoteUpdate", () => checkForRemoteUpdate, (value) => { checkFor
 expose("runAutobuyers", () => runAutobuyers, (value) => { runAutobuyers = value; });
 expose("shouldAutoRunGeneration", () => shouldAutoRunGeneration, (value) => { shouldAutoRunGeneration = value; });
 expose("runLayerAutomation", () => runLayerAutomation, (value) => { runLayerAutomation = value; });
+expose("runEternityMilestoneAutomation", () => runEternityMilestoneAutomation);
 expose("runEternityMilestoneEightAutomation", () => runEternityMilestoneEightAutomation);
 expose("update", () => update, (value) => { update = value; });
 expose("advanceOnlineTime", () => advanceOnlineTime, (value) => { advanceOnlineTime = value; });
@@ -2085,6 +2101,7 @@ window.__angleDebug = {
   runGeneration: runtime.runGeneration,
   runCoreBoost: runtime.runCoreBoost,
   runInfinity: runtime.runInfinity,
+  runEternityMilestoneAutomation: runtime.runEternityMilestoneAutomation,
   canEternity: runtime.canEternity,
   performEternity: runtime.performEternity,
   claimTimelineTf: runtime.claimTimelineTf,
