@@ -1641,6 +1641,143 @@ try {
   assert.equal(desktopUiChanges.infinityUpgradeNodeCount, 21, "desktop IU should render every upgrade node");
   assert.equal(desktopUiChanges.infinityUpgradeNodeContract, true, "desktop IU nodes should keep name, cost, and state in the node");
   assert.ok(desktopUiChanges.infinityUpgradeNodeHeights.every((height) => height <= 50), "desktop IU nodes should stay compact");
+  const infinityUpgradeInteraction = await page.evaluate(() => {
+    const { state, runtime, switchMainTab, switchInfinitySubtab } = window.__angleDebug;
+    const original = {
+      autoBuyInfinityUpgrades: state.autoBuyInfinityUpgrades,
+      automationEnabled: state.automationEnabled,
+      eternityCount: state.eternityCount,
+      infinityCount: state.infinityCount,
+      infinityPoints: state.infinityPoints,
+      infinityPointsExact: state.infinityPointsExact,
+      infinityPointsLog10: state.infinityPointsLog10,
+      infinityUpgradeMask: state.infinityUpgradeMask,
+      selectedInfinityUpgradeId: runtime.selectedInfinityUpgradeId,
+    };
+    const nodeFor = (id) => document.querySelector(
+      '[data-infinity-panel="upgrades"] [data-upgrade="' + id + '"]',
+    );
+    const setIp = (value) => runtime.syncInfinityPointCachesFromExact(BigInt(value));
+    const doubleClick = (id) => {
+      nodeFor(id)?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+      window.advanceTime(0);
+    };
+
+    state.autoBuyInfinityUpgrades = false;
+    state.automationEnabled = false;
+    state.eternityCount = 0;
+    state.infinityCount = 1;
+    state.infinityUpgradeMask = 0;
+    switchMainTab("infinity");
+    switchInfinitySubtab("upgrades");
+    setIp(1);
+    runtime.selectedInfinityUpgradeId = "1-2";
+    runtime.updateUi();
+    nodeFor("1-1")?.click();
+    const singleClick = {
+      selected: runtime.selectedInfinityUpgradeId,
+      mask: state.infinityUpgradeMask,
+    };
+
+    runtime.selectedInfinityUpgradeId = "1-2";
+    setIp(1);
+    runtime.updateUi();
+    doubleClick("1-1");
+    const directPurchase = {
+      selected: runtime.selectedInfinityUpgradeId,
+      mask: state.infinityUpgradeMask,
+      points: state.infinityPointsExact,
+    };
+
+    state.infinityUpgradeMask = 1;
+    setIp(1);
+    runtime.selectedInfinityUpgradeId = "2-1";
+    runtime.updateUi();
+    doubleClick("2-1");
+    const prerequisiteBlocked = state.infinityUpgradeMask;
+
+    state.infinityUpgradeMask = 1;
+    setIp(0);
+    runtime.selectedInfinityUpgradeId = "1-1";
+    runtime.updateUi();
+    doubleClick("1-2");
+    const unaffordable = state.infinityUpgradeMask;
+
+    state.infinityUpgradeMask = 1;
+    setIp(1);
+    runtime.selectedInfinityUpgradeId = "1-2";
+    runtime.updateUi();
+    doubleClick("1-1");
+    const purchasedNoop = {
+      mask: state.infinityUpgradeMask,
+      points: state.infinityPointsExact,
+    };
+
+    state.infinityUpgradeMask = 1;
+    setIp(1);
+    runtime.selectedInfinityUpgradeId = "1-1";
+    runtime.updateUi();
+    nodeFor("1-2")?.click();
+    window.advanceTime(0);
+    runtime.elements.infinityUpgradeDetailBuy.click();
+    window.advanceTime(0);
+    const detailPanelPurchase = {
+      selected: runtime.selectedInfinityUpgradeId,
+      mask: state.infinityUpgradeMask,
+      points: state.infinityPointsExact,
+    };
+
+    state.infinityUpgradeMask = 0;
+    setIp(2);
+    state.eternityCount = 20;
+    runtime.updateUi();
+    const autobuyCount = runtime.buyAllInfinityUpgrades({ refresh: false, save: false });
+    const autobuy = {
+      count: autobuyCount,
+      mask: state.infinityUpgradeMask,
+      points: state.infinityPointsExact,
+    };
+
+    Object.assign(state, original);
+    runtime.selectedInfinityUpgradeId = original.selectedInfinityUpgradeId;
+    runtime.updateUi();
+    return {
+      singleClick,
+      directPurchase,
+      prerequisiteBlocked,
+      unaffordable,
+      purchasedNoop,
+      detailPanelPurchase,
+      autobuy,
+    };
+  });
+  assert.deepEqual(
+    infinityUpgradeInteraction.singleClick,
+    { selected: "1-1", mask: 0 },
+    "single-clicking an IU should only select it",
+  );
+  assert.deepEqual(
+    infinityUpgradeInteraction.directPurchase,
+    { selected: "1-2", mask: 1, points: "0" },
+    "double-clicking an IU should purchase the clicked ID without stale selection",
+  );
+  assert.equal(infinityUpgradeInteraction.prerequisiteBlocked, 1, "double-click should keep prerequisite-blocked IUs unpurchased");
+  assert.equal(infinityUpgradeInteraction.unaffordable, 1, "double-click should keep unaffordable IUs unpurchased");
+  assert.deepEqual(
+    infinityUpgradeInteraction.purchasedNoop,
+    { mask: 1, points: "1" },
+    "double-clicking a purchased IU should have no effect",
+  );
+  assert.deepEqual(
+    infinityUpgradeInteraction.detailPanelPurchase,
+    { selected: "1-2", mask: 3, points: "0" },
+    "the detail-panel IU purchase button should remain functional",
+  );
+  assert.deepEqual(
+    infinityUpgradeInteraction.autobuy,
+    { count: 2, mask: 3, points: "0" },
+    "Infinity Upgrade autobuy should remain unchanged",
+  );
   const towerInitial = await page.evaluate(() => {
     const { state, switchMainTab, switchInfinitySubtab, switchChallengeSubtab } = window.__angleDebug;
     state.towerFloor = 0;
