@@ -355,6 +355,7 @@ function runInfinity(forced = false) {
   runtime.resetBelowInfinity();
   runtime.state.currentInfinityRunTime = 0;
   runtime.state.currentInfinityRealTime = 0;
+  runtime.runEternityMilestoneAutomation?.({ refresh: false, save: false });
   runtime.maybeForceEternity?.({ save: false, update: false });
   runtime.updateUi();
   runtime.saveGame("manual");
@@ -414,12 +415,14 @@ function toggleInfinityChallenge(index = nextChallengeIndex()) {
   runtime.saveGame("manual");
 }
 
-function breakInfiniteCap() {
-  if (!canBreakInfiniteCap()) return;
+function breakInfiniteCap(options = {}) {
+  if (typeof Event !== "undefined" && options instanceof Event) options = {};
+  if (!canBreakInfiniteCap()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-break-cap", { force: true })) return;
   runtime.state.infiniteCapBroken = true;
-  runtime.updateUi();
-  runtime.saveGame("manual");
+  if (options.refresh !== false) runtime.updateUi();
+  if (options.save !== false) runtime.saveGame("manual");
+  return true;
 }
 
 expose("infinityUpgradeById", () => infinityUpgradeById, (value) => { infinityUpgradeById = value; });
