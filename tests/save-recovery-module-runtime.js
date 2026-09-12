@@ -530,6 +530,8 @@ async function runSaveRecoveryModuleRuntimeTest() {
     const quarantine = JSON.parse(storage.get(runtime.SAVE_QUARANTINE_KEY));
     assert.equal(quarantine.raw, invalidRaw, "invalid JSON should be preserved verbatim");
     assert.equal(storage.has(runtime.SAVE_LOAD_FAILURE_KEY), false, "format failures should use quarantine without load diagnostics");
+    assert.equal(debug.saveGame("manual"), false, "same-session recovery should block manual saves");
+    assert.equal(debug.saveGame("auto"), false, "same-session recovery should block autosaves");
     runtime.updateUi();
     assert.equal(storage.has(runtime.SAVE_KEY), false, "the initial state must not be autosaved after a format failure");
 
