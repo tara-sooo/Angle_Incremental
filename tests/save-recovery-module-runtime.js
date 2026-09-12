@@ -530,8 +530,18 @@ async function runSaveRecoveryModuleRuntimeTest() {
     const quarantine = JSON.parse(storage.get(runtime.SAVE_QUARANTINE_KEY));
     assert.equal(quarantine.raw, invalidRaw, "invalid JSON should be preserved verbatim");
     assert.equal(storage.has(runtime.SAVE_LOAD_FAILURE_KEY), false, "format failures should use quarantine without load diagnostics");
+    assert.equal(debug.saveGame("manual"), false, "same-session recovery should block manual saves");
+    assert.equal(debug.saveGame("auto"), false, "same-session recovery should block autosaves");
     runtime.updateUi();
     assert.equal(storage.has(runtime.SAVE_KEY), false, "the initial state must not be autosaved after a format failure");
+
+    const reloaded = await loadRuntime(candidatePath, storage);
+    assert.equal(reloaded.runtime.loadRecoveryMode, true, "a quarantined save should require recovery after reload");
+    assert.equal(reloaded.runtime.recoveryEntries().quarantine.raw, invalidRaw, "reload should preserve the quarantined raw save");
+    assert.equal(reloaded.debug.saveGame("manual"), false, "recovery mode should block manual saves after reload");
+    assert.equal(reloaded.storage.has(reloaded.runtime.SAVE_KEY), false, "recovery mode should not create a fresh save after reload");
+    reloaded.runtime.updateUi();
+    assert.equal(reloaded.runtime.elements.saveRecoveryDetails.open, true, "reload should surface the recovery UI");
   }
 
   {
@@ -564,6 +574,56 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(await debug.restoreQuarantineSave(), true, "a quarantined valid save should be restorable");
     assert.equal(storage.has(runtime.SAVE_QUARANTINE_KEY), false, "successful quarantine restore should consume the quarantine copy");
     assert.equal(storage.has(runtime.SAVE_KEY), true, "successful quarantine restore should write the normal save");
+  }
+
+  {
+    const source = await loadRuntime(candidatePath);
+    const recoverableRaw = JSON.stringify(source.runtime.serializeSaveData());
+    source.storage.set(source.runtime.SAVE_QUARANTINE_KEY, JSON.stringify({
+      quarantinedAt: Date.now(),
+      appVersion: source.runtime.APP_VERSION,
+      raw: recoverableRaw,
+    }));
+    const reloaded = await loadRuntime(candidatePath, source.storage);
+    assert.equal(reloaded.runtime.loadRecoveryMode, true, "a persisted quarantine should activate recovery on startup");
+    assert.equal(await reloaded.debug.restoreQuarantineSave(), true, "a startup recovery should use the existing quarantine restore path");
+    assert.equal(reloaded.runtime.loadRecoveryMode, false, "successful quarantine restore should finish startup recovery");
+    assert.equal(reloaded.storage.has(reloaded.runtime.SAVE_QUARANTINE_KEY), false, "startup recovery should consume the quarantine copy after restore");
+    assert.equal(reloaded.storage.has(reloaded.runtime.SAVE_KEY), true, "startup recovery should write the canonical save");
+  }
+
+  {
+    const source = await loadRuntime(candidatePath);
+    source.storage.set(source.runtime.SAVE_QUARANTINE_KEY, JSON.stringify({
+      quarantinedAt: Date.now(),
+      appVersion: source.runtime.APP_VERSION,
+      raw: "{reset-quarantine",
+    }));
+    const reloaded = await loadRuntime(candidatePath, source.storage);
+    assert.equal(reloaded.runtime.loadRecoveryMode, true, "reset should begin from the persisted recovery state");
+    reloaded.debug.resetSave();
+    assert.equal(reloaded.runtime.loadRecoveryMode, false, "explicit reset should exit recovery");
+    assert.equal(reloaded.storage.has(reloaded.runtime.SAVE_QUARANTINE_KEY), false, "explicit reset should abandon the quarantine");
+    assert.equal(reloaded.storage.has(reloaded.runtime.SAVE_KEY), false, "explicit reset should not create a normal save");
+
+    const fresh = await loadRuntime(candidatePath, reloaded.storage);
+    assert.equal(fresh.runtime.loadRecoveryMode, false, "a reset should remain a normal first run after reload");
+    assert.equal(fresh.storage.has(fresh.runtime.SAVE_QUARANTINE_KEY), false, "a reset should keep quarantine cleared after reload");
+  }
+
+  {
+    const source = await loadRuntime(candidatePath);
+    source.debug.state.generationCount = 12;
+    assert.equal(source.debug.saveGame("manual"), true, "a healthy save should be available for the secondary quarantine test");
+    source.storage.set(source.runtime.SAVE_QUARANTINE_KEY, JSON.stringify({
+      quarantinedAt: Date.now(),
+      appVersion: source.runtime.APP_VERSION,
+      raw: "{secondary-copy",
+    }));
+    const reloaded = await loadRuntime(candidatePath, source.storage);
+    assert.equal(reloaded.runtime.loadRecoveryMode, false, "a healthy normal save should remain authoritative");
+    assert.equal(reloaded.debug.saveGame("manual"), true, "a secondary quarantine should not block healthy saves");
+    assert.equal(JSON.parse(reloaded.storage.get(reloaded.runtime.SAVE_QUARANTINE_KEY)).raw, "{secondary-copy", "a secondary quarantine should remain untouched");
   }
 
   {
