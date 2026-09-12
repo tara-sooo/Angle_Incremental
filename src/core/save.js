@@ -1088,7 +1088,12 @@ async function loadGame(options = {}) {
   try {
     raw = localStorage.getItem(runtime.SAVE_KEY);
     if (!raw) {
-      runtime.setSaveStatus(runtime.t("noSave"));
+      if (readQuarantineEntry()) {
+        loadRecoveryMode = true;
+        runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
+      } else {
+        runtime.setSaveStatus(runtime.t("noSave"));
+      }
       return false;
     }
 
@@ -1274,6 +1279,8 @@ function resetSave() {
   finishSaveConflict();
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   localStorage.removeItem(runtime.SAVE_KEY);
+  localStorage.removeItem(runtime.SAVE_QUARANTINE_KEY);
+  recoveryRevision += 1;
   lastKnownSaveFingerprint = "";
   lastLocalSaveFingerprint = "";
   runtime.offlineReport = null;
