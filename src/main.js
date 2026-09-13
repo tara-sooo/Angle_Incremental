@@ -1719,6 +1719,7 @@ function renderGameToText() {
   const currentGainLog = runtime.currentGainLog10();
   const currentCostLogs = runtime.costLogs();
   const gainExpression = runtime.gainExpressionConfig();
+  const eternityGainLog10 = runtime.eternityGainLog10();
   const timelineEternityRequirement = runtime.timelineEternityRequirement();
   return JSON.stringify({
     coordinateSystem: "canvas pixels, origin top-left, x right, y down",
@@ -1842,6 +1843,12 @@ function renderGameToText() {
         purchased: runtime.hasInfinityUpgrade(upgrade.id),
         canBuy: runtime.canBuyInfinityUpgrade(upgrade.id),
       })),
+    },
+    eternity: {
+      count: runtime.state.eternityCount,
+      canEternity: runtime.canEternity(),
+      pendingGain: runtime.formatUiLogNumber(eternityGainLog10),
+      pendingGainLog10: Number.isFinite(eternityGainLog10) ? Number(eternityGainLog10.toPrecision(6)) : null,
     },
     tower: {
       floor: runtime.towerFloor(),
@@ -2103,6 +2110,8 @@ window.__angleDebug = {
   runEternityMilestoneAutomation: runtime.runEternityMilestoneAutomation,
   canEternity: runtime.canEternity,
   performEternity: runtime.performEternity,
+  eternityGain: runtime.eternityGain,
+  eternityGainLog10: runtime.eternityGainLog10,
   claimTimelineTf: runtime.claimTimelineTf,
   claimScoreTf: runtime.claimScoreTf,
   claimIpTf: runtime.claimIpTf,
@@ -2115,6 +2124,11 @@ window.__angleDebug = {
   timelineParallelRawLog10: runtime.timelineParallelRawLog10,
   timelineParallelEffectiveLog10: runtime.timelineParallelEffectiveLog10,
   timelineRealInfinityCountGainMultiplier: runtime.timelineRealInfinityCountGainMultiplier,
+  timelineRealAd30EternityGainMultiplierLog10: runtime.timelineRealAd30EternityGainMultiplierLog10,
+  timelineRealAd30EternityGainMultiplier: runtime.timelineRealAd30EternityGainMultiplier,
+  timelineParallelAd30InfinityEffectiveLog10: runtime.timelineParallelAd30InfinityEffectiveLog10,
+  timelineParallelAd30EternityGainMultiplierLog10: runtime.timelineParallelAd30EternityGainMultiplierLog10,
+  timelineParallelAd30EternityGainMultiplier: runtime.timelineParallelAd30EternityGainMultiplier,
   timelineIpGainMultiplierLog10: runtime.timelineIpGainMultiplierLog10,
   advanceTimelineRunTime: runtime.advanceTimelineRunTime,
   timelineNodes: runtime.timelineNodes,

@@ -77,8 +77,8 @@ async function testTimelineTreePurchases() {
   runtime.updateUi();
   assert.deepEqual(
     Array.from(runtime.timelineNodes(), (node) => node.id),
-    ["Real-BC16500", "Parallel-BC16500", "Real-BC6000", "Parallel-BC6000"],
-    "Timeline should expose both route alternatives in both eras",
+    ["Real-BC16500", "Parallel-BC16500", "Real-BC6000", "Parallel-BC6000", "Real-AD30", "Parallel-AD30"],
+    "Timeline should expose both route alternatives in all eras",
   );
   assert.deepEqual(
     Array.from(runtime.timelineNodes(), (node) => [
@@ -93,6 +93,8 @@ async function testTimelineTreePurchases() {
       ["BC16500", "Parallel", 1, "all", []],
       ["BC6000", "Real", 1, "any", ["Real-BC16500", "Parallel-BC16500"]],
       ["BC6000", "Parallel", 1, "any", ["Real-BC16500", "Parallel-BC16500"]],
+      ["AD30", "Real", 5, "any", ["Real-BC6000", "Parallel-BC6000"]],
+      ["AD30", "Parallel", 5, "any", ["Real-BC6000", "Parallel-BC6000"]],
     ],
     "Timeline definitions should carry route, cost, and previous-era prerequisite metadata",
   );
@@ -169,6 +171,117 @@ async function testTimelineTreePurchases() {
     ],
     "cross-route BC6000 purchases should survive save/load",
   );
+
+  const ad30Switch = await loadRuntime(candidatePath);
+  ad30Switch.debug.state.eternityCount = 1;
+  ad30Switch.debug.state.scoreTfClaims = 7;
+  ad30Switch.debug.state.timelinePurchasedNodes = [
+    { id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 },
+  ];
+  assert.equal(ad30Switch.runtime.timelineNodeAvailability("Real-AD30").reason, "available");
+  assert.equal(ad30Switch.runtime.timelineNodeAvailability("Parallel-AD30").reason, "available", "AD30 should allow switching from the BC6000 route");
+  assert.equal(ad30Switch.runtime.purchaseTimelineNode("Parallel-AD30", { save: false, update: false }), true);
+  assert.equal(ad30Switch.runtime.timelineNodeAvailability("Real-AD30").reason, "route-conflict", "AD30 alternatives should remain exclusive");
+  assert.equal(ad30Switch.debug.state.timelinePurchasedNodes.at(-1).id, "Parallel-AD30");
+}
+
+async function testAd30EffectsAndEternityGain() {
+  const source = await loadRuntime(candidatePath);
+  const { debug, runtime } = source;
+  const { state } = debug;
+  runtime.updateUi = () => {};
+  runtime.saveGame = () => true;
+  runtime.createCheckpoint = () => true;
+  state.eternityCount = 1;
+  state.timelinePurchasedNodes = [{ id: "Real-AD30", era: "AD30", route: "Real", costTF: 5 }];
+
+  for (const scoreLog10 of [14000, 19000, 24000, 29000, 34000]) {
+    setScoreLog(state, scoreLog10);
+    const expectedMultiplier = 1 + 20 ** ((scoreLog10 - 14000) / 5000);
+    assertClose(
+      runtime.timelineRealAd30EternityGainMultiplierLog10(),
+      Math.log10(expectedMultiplier),
+      1e-12,
+      `Real AD30 multiplier at Score e${scoreLog10}`,
+    );
+    assert.equal(runtime.eternityGain(), Math.floor(expectedMultiplier), `Real AD30 gain at Score e${scoreLog10}`);
+  }
+  state.score = 0;
+  state.scoreLog10 = -Infinity;
+  assert.equal(runtime.timelineRealAd30EternityGainMultiplierLog10(), 0, "Real AD30 should be neutral before Score generation");
+  assert.equal(runtime.eternityGain(), 1, "an ungenerated Score should leave the Eternity gain at one");
+
+  state.timelinePurchasedNodes = [{ id: "Parallel-AD30", era: "AD30", route: "Parallel", costTF: 5 }];
+  for (const infinityCount of [0, 1, 10 ** 15, 10 ** 20, 10 ** 30, 10 ** 50, 10 ** 100]) {
+    state.infinityCount = infinityCount;
+    const rawLog10 = Math.log10(infinityCount);
+    const effectiveLog10 = rawLog10 <= 15
+      ? rawLog10
+      : 15 + 2 * Math.log10(1 + (rawLog10 - 15) / 2);
+    const expectedMultiplierLog10 = infinityCount > 0
+      ? Math.log10(1 + 10 ** effectiveLog10 / 4)
+      : 0;
+    if (infinityCount > 0) {
+      assertClose(
+        runtime.timelineParallelAd30InfinityEffectiveLog10(),
+        effectiveLog10,
+        1e-12,
+        `Parallel AD30 effective Infinity at ${infinityCount}`,
+      );
+    } else {
+      assert.equal(runtime.timelineParallelAd30InfinityEffectiveLog10(), -Infinity, "zero Infinity count should have no effective Infinity");
+    }
+    assertClose(
+      runtime.timelineParallelAd30EternityGainMultiplierLog10(),
+      expectedMultiplierLog10,
+      1e-12,
+      `Parallel AD30 multiplier at ${infinityCount}`,
+    );
+    assert.equal(runtime.eternityGain(), Math.floor(infinityCount > 0 ? 1 + 10 ** effectiveLog10 / 4 : 1));
+  }
+  state.infinityCount = Number.MAX_VALUE;
+  assert.ok(Number.isFinite(runtime.timelineParallelAd30InfinityEffectiveLog10()), "maximum finite Infinity count should stay in log space");
+  assert.ok(Number.isFinite(runtime.eternityGain()), "huge Parallel AD30 gains must remain finite");
+
+  state.timelinePurchasedNodes = [{ id: "Real-AD30", era: "AD30", route: "Real", costTF: 5 }];
+  state.eternityCount = 7;
+  setScoreLog(state, 14000);
+  markEternityReady(runtime, state);
+  const realGain = runtime.eternityGain();
+  assert.equal(realGain, 2);
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.equal(state.eternityCount, 9, "performEternity should add the canonical Real AD30 gain before reset");
+
+  state.timelinePurchasedNodes = [{ id: "Parallel-AD30", era: "AD30", route: "Parallel", costTF: 5 }];
+  state.eternityCount = 7;
+  state.infinityCount = 10 ** 15;
+  markEternityReady(runtime, state);
+  const parallelGain = runtime.eternityGain();
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.equal(state.eternityCount, 7 + parallelGain, "performEternity should use the same Parallel AD30 gain exposed to the UI");
+
+  state.timelinePurchasedNodes = [{ id: "Real-AD30", era: "AD30", route: "Real", costTF: 5 }];
+  state.eternityCount = 1;
+  setScoreLog(state, 14000);
+  const saved = runtime.serializeSaveData();
+  const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(saved)]]));
+  assert.equal(loaded.debug.state.timelinePurchasedNodes[0].id, "Real-AD30", "AD30 ownership should survive save/load");
+  assert.equal(loaded.runtime.eternityGain(), 2, "AD30 gain should survive save/load");
+  assert.equal(loaded.debug.respecTimeline({ save: false, update: false }), true);
+  assert.equal(loaded.runtime.eternityGain(), 1, "Respec should remove the AD30 gain");
+
+  state.timelinePurchasedNodes = [{ id: "Parallel-AD30", era: "AD30", route: "Parallel", costTF: 5 }];
+  state.eternityCount = Number.MAX_SAFE_INTEGER - 1;
+  state.infinityCount = 10 ** 100;
+  markEternityReady(runtime, state);
+  assert.ok(Number.isFinite(runtime.eternityGain()), "large Parallel gains must not become Infinity");
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  assert.ok(Number.isFinite(state.eternityCount), "Eternity count must remain finite near the safe-integer boundary");
+  const boundarySave = runtime.serializeSaveData();
+  assert.ok(Number.isFinite(boundarySave.state.eternityCount), "large Eternity counts must remain saveable");
+  const boundaryLoaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(boundarySave)]]));
+  assert.ok(Number.isFinite(boundaryLoaded.debug.state.eternityCount), "large Eternity counts must survive save/load");
+  assert.doesNotThrow(() => boundaryLoaded.runtime.timelineEternityRequirement(), "large finite Eternity counts must remain valid Timeline inputs");
 }
 
 async function testResetPersistenceAndRespec() {
@@ -553,6 +666,7 @@ async function testTimelineResetSemantics() {
 async function runTimelineModuleRuntimeTest() {
   await testManualTracks();
   await testTimelineTreePurchases();
+  await testAd30EffectsAndEternityGain();
   await testResetPersistenceAndRespec();
   await testSaveCompatibility();
   await testTimelineEffectsAndTimer();
