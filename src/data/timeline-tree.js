@@ -25,8 +25,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "Endless Ice Age",
     }),
     description: Object.freeze({
-      ja: "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×{softcap}でソフトキャップ）",
-      en: "After clearing IC8, IP gain increases by ×3 each second (softcap at ×{softcap}).",
+      ja: "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×{softcap} SC）",
+      en: "After clearing IC8, IP gain increases by ×3 each second (SC at ×{softcap}).",
     }),
   }),
   Object.freeze({
@@ -41,8 +41,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "Between the Tigris and Euphrates",
     }),
     description: Object.freeze({
-      ja: "IC6のInfinity数報酬倍率はEternity数に応じた2^Eになる（e10以降は強度2のlogソフトキャップ）",
-      en: "The IC6 Infinity count reward uses 2^E by Eternity count (strength-2 log softcap from e10).",
+      ja: "IC6のInfinity数報酬倍率はEternity数に応じて強化される（1 Eternityごとに×2、×1e10以降 SC）",
+      en: "IC6 Infinity count reward multiplier increases by ×2 per Eternity (SC after ×1e10).",
     }),
   }),
   Object.freeze({
@@ -57,8 +57,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "Life in the Delta",
     }),
     description: Object.freeze({
-      ja: "TowerのScore exponentのFloor係数を+0.05から+0.07に変更する",
-      en: "Change the Tower Score exponent's Floor coefficient from +0.05 to +0.07.",
+      ja: "Towerのスコア累乗の増加量を+^0.05/Floorから+^0.07/Floorに変更する",
+      en: "Change the Tower score exponent increase from +^0.05/Floor to +^0.07/Floor.",
     }),
   }),
   Object.freeze({
@@ -73,8 +73,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "The God-Child Reborn",
     }),
     description: Object.freeze({
-      ja: "現在のScoreのlog10(S)に応じてEternity獲得量を1 + 20^((S - 14000) / 5000)倍にする（ソフトキャップなし）",
-      en: "Multiply Eternity gain by 1 + 20^((S - 14000) / 5000), where S is log10 of current Score (no softcap).",
+      ja: "現在のスコアに応じてEternity獲得量を×(1 + 20^((log10(スコア)-14000)/5000))する",
+      en: "Multiply Eternity gain by ×(1 + 20^((log10(Score)-14000)/5000)) based on current Score.",
     }),
   }),
   Object.freeze({
@@ -89,8 +89,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "A Human Declaration Impossible After Death",
     }),
     description: Object.freeze({
-      ja: "現在のInfinity数Iに応じてEternity獲得量を1 + I / 4倍にする（Iのlog10がe15を超えると強度2のlogソフトキャップ）",
-      en: "Multiply Eternity gain by 1 + I / 4 from current Infinity count I (strength-2 log softcap after log10(I) exceeds e15).",
+      ja: "現在のInfinity数に応じてEternity獲得量を×(1 + 10^(log10(Infinity数)) / 4)する（Infinity数e15以降 SC）",
+      en: "Multiply Eternity gain by ×(1 + 10^(log10(Infinity count)) / 4) based on current Infinity count (SC after e15 Infinity count).",
     }),
   }),
 ]);
