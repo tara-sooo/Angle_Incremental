@@ -6,6 +6,9 @@ const MAX_ETERNITY_REQUIREMENT_EXPONENT = 1024;
 const TIMELINE_TRACK_IDS = Object.freeze(["score", "ip", "eternity"]);
 const TIMELINE_NODE_BY_ID = new Map(TIMELINE_NODES.map((node) => [node.id, node]));
 const PARALLEL_RAW_SOFTCAP_LOG10 = 10;
+const REAL_BC6000_SOFTCAP_LOG10 = 10;
+const REAL_BC6000_SOFTCAP_STRENGTH = 2;
+const IC6_REWARD_LOG10 = Math.log10(2);
 const TIMELINE_TRACKS = Object.freeze({
   score: Object.freeze({
     stateKey: "scoreTfClaims",
@@ -181,10 +184,37 @@ function timelineParallelEffectiveLog10(seconds = timelineParallelSecondsSinceIc
     + 10 * Math.log10(1 + (rawLog10 - PARALLEL_RAW_SOFTCAP_LOG10) / 10);
 }
 
-function timelineRealInfinityCountGainMultiplier() {
+function timelineRealBc6000Ic6RewardLog10() {
+  if (!timelineNodeIsPurchasedById("Real-BC6000") || runtime.isChallengeCompleted?.(6) !== true) return 0;
+  const rawLog10 = normalizedEternityCount() * IC6_REWARD_LOG10;
+  if (rawLog10 <= REAL_BC6000_SOFTCAP_LOG10) return rawLog10;
+  return REAL_BC6000_SOFTCAP_LOG10
+    + REAL_BC6000_SOFTCAP_STRENGTH
+      * Math.log10(1 + (rawLog10 - REAL_BC6000_SOFTCAP_LOG10) / REAL_BC6000_SOFTCAP_STRENGTH);
+}
+
+function timelineRealBc16500InfinityCountGainMultiplier() {
   if (!timelineRealOwned()) return 1;
   const currentIpLog10 = runtime.currentInfinityPointsLog10?.() ?? -Infinity;
   return Number.isFinite(currentIpLog10) ? Math.max(1, 1 + currentIpLog10) : 1;
+}
+
+function timelineRealInfinityCountGainMultiplierLog10() {
+  normalizeTimelineState();
+  let multiplierLog10 = runtime.log10Value(timelineRealBc16500InfinityCountGainMultiplier());
+  const rewardLog10 = timelineRealBc6000Ic6RewardLog10();
+  if (rewardLog10 > 0) multiplierLog10 += Math.max(0, rewardLog10 - IC6_REWARD_LOG10);
+  return multiplierLog10;
+}
+
+function timelineRealInfinityCountGainMultiplier() {
+  normalizeTimelineState();
+  const multiplier = timelineRealBc16500InfinityCountGainMultiplier();
+  const rewardLog10 = timelineRealBc6000Ic6RewardLog10();
+  const extraLog10 = rewardLog10 > 0 ? Math.max(0, rewardLog10 - IC6_REWARD_LOG10) : 0;
+  return extraLog10 > 0
+    ? runtime.valueFromLog10(runtime.log10Value(multiplier) + extraLog10)
+    : multiplier;
 }
 
 function timelineIpGainMultiplierLog10() {
@@ -225,6 +255,9 @@ function timelineNodeIsPurchased(node) {
 function timelineNodeMissingPrerequisites(node) {
   const ownedIds = new Set(runtime.state.timelinePurchasedNodes.map((purchased) => purchased.id));
   const prerequisites = Array.isArray(node.prerequisites) ? node.prerequisites : [];
+  if (node.prerequisiteMode === "any") {
+    return prerequisites.some((id) => ownedIds.has(id)) ? [] : prerequisites;
+  }
   return prerequisites.filter((id) => !ownedIds.has(id));
 }
 
@@ -351,6 +384,8 @@ expose("timelineParallelOwned", () => timelineParallelOwned);
 expose("timelineParallelSecondsSinceIc8Clear", () => timelineParallelSecondsSinceIc8Clear);
 expose("timelineParallelRawLog10", () => timelineParallelRawLog10);
 expose("timelineParallelEffectiveLog10", () => timelineParallelEffectiveLog10);
+expose("timelineRealBc6000Ic6RewardLog10", () => timelineRealBc6000Ic6RewardLog10);
+expose("timelineRealInfinityCountGainMultiplierLog10", () => timelineRealInfinityCountGainMultiplierLog10);
 expose("timelineRealInfinityCountGainMultiplier", () => timelineRealInfinityCountGainMultiplier);
 expose("timelineIpGainMultiplierLog10", () => timelineIpGainMultiplierLog10);
 expose("advanceTimelineRunTime", () => advanceTimelineRunTime);

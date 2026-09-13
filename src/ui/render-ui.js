@@ -250,6 +250,10 @@ function timelineNodeDescriptionText(node) {
   return localizedTimelineText(node.description).replace("{softcap}", runtime.formatUiLogNumber(10));
 }
 
+function timelineNodePrerequisiteText(prerequisites, mode) {
+  return prerequisites.join(mode === "any" ? " or " : ", ");
+}
+
 function timelineNodeStatusText(availability) {
   switch (availability.reason) {
     case "owned":
@@ -257,9 +261,10 @@ function timelineNodeStatusText(availability) {
     case "timeline-locked":
       return runtime.t("timelineNodeLocked");
     case "missing-prerequisites":
+      if (availability.node?.prerequisiteMode === "any") return runtime.t("timelineNodeMissingAnyPrerequisite");
       return runtime.t("timelineNodeMissingPrerequisites").replace(
         "{nodes}",
-        availability.missingPrerequisites.join(", "),
+        timelineNodePrerequisiteText(availability.missingPrerequisites, availability.node?.prerequisiteMode),
       );
     case "route-conflict":
       return runtime.t("timelineNodeAlternativeLocked");
@@ -286,6 +291,14 @@ function timelineNodeCurrentEffectText(node, availability) {
     return runtime.t("timelineParallelCurrentEffect")
       .replace("{multiplier}", formatMultiplierLog(effectiveLog10))
       .replace("{time}", runtime.formatLongDuration(runtime.timelineParallelSecondsSinceIc8Clear?.() ?? 0));
+  }
+  if (node.id === "Real-BC6000") {
+    return runtime.t("timelineRealBc6000CurrentEffect")
+      .replace("{multiplier}", formatMultiplierLog(runtime.timelineRealBc6000Ic6RewardLog10?.() ?? 0));
+  }
+  if (node.id === "Parallel-BC6000") {
+    return runtime.t("timelineParallelBc6000CurrentEffect")
+      .replace("{exponent}", runtime.towerScoreExponent().toFixed(2));
   }
   return runtime.t("timelineNodeInactive");
 }
@@ -406,7 +419,7 @@ function updateTimelineNodeDetail(node, availability) {
   if (runtime.elements.timelineNodeDetailDescription) runtime.elements.timelineNodeDetailDescription.textContent = timelineNodeDescriptionText(node);
   if (runtime.elements.timelineNodeDetailCurrentEffect) runtime.elements.timelineNodeDetailCurrentEffect.textContent = timelineNodeCurrentEffectText(node, availability);
   if (runtime.elements.timelineNodeDetailPrerequisites) runtime.elements.timelineNodeDetailPrerequisites.textContent = prerequisites.length > 0
-    ? prerequisites.join(", ")
+    ? timelineNodePrerequisiteText(prerequisites, node.prerequisiteMode)
     : runtime.t("timelineNoPrerequisites");
   if (runtime.elements.timelineNodePurchaseButton) {
     runtime.elements.timelineNodePurchaseButton.dataset.timelineNodePurchase = node.id;

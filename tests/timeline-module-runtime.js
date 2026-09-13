@@ -77,20 +77,34 @@ async function testTimelineTreePurchases() {
   runtime.updateUi();
   assert.deepEqual(
     Array.from(runtime.timelineNodes(), (node) => node.id),
-    ["Real-BC16500", "Parallel-BC16500"],
-    "the first era should expose exactly the two canonical route nodes",
+    ["Real-BC16500", "Parallel-BC16500", "Real-BC6000", "Parallel-BC6000"],
+    "Timeline should expose both route alternatives in both eras",
   );
   assert.deepEqual(
-    Array.from(runtime.timelineNodes(), (node) => [node.era, node.route, node.costTF, Array.from(node.prerequisites)]),
+    Array.from(runtime.timelineNodes(), (node) => [
+      node.era,
+      node.route,
+      node.costTF,
+      node.prerequisiteMode || "all",
+      Array.from(node.prerequisites),
+    ]),
     [
-      ["BC16500", "Real", 1, []],
-      ["BC16500", "Parallel", 1, []],
+      ["BC16500", "Real", 1, "all", []],
+      ["BC16500", "Parallel", 1, "all", []],
+      ["BC6000", "Real", 1, "any", ["Real-BC16500", "Parallel-BC16500"]],
+      ["BC6000", "Parallel", 1, "any", ["Real-BC16500", "Parallel-BC16500"]],
     ],
-    "first-era definitions should carry independent route metadata and one-TF costs",
+    "Timeline definitions should carry route, cost, and previous-era prerequisite metadata",
   );
   assert.equal(runtime.timelineAvailableTf(), 1);
   assert.equal(runtime.canPurchaseTimelineNode("Real-BC16500"), true);
   assert.equal(runtime.canPurchaseTimelineNode("Parallel-BC16500"), true, "either route should be purchasable before a route is selected");
+  assert.equal(runtime.timelineNodeAvailability("Real-BC6000").reason, "missing-prerequisites", "BC6000 should require one BC16500 route");
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(runtime.timelineNodeAvailability("Real-BC6000").missingPrerequisites)),
+    ["Real-BC16500", "Parallel-BC16500"],
+    "an any prerequisite should report all alternatives while none is owned",
+  );
   assert.equal(runtime.purchaseTimelineNode("Real-BC16500", { save: false, update: false }), true);
   assert.equal(state.timelinePurchasedNodes.length, 1);
   assert.deepEqual(
@@ -131,6 +145,30 @@ async function testTimelineTreePurchases() {
     { id: "Parallel-BC16500", era: "BC16500", route: "Parallel", costTF: 1 },
   ], "save/load should preserve the canonical purchased node");
   assert.equal(loaded.runtime.timelineAvailableTf(), 0);
+
+  const crossRoute = await loadRuntime(candidatePath);
+  crossRoute.debug.state.eternityCount = 1;
+  crossRoute.debug.state.scoreTfClaims = 2;
+  crossRoute.debug.state.timelinePurchasedNodes = [
+    { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
+  ];
+  assert.equal(crossRoute.runtime.timelineNodeAvailability("Real-BC6000").reason, "available");
+  assert.equal(crossRoute.runtime.timelineNodeAvailability("Parallel-BC6000").reason, "available", "BC6000 should allow switching from the prior route");
+  assert.equal(crossRoute.runtime.purchaseTimelineNode("Parallel-BC6000", { save: false, update: false }), true);
+  assert.equal(crossRoute.runtime.timelineNodeAvailability("Real-BC6000").reason, "route-conflict", "BC6000 alternatives should remain exclusive");
+  const crossRouteSerialized = crossRoute.runtime.serializeSaveData();
+  const crossRouteReloaded = await loadRuntime(
+    candidatePath,
+    new Map([[crossRoute.runtime.SAVE_KEY, JSON.stringify(crossRouteSerialized)]]),
+  );
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(crossRouteReloaded.debug.state.timelinePurchasedNodes)),
+    [
+      { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
+      { id: "Parallel-BC6000", era: "BC6000", route: "Parallel", costTF: 1 },
+    ],
+    "cross-route BC6000 purchases should survive save/load",
+  );
 }
 
 async function testResetPersistenceAndRespec() {
@@ -310,6 +348,57 @@ async function testTimelineEffectsAndTimer() {
   state.completedChallenges = 0;
   state.achievementMaskHigh = 0;
 
+  state.timelinePurchasedNodes = [{ id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 }];
+  state.eternityCount = 1;
+  state.completedChallenges = 1 << (6 - 1);
+  runtime.syncInfinityPointCachesFromExact(0n);
+  assertClose(runtime.timelineRealBc6000Ic6RewardLog10(), Math.log10(2), 1e-12, "E=1 should retain the raw IC6 x2 reward");
+  assert.equal(runtime.timelineRealInfinityCountGainMultiplier(), 1, "E=1 should not add a second IC6 x2 outside the base reward");
+  assert.equal(runtime.infinityCountGain(), 2, "E=1 should produce the canonical IC6 reward exactly once");
+
+  state.eternityCount = 4;
+  assertClose(runtime.timelineRealBc6000Ic6RewardLog10(), 4 * Math.log10(2), 1e-12, "the raw Real-BC6000 reward should scale with Eternity count");
+  assertClose(runtime.timelineRealInfinityCountGainMultiplierLog10(), 3 * Math.log10(2), 1e-12, "the Timeline multiplier should exclude the existing IC6 x2");
+  assert.equal(runtime.infinityCountGain(), 16, "the final IC6 reward should be 2^E without double counting");
+
+  state.eternityCount = 34;
+  const realSoftcapRawLog10 = 34 * Math.log10(2);
+  const realSoftcapEffectiveLog10 = 10 + 2 * Math.log10(1 + (realSoftcapRawLog10 - 10) / 2);
+  assertClose(
+    runtime.timelineRealBc6000Ic6RewardLog10(),
+    realSoftcapEffectiveLog10,
+    1e-12,
+    "Real-BC6000 should apply the strength-2 softcap after e10",
+  );
+  assertClose(
+    runtime.log10Value(runtime.infinityCountGain()),
+    realSoftcapEffectiveLog10,
+    1e-9,
+    "the final IC6 reward should retain the effective log value",
+  );
+
+  state.eternityCount = 1e100;
+  const hugeRealRewardLog10 = runtime.timelineRealBc6000Ic6RewardLog10();
+  assert.ok(Number.isFinite(hugeRealRewardLog10) && hugeRealRewardLog10 > 200, "huge Eternity counts should remain in log space without overflowing");
+  assert.ok(Number.isFinite(runtime.infinityCountGain()), "huge but representable BC6000 rewards should remain finite");
+
+  state.completedChallenges = 0;
+  assert.equal(runtime.timelineRealBc6000Ic6RewardLog10(), 0, "Real-BC6000 should be inactive before IC6 clear");
+  assert.equal(runtime.infinityCountGain(), 1, "uncleared IC6 should not receive the BC6000 reward");
+
+  state.timelinePurchasedNodes = [{ id: "Parallel-BC6000", era: "BC6000", route: "Parallel", costTF: 1 }];
+  state.towerFloor = 5;
+  assert.equal(runtime.towerScoreExponent(), 1.35, "Parallel-BC6000 should use the +0.07 Floor coefficient");
+  assert.equal(debug.respecTimeline({ save: false, update: false }), true, "Timeline respec should remove BC6000 effects");
+  state.towerFloor = 5;
+  assert.equal(runtime.towerScoreExponent(), 1.25, "respec should restore the normal Tower coefficient");
+
+  state.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+  state.towerFloor = 0;
+  state.eternityCount = 1;
+  state.completedChallenges = 0;
+  state.scoreLog10 = 310;
+  state.score = Number.MAX_VALUE;
   runtime.syncInfinityPointCachesFromExact(10n);
   state.infinityCount = 1;
   debug.runInfinity(false);
@@ -410,6 +499,22 @@ async function testTimelineEffectsAndTimer() {
   const loadedReal = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(realSerialized)]]));
   assert.equal(loadedReal.debug.state.timelinePurchasedNodes[0].id, "Real-BC16500", "save/load should preserve Real ownership");
   assert.equal(loadedReal.runtime.timelineRealInfinityCountGainMultiplier(), 2, "save/load should preserve the active Real count effect");
+
+  state.timelinePurchasedNodes = [{ id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 }];
+  state.eternityCount = 4;
+  state.completedChallenges = 1 << (6 - 1);
+  const real6000Serialized = runtime.serializeSaveData();
+  const loadedReal6000 = await loadRuntime(
+    candidatePath,
+    new Map([[runtime.SAVE_KEY, JSON.stringify(real6000Serialized)]]),
+  );
+  assert.equal(loadedReal6000.debug.state.timelinePurchasedNodes[0].id, "Real-BC6000", "save/load should preserve BC6000 ownership");
+  assertClose(
+    loadedReal6000.runtime.timelineRealBc6000Ic6RewardLog10(),
+    4 * Math.log10(2),
+    1e-12,
+    "save/load should preserve the active BC6000 reward",
+  );
 }
 
 async function testTimelineResetSemantics() {
