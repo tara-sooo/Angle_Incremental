@@ -24,7 +24,6 @@ import "./systems/core-boost.js";
 import "./systems/infinity.js";
 import "./systems/infinite-angle.js";
 import "./ui/events.js";
-import "./systems/balance.js";
 import "./systems/eternity.js";
 import "./systems/timeline.js";
 

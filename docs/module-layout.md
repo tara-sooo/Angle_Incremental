@@ -5,7 +5,7 @@ The gameplay runtime is split by responsibility and loaded as browser ES modules
 ```text
 src/
   core/
-    constants.js       # thresholds, save version, timing and balance constants
+    constants.js       # thresholds, save version, timing and active balance constants
     state.js           # state object and serialized-field schema
     numbers.js         # log10 resources, huge-number helpers, formatting
     save.js            # local storage, migration, and reset
@@ -13,7 +13,7 @@ src/
 
   data/
     i18n.js            # TEXT and translation helper
-    infinity-data.js   # Infinity upgrades, challenges, balance profile
+    infinity-data.js   # Infinity upgrades and challenges
 
   systems/
     angle.js           # vertices, laps, score, normal upgrades, costs
@@ -21,13 +21,6 @@ src/
     core-boost.js      # Core Boost requirements, effects, reset logic
     infinity.js        # Infinity, IP, IU, IC, Infinite Angle
     achievements.js    # achievement definitions and unlock checks
-    balance.js         # installs the active balance profile
-    balance-angle.js   # angle and normal-upgrade balance rules
-    balance-generation.js # Generation balance rules and save restoration
-    balance-core-boost.js # Core Boost balance rules
-    balance-infinity.js # IP and Infinity Upgrade balance rules
-    balance-ui.js      # active Infinity Upgrade tree layout
-
   ui/
     dom.js             # DOM and canvas bindings
     render-ui.js       # shared helpers and UI update orchestration

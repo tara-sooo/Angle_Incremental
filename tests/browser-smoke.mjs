@@ -30,13 +30,7 @@ const expectedModulePaths = [
   "/src/systems/core-boost.js",
   "/src/systems/infinity.js",
   "/src/systems/infinite-angle.js",
-  "/src/systems/balance.js",
   "/src/systems/eternity.js",
-  "/src/systems/balance-angle.js",
-  "/src/systems/balance-generation.js",
-  "/src/systems/balance-core-boost.js",
-  "/src/systems/balance-infinity.js",
-  "/src/systems/balance-ui.js",
   "/src/systems/infinity-point-normalization.js",
   "/src/ui/events.js",
 ];

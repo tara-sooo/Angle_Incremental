@@ -118,6 +118,7 @@ function resetBelowCoreBoost() {
   runtime.state.generationCostFactor = 1;
   runtime.state.currentGenerationRunTime = 0;
   runtime.state.floatingTexts = [];
+  runtime.applyResetStartScore();
 }
 
 function runCoreBoost() {

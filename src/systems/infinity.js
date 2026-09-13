@@ -4,6 +4,11 @@ import { runtime, expose } from "../runtime/shared.js";
 
 let infinityUpgradeLookup = null;
 let infinityUpgradeSource = null;
+const IC8_IP_MULTIPLIER_DIVISOR_LOG10 = 20;
+const INFINITY_UPGRADE_COST_PER_INFINITY = 0.002;
+const INFINITY_UPGRADE_COST_SOFTCAP_START_EXPONENT = 0.9;
+const INFINITY_UPGRADE_COST_SOFTCAP_ASYMPTOTE_EXPONENT = 0.8;
+const INFINITY_UPGRADE_COST_POST_SOFTCAP_DECAY = 0.005;
 
 function infinityUpgradeById(id) {
   if (infinityUpgradeSource !== runtime.INFINITY_UPGRADES) {
@@ -99,20 +104,59 @@ function canInfinity() {
   return runtime.currentScoreLog10() >= runtime.INFINITY_REQUIREMENT_LOG10;
 }
 
+function generationIpMultiplierLog10() {
+  if (!runtime.isChallengeCompleted(8)) return 0;
+  return Math.max(0, runtime.generationScoreMultiplierEffectLog10() - IC8_IP_MULTIPLIER_DIVISOR_LOG10);
+}
+
+function floorWithFloatingPointTolerance(value) {
+  return Math.floor(value + Math.max(1, Math.abs(value)) * Number.EPSILON * 8);
+}
+
+function baseInfinityPointGain() {
+  if (!runtime.canInfinity()) return 0;
+  const scoreLog10 = runtime.currentScoreLog10();
+  let base;
+  if (runtime.state.infiniteCapBroken) base = Math.floor(scoreLog10 / Math.log10(2) - 307);
+  else if (runtime.hasInfinityUpgrade("9-1")) base = Math.floor(scoreLog10 / Math.log10(7) - 307);
+  else base = Math.floor(scoreLog10 - 307);
+  return Math.max(1, base);
+}
+
+function infinityPointGainRawLog10() {
+  const gained = baseInfinityPointGain();
+  if (gained <= 0) return -Infinity;
+  let gainLog10 = runtime.log10Value(gained);
+  if (runtime.isAchievementUnlocked(17)) gainLog10 += Math.log10(2);
+  if (runtime.isAchievementUnlocked(21)) gainLog10 += Math.log10(2);
+  if (runtime.isAchievementUnlocked(31)) gainLog10 += 2;
+  return gainLog10
+    + generationIpMultiplierLog10()
+    + (runtime.timelineIpGainMultiplierLog10?.() ?? 0);
+}
+
 function infinityPointGain() {
-  if (!canInfinity()) return 0;
-  const scoreLog = runtime.currentScoreLog10();
-  const base = Math.max(1, Math.floor(scoreLog - 307));
-  const gained = Math.max(1, Math.floor(base));
-  let multiplier = 1;
-  if (runtime.isAchievementUnlocked(17)) multiplier *= 2;
-  if (runtime.isAchievementUnlocked(21)) multiplier *= 2;
-  if (runtime.isAchievementUnlocked(31)) multiplier *= 100;
-  return gained * multiplier;
+  const gainLog10 = infinityPointGainRawLog10();
+  if (gainLog10 === -Infinity) return 0;
+  const gainValue = runtime.valueFromLog10(gainLog10);
+  if (gainValue === Number.MAX_VALUE) return Number.MAX_VALUE;
+  return Math.max(1, floorWithFloatingPointTolerance(gainValue));
 }
 
 function infinityPointGainLog10() {
-  return runtime.log10Value(runtime.infinityPointGain());
+  return infinityPointGainRawLog10();
+}
+
+function infinityUpgradeCostExponent() {
+  if (!runtime.hasInfinityUpgrade("7-2")) return 1;
+  const infinityCount = Math.max(0, runtime.state.infinityCount);
+  const rawExponent = 1 - infinityCount * INFINITY_UPGRADE_COST_PER_INFINITY;
+  if (rawExponent >= INFINITY_UPGRADE_COST_SOFTCAP_START_EXPONENT) return rawExponent;
+  const postSoftcapInfinities = infinityCount
+    - (1 - INFINITY_UPGRADE_COST_SOFTCAP_START_EXPONENT) / INFINITY_UPGRADE_COST_PER_INFINITY;
+  return INFINITY_UPGRADE_COST_SOFTCAP_ASYMPTOTE_EXPONENT
+    + (INFINITY_UPGRADE_COST_SOFTCAP_START_EXPONENT - INFINITY_UPGRADE_COST_SOFTCAP_ASYMPTOTE_EXPONENT)
+      * Math.exp(-Math.max(0, postSoftcapInfinities) * INFINITY_UPGRADE_COST_POST_SOFTCAP_DECAY);
 }
 
 function canSpendInfinityPoints(costLog10) {
@@ -200,6 +244,8 @@ function resetBelowInfinity() {
   runtime.state.currentInfinityRunHadGeneration = false;
   runtime.state.currentInfinityRunHadCoreBoost = false;
   runtime.state.floatingTexts = [];
+  runtime.applyStartingCoreBoosts();
+  runtime.applyResetStartScore();
 }
 
 function applyStartingCoreBoosts() {
@@ -334,14 +380,9 @@ function runInfinity(forced = false) {
 
   const gained = runtime.infinityPointGain();
   const gainedLog10 = runtime.infinityPointGainLog10();
-  const canonicalBalanceGain = runtime.infinityPointGain === runtime.balanceInfinityPointGain;
   const countGain = infinityCountGain();
   runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + countGain);
-  if (canonicalBalanceGain && runtime.balanceInfinityPointGainRawLog10) {
-    addInfinityPointsLog10(runtime.balanceInfinityPointGainRawLog10());
-  } else {
-    addInfinityPoints(gained);
-  }
+  addInfinityPointsLog10(gainedLog10);
   recordInfinityRun(
     scoreLogBeforeReset,
     gained,
@@ -445,6 +486,7 @@ expose("challengeReward", () => challengeReward, (value) => { challengeReward = 
 expose("canInfinity", () => canInfinity, (value) => { canInfinity = value; });
 expose("infinityPointGain", () => infinityPointGain, (value) => { infinityPointGain = value; });
 expose("infinityPointGainLog10", () => infinityPointGainLog10, (value) => { infinityPointGainLog10 = value; });
+expose("infinityUpgradeCostExponent", () => infinityUpgradeCostExponent);
 expose("canSpendInfinityPoints", () => canSpendInfinityPoints, (value) => { canSpendInfinityPoints = value; });
 expose("addInfinityPoints", () => addInfinityPoints, (value) => { addInfinityPoints = value; });
 expose("addInfinityPointsLog10", () => addInfinityPointsLog10, (value) => { addInfinityPointsLog10 = value; });

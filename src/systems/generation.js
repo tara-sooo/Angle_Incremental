@@ -2,9 +2,12 @@ import { runtime, expose } from "../runtime/shared.js";
 
 // Generation requirements, rewards, and reset behavior.
 
+const GENERATION_REWARD_LOG_COEFFICIENT = 0.20;
+
 function generationScorePower() {
   let power = runtime.GENERATION_SCORE_POWER;
   if (runtime.hasInfinityUpgrade("3-1")) power *= runtime.applyInfinityUpgradePower(1.5);
+  if (runtime.hasInfinityUpgrade("6-1")) power *= runtime.applyInfinityUpgradePower(1.2);
   return power;
 }
 
@@ -68,12 +71,28 @@ function generationCostFactorEffect() {
   return generationCostFactorWithBonuses(runtime.state.generationCostFactor);
 }
 
+function generationMinCostFactor() {
+  return runtime.hasInfinityUpgrade("6-2") ? 0.70 : runtime.GENERATION_MIN_NEW_COST_FACTOR;
+}
+
 function generationRewardForLog(generationScoreLog) {
   const depth = Math.max(0, generationScoreLog - runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE));
+  const shallowScoreLift = 0.60 * (1 - Math.exp(-depth / 4));
+  const shallowCostLift = 0.13 * (1 - Math.exp(-depth / 5));
+  const baseScoreMultiplierLog10 = Math.min(
+    8,
+    Math.log10(1 + depth) * GENERATION_REWARD_LOG_COEFFICIENT + shallowScoreLift,
+  );
+  const ic8ScoreMultiplierLog10 = Number.isFinite(generationScoreLog)
+    ? runtime.clampLog10(generationScoreLog * 0.014 + shallowScoreLift)
+    : baseScoreMultiplierLog10;
+  const scoreMultiplierLog10 = runtime.isChallengeCompleted(8)
+    ? ic8ScoreMultiplierLog10
+    : baseScoreMultiplierLog10;
   return {
-    scoreMultiplierLog10: Math.min(8, Math.log10(1 + depth) * 2),
-    scoreMultiplierGain: runtime.valueFromLog10(Math.min(8, Math.log10(1 + depth) * 2)),
-    costReduction: Math.min(0.22, Math.log10(1 + depth) * 0.04),
+    scoreMultiplierLog10,
+    scoreMultiplierGain: runtime.valueFromLog10(scoreMultiplierLog10),
+    costReduction: Math.min(0.24, Math.log10(1 + depth) * 0.04 + shallowCostLift),
   };
 }
 
@@ -108,7 +127,7 @@ function nextGenerationValues() {
   const reward = generationRewardForLog(runtime.currentGenerationScoreLog10());
   const nextRawScoreMultiplierLog = reward.scoreMultiplierLog10;
   const nextRawCostFactor = Math.max(
-    runtime.GENERATION_MIN_NEW_COST_FACTOR,
+    generationMinCostFactor(),
     runtime.state.generationCostFactor * (1 - reward.costReduction),
     runtime.state.activeTowerChallenge === 2 ? 0.90 : 0,
   );
@@ -118,6 +137,12 @@ function nextGenerationValues() {
     scoreMultiplierLog10: towerChallengeGenerationScoreMultiplierLog10(applyGenerationAchievementRewardLog10(generationScoreMultiplierBaseEffectLog10(nextRawScoreMultiplierLog))),
     costFactor: generationCostFactorWithBonuses(nextRawCostFactor),
   };
+}
+
+function applyResetStartScore() {
+  if (!runtime.hasInfinityUpgrade("5-2")) return;
+  runtime.state.score = 100;
+  runtime.state.scoreLog10 = 2;
 }
 
 function runGeneration() {
@@ -134,7 +159,7 @@ function runGeneration() {
   runtime.state.generationScoreMultiplierLog10 = reward.scoreMultiplierLog10;
   runtime.state.generationScoreMultiplier = runtime.valueFromLog10(runtime.state.generationScoreMultiplierLog10);
   runtime.state.generationCostFactor = Math.max(
-    runtime.GENERATION_MIN_NEW_COST_FACTOR,
+    generationMinCostFactor(),
     nextCostFactor,
     runtime.state.activeTowerChallenge === 2 ? 0.90 : 0,
   );
@@ -156,6 +181,7 @@ function runGeneration() {
     runtime.state.floatingTexts = [];
     runtime.state.currentGenerationRunTime = 0;
   }
+  if (!runtime.eternityMilestonePreservesGenerationReset?.()) applyResetStartScore();
   runtime.checkAchievements(true);
   runtime.updateUi();
   runtime.saveGame("manual");
@@ -174,6 +200,7 @@ expose("applyGenerationAchievementReward", () => applyGenerationAchievementRewar
 expose("generationScoreMultiplierEffectLog10", () => generationScoreMultiplierEffectLog10, (value) => { generationScoreMultiplierEffectLog10 = value; });
 expose("generationScoreMultiplierEffect", () => generationScoreMultiplierEffect, (value) => { generationScoreMultiplierEffect = value; });
 expose("generationCostFactorEffect", () => generationCostFactorEffect, (value) => { generationCostFactorEffect = value; });
+expose("applyResetStartScore", () => applyResetStartScore);
 expose("generationRewardForLog", () => generationRewardForLog, (value) => { generationRewardForLog = value; });
 expose("generationRewardFor", () => generationRewardFor, (value) => { generationRewardFor = value; });
 expose("generationRequirementLog10", () => generationRequirementLog10, (value) => { generationRequirementLog10 = value; });

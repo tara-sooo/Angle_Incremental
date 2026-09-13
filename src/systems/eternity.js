@@ -137,8 +137,7 @@ function recordEternityRun() {
 }
 
 function resetEternityProgression() {
-  const resetBelowInfinity = runtime.balanceResetBelowInfinity || runtime.resetBelowInfinity;
-  resetBelowInfinity();
+  runtime.resetBelowInfinity();
   Object.assign(runtime.state, {
     coreBoostCount: 0,
     infinityCount: 0,

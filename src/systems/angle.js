@@ -5,6 +5,7 @@ import { runtime, expose } from "../runtime/shared.js";
 function rawLapSpeedLog10() {
   let multiplierLog = effectiveSpeedLevel() * runtime.log10Value(1.22);
   if (runtime.hasInfinityUpgrade("2-1")) multiplierLog += runtime.log10Value(runtime.applyInfinityUpgradePower(1.5));
+  if (runtime.hasInfinityUpgrade("5-1")) multiplierLog += runtime.log10Value(runtime.applyInfinityUpgradePower(3));
   if (runtime.isChallengeCompleted(3)) multiplierLog += runtime.log10Value(1.1);
   if (runtime.state.activeChallenge === 3) multiplierLog *= 0.8;
   return runtime.clampLog10(multiplierLog);
@@ -294,30 +295,18 @@ function sumCoreHitGains(firstCoreStep, coreHits, increase) {
 }
 
 function earlyLayerCostScalingFactor() {
-  let generationFactor;
-  if (runtime.state.generationCount <= 0) generationFactor = 1;
-  else if (runtime.state.generationCount === 1) generationFactor = 0.9;
-  else if (runtime.state.generationCount === 2) generationFactor = 0.45;
-  else if (runtime.state.generationCount === 3) generationFactor = 0.2;
-  else generationFactor = 0.08;
-
-  let coreRelief;
-  const effectiveCoreBoosts = runtime.effectiveCoreBoostCount();
-  if (effectiveCoreBoosts <= 0) coreRelief = 1;
-  else if (effectiveCoreBoosts === 1) coreRelief = 0.35;
-  else if (effectiveCoreBoosts === 2) coreRelief = 0.1;
-  else coreRelief = 0;
-
-  return generationFactor * coreRelief;
+  return 1;
 }
 
 function preGenerationCostScalingLog10(kind, level) {
-  const scalingFactor = earlyLayerCostScalingFactor();
-  if (scalingFactor <= 0) return 0;
   const scaling = runtime.PRE_GENERATION_COST_SCALING[kind];
   if (!scaling) return 0;
   const excess = Math.max(0, level - scaling.startsAfter);
-  return excess * excess * scaling.logScale * scalingFactor;
+  let generationRelief = 1;
+  if (runtime.state.generationCount === 1) generationRelief = 0.25;
+  else if (runtime.state.generationCount === 2) generationRelief = 0.10;
+  else if (runtime.state.generationCount >= 3) generationRelief = 0.05;
+  return excess * excess * scaling.logScale * generationRelief;
 }
 
 function stagedUpgradeCostScalingLog10(costLog) {
@@ -346,7 +335,8 @@ function costLog10(kind, base, level, growth) {
 
   const earlyAdjustedLog = adjustedLog + preGenerationCostScalingLog10(kind, level);
   const scaledLog = earlyAdjustedLog + stagedUpgradeCostScalingLog10(earlyAdjustedLog);
-  return runtime.isChallengeCompleted(2) ? scaledLog * 0.95 : scaledLog;
+  const challengeAdjustedLog = runtime.isChallengeCompleted(2) ? scaledLog * 0.95 : scaledLog;
+  return challengeAdjustedLog * runtime.infinityUpgradeCostExponent();
 }
 
 function cost(kind, base, level, growth) {
@@ -495,11 +485,12 @@ function upgradeCostLog(kind) {
 function canBuyNormalUpgrade(kind) {
   if (runtime.state.activeTowerChallenge === 1) return false;
   if (!runtime.towerChallenge4AllowsNormalUpgrade(kind)) return false;
-  if (runtime.state.activeChallenge === 7 && currentScoreLog10() > 30) return false;
+  const costLog = upgradeCostLog(kind);
+  if (runtime.state.activeChallenge === 7 && costLog > 30) return false;
   if (kind === "vertex") {
     if (runtime.state.activeChallenge === 2 && runtime.effectiveVertexCount() >= 200) return false;
   }
-  return runtime.canSpendLog(upgradeCostLog(kind));
+  return runtime.canSpendLog(costLog);
 }
 
 function spendNormalUpgrade(kind) {
