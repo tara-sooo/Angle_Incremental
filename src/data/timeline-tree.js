@@ -61,6 +61,38 @@ const TIMELINE_NODES = Object.freeze([
       en: "Change the Tower Score exponent's Floor coefficient from +0.05 to +0.07.",
     }),
   }),
+  Object.freeze({
+    id: "Real-AD30",
+    era: "AD30",
+    route: "Real",
+    costTF: 5,
+    prerequisites: Object.freeze(["Real-BC6000", "Parallel-BC6000"]),
+    prerequisiteMode: "any",
+    name: Object.freeze({
+      ja: "復活する神の子",
+      en: "The God-Child Reborn",
+    }),
+    description: Object.freeze({
+      ja: "現在のScoreのlog10(S)に応じてEternity獲得量を1 + 20^((S - 14000) / 5000)倍にする（ソフトキャップなし）",
+      en: "Multiply Eternity gain by 1 + 20^((S - 14000) / 5000), where S is log10 of current Score (no softcap).",
+    }),
+  }),
+  Object.freeze({
+    id: "Parallel-AD30",
+    era: "AD30",
+    route: "Parallel",
+    costTF: 5,
+    prerequisites: Object.freeze(["Real-BC6000", "Parallel-BC6000"]),
+    prerequisiteMode: "any",
+    name: Object.freeze({
+      ja: "死後にはできない人間宣言",
+      en: "A Human Declaration Impossible After Death",
+    }),
+    description: Object.freeze({
+      ja: "現在のInfinity数Iに応じてEternity獲得量を1 + I / 4倍にする（Iのlog10がe15を超えると強度2のlogソフトキャップ）",
+      en: "Multiply Eternity gain by 1 + I / 4 from current Infinity count I (strength-2 log softcap after log10(I) exceeds e15).",
+    }),
+  }),
 ]);
 
 export { TIMELINE_NODES };

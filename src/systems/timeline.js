@@ -9,6 +9,12 @@ const PARALLEL_RAW_SOFTCAP_LOG10 = 10;
 const REAL_BC6000_SOFTCAP_LOG10 = 10;
 const REAL_BC6000_SOFTCAP_STRENGTH = 2;
 const IC6_REWARD_LOG10 = Math.log10(2);
+const REAL_AD30_SCORE_START_LOG10 = 14000;
+const REAL_AD30_SCORE_STEP_LOG10 = 5000;
+const REAL_AD30_POWER_LOG10 = Math.log10(20);
+const PARALLEL_AD30_SOFTCAP_LOG10 = 15;
+const PARALLEL_AD30_SOFTCAP_STRENGTH = 2;
+const PARALLEL_AD30_DIVISOR_LOG10 = Math.log10(4);
 const TIMELINE_TRACKS = Object.freeze({
   score: Object.freeze({
     stateKey: "scoreTfClaims",
@@ -78,7 +84,8 @@ function normalizeTimelineState() {
 }
 
 function normalizedEternityCount() {
-  return Math.max(0, Math.floor(Number(runtime.state.eternityCount) || 0));
+  const count = Number(runtime.state.eternityCount);
+  return Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
 }
 
 function timelineDiscovered() {
@@ -191,6 +198,55 @@ function timelineRealBc6000Ic6RewardLog10() {
   return REAL_BC6000_SOFTCAP_LOG10
     + REAL_BC6000_SOFTCAP_STRENGTH
       * Math.log10(1 + (rawLog10 - REAL_BC6000_SOFTCAP_LOG10) / REAL_BC6000_SOFTCAP_STRENGTH);
+}
+
+function timelineRealAd30EternityGainMultiplierLog10() {
+  if (!timelineNodeIsPurchasedById("Real-AD30")) return 0;
+  const scoreLog10 = runtime.currentScoreLog10?.() ?? -Infinity;
+  if (!Number.isFinite(scoreLog10)) return 0;
+  const exponentLog10 = (scoreLog10 - REAL_AD30_SCORE_START_LOG10)
+    / REAL_AD30_SCORE_STEP_LOG10
+    * REAL_AD30_POWER_LOG10;
+  return runtime.combineLog10(0, exponentLog10);
+}
+
+function timelineRealAd30EternityGainMultiplier() {
+  if (!timelineNodeIsPurchasedById("Real-AD30")) return 1;
+  const scoreLog10 = runtime.currentScoreLog10?.() ?? -Infinity;
+  if (!Number.isFinite(scoreLog10)) return 1;
+  const powerLog10 = (scoreLog10 - REAL_AD30_SCORE_START_LOG10)
+    / REAL_AD30_SCORE_STEP_LOG10
+    * REAL_AD30_POWER_LOG10;
+  const power = runtime.valueFromLog10(powerLog10);
+  return power === Number.MAX_VALUE ? power : 1 + power;
+}
+
+function timelineParallelAd30InfinityEffectiveLog10() {
+  const infinityCount = runtime.sanitizeNumber(runtime.state.infinityCount, 0);
+  if (infinityCount <= 0) return -Infinity;
+  const rawLog10 = runtime.log10Value(infinityCount);
+  if (!Number.isFinite(rawLog10)) return -Infinity;
+  if (rawLog10 <= PARALLEL_AD30_SOFTCAP_LOG10) return rawLog10;
+  return PARALLEL_AD30_SOFTCAP_LOG10
+    + PARALLEL_AD30_SOFTCAP_STRENGTH
+      * Math.log10(1 + (rawLog10 - PARALLEL_AD30_SOFTCAP_LOG10) / PARALLEL_AD30_SOFTCAP_STRENGTH);
+}
+
+function timelineParallelAd30EternityGainMultiplierLog10() {
+  if (!timelineNodeIsPurchasedById("Parallel-AD30")) return 0;
+  const effectiveLog10 = timelineParallelAd30InfinityEffectiveLog10();
+  if (effectiveLog10 === -Infinity) return 0;
+  return runtime.combineLog10(0, effectiveLog10 - PARALLEL_AD30_DIVISOR_LOG10);
+}
+
+function timelineParallelAd30EternityGainMultiplier() {
+  if (!timelineNodeIsPurchasedById("Parallel-AD30")) return 1;
+  const effectiveLog10 = timelineParallelAd30InfinityEffectiveLog10();
+  if (effectiveLog10 === -Infinity) return 1;
+  const effectiveInfinity = runtime.valueFromLog10(effectiveLog10);
+  if (effectiveInfinity === Number.MAX_VALUE) return effectiveInfinity;
+  const multiplier = 1 + effectiveInfinity / 4;
+  return Number.isFinite(multiplier) ? multiplier : Number.MAX_VALUE;
 }
 
 function timelineRealBc16500InfinityCountGainMultiplier() {
@@ -385,6 +441,11 @@ expose("timelineParallelSecondsSinceIc8Clear", () => timelineParallelSecondsSinc
 expose("timelineParallelRawLog10", () => timelineParallelRawLog10);
 expose("timelineParallelEffectiveLog10", () => timelineParallelEffectiveLog10);
 expose("timelineRealBc6000Ic6RewardLog10", () => timelineRealBc6000Ic6RewardLog10);
+expose("timelineRealAd30EternityGainMultiplierLog10", () => timelineRealAd30EternityGainMultiplierLog10);
+expose("timelineRealAd30EternityGainMultiplier", () => timelineRealAd30EternityGainMultiplier);
+expose("timelineParallelAd30InfinityEffectiveLog10", () => timelineParallelAd30InfinityEffectiveLog10);
+expose("timelineParallelAd30EternityGainMultiplierLog10", () => timelineParallelAd30EternityGainMultiplierLog10);
+expose("timelineParallelAd30EternityGainMultiplier", () => timelineParallelAd30EternityGainMultiplier);
 expose("timelineRealInfinityCountGainMultiplierLog10", () => timelineRealInfinityCountGainMultiplierLog10);
 expose("timelineRealInfinityCountGainMultiplier", () => timelineRealInfinityCountGainMultiplier);
 expose("timelineIpGainMultiplierLog10", () => timelineIpGainMultiplierLog10);

@@ -107,6 +107,10 @@ function installEternityUi() {
               <span data-i18n="eternityCurrentIp"></span>
               <strong id="eternityCurrentIp">0 IP</strong>
             </div>
+            <div>
+              <span data-i18n="eternityPendingGain"></span>
+              <strong id="eternityPendingGain">1</strong>
+            </div>
           </div>
           <div class="eternity-action-row dense-action-row ui-action-row">
             <button id="eternityPerformButton" class="eternity-perform-button" type="button" data-eternity-action="perform"></button>
@@ -234,6 +238,7 @@ function updateEternityUi() {
 
   const headingCount = eternityRoot.querySelector("#eternityHeadingCount");
   const currentIp = eternityRoot.querySelector("#eternityCurrentIp");
+  const pendingGain = eternityRoot.querySelector("#eternityPendingGain");
   const performButton = eternityRoot.querySelector("#eternityPerformButton");
   const entitlement = eternityRoot.querySelector("#eternityChoiceEntitlement");
   const allOwned = eternityRoot.querySelector("#eternityChoiceAllOwned");
@@ -249,6 +254,11 @@ function updateEternityUi() {
       runtime.currentInfinityPointsLog10(),
       runtime.state.infinityPointsExact,
     )} IP`;
+  }
+  if (pendingGain) {
+    pendingGain.textContent = runtime.formatUiLogNumber(
+      runtime.eternityGainLog10?.() ?? runtime.log10Value(runtime.eternityGain?.() ?? 1),
+    );
   }
   if (performButton) {
     performButton.disabled = !ready;

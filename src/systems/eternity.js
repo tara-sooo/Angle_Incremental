@@ -23,7 +23,7 @@ const FIRST_TIER_MILESTONE_MASK = Object.values(FIRST_TIER_MILESTONE_BITS)
 const FIRST_TIER_MILESTONE_COUNT = Object.keys(FIRST_TIER_MILESTONE_BITS).length;
 
 function normalizedEternityCount() {
-  return Math.max(0, Math.floor(runtime.state.eternityCount));
+  return Math.floor(runtime.sanitizeNumber(runtime.state.eternityCount, 0));
 }
 
 function normalizeEternityMilestoneMask(value) {
@@ -112,6 +112,31 @@ function eternityIpThresholdMet() {
 function canEternity() {
   return eternityIpThresholdMet()
     && runtime.towerChallenge4CompletedForEternity?.() === true;
+}
+
+function eternityGain() {
+  const realMultiplier = runtime.timelineRealAd30EternityGainMultiplier?.() ?? 1;
+  const parallelMultiplier = runtime.timelineParallelAd30EternityGainMultiplier?.() ?? 1;
+  const rawGain = realMultiplier >= Number.MAX_VALUE / parallelMultiplier
+    ? Number.MAX_VALUE
+    : realMultiplier * parallelMultiplier;
+  return rawGain === Number.MAX_VALUE ? rawGain : Math.max(1, Math.floor(rawGain));
+}
+
+function eternityGainLog10() {
+  return runtime.log10Value(eternityGain());
+}
+
+function addEternityGain(gain) {
+  const current = normalizedEternityCount();
+  const numericGain = Number(gain);
+  const amount = Number.isFinite(numericGain)
+    ? Math.max(1, Math.floor(numericGain))
+    : numericGain === Infinity
+      ? Number.MAX_VALUE
+      : 1;
+  // ponytail: retain the existing Number save schema; exact high-count integers can move to a separate issue.
+  return current >= Number.MAX_VALUE - amount ? Number.MAX_VALUE : current + amount;
 }
 
 function shouldForceEternity() {
@@ -205,9 +230,10 @@ function applyEternityRunStartState() {
 function performEternity(options = {}) {
   if (!canEternity()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-eternity", { force: true })) return false;
+  const gain = eternityGain();
   recordEternityRun();
   resetEternityProgression();
-  runtime.state.eternityCount = Math.max(0, Math.floor(runtime.state.eternityCount)) + 1;
+  runtime.state.eternityCount = addEternityGain(gain);
   runtime.markMainTabsUnlocked?.(["timeline"]);
   applyEternityRunStartState();
   runtime.state.eternityMilestoneChoice = "";
@@ -223,6 +249,8 @@ function maybeForceEternity() {
 
 expose("eternityRequirementExact", () => eternityRequirementExact);
 expose("eternityIpThresholdMet", () => eternityIpThresholdMet);
+expose("eternityGainLog10", () => eternityGainLog10);
+expose("eternityGain", () => eternityGain);
 expose("normalizeEternityMilestoneMask", () => normalizeEternityMilestoneMask);
 expose("normalizeEternityMilestoneChoice", () => normalizeEternityMilestoneChoice);
 expose("eternityMilestoneActive", () => eternityMilestoneActive);

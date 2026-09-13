@@ -79,6 +79,26 @@ async function testEternityRunStatistics() {
   assert.equal(state.fastestEternityTime, 3.25, "zero-time records must not replace the fastest record");
 }
 
+async function testCanonicalAd30EternityGain() {
+  const real = await loadRuntime(candidatePath);
+  real.debug.state.timelinePurchasedNodes = [{ id: "Real-AD30", era: "AD30", route: "Real", costTF: 5 }];
+  setScore(real.debug.state, 14000);
+  assert.equal(real.runtime.eternityGain(), 2, "Real AD30 should double the canonical Eternity gain at Score e14000");
+  assert.equal(real.runtime.eternityGainLog10(), Math.log10(2), "the pending log gain should match the canonical gain");
+  markEternityReady(real.runtime, real.debug.state);
+  assert.equal(real.debug.performEternity({ save: false, update: false }), true);
+  assert.equal(real.debug.state.eternityCount, 2, "performEternity should add the Real AD30 gain exactly once");
+
+  const parallel = await loadRuntime(candidatePath);
+  parallel.debug.state.timelinePurchasedNodes = [{ id: "Parallel-AD30", era: "AD30", route: "Parallel", costTF: 5 }];
+  parallel.debug.state.infinityCount = 10 ** 15;
+  const expectedGain = 1 + 10 ** 15 / 4;
+  assert.equal(parallel.runtime.eternityGain(), expectedGain, "Parallel AD30 should use the linear Infinity count formula before its softcap");
+  markEternityReady(parallel.runtime, parallel.debug.state);
+  assert.equal(parallel.debug.performEternity({ save: false, update: false }), true);
+  assert.equal(parallel.debug.state.eternityCount, expectedGain, "performEternity should use the same Parallel AD30 gain as the API");
+}
+
 async function testMilestoneChoiceLifecycle() {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
@@ -959,6 +979,7 @@ async function testMainTabDiscoveryLifecycle() {
 
 async function runEternityModuleRuntimeTest() {
   await testEternityRunStatistics();
+  await testCanonicalAd30EternityGain();
   await testMilestoneChoiceLifecycle();
   await testMilestoneThresholdsAndEffects();
   await testMilestoneEightCoexistsWithLayerAutomation();

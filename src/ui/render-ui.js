@@ -300,6 +300,14 @@ function timelineNodeCurrentEffectText(node, availability) {
     return runtime.t("timelineParallelBc6000CurrentEffect")
       .replace("{exponent}", runtime.towerScoreExponent().toFixed(2));
   }
+  if (node.id === "Real-AD30") {
+    return runtime.t("timelineRealAd30CurrentEffect")
+      .replace("{multiplier}", formatMultiplierLog(runtime.timelineRealAd30EternityGainMultiplierLog10?.() ?? 0));
+  }
+  if (node.id === "Parallel-AD30") {
+    return runtime.t("timelineParallelAd30CurrentEffect")
+      .replace("{multiplier}", formatMultiplierLog(runtime.timelineParallelAd30EternityGainMultiplierLog10?.() ?? 0));
+  }
   return runtime.t("timelineNodeInactive");
 }
 

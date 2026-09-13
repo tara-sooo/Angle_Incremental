@@ -129,6 +129,7 @@ try {
     compactRequirement: document.querySelector('[data-i18n="eternityRequirementCompact"]')?.textContent,
     compactRequirementCount: document.querySelectorAll('[data-i18n="eternityRequirementCompact"]').length,
     currentIp: document.getElementById("eternityCurrentIp")?.textContent,
+    pendingGain: document.getElementById("eternityPendingGain")?.textContent,
     legacyCount: document.getElementById("eternityCountValue"),
     legacyTc4: document.getElementById("eternityTc4Requirement"),
     legacyIp: document.getElementById("eternityIpRequirement"),
@@ -182,6 +183,7 @@ try {
   assert.equal(initial.compactRequirement, "TC4クリア + 1.80e308 IP", "Eternity should show one compact requirement summary");
   assert.equal(initial.compactRequirementCount, 1, "Eternity should not duplicate its compact requirement");
   assert.equal(initial.currentIp, "0 IP", "Eternity should keep current IP visible");
+  assert.equal(initial.pendingGain, "1", "Eternity should show the canonical base pending gain");
   assert.equal(initial.legacyCount, null, "Eternity should remove the duplicate body count");
   assert.equal(initial.legacyTc4, null, "Eternity should remove the separate TC4 status row");
   assert.equal(initial.legacyIp, null, "Eternity should remove the separate IP status row");
@@ -354,8 +356,8 @@ try {
   assert.equal(timelineInitial.scoreDisabled, true, "an unmet Timeline track should disable its claim control");
   assert.equal(timelineInitial.respecTop, true, "Respec should live in the Timeline overview");
   assert.equal(timelineInitial.respecBeforeClaims, true, "Respec should appear before the claim rows");
-  assert.equal(timelineInitial.treeNodeCount, 4, "Timeline should show both route alternatives in both eras");
-  assert.equal(timelineInitial.eraCount, 2, "the tree should render one branching group per era");
+  assert.equal(timelineInitial.treeNodeCount, 6, "Timeline should show both route alternatives in all eras");
+  assert.equal(timelineInitial.eraCount, 3, "the tree should render one branching group per era");
   assert.equal(timelineInitial.eraLabel, "BC16500", "the tree should label the visible era");
   assert.equal(timelineInitial.realRoute, "Real");
   assert.equal(timelineInitial.parallelRoute, "Parallel");
@@ -790,6 +792,8 @@ try {
     timelineTree: document.querySelector('[data-i18n="timelineTree"]')?.textContent,
     realNodeName: document.querySelector('[data-timeline-node="Real-BC16500"] .timeline-node-name')?.textContent,
     parallelNodeName: document.querySelector('[data-timeline-node="Parallel-BC16500"] .timeline-node-name')?.textContent,
+    realAd30NodeName: document.querySelector('[data-timeline-node="Real-AD30"] .timeline-node-name')?.textContent,
+    parallelAd30NodeName: document.querySelector('[data-timeline-node="Parallel-AD30"] .timeline-node-name')?.textContent,
     detailLabel: document.querySelector('[data-i18n="timelineNodeDetail"]')?.textContent,
     detailName: document.getElementById("timelineNodeDetailHeading")?.textContent,
     detailDescription: document.getElementById("timelineNodeDetailDescription")?.textContent,
@@ -819,6 +823,8 @@ try {
   assert.equal(english.timelineTree, "Timeline Tree", "Timeline Tree should have English copy");
   assert.equal(english.realNodeName, "Inert Stone Tools", "Real node should have English copy");
   assert.equal(english.parallelNodeName, "Endless Ice Age", "Parallel node should have English copy");
+  assert.equal(english.realAd30NodeName, "The God-Child Reborn", "Real AD30 node should have English copy");
+  assert.equal(english.parallelAd30NodeName, "A Human Declaration Impossible After Death", "Parallel AD30 node should have English copy");
   assert.equal(english.detailLabel, "Selected node");
   assert.equal(english.detailName, "Endless Ice Age");
   assert.ok(english.detailDescription?.includes("×1.00e10"), "Timeline softcap should follow the scientific number setting");
@@ -844,6 +850,66 @@ try {
   assert.match(englishReal.currentEffect || "", /Current Infinity count multiplier/);
   assert.equal(englishReal.timeline.ipGainMultiplierLog10, 0, "Real should not expose an IP multiplier in debug text");
   assert.ok(englishReal.timeline.realInfinityCountGainMultiplier >= 1, "debug text should expose the Real count multiplier");
+
+  const ad30 = await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.state.scoreTfClaims = 7;
+    debug.state.scoreLog10 = 14000;
+    debug.state.score = Number.MAX_VALUE;
+    debug.state.infinityCount = 0;
+    debug.state.timelinePurchasedNodes = [
+      { id: "Parallel-BC6000", era: "BC6000", route: "Parallel", costTF: 1 },
+      { id: "Real-AD30", era: "AD30", route: "Real", costTF: 5 },
+    ];
+    debug.runtime.selectTimelineNode?.("Real-AD30");
+    debug.runtime.updateUi();
+    const real = {
+      state: document.querySelector('[data-timeline-node="Real-AD30"]')?.dataset.state,
+      otherState: document.querySelector('[data-timeline-node="Parallel-AD30"]')?.dataset.state,
+      name: document.getElementById("timelineNodeDetailHeading")?.textContent,
+      description: document.getElementById("timelineNodeDetailDescription")?.textContent,
+      prerequisites: document.getElementById("timelineNodeDetailPrerequisites")?.textContent,
+      effect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
+      pendingGain: document.getElementById("eternityPendingGain")?.textContent,
+      debug: JSON.parse(window.render_game_to_text()).eternity,
+    };
+
+    debug.state.timelinePurchasedNodes = [
+      { id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 },
+      { id: "Parallel-AD30", era: "AD30", route: "Parallel", costTF: 5 },
+    ];
+    debug.state.infinityCount = 10 ** 15;
+    debug.runtime.selectTimelineNode?.("Parallel-AD30");
+    debug.runtime.updateUi();
+    const parallel = {
+      state: document.querySelector('[data-timeline-node="Parallel-AD30"]')?.dataset.state,
+      otherState: document.querySelector('[data-timeline-node="Real-AD30"]')?.dataset.state,
+      name: document.getElementById("timelineNodeDetailHeading")?.textContent,
+      description: document.getElementById("timelineNodeDetailDescription")?.textContent,
+      prerequisites: document.getElementById("timelineNodeDetailPrerequisites")?.textContent,
+      effect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
+      pendingGain: document.getElementById("eternityPendingGain")?.textContent,
+      debug: JSON.parse(window.render_game_to_text()).eternity,
+    };
+    return { real, parallel };
+  });
+  assert.equal(ad30.real.state, "owned", "owned Real AD30 should be rendered as active");
+  assert.equal(ad30.real.otherState, "route-conflict", "Parallel AD30 should conflict with Real AD30");
+  assert.equal(ad30.real.name, "The God-Child Reborn");
+  assert.ok(ad30.real.description.includes("1 + 20^((S - 14000) / 5000)"), "Real AD30 should expose its Score formula");
+  assert.equal(ad30.real.prerequisites, "Real-BC6000 or Parallel-BC6000");
+  assert.match(ad30.real.effect || "", /Current Eternity gain multiplier: ×2/);
+  assert.equal(ad30.real.pendingGain, "2", "Real AD30 pending gain should use the canonical gain");
+  assert.equal(ad30.real.debug.pendingGain, "2", "debug text should match the Real pending gain");
+  assert.equal(ad30.parallel.state, "owned", "owned Parallel AD30 should be rendered as active");
+  assert.equal(ad30.parallel.otherState, "route-conflict", "Real AD30 should conflict with Parallel AD30");
+  assert.equal(ad30.parallel.name, "A Human Declaration Impossible After Death");
+  assert.ok(ad30.parallel.description.includes("1 + I / 4"), "Parallel AD30 should expose its Infinity formula");
+  assert.ok(ad30.parallel.description.includes("e15"), "Parallel AD30 should expose its softcap boundary");
+  assert.equal(ad30.parallel.prerequisites, "Real-BC6000 or Parallel-BC6000");
+  assert.match(ad30.parallel.effect || "", /Current Eternity gain multiplier: ×2\.50e14/);
+  assert.equal(ad30.parallel.pendingGain, "2.50e14", "Parallel AD30 pending gain should use the canonical gain");
+  assert.equal(ad30.parallel.debug.pendingGain, "2.50e14", "debug text should match the Parallel pending gain");
 
   await page.setViewportSize({ width: 412, height: 915 });
   await page.click('[data-eternity-tab="timeline"]');
@@ -884,7 +950,7 @@ try {
   assert.deepEqual(timelineMobile.subtabCodes, ["MS", "TL"], "mobile Eternity subtabs should expose compact codes");
   assert.ok(timelineMobile.subtabNavWidth <= timelineMobile.subtabClientWidth, "mobile Eternity subtabs should fit without horizontal overflow");
   assert.equal(timelineMobile.gridColumnCount, 2, "Timeline nodes should preserve two route columns on mobile");
-  assert.deepEqual(timelineMobile.branchRouteOrder, ["Real", "Parallel", "Real", "Parallel"], "Timeline should preserve route order on mobile");
+  assert.deepEqual(timelineMobile.branchRouteOrder, ["Real", "Parallel", "Real", "Parallel", "Real", "Parallel"], "Timeline should preserve route order on mobile");
   assert.ok(timelineMobile.nodeRects[0].x < timelineMobile.nodeRects[1].x, "mobile Real and Parallel nodes should retain left/right topology");
   assert.ok(Math.abs(timelineMobile.nodeRects[0].y - timelineMobile.nodeRects[1].y) <= 1, "mobile route nodes should share a tree level");
   assert.ok(timelineMobile.nodeRects.every((node) => node.height <= 60), "mobile Timeline nodes should stay in the compact class");
