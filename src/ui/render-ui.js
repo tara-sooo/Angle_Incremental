@@ -251,6 +251,10 @@ function timelineNodeDescriptionText(node) {
 }
 
 function timelineNodePrerequisiteText(prerequisites, mode) {
+  if (mode === "any" && prerequisites.length > 0) {
+    const era = runtime.timelineNode?.(prerequisites[0])?.era;
+    if (era) return runtime.t("timelineNodeAnyPrerequisite").replace("{era}", era);
+  }
   return prerequisites.join(mode === "any" ? " or " : ", ");
 }
 
@@ -278,8 +282,7 @@ function timelineNodeStatusText(availability) {
   }
 }
 
-function timelineNodeCurrentEffectText(node, availability) {
-  if (availability.reason !== "owned") return runtime.t("timelineNodeInactive");
+function timelineNodeCurrentEffectText(node) {
   if (node.id === "Real-BC16500") {
     return runtime.t("timelineRealCurrentEffect")
       .replace("{multiplier}", formatMultiplierLog(
@@ -308,7 +311,7 @@ function timelineNodeCurrentEffectText(node, availability) {
     return runtime.t("timelineParallelAd30CurrentEffect")
       .replace("{multiplier}", formatMultiplierLog(runtime.timelineParallelAd30EternityGainMultiplierLog10?.() ?? 0));
   }
-  return runtime.t("timelineNodeInactive");
+  return "";
 }
 
 function timelineNodeRouteClass(route) {
@@ -425,7 +428,12 @@ function updateTimelineNodeDetail(node, availability) {
   const prerequisites = Array.isArray(node.prerequisites) ? node.prerequisites : [];
   if (runtime.elements.timelineNodeDetailHeading) runtime.elements.timelineNodeDetailHeading.textContent = localizedTimelineText(node.name);
   if (runtime.elements.timelineNodeDetailDescription) runtime.elements.timelineNodeDetailDescription.textContent = timelineNodeDescriptionText(node);
-  if (runtime.elements.timelineNodeDetailCurrentEffect) runtime.elements.timelineNodeDetailCurrentEffect.textContent = timelineNodeCurrentEffectText(node, availability);
+  if (runtime.elements.timelineNodeDetailCurrentEffect) {
+    const currentEffect = runtime.elements.timelineNodeDetailCurrentEffect;
+    const owned = availability.reason === "owned";
+    currentEffect.hidden = !owned;
+    currentEffect.textContent = owned ? timelineNodeCurrentEffectText(node) : "";
+  }
   if (runtime.elements.timelineNodeDetailPrerequisites) runtime.elements.timelineNodeDetailPrerequisites.textContent = prerequisites.length > 0
     ? timelineNodePrerequisiteText(prerequisites, node.prerequisiteMode)
     : runtime.t("timelineNoPrerequisites");
@@ -477,7 +485,7 @@ function updateTimelineUi() {
       claims: runtime.elements.timelineScoreClaims,
       requirement: runtime.elements.timelineScoreRequirement,
       button: runtime.elements.timelineScoreClaimButton,
-      requirementText: `${runtime.formatUiLogNumber(runtime.timelineScoreRequirementLog10())} Score`,
+      requirementText: `${runtime.formatUiLogNumber(runtime.timelineScoreRequirementLog10())} ${runtime.t("timelineScoreTrack")}`,
     },
     {
       id: "ip",

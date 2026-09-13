@@ -350,7 +350,7 @@ try {
   assert.equal(timelineInitial.milestoneInactive, true, "Timeline selection should hide the Milestone subpanel");
   assert.equal(timelineInitial.eternityPanelActive, true, "Timeline selection should keep the Eternity main panel active");
   assert.equal(timelineInitial.mainPanelPresent, false, "Timeline should not be addressable as a main panel");
-  assert.equal(timelineInitial.scoreRequirement, "1.00e20,000 Score", "Timeline should show the exact initial Score requirement");
+  assert.equal(timelineInitial.scoreRequirement, "1.00e20,000 スコア", "Timeline should show the exact initial score requirement");
   assert.equal(timelineInitial.ipRequirement, "1.00e400 IP", "Timeline should show the exact initial IP requirement");
   assert.equal(timelineInitial.eternityRequirement, "2", "Timeline should show the exact initial Eternity requirement");
   assert.equal(timelineInitial.scoreDisabled, true, "an unmet Timeline track should disable its claim control");
@@ -369,7 +369,7 @@ try {
   assert.equal(timelineInitial.detailButtonDisplay, "none", "a hidden node action should leave the Timeline layout");
   assert.match(timelineInitial.realStatus || "", /TF不足/);
   assert.equal(timelineInitial.detailDescription, "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）");
-  assert.match(timelineInitial.detailCurrentEffect || "", /未購入/);
+  assert.equal(timelineInitial.detailCurrentEffect, "", "an unpurchased Timeline node should not render inactive copy");
   assert.equal(timelineInitial.cardDescription, undefined, "compact nodes should not expand long descriptions");
   assert.equal(timelineInitial.repeatedDetailFields, false, "the selected detail should not repeat tree identity and state fields");
   assert.equal(timelineInitial.respecWarning, false, "Respec consequences should be reserved for confirmation");
@@ -484,7 +484,7 @@ try {
   }));
   assert.equal(selectedParallel.selected, "Parallel-BC16500", "clicking a node should move the focused detail");
   assert.equal(selectedParallel.detailName, "終わらない氷河期");
-  assert.equal(selectedParallel.detailDescription, "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×" + selectedParallel.softcap + "でソフトキャップ）");
+  assert.equal(selectedParallel.detailDescription, "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×" + selectedParallel.softcap + " SC）");
   assert.equal(selectedParallel.timelineText.includes("実効log10"), false, "Parallel details should omit effective-log diagnostics");
   assert.equal(selectedParallel.purchaseNode, "Parallel-BC16500");
   await page.click('[data-timeline-node="Real-BC6000"]');
@@ -497,7 +497,7 @@ try {
   assert.equal(selectedReal6000.selected, "Real-BC6000");
   assert.equal(selectedReal6000.detailName, "チグリスとユーフラテスの狭間に");
   assert.match(selectedReal6000.detailDescription || "", /e10/);
-  assert.equal(selectedReal6000.prerequisites, "Real-BC16500 or Parallel-BC16500");
+  assert.equal(selectedReal6000.prerequisites, "BC16500のいずれかのノード");
   await page.click('[data-timeline-node="Real-BC16500"]');
 
   await page.evaluate(() => {
@@ -524,12 +524,12 @@ try {
   }));
   assert.equal(timelineClaimed.claims, 1, "Timeline claim controls should grant one TF");
   assert.equal(timelineClaimed.earned, "1 TF", "Timeline should display earned TF");
-  assert.equal(timelineClaimed.next, "1.00e30,000 Score", "the Score requirement should advance after one claim");
+  assert.equal(timelineClaimed.next, "1.00e30,000 スコア", "the score requirement should advance after one claim");
   assert.equal(timelineClaimed.score, 25000, "claiming TF must not consume Score");
   assert.equal(timelineClaimed.detailButtonDisabled, false, "one available TF should make the selected node purchasable");
   assert.equal(timelineClaimed.detailPurchaseNode, "Real-BC16500");
   assert.equal(timelineClaimed.detailDescription, "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）");
-  assert.match(timelineClaimed.detailCurrentEffect || "", /未購入/);
+  assert.equal(timelineClaimed.detailCurrentEffect, "", "an unpurchased Timeline node should not render inactive copy after a claim");
 
   await page.click("#timelineNodePurchaseButton");
   const realPurchased = await page.evaluate(() => ({
@@ -828,7 +828,7 @@ try {
   assert.equal(english.detailLabel, "Selected node");
   assert.equal(english.detailName, "Endless Ice Age");
   assert.ok(english.detailDescription?.includes("×1.00e10"), "Timeline softcap should follow the scientific number setting");
-  assert.match(english.detailCurrentEffect || "", /Inactive/);
+  assert.equal(english.detailCurrentEffect, "", "English unpurchased Timeline nodes should not render inactive copy");
   assert.equal(english.timelineWarning, undefined, "Timeline should not keep a permanent Respec warning");
   assert.equal(english.timelineText.includes("effective log10"), false, "English Timeline should not expose effective-log diagnostics");
   assert.equal(english.purchasedSummary, false, "English Timeline should not render a purchased-node summary");
@@ -896,17 +896,16 @@ try {
   assert.equal(ad30.real.state, "owned", "owned Real AD30 should be rendered as active");
   assert.equal(ad30.real.otherState, "route-conflict", "Parallel AD30 should conflict with Real AD30");
   assert.equal(ad30.real.name, "The God-Child Reborn");
-  assert.ok(ad30.real.description.includes("1 + 20^((S - 14000) / 5000)"), "Real AD30 should expose its Score formula");
-  assert.equal(ad30.real.prerequisites, "Real-BC6000 or Parallel-BC6000");
+  assert.equal(ad30.real.description, "Multiply Eternity gain by ×(1 + 20^((log10(Score)-14000)/5000)) based on current Score.", "Real AD30 should expose its original Score formula");
+  assert.equal(ad30.real.prerequisites, "One of the BC6000 nodes");
   assert.match(ad30.real.effect || "", /Current Eternity gain multiplier: ×2/);
   assert.equal(ad30.real.pendingGain, "2", "Real AD30 pending gain should use the canonical gain");
   assert.equal(ad30.real.debug.pendingGain, "2", "debug text should match the Real pending gain");
   assert.equal(ad30.parallel.state, "owned", "owned Parallel AD30 should be rendered as active");
   assert.equal(ad30.parallel.otherState, "route-conflict", "Real AD30 should conflict with Parallel AD30");
   assert.equal(ad30.parallel.name, "A Human Declaration Impossible After Death");
-  assert.ok(ad30.parallel.description.includes("1 + I / 4"), "Parallel AD30 should expose its Infinity formula");
-  assert.ok(ad30.parallel.description.includes("e15"), "Parallel AD30 should expose its softcap boundary");
-  assert.equal(ad30.parallel.prerequisites, "Real-BC6000 or Parallel-BC6000");
+  assert.equal(ad30.parallel.description, "Multiply Eternity gain by ×(1 + 10^(log10(Infinity count)) / 4) based on current Infinity count (SC after e15 Infinity count).", "Parallel AD30 should expose its original Infinity formula");
+  assert.equal(ad30.parallel.prerequisites, "One of the BC6000 nodes");
   assert.match(ad30.parallel.effect || "", /Current Eternity gain multiplier: ×2\.50e14/);
   assert.equal(ad30.parallel.pendingGain, "2.50e14", "Parallel AD30 pending gain should use the canonical gain");
   assert.equal(ad30.parallel.debug.pendingGain, "2.50e14", "debug text should match the Parallel pending gain");
