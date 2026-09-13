@@ -481,12 +481,14 @@ try {
     softcap: window.__angleDebug.runtime.formatUiLogNumber(10),
     timelineText: document.querySelector('[data-eternity-panel="timeline"]')?.textContent || "",
     purchaseNode: document.getElementById("timelineNodePurchaseButton")?.dataset.timelineNodePurchase,
+    purchased: window.__angleDebug.state.timelinePurchasedNodes.map((node) => node.id),
   }));
   assert.equal(selectedParallel.selected, "Parallel-BC16500", "clicking a node should move the focused detail");
   assert.equal(selectedParallel.detailName, "終わらない氷河期");
   assert.equal(selectedParallel.detailDescription, "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×" + selectedParallel.softcap + " SC）");
   assert.equal(selectedParallel.timelineText.includes("実効log10"), false, "Parallel details should omit effective-log diagnostics");
   assert.equal(selectedParallel.purchaseNode, "Parallel-BC16500");
+  assert.deepEqual(selectedParallel.purchased, [], "a single Timeline activation should select without purchasing");
   await page.click('[data-timeline-node="Real-BC6000"]');
   const selectedReal6000 = await page.evaluate(() => ({
     selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
@@ -531,6 +533,89 @@ try {
   assert.equal(timelineClaimed.detailDescription, "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）");
   assert.equal(timelineClaimed.detailCurrentEffect, "", "an unpurchased Timeline node should not render inactive copy after a claim");
 
+  await page.waitForTimeout(500);
+  await page.locator('.timeline-node[data-timeline-node="Real-BC16500"]').dblclick();
+  const timelineMouseDouble = await page.evaluate(() => ({
+    selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
+    purchased: window.__angleDebug.state.timelinePurchasedNodes.map((node) => node.id),
+    available: document.getElementById("timelineAvailableTf")?.textContent,
+  }));
+  assert.deepEqual(
+    timelineMouseDouble,
+    { selected: "Real-BC16500", purchased: ["Real-BC16500"], available: "0 TF" },
+    "a Timeline mouse double-click should purchase the exact clicked node once",
+  );
+  await page.waitForTimeout(500);
+  assert.equal(
+    await page.evaluate(() => window.__angleDebug.respecTimeline({ save: false })),
+    true,
+    "Timeline respec should reset the direct-purchase fixture",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  const timelineTouchDouble = await page.evaluate(() => {
+    const nodeFor = (id) => document.querySelector('[data-timeline-node="' + id + '"]');
+    const pointerActivate = (id) => {
+      const node = nodeFor(id);
+      node?.dispatchEvent(new PointerEvent("pointerup", {
+        bubbles: true,
+        pointerType: "touch",
+        button: 0,
+      }));
+      node?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    };
+    const debug = window.__angleDebug;
+    debug.state.scoreTfClaims = 2;
+    debug.runtime.updateUi();
+    pointerActivate("Parallel-BC16500");
+    pointerActivate("Parallel-BC16500");
+    return {
+      selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
+      purchased: debug.state.timelinePurchasedNodes.map((node) => node.id),
+      available: document.getElementById("timelineAvailableTf")?.textContent,
+    };
+  });
+  assert.deepEqual(
+    timelineTouchDouble,
+    { selected: "Parallel-BC16500", purchased: ["Parallel-BC16500"], available: "1 TF" },
+    "a Timeline touch double-tap should purchase the exact tapped node once on mobile",
+  );
+  const timelineCrossNode = await page.evaluate(() => {
+    const nodeFor = (id) => document.querySelector('[data-timeline-node="' + id + '"]');
+    const pointerActivate = (id) => {
+      const node = nodeFor(id);
+      node?.dispatchEvent(new PointerEvent("pointerup", {
+        bubbles: true,
+        pointerType: "touch",
+        button: 0,
+      }));
+      node?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    };
+    const debug = window.__angleDebug;
+    debug.runtime.respecTimeline({ save: false });
+    debug.state.scoreTfClaims = 2;
+    debug.runtime.updateUi();
+    pointerActivate("Real-BC16500");
+    pointerActivate("Parallel-BC16500");
+    return {
+      selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
+      purchased: debug.state.timelinePurchasedNodes.map((node) => node.id),
+      available: document.getElementById("timelineAvailableTf")?.textContent,
+    };
+  });
+  assert.deepEqual(
+    timelineCrossNode,
+    { selected: "Parallel-BC16500", purchased: [], available: "2 TF" },
+    "two quick Timeline taps on different nodes must not form a double-tap",
+  );
+  await page.waitForTimeout(500);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.runtime.respecTimeline({ save: false });
+    debug.state.scoreTfClaims = 1;
+    debug.runtime.updateUi();
+  });
+  await page.click('[data-timeline-node="Real-BC16500"]');
   await page.click("#timelineNodePurchaseButton");
   const realPurchased = await page.evaluate(() => ({
     purchased: window.__angleDebug.state.timelinePurchasedNodes,
@@ -555,6 +640,13 @@ try {
   assert.equal(realPurchased.purchasedSummary, false);
   assert.match(realPurchased.realCurrentEffect || "", /現在のInfinity数獲得倍率/);
   assert.equal(realPurchased.parallelStatus, "別ルート選択済み");
+
+  await page.locator('.timeline-node[data-timeline-node="Parallel-BC16500"]').dblclick();
+  assert.deepEqual(
+    await page.evaluate(() => window.__angleDebug.state.timelinePurchasedNodes.map((node) => node.id)),
+    ["Real-BC16500"],
+    "direct purchase must keep the canonical same-era route conflict check",
+  );
 
   assert.equal(
     await page.evaluate(() => window.__angleDebug.respecTimeline({ save: false })),

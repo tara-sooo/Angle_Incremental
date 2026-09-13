@@ -1799,7 +1799,7 @@ try {
   assert.equal(desktopUiChanges.infinityUpgradeNodeCount, 21, "desktop IU should render every upgrade node");
   assert.equal(desktopUiChanges.infinityUpgradeNodeContract, true, "desktop IU nodes should keep name, cost, and state in the node");
   assert.ok(desktopUiChanges.infinityUpgradeNodeHeights.every((height) => height <= 50), "desktop IU nodes should stay compact");
-  const infinityUpgradeInteraction = await page.evaluate(() => {
+  const infinityUpgradeInteraction = await page.evaluate(async () => {
     const { state, runtime, switchMainTab, switchInfinitySubtab } = window.__angleDebug;
     const original = {
       autoBuyInfinityUpgrades: state.autoBuyInfinityUpgrades,
@@ -1816,9 +1816,20 @@ try {
       '[data-infinity-panel="upgrades"] [data-upgrade="' + id + '"]',
     );
     const setIp = (value) => runtime.syncInfinityPointCachesFromExact(BigInt(value));
-    const doubleClick = (id) => {
-      nodeFor(id)?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    const pointerActivate = (id, pointerType = "mouse") => {
+      const node = nodeFor(id);
+      if (!node) return;
+      node.dispatchEvent(new PointerEvent("pointerup", {
+        bubbles: true,
+        pointerType,
+        button: 0,
+      }));
+      node.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
       window.advanceTime(0);
+    };
+    const doubleActivate = (id, pointerType = "mouse") => {
+      pointerActivate(id, pointerType);
+      pointerActivate(id, pointerType);
     };
 
     state.autoBuyInfinityUpgrades = false;
@@ -1837,11 +1848,42 @@ try {
       mask: state.infinityUpgradeMask,
     };
 
+    await new Promise((resolve) => setTimeout(resolve, 500));
     runtime.selectedInfinityUpgradeId = "1-2";
     setIp(1);
     runtime.updateUi();
-    doubleClick("1-1");
+    pointerActivate("1-1", "mouse");
+    nodeFor("1-1")?.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    const nativeDblclickIgnored = {
+      selected: runtime.selectedInfinityUpgradeId,
+      mask: state.infinityUpgradeMask,
+      points: state.infinityPointsExact,
+    };
+    pointerActivate("1-1", "mouse");
     const directPurchase = {
+      selected: runtime.selectedInfinityUpgradeId,
+      mask: state.infinityUpgradeMask,
+      points: state.infinityPointsExact,
+    };
+
+    state.infinityUpgradeMask = 0;
+    setIp(1);
+    runtime.selectedInfinityUpgradeId = "1-1";
+    runtime.updateUi();
+    doubleActivate("1-2", "touch");
+    const touchDirectPurchase = {
+      selected: runtime.selectedInfinityUpgradeId,
+      mask: state.infinityUpgradeMask,
+      points: state.infinityPointsExact,
+    };
+
+    state.infinityUpgradeMask = 0;
+    setIp(2);
+    runtime.selectedInfinityUpgradeId = "1-1";
+    runtime.updateUi();
+    pointerActivate("1-1", "touch");
+    pointerActivate("1-2", "touch");
+    const crossNode = {
       selected: runtime.selectedInfinityUpgradeId,
       mask: state.infinityUpgradeMask,
       points: state.infinityPointsExact,
@@ -1851,21 +1893,21 @@ try {
     setIp(1);
     runtime.selectedInfinityUpgradeId = "2-1";
     runtime.updateUi();
-    doubleClick("2-1");
+    doubleActivate("2-1");
     const prerequisiteBlocked = state.infinityUpgradeMask;
 
     state.infinityUpgradeMask = 1;
     setIp(0);
     runtime.selectedInfinityUpgradeId = "1-1";
     runtime.updateUi();
-    doubleClick("1-2");
+    doubleActivate("1-2");
     const unaffordable = state.infinityUpgradeMask;
 
     state.infinityUpgradeMask = 1;
     setIp(1);
     runtime.selectedInfinityUpgradeId = "1-2";
     runtime.updateUi();
-    doubleClick("1-1");
+    doubleActivate("1-1");
     const purchasedNoop = {
       mask: state.infinityUpgradeMask,
       points: state.infinityPointsExact,
@@ -1902,6 +1944,9 @@ try {
     return {
       singleClick,
       directPurchase,
+      nativeDblclickIgnored,
+      touchDirectPurchase,
+      crossNode,
       prerequisiteBlocked,
       unaffordable,
       purchasedNoop,
@@ -1916,15 +1961,30 @@ try {
   );
   assert.deepEqual(
     infinityUpgradeInteraction.directPurchase,
-    { selected: "1-2", mask: 1, points: "0" },
-    "double-clicking an IU should purchase the clicked ID without stale selection",
+    { selected: "1-1", mask: 1, points: "0" },
+    "mouse double activation should select and purchase the exact clicked IU",
   );
-  assert.equal(infinityUpgradeInteraction.prerequisiteBlocked, 1, "double-click should keep prerequisite-blocked IUs unpurchased");
-  assert.equal(infinityUpgradeInteraction.unaffordable, 1, "double-click should keep unaffordable IUs unpurchased");
+  assert.deepEqual(
+    infinityUpgradeInteraction.nativeDblclickIgnored,
+    { selected: "1-1", mask: 0, points: "1" },
+    "native dblclick must not purchase in addition to the pointer activation path",
+  );
+  assert.deepEqual(
+    infinityUpgradeInteraction.touchDirectPurchase,
+    { selected: "1-2", mask: 2, points: "0" },
+    "touch double activation should purchase the exact tapped IU",
+  );
+  assert.deepEqual(
+    infinityUpgradeInteraction.crossNode,
+    { selected: "1-2", mask: 0, points: "2" },
+    "rapid activations on different IUs must not form a double activation",
+  );
+  assert.equal(infinityUpgradeInteraction.prerequisiteBlocked, 1, "double activation should keep prerequisite-blocked IUs unpurchased");
+  assert.equal(infinityUpgradeInteraction.unaffordable, 1, "double activation should keep unaffordable IUs unpurchased");
   assert.deepEqual(
     infinityUpgradeInteraction.purchasedNoop,
     { mask: 1, points: "1" },
-    "double-clicking a purchased IU should have no effect",
+    "double activation on a purchased IU should have no effect",
   );
   assert.deepEqual(
     infinityUpgradeInteraction.detailPanelPurchase,
