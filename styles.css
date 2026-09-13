@@ -2873,6 +2873,9 @@ canvas {
 
   .timeline-node-name {
     font-size: 0.76rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .timeline-node-cost,

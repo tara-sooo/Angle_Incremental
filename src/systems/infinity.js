@@ -320,6 +320,11 @@ function recordInfinityRun(
 function infinityCountGain() {
   const baseGain = (isChallengeCompleted(6) ? 2 : 1)
     * (runtime.isAchievementUnlocked(38) ? 2 : 1);
+  const timelineMultiplierLog10 = runtime.timelineRealInfinityCountGainMultiplierLog10?.();
+  if (timelineMultiplierLog10 !== undefined) {
+    const gain = runtime.valueFromLog10(runtime.log10Value(baseGain) + timelineMultiplierLog10);
+    return gain === Number.MAX_VALUE ? gain : floorWithFloatingPointTolerance(gain);
+  }
   return Math.floor(baseGain * (runtime.timelineRealInfinityCountGainMultiplier?.() ?? 1));
 }
 

@@ -354,8 +354,8 @@ try {
   assert.equal(timelineInitial.scoreDisabled, true, "an unmet Timeline track should disable its claim control");
   assert.equal(timelineInitial.respecTop, true, "Respec should live in the Timeline overview");
   assert.equal(timelineInitial.respecBeforeClaims, true, "Respec should appear before the claim rows");
-  assert.equal(timelineInitial.treeNodeCount, 2, "Timeline should show both first-era route alternatives");
-  assert.equal(timelineInitial.eraCount, 1, "the first era should render as one branching group");
+  assert.equal(timelineInitial.treeNodeCount, 4, "Timeline should show both route alternatives in both eras");
+  assert.equal(timelineInitial.eraCount, 2, "the tree should render one branching group per era");
   assert.equal(timelineInitial.eraLabel, "BC16500", "the tree should label the visible era");
   assert.equal(timelineInitial.realRoute, "Real");
   assert.equal(timelineInitial.parallelRoute, "Parallel");
@@ -485,6 +485,17 @@ try {
   assert.equal(selectedParallel.detailDescription, "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×" + selectedParallel.softcap + "でソフトキャップ）");
   assert.equal(selectedParallel.timelineText.includes("実効log10"), false, "Parallel details should omit effective-log diagnostics");
   assert.equal(selectedParallel.purchaseNode, "Parallel-BC16500");
+  await page.click('[data-timeline-node="Real-BC6000"]');
+  const selectedReal6000 = await page.evaluate(() => ({
+    selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
+    detailName: document.getElementById("timelineNodeDetailHeading")?.textContent,
+    detailDescription: document.getElementById("timelineNodeDetailDescription")?.textContent,
+    prerequisites: document.getElementById("timelineNodeDetailPrerequisites")?.textContent,
+  }));
+  assert.equal(selectedReal6000.selected, "Real-BC6000");
+  assert.equal(selectedReal6000.detailName, "チグリスとユーフラテスの狭間に");
+  assert.match(selectedReal6000.detailDescription || "", /e10/);
+  assert.equal(selectedReal6000.prerequisites, "Real-BC16500 or Parallel-BC16500");
   await page.click('[data-timeline-node="Real-BC16500"]');
 
   await page.evaluate(() => {
@@ -873,7 +884,7 @@ try {
   assert.deepEqual(timelineMobile.subtabCodes, ["MS", "TL"], "mobile Eternity subtabs should expose compact codes");
   assert.ok(timelineMobile.subtabNavWidth <= timelineMobile.subtabClientWidth, "mobile Eternity subtabs should fit without horizontal overflow");
   assert.equal(timelineMobile.gridColumnCount, 2, "Timeline nodes should preserve two route columns on mobile");
-  assert.deepEqual(timelineMobile.branchRouteOrder, ["Real", "Parallel"], "Timeline should preserve route order on mobile");
+  assert.deepEqual(timelineMobile.branchRouteOrder, ["Real", "Parallel", "Real", "Parallel"], "Timeline should preserve route order on mobile");
   assert.ok(timelineMobile.nodeRects[0].x < timelineMobile.nodeRects[1].x, "mobile Real and Parallel nodes should retain left/right topology");
   assert.ok(Math.abs(timelineMobile.nodeRects[0].y - timelineMobile.nodeRects[1].y) <= 1, "mobile route nodes should share a tree level");
   assert.ok(timelineMobile.nodeRects.every((node) => node.height <= 60), "mobile Timeline nodes should stay in the compact class");
