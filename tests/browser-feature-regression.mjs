@@ -3241,6 +3241,98 @@ try {
     assert.equal(mobileAngleSurface.resetPosition, "static", "mobile ANGLE reset summaries should remain in normal flow");
     assert.equal(mobileAngleSurface.resetOverlapsCanvas, false, "mobile reset summaries should not cover the ANGLE canvas");
     assert.ok(mobileAngleSurface.renderTextLength > 0, "mobile ANGLE should retain the render_game_to_text debug surface");
+    await mobilePage.setViewportSize({ width: 320, height: 844 });
+    const mobileLapSpeedSoftcap = await mobilePage.evaluate(() => {
+      const { runtime, state, switchMainTab } = window.__angleDebug;
+      const original = structuredClone(state);
+      const originalTab = runtime.activeMainTab;
+      const readLayout = (speedLevel, language) => {
+        Object.assign(state, {
+          generationCount: 0,
+          coreBoostCount: 0,
+          towerFloor: 0,
+          activeChallenge: 0,
+          activeTowerChallenge: 0,
+          completedChallenges: 0,
+          infinityUpgradeMask: 0,
+          eternityCount: 0,
+          eternityMilestoneMask: 0,
+          speedLevel,
+          language,
+          numberFormat: "compact",
+        });
+        runtime.appliedLanguage = "";
+        switchMainTab("angle");
+        window.advanceTime(0);
+        const value = document.querySelector("#lapSpeedValue");
+        const metric = value?.closest(".metric");
+        const stage = document.querySelector(".stage-panel");
+        const header = stage?.querySelector(".topbar");
+        return {
+          text: value?.textContent ?? "",
+          title: value?.getAttribute("title") ?? null,
+          metricHeight: metric?.getBoundingClientRect().height ?? 0,
+          metricClientHeight: metric?.clientHeight ?? 0,
+          metricScrollHeight: metric?.scrollHeight ?? 0,
+          metricClientWidth: metric?.clientWidth ?? 0,
+          metricScrollWidth: metric?.scrollWidth ?? 0,
+          stageTop: stage?.getBoundingClientRect().top ?? 0,
+          headerTop: header?.getBoundingClientRect().top ?? 0,
+          rawLapSpeedLog10: runtime.rawLapSpeedLog10(),
+          effectiveLapSpeedLog10: runtime.effectiveLapSpeedLog10(),
+          softcapStart: runtime.lapSpeedSoftcapStart(),
+          softcapPower: runtime.lapSpeedSoftcapPower(),
+          softcapped: runtime.isLapSpeedSoftcapped(),
+        };
+      };
+      const result = {
+        inactive: readLayout(0, "ja"),
+        activeShort: readLayout(20, "ja"),
+        activeLong: readLayout(250, "ja"),
+        activeShortAgain: readLayout(20, "ja"),
+        activeLongAgain: readLayout(250, "ja"),
+        activeLongEnglish: readLayout(250, "en"),
+      };
+      Object.assign(state, original);
+      runtime.appliedLanguage = "";
+      switchMainTab(originalTab);
+      window.advanceTime(0);
+      return result;
+    });
+    await mobilePage.setViewportSize({ width: 390, height: 844 });
+    assert.equal(mobileLapSpeedSoftcap.inactive.softcapped, false, "lap speed below the softcap should be inactive");
+    assert.doesNotMatch(mobileLapSpeedSoftcap.inactive.text, / SC$/, "inactive lap speed should not show SC");
+    const activeLapSpeedLayouts = [
+      mobileLapSpeedSoftcap.activeShort,
+      mobileLapSpeedSoftcap.activeLong,
+      mobileLapSpeedSoftcap.activeShortAgain,
+      mobileLapSpeedSoftcap.activeLongAgain,
+    ];
+    for (const layout of [...activeLapSpeedLayouts, mobileLapSpeedSoftcap.activeLongEnglish]) {
+      assert.match(layout.text, / SC$/, "softcapped lap speed should end with SC");
+      assert.doesNotMatch(layout.text, /軟上限中|softcapped/, "old softcap wording should be absent");
+      assert.equal(layout.title, null, "lap speed should not add a tooltip title");
+      assert.ok(layout.metricScrollHeight <= layout.metricClientHeight + 1, "lap speed metric should not wrap vertically");
+      assert.ok(layout.metricScrollWidth <= layout.metricClientWidth + 1, "lap speed metric should not overflow horizontally");
+      assert.equal(layout.softcapped, true, "softcapped lap speed should retain its state");
+      assert.equal(layout.softcapStart, 35, "lap speed softcap start should remain unchanged");
+      assert.equal(layout.softcapPower, 0.22, "lap speed softcap power should remain unchanged");
+    }
+    const metricHeights = activeLapSpeedLayouts.map((layout) => layout.metricHeight);
+    assert.ok(Math.max(...metricHeights) - Math.min(...metricHeights) <= 1, "lap speed value changes should keep metric height stable");
+    const stageTops = activeLapSpeedLayouts.map((layout) => layout.stageTop);
+    assert.ok(Math.max(...stageTops) - Math.min(...stageTops) <= 1, "lap speed value changes should keep ANGLE stage position stable");
+    const headerTops = activeLapSpeedLayouts.map((layout) => layout.headerTop);
+    assert.ok(Math.max(...headerTops) - Math.min(...headerTops) <= 1, "lap speed value changes should keep ANGLE header position stable");
+    for (const [layout, speedLevel] of [
+      [mobileLapSpeedSoftcap.activeShort, 20],
+      [mobileLapSpeedSoftcap.activeLong, 250],
+    ]) {
+      const expectedRaw = speedLevel * Math.log10(1.22);
+      const expectedEffective = Math.log10(35) + (expectedRaw - Math.log10(35)) * 0.22;
+      assert.ok(Math.abs(layout.rawLapSpeedLog10 - expectedRaw) < 1e-12, "lap speed raw log should remain unchanged");
+      assert.ok(Math.abs(layout.effectiveLapSpeedLog10 - expectedEffective) < 1e-12, "lap speed effective log should remain unchanged");
+    }
     const mobileTc4Surface = await mobilePage.evaluate(() => {
       const { state } = window.__angleDebug;
       const original = structuredClone(state);
