@@ -57,9 +57,9 @@ const LAP_SPEED_SOFTCAP_POWER = 0.5;
 const PRE_GENERATION_LAP_SPEED_SOFTCAP_START = 35;
 const PRE_GENERATION_LAP_SPEED_SOFTCAP_POWER = 0.22;
 const PRE_GENERATION_COST_SCALING = {
-  speed: { startsAfter: 20, logScale: 0.3 },
-  vertex: { startsAfter: 15, logScale: 1.2 },
-  gain: { startsAfter: 12, logScale: 0.55 },
+  speed: { startsAfter: 10, logScale: 0.00140 },
+  vertex: { startsAfter: 8, logScale: 0.00560 },
+  gain: { startsAfter: 6, logScale: 0.00260 },
 };
 const STAGED_UPGRADE_COST_SCALING = [
   { startsAfterLog10: 30, logScale: 0.02 },

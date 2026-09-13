@@ -648,10 +648,22 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
     ? runtime.log10Value(runtime.sanitizeNumber(data.generationScoreMultiplier, 1, 1))
     : savedGenerationMultiplierLog;
   runtime.state.generationScoreMultiplier = runtime.valueFromLog10(runtime.state.generationScoreMultiplierLog10);
+  const savedGenerationCostFactor = runtime.sanitizeNumber(
+    data.generationCostFactor,
+    1,
+    runtime.GENERATION_MIN_NEW_COST_FACTOR,
+  );
   runtime.state.generationCostFactor = Math.max(
     runtime.GENERATION_MIN_NEW_COST_FACTOR,
-    Math.min(1, runtime.sanitizeNumber(data.generationCostFactor, 1, runtime.GENERATION_MIN_NEW_COST_FACTOR)),
+    Math.min(1, savedGenerationCostFactor),
   );
+  const savedInfinityUpgradeMask = Math.floor(Number(data.infinityUpgradeMask) || 0);
+  if ((savedInfinityUpgradeMask & (1 << 9)) !== 0) {
+    const parsedGenerationCostFactor = runtime.parseSavedNumber(data.generationCostFactor);
+    if (Number.isFinite(parsedGenerationCostFactor)) {
+      runtime.state.generationCostFactor = Math.max(0.70, Math.min(1, parsedGenerationCostFactor));
+    }
+  }
   runtime.state.coreBoostCount = Math.floor(runtime.sanitizeNumber(data.coreBoostCount, 0));
   runtime.state.infinityCount = Math.floor(runtime.sanitizeNumber(data.infinityCount, 0));
   runtime.state.eternityCount = Math.max(0, Math.floor(runtime.sanitizeNumber(data.eternityCount, 0)));
@@ -953,6 +965,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   const snapshot = snapshotRuntimeState();
   try {
     applySaveDataUnsafe(data, saveVersion);
+    runtime.applyStartingCoreBoosts();
   } catch (error) {
     restoreRuntimeState(snapshot);
     throw error;

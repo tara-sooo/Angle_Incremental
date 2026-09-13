@@ -32,7 +32,6 @@ const expectedOrder = [
   "src/systems/infinity.js",
   "src/systems/infinite-angle.js",
   "src/ui/events.js",
-  "src/systems/balance.js",
   "src/systems/eternity.js",
   "src/systems/timeline.js",
 ];
@@ -47,5 +46,20 @@ assert.match(mainSource, /^import \{ runtime, expose \} from "\.\/runtime\/share
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.match(indexSource, /<script type="module" src="src\/main\.js[^\"]*"><\/script>/);
 assert.equal(fs.existsSync(path.join(root, "game.js")), false, "the removed classic entrypoint must stay absent");
+
+for (const moduleName of [
+  "balance.js",
+  "balance-angle.js",
+  "balance-generation.js",
+  "balance-core-boost.js",
+  "balance-infinity.js",
+  "balance-ui.js",
+]) {
+  assert.equal(
+    fs.existsSync(path.join(root, "src", "systems", moduleName)),
+    false,
+    moduleName + " must stay removed after active balance canonicalization",
+  );
+}
 
 console.log("ESM entrypoint and import order are canonical");
