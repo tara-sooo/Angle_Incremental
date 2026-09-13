@@ -1,4 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { bindDoubleActivation } from "./node-activation.js?v=0.13.2";
 
 // Shared form helpers and the UI update orchestrator.
 
@@ -325,6 +326,11 @@ function createTimelineNodeCard(node) {
   card.dataset.timelineNode = node.id;
   card.dataset.route = node.route || "";
   card.setAttribute("aria-controls", "timelineNodeDetail");
+  bindDoubleActivation(card, {
+    id: node.id,
+    onActivate: (id) => runtime.selectTimelineNode?.(id),
+    onDoubleActivate: (id) => runtime.purchaseTimelineNode?.(id),
+  });
 
   const heading = document.createElement("span");
   heading.className = "timeline-node-heading";

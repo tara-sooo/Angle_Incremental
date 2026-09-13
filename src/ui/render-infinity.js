@@ -1,4 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { bindDoubleActivation } from "./node-activation.js?v=0.13.2";
 
 let lastInfinityUpgradeSignature = null;
 
@@ -33,8 +34,11 @@ function createInfinityUpgradeRows() {
       button.className = "infinity-upgrade-node ui-tree-node";
       button.type = "button";
       button.dataset.upgrade = upgrade.id;
-      button.addEventListener("click", () => runtime.selectInfinityUpgrade(upgrade.id));
-      button.addEventListener("dblclick", () => runtime.buyInfinityUpgrade(upgrade.id));
+      bindDoubleActivation(button, {
+        id: upgrade.id,
+        onActivate: (id) => runtime.selectInfinityUpgrade(id),
+        onDoubleActivate: (id) => runtime.buyInfinityUpgrade(id),
+      });
       const name = document.createElement("strong");
       name.className = "infinity-upgrade-name";
       const meta = document.createElement("span");
