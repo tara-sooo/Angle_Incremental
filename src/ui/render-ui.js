@@ -356,6 +356,42 @@ function createTimelineNodeCard(node) {
   return card;
 }
 
+function createTimelineConnector(type, era, nodes = []) {
+  const connector = document.createElement("div");
+  connector.className = "timeline-connector timeline-era-" + type;
+  connector.dataset.timelineConnector = type;
+  connector.dataset.timelineEra = era;
+  connector.setAttribute("aria-hidden", "true");
+  nodes.forEach((node) => {
+    const branch = document.createElement("span");
+    branch.className = "timeline-connector-branch";
+    branch.dataset.timelineConnectorNode = node.id;
+    branch.dataset.route = node.route || "";
+    connector.append(branch);
+  });
+  return connector;
+}
+
+function updateTimelineConnectorState(nodes) {
+  const host = runtime.elements.timelineNodeGrid;
+  if (!host) return;
+  const purchasedIds = new Set(
+    Array.isArray(runtime.state?.timelinePurchasedNodes)
+      ? runtime.state.timelinePurchasedNodes.map((entry) => entry?.id).filter(Boolean)
+      : [],
+  );
+  host.querySelectorAll(".timeline-connector-branch").forEach((branch) => {
+    branch.classList.toggle("is-owned", purchasedIds.has(branch.dataset.timelineConnectorNode));
+  });
+  host.querySelectorAll(".timeline-era-bridge").forEach((bridge) => {
+    const nextEra = bridge.dataset.toEra;
+    bridge.classList.toggle(
+      "is-owned",
+      nodes.some((node) => node.era === nextEra && purchasedIds.has(node.id)),
+    );
+  });
+}
+
 function renderTimelineNodeTree(nodes) {
   const host = runtime.elements.timelineNodeGrid;
   if (!host) return;
@@ -367,7 +403,8 @@ function renderTimelineNodeTree(nodes) {
       if (!eras.has(node.era)) eras.set(node.era, []);
       eras.get(node.era).push(node);
     });
-    eras.forEach((eraNodes, era) => {
+    const eraEntries = Array.from(eras.entries());
+    eraEntries.forEach(([era, eraNodes], index) => {
       const eraSection = document.createElement("section");
       eraSection.className = "timeline-era";
       eraSection.dataset.timelineEra = era;
@@ -380,8 +417,19 @@ function renderTimelineNodeTree(nodes) {
         .slice()
         .sort((left, right) => (left.route === "Parallel" ? 1 : 0) - (right.route === "Parallel" ? 1 : 0))
         .forEach((node) => grid.append(createTimelineNodeCard(node)));
-      eraSection.append(eraHeading, grid);
+      eraSection.append(
+        eraHeading,
+        createTimelineConnector("split", era, eraNodes),
+        grid,
+        createTimelineConnector("merge", era, eraNodes),
+      );
       host.append(eraSection);
+      if (index < eraEntries.length - 1) {
+        const bridge = createTimelineConnector("bridge", era);
+        bridge.dataset.fromEra = era;
+        bridge.dataset.toEra = eraEntries[index + 1][0];
+        host.append(bridge);
+      }
     });
     host.dataset.timelineSignature = signature;
   }
@@ -469,6 +517,7 @@ function updateTimelineTreeUi() {
     const node = runtime.timelineNode?.(card.dataset.timelineNode);
     if (node) updateTimelineNodeCard(card, node, runtime.timelineNodeAvailability(node.id));
   });
+  updateTimelineConnectorState(nodes);
   updateTimelineNodeDetail(
     selectedNode,
     selectedNode ? runtime.timelineNodeAvailability(selectedNode.id) : null,
