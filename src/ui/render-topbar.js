@@ -57,7 +57,7 @@ function topBarSignature(mode) {
     runtime.currentGenerationScoreLog10(),
     runtime.currentPreviousGenerationScoreLog10(),
     runtime.state.coreBoostCount,
-    runtime.state.infinityCount,
+    runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount").toString(),
     runtime.state.activeChallenge,
     runtime.state.completedChallenges,
     runtime.state.achievementMask,
@@ -99,7 +99,11 @@ function updateTopBar() {
   if (mode === "progress") {
     if (label) label.textContent = runtime.t("topBarProgress");
     const infinityReady = runtime.canInfinity();
-    const infinityState = infinityReady ? "READY" : runtime.state.infinityCount > 0 ? "OPEN" : "LOCKED";
+    const infinityState = infinityReady
+      ? "READY"
+      : runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") > 0n
+        ? "OPEN"
+        : "LOCKED";
     const generationUnlocked = runtime.currentTotalScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE);
     const generationReady = runtime.canRunGeneration();
     const waitingPrevious = generationUnlocked

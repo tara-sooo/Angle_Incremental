@@ -11,6 +11,10 @@ const COMPACT_UNIT_LOG10 = Object.freeze({
   qi: 18,
   sx: 21,
 });
+// ponytail: keep exact progression bounded to the finite native range; lift this
+// ceiling only when the game needs arbitrary-precision counts above 309 digits.
+const MAX_EXACT_INTEGER = BigInt(Number.MAX_VALUE);
+const exactStateSyncRecords = new WeakMap();
 
 function parseSavedNumber(value) {
   if (typeof value === "number") return value;
@@ -20,6 +24,153 @@ function parseSavedNumber(value) {
   if (trimmed === "Infinity") return Infinity;
   if (trimmed === "-Infinity") return -Infinity;
   return Number(trimmed);
+}
+
+function parseExactInteger(value, fallback = null) {
+  if (typeof value === "bigint") {
+    return value >= 0n ? (value > MAX_EXACT_INTEGER ? MAX_EXACT_INTEGER : value) : fallback;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value) || value < 0) return fallback;
+    const exact = BigInt(Math.floor(value));
+    return exact > MAX_EXACT_INTEGER ? MAX_EXACT_INTEGER : exact;
+  }
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  if (/^\d+$/.test(trimmed)) {
+    const exact = BigInt(trimmed);
+    return exact > MAX_EXACT_INTEGER ? MAX_EXACT_INTEGER : exact;
+  }
+  const parsed = parseSavedNumber(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  const exact = BigInt(Math.floor(parsed));
+  return exact > MAX_EXACT_INTEGER ? MAX_EXACT_INTEGER : exact;
+}
+
+function normalizeExactInteger(value, fallback = 0n) {
+  const parsed = parseExactInteger(value, null);
+  if (parsed !== null) return parsed;
+  return normalizeExactInteger(fallback, 0n);
+}
+
+function exactIntegerFromLog10(log10) {
+  const normalized = sanitizeLog10(log10, -Infinity);
+  if (normalized === -Infinity || normalized <= 0) return normalized === 0 ? 1n : 0n;
+  if (normalized >= Math.log10(Number.MAX_VALUE)) return MAX_EXACT_INTEGER;
+  if (normalized < 15) {
+    const value = 10 ** normalized;
+    return normalizeExactInteger(
+      Math.max(0, Math.floor(value + Math.max(1, value) * Number.EPSILON * 8)),
+    );
+  }
+  const exponent = Math.floor(normalized);
+  const mantissa = 10 ** (normalized - exponent);
+  const significant = Math.max(1, Math.round(mantissa * (10 ** 15)));
+  if (significant >= 10 ** 16) {
+    return normalizeExactInteger(BigInt("1" + "0".repeat(exponent + 1)));
+  }
+  const digits = String(significant);
+  const zeros = exponent - (digits.length - 1);
+  if (zeros >= 0) return normalizeExactInteger(BigInt(digits + "0".repeat(zeros)));
+  return normalizeExactInteger(BigInt(digits.slice(0, Math.max(1, digits.length + zeros))));
+}
+
+function log10ExactInteger(value) {
+  const exact = normalizeExactInteger(value);
+  if (exact <= 0n) return -Infinity;
+  const text = exact.toString();
+  if (text.length <= 15) return Math.log10(Number(text));
+  const leadingDigits = 16;
+  const leading = Number(text.slice(0, leadingDigits)) / (10 ** (leadingDigits - 1));
+  return Math.min(
+    Math.log10(leading) + text.length - 1,
+    runtime.MAX_TRACKED_LOG10,
+  );
+}
+
+function numberFromExactInteger(value) {
+  const exact = normalizeExactInteger(value);
+  return Number(exact);
+}
+
+function exactStateRecord(state, exactField, valueField) {
+  if (!state || typeof state !== "object") return null;
+  let records = exactStateSyncRecords.get(state);
+  if (!records) {
+    records = new Map();
+    exactStateSyncRecords.set(state, records);
+  }
+  const key = exactField + ":" + valueField;
+  let record = records.get(key);
+  if (!record) {
+    record = { exact: "", value: 0n, projection: 0 };
+    records.set(key, record);
+  }
+  return record;
+}
+
+function setExactIntegerState(state, exactField, valueField, value) {
+  const exact = normalizeExactInteger(value);
+  const exactText = exact.toString();
+  const projection = numberFromExactInteger(exact);
+  const record = exactStateRecord(state, exactField, valueField);
+  if (state[exactField] !== exactText) state[exactField] = exactText;
+  if (!Object.is(state[valueField], projection)) state[valueField] = projection;
+  if (record) {
+    record.exact = exactText;
+    record.value = exact;
+    record.projection = projection;
+  }
+  return exact;
+}
+
+function currentExactIntegerState(state, exactField, valueField, fallback = 0n) {
+  const record = exactStateRecord(state, exactField, valueField);
+  if (record && state?.[exactField] === record.exact && Object.is(state?.[valueField], record.projection)) {
+    return record.value;
+  }
+  const parsedExact = parseExactInteger(state?.[exactField], null);
+  let exact = parsedExact;
+  if (exact === null) {
+    exact = parseExactInteger(state?.[valueField], fallback);
+  } else if (record && !Object.is(state?.[valueField], record.projection)) {
+    exact = parseExactInteger(state?.[valueField], fallback);
+  } else if (
+    record
+    && record.exact === ""
+    && !Object.is(state?.[valueField], numberFromExactInteger(0n))
+  ) {
+    exact = parseExactInteger(state?.[valueField], fallback);
+  }
+  return setExactIntegerState(state, exactField, valueField, exact ?? fallback);
+}
+
+function hydrateExactIntegerState(state, exactField, valueField, exactValue, legacyValue, fallback = 0n) {
+  const exact = parseExactInteger(exactValue, null);
+  const legacy = parseExactInteger(legacyValue, null);
+  const legacyDiffers = legacy !== null
+    && exact !== null
+    && !Object.is(numberFromExactInteger(exact), numberFromExactInteger(legacy));
+  return setExactIntegerState(
+    state,
+    exactField,
+    valueField,
+    exact === null || legacyDiffers || (exact === 0n && legacy !== null && legacy > 0n)
+      ? legacy ?? fallback
+      : exact,
+  );
+}
+
+function addExactIntegerState(state, exactField, valueField, amount) {
+  const current = currentExactIntegerState(state, exactField, valueField);
+  const parsedAmount = parseExactInteger(amount, null);
+  if (parsedAmount === null || parsedAmount <= 0n) return current;
+  return setExactIntegerState(state, exactField, valueField, current + parsedAmount);
+}
+
+function exactIntegerStatePositive(state, exactField, valueField) {
+  return currentExactIntegerState(state, exactField, valueField) > 0n;
 }
 
 function sanitizeNumber(value, fallback, min = 0) {
@@ -108,11 +259,19 @@ function sanitizeInfinityRunRecords(value) {
 
 function sanitizeEternityRunRecords(value) {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 10).map((record) => ({
-    time: sanitizeNumber(record && record.time, 0),
-    realTime: sanitizeNumber(record && record.realTime, null),
-    infinityCount: Math.max(0, Math.floor(sanitizeNumber(record && record.infinityCount, 0))),
-  }));
+  return value.slice(0, 10).map((record) => {
+    const exactField = parseExactInteger(record && record.infinityCountExact, null);
+    const exactCount = exactField ?? parseExactInteger(record && record.infinityCount, 0n);
+    const normalized = {
+      time: sanitizeNumber(record && record.time, 0),
+      realTime: sanitizeNumber(record && record.realTime, null),
+      infinityCount: numberFromExactInteger(exactCount),
+    };
+    if (exactField !== null || exactCount > BigInt(Number.MAX_SAFE_INTEGER)) {
+      normalized.infinityCountExact = exactCount.toString();
+    }
+    return normalized;
+  });
 }
 
 function valueFromLog10(log) {
@@ -223,6 +382,10 @@ function formatExactHeldScientific(exactValue) {
 }
 
 function formatHeldUiLogNumber(log10Value, exactValue = null) {
+  const exact = parseExactInteger(exactValue, null);
+  if (exact !== null && exact <= BigInt(Number.MAX_SAFE_INTEGER)) {
+    return formatUiNumber(Number(exact));
+  }
   return formatExactHeldScientific(exactValue) || formatUiLogNumber(log10Value, true);
 }
 
@@ -268,6 +431,17 @@ function formatLongDuration(seconds) {
     .join("");
 }
 expose("parseSavedNumber", () => parseSavedNumber, (value) => { parseSavedNumber = value; });
+expose("MAX_EXACT_INTEGER", () => MAX_EXACT_INTEGER);
+expose("parseExactInteger", () => parseExactInteger, (value) => { parseExactInteger = value; });
+expose("normalizeExactInteger", () => normalizeExactInteger, (value) => { normalizeExactInteger = value; });
+expose("exactIntegerFromLog10", () => exactIntegerFromLog10, (value) => { exactIntegerFromLog10 = value; });
+expose("log10ExactInteger", () => log10ExactInteger, (value) => { log10ExactInteger = value; });
+expose("numberFromExactInteger", () => numberFromExactInteger, (value) => { numberFromExactInteger = value; });
+expose("setExactIntegerState", () => setExactIntegerState, (value) => { setExactIntegerState = value; });
+expose("currentExactIntegerState", () => currentExactIntegerState, (value) => { currentExactIntegerState = value; });
+expose("hydrateExactIntegerState", () => hydrateExactIntegerState, (value) => { hydrateExactIntegerState = value; });
+expose("addExactIntegerState", () => addExactIntegerState, (value) => { addExactIntegerState = value; });
+expose("exactIntegerStatePositive", () => exactIntegerStatePositive, (value) => { exactIntegerStatePositive = value; });
 expose("sanitizeNumber", () => sanitizeNumber, (value) => { sanitizeNumber = value; });
 expose("sanitizeLog10", () => sanitizeLog10, (value) => { sanitizeLog10 = value; });
 expose("clampLog10", () => clampLog10, (value) => { clampLog10 = value; });

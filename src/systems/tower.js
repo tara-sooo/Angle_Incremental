@@ -149,8 +149,8 @@ function towerChallenge3RelaxedPower(
   targetPower,
   postTargetSpan = TOWER_CHALLENGE_3_RELAXATION_COUNT,
 ) {
-  const rawCount = Number(runtime.state.infinityCount);
-  const count = Number.isFinite(rawCount) ? Math.max(0, rawCount) : 0;
+  const count = runtime.normalizedInfinityCount?.()
+    ?? Math.max(0, Number(runtime.state.infinityCount) || 0);
   if (count <= TOWER_CHALLENGE_3_RELAXATION_COUNT) {
     return startPower + (targetPower - startPower) * count / TOWER_CHALLENGE_3_RELAXATION_COUNT;
   }
@@ -231,13 +231,15 @@ function towerChallengeImplemented(index) {
 
 function towerChallenge4AllowsNormalUpgrade(kind) {
   if (runtime.state.activeTowerChallenge !== 4) return true;
-  if (kind === "speed") return runtime.state.speedLevel < 1;
-  if (kind === "gain") return runtime.state.gainLevel < 1;
-  if (kind === "vertex") {
-    const level = runtime.state.activeChallenge === 8
-      ? runtime.state.ic8VertexUpgradeLevel
-      : runtime.state.vertices - 3;
-    return Math.max(0, Math.floor(level)) < 1;
+  if (kind === "speed" || kind === "gain" || kind === "vertex") {
+    const exactSafeLevel = runtime.normalUpgradeLevelValue?.(kind);
+    if (exactSafeLevel !== undefined) return exactSafeLevel < 1;
+    const legacyLevel = kind === "vertex"
+      ? runtime.state.activeChallenge === 8
+        ? runtime.state.ic8VertexUpgradeLevel
+        : runtime.state.vertices - 3
+      : runtime.state[kind + "Level"];
+    return Math.max(0, Math.floor(Number(legacyLevel) || 0)) < 1;
   }
   return false;
 }

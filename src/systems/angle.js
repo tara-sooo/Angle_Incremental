@@ -2,6 +2,55 @@ import { runtime, expose } from "../runtime/shared.js";
 
 // Angle progression, vertex processing, normal upgrades, and score gain.
 
+function normalUpgradeFields(kind) {
+  if (kind === "speed") return ["speedLevelExact", "speedLevel"];
+  if (kind === "gain") return ["gainLevelExact", "gainLevel"];
+  if (kind === "vertex") {
+    return runtime.state.activeChallenge === 8
+      ? ["ic8VertexUpgradeLevelExact", "ic8VertexUpgradeLevel"]
+      : ["verticesExact", "vertices"];
+  }
+  return null;
+}
+
+function currentExactVertices() {
+  return runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
+}
+
+function currentExactNormalUpgradeLevel(kind) {
+  const fields = normalUpgradeFields(kind);
+  if (!fields) return 0n;
+  const exact = runtime.currentExactIntegerState(runtime.state, fields[0], fields[1]);
+  return kind === "vertex" && runtime.state.activeChallenge !== 8
+    ? exact > 3n ? exact - 3n : 0n
+    : exact;
+}
+
+function normalUpgradeLevelValue(kind) {
+  return runtime.numberFromExactInteger(currentExactNormalUpgradeLevel(kind));
+}
+
+function normalUpgradeLevelLog10(kind) {
+  return runtime.log10ExactInteger(currentExactNormalUpgradeLevel(kind));
+}
+
+function normalUpgradeLevelExact(kind) {
+  return currentExactNormalUpgradeLevel(kind).toString();
+}
+
+function addNormalUpgradeLevel(kind, amount = 1n) {
+  const fields = normalUpgradeFields(kind);
+  if (!fields) return 0n;
+  return runtime.addExactIntegerState(runtime.state, fields[0], fields[1], amount);
+}
+
+function resetNormalUpgradeLevels() {
+  runtime.setExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
+  runtime.setExactIntegerState(runtime.state, "ic8VertexUpgradeLevelExact", "ic8VertexUpgradeLevel", 0n);
+  runtime.setExactIntegerState(runtime.state, "speedLevelExact", "speedLevel", 0n);
+  runtime.setExactIntegerState(runtime.state, "gainLevelExact", "gainLevel", 0n);
+}
+
 function rawLapSpeedLog10() {
   let multiplierLog = effectiveSpeedLevel() * runtime.log10Value(1.22);
   if (runtime.hasInfinityUpgrade("2-1")) multiplierLog += runtime.log10Value(runtime.applyInfinityUpgradePower(1.5));
@@ -150,27 +199,30 @@ function iu11_2Hardcap() {
 }
 
 function iu11_2EffectiveInfinityCount() {
-  const rawInfinityCount = Number(runtime.state.infinityCount);
-  const nonNegativeInfinityCount = Number.isNaN(rawInfinityCount) ? 0 : Math.max(0, rawInfinityCount);
-  return Math.min(iu11_2Hardcap(), nonNegativeInfinityCount);
+  const hardcap = BigInt(iu11_2Hardcap());
+  const count = runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount");
+  return Number(count < hardcap ? count : hardcap);
 }
 
 function effectiveSpeedLevel() {
-  return runtime.state.speedLevel * runtime.towerNormalUpgradeMultiplier()
+  return normalUpgradeLevelValue("speed") * runtime.towerNormalUpgradeMultiplier()
     + sponsoredNormalUpgradeBonusLevel()
     + (runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0);
 }
 
 function effectiveGainLevel() {
-  return runtime.state.gainLevel * runtime.towerNormalUpgradeMultiplier()
+  return normalUpgradeLevelValue("gain") * runtime.towerNormalUpgradeMultiplier()
     + sponsoredNormalUpgradeBonusLevel()
     + (runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0);
 }
 
 function effectiveVertexCount() {
   if (runtime.state.activeChallenge === 8) return 3;
-  const purchasedVertices = Math.max(0, runtime.state.vertices - 3);
-  const count = 3 + Math.floor(purchasedVertices * runtime.towerNormalUpgradeMultiplier())
+  const purchasedVertices = Math.max(0, runtime.numberFromExactInteger(currentExactVertices()) - 3);
+  const scaledPurchasedVertices = purchasedVertices * runtime.towerNormalUpgradeMultiplier();
+  const count = 3 + (Number.isFinite(scaledPurchasedVertices)
+    ? Math.floor(scaledPurchasedVertices)
+    : Number.MAX_VALUE)
     + sponsoredNormalUpgradeBonusLevel()
     + (runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0);
   if (runtime.state.activeChallenge === 2) return Math.min(200, count);
@@ -192,8 +244,11 @@ function applyInfinitySoftcap(rawLog10) {
 }
 
 function vertexGainIncreaseLog10() {
+  const infinityCountPlusOne = runtime.numberFromExactInteger(
+    runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") + 1n,
+  );
   const infinityResetBoost = runtime.hasInfinityUpgrade("1-1")
-    ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, iu11_2EffectiveInfinityCount()) : runtime.state.infinityCount + 1)
+    ? runtime.applyInfinityUpgradePower(runtime.hasInfinityUpgrade("11-2") ? Math.pow(1.005, iu11_2EffectiveInfinityCount()) : infinityCountPlusOne)
     : 1;
   let gainLog10 = runtime.log10Value(0.01 + effectiveGainLevel() * 0.01)
     + runtime.log10Value(runtime.coreBoostGainIncreaseMultiplier())
@@ -344,20 +399,20 @@ function cost(kind, base, level, growth) {
 }
 
 function costLogs() {
-  const vertexLevel = runtime.state.activeChallenge === 8 ? runtime.state.ic8VertexUpgradeLevel : runtime.state.vertices - 3;
+  const vertexLevel = normalUpgradeLevelValue("vertex");
   return {
-    speed: costLog10("speed", 5, runtime.state.speedLevel, 1.55),
+    speed: costLog10("speed", 5, normalUpgradeLevelValue("speed"), 1.55),
     vertex: costLog10("vertex", 12, vertexLevel, 1.72),
-    gain: costLog10("gain", 18, runtime.state.gainLevel, 1.68),
+    gain: costLog10("gain", 18, normalUpgradeLevelValue("gain"), 1.68),
   };
 }
 
 function costs() {
-  const vertexLevel = runtime.state.activeChallenge === 8 ? runtime.state.ic8VertexUpgradeLevel : runtime.state.vertices - 3;
+  const vertexLevel = normalUpgradeLevelValue("vertex");
   return {
-    speed: cost("speed", 5, runtime.state.speedLevel, 1.55),
+    speed: cost("speed", 5, normalUpgradeLevelValue("speed"), 1.55),
     vertex: cost("vertex", 12, vertexLevel, 1.72),
-    gain: cost("gain", 18, runtime.state.gainLevel, 1.68),
+    gain: cost("gain", 18, normalUpgradeLevelValue("gain"), 1.68),
   };
 }
 
@@ -377,7 +432,7 @@ function addScore(amount, amountLog10 = runtime.log10Value(amount)) {
 
   if (runtime.checkAchievements(true).length > 0) runtime.saveGame("manual");
   if (
-    runtime.state.infinityCount === 0
+    runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") === 0n
     && runtime.canInfinity()
     && (runtime.state.activeTowerChallenge <= 0 || runtime.towerChallengeCanComplete())
   ) {
@@ -507,15 +562,14 @@ function resetVertexProgress() {
 
 function buySpeed() {
   if (!spendNormalUpgrade("speed")) return;
-  runtime.state.speedLevel += 1;
+  addNormalUpgradeLevel("speed");
   runtime.updateUi();
   runtime.saveGame("manual");
 }
 
 function buyVertex() {
   if (!spendNormalUpgrade("vertex")) return;
-  if (runtime.state.activeChallenge === 8) runtime.state.ic8VertexUpgradeLevel += 1;
-  else runtime.state.vertices += 1;
+  addNormalUpgradeLevel("vertex");
   resetVertexProgress();
   runtime.updateUi();
   runtime.saveGame("manual");
@@ -523,7 +577,7 @@ function buyVertex() {
 
 function buyGain() {
   if (!spendNormalUpgrade("gain")) return;
-  runtime.state.gainLevel += 1;
+  addNormalUpgradeLevel("gain");
   runtime.updateUi();
   runtime.saveGame("manual");
 }
@@ -540,15 +594,14 @@ function buyAllUpgrades(options = {}) {
   while (bought && purchases < runtime.BUY_ALL_LIMIT) {
     bought = false;
     if (allowSpeed && spendNormalUpgrade("speed")) {
-      runtime.state.speedLevel += 1;
+      addNormalUpgradeLevel("speed");
       purchases += 1;
       bought = true;
       if (purchases >= runtime.BUY_ALL_LIMIT) break;
     }
 
     if (allowVertex && spendNormalUpgrade("vertex")) {
-      if (runtime.state.activeChallenge === 8) runtime.state.ic8VertexUpgradeLevel += 1;
-      else runtime.state.vertices += 1;
+      addNormalUpgradeLevel("vertex");
       resetVertexProgress();
       purchases += 1;
       bought = true;
@@ -556,7 +609,7 @@ function buyAllUpgrades(options = {}) {
     }
 
     if (allowGain && spendNormalUpgrade("gain")) {
-      runtime.state.gainLevel += 1;
+      addNormalUpgradeLevel("gain");
       purchases += 1;
       bought = true;
     }
@@ -598,6 +651,13 @@ expose("currentInfiniteScoreLog10", () => currentInfiniteScoreLog10, (value) => 
 expose("sponsoredNormalUpgradeBonusLevel", () => sponsoredNormalUpgradeBonusLevel, (value) => { sponsoredNormalUpgradeBonusLevel = value; });
 expose("iu11_2Hardcap", () => iu11_2Hardcap, (value) => { iu11_2Hardcap = value; });
 expose("iu11_2EffectiveInfinityCount", () => iu11_2EffectiveInfinityCount, (value) => { iu11_2EffectiveInfinityCount = value; });
+expose("currentExactVertices", () => currentExactVertices);
+expose("currentExactNormalUpgradeLevel", () => currentExactNormalUpgradeLevel);
+expose("normalUpgradeLevelValue", () => normalUpgradeLevelValue);
+expose("normalUpgradeLevelLog10", () => normalUpgradeLevelLog10);
+expose("normalUpgradeLevelExact", () => normalUpgradeLevelExact);
+expose("addNormalUpgradeLevel", () => addNormalUpgradeLevel);
+expose("resetNormalUpgradeLevels", () => resetNormalUpgradeLevels);
 expose("effectiveSpeedLevel", () => effectiveSpeedLevel, (value) => { effectiveSpeedLevel = value; });
 expose("effectiveGainLevel", () => effectiveGainLevel, (value) => { effectiveGainLevel = value; });
 expose("effectiveVertexCount", () => effectiveVertexCount, (value) => { effectiveVertexCount = value; });

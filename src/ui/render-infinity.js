@@ -93,7 +93,7 @@ function updateInfinityUpgradeRows() {
     runtime.state.infinityUpgradeMask,
     runtime.state.infinityPointsExact,
     runtime.state.infinityPointsLog10,
-    runtime.state.infinityCount,
+    runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount").toString(),
     runtime.state.language,
     runtime.state.numberFormat,
     runtime.selectedInfinityUpgradeId,

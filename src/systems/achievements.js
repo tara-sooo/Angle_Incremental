@@ -8,7 +8,7 @@ const ACHIEVEMENTS = [
     title: { ja: "頂点すなわち角度", en: "A Vertex Is an Angle" },
     condition: { ja: "角の数を増やす", en: "Increase the number of vertices." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.state.vertices > 3,
+    isUnlocked: () => runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n) > 3n,
   },
   {
     title: { ja: "世代を超えて", en: "Beyond Generations" },
@@ -38,7 +38,7 @@ const ACHIEVEMENTS = [
     title: { ja: "contagon", en: "contagon" },
     condition: { ja: "頂点の数が30を超える", en: "Raise vertices above 30." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.state.vertices > 30,
+    isUnlocked: () => runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n) > 30n,
   },
   {
     title: { ja: "スケーリングは始まっている", en: "Scaling Has Begun" },
@@ -56,7 +56,7 @@ const ACHIEVEMENTS = [
     title: { ja: "宇宙は収縮する", en: "The Universe Contracts" },
     condition: { ja: "Infinityに到達", en: "Reach Infinity." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.state.infinityCount > 0,
+    isUnlocked: () => runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") > 0n,
   },
   {
     title: { ja: "根元から", en: "From the Root" },
@@ -92,7 +92,7 @@ const ACHIEVEMENTS = [
     title: { ja: "流石に最初よりは早い", en: "Faster Than the Beginning" },
     condition: { ja: "Infinityに10回到達", en: "Reach Infinity 10 times." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.state.infinityCount >= 10,
+    isUnlocked: () => runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") >= 10n,
   },
   {
     title: { ja: "実は3より弱い", en: "Actually Weaker Than 3" },
@@ -164,7 +164,7 @@ const ACHIEVEMENTS = [
     title: { ja: "ランクスコアは存在しないけど", en: "There Is No Rank Score, Though" },
     condition: { ja: "Infinity量が5000を超える", en: "Have more than 5000 Infinity." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.state.infinityCount > 5000,
+    isUnlocked: () => runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") > 5000n,
   },
   {
     title: { ja: "勝つまで欲しがらなかった", en: "Did Not Want It Until Winning" },
@@ -230,7 +230,7 @@ const ACHIEVEMENTS = [
     title: { ja: "無限万長者", en: "Infinity Millionaire" },
     condition: { ja: "Infinity数が1.5e6を超える", en: "Have more than 1.5e6 Infinity." },
     reward: { ja: "Infinity数獲得量を×2", en: "Infinity count gain x2." },
-    isUnlocked: () => runtime.state.infinityCount > 1.5e6,
+    isUnlocked: () => runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") > 1_500_000n,
   },
   {
     title: { ja: "とうに越した先に", en: "Far Beyond" },
@@ -248,7 +248,7 @@ const ACHIEVEMENTS = [
     title: { ja: "Time is generative", en: "Time is generative" },
     condition: { ja: "初回Eternityを実行", en: "Perform Eternity for the first time." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.state.eternityCount > 0,
+    isUnlocked: () => runtime.currentExactIntegerState(runtime.state, "eternityCountExact", "eternityCount") > 0n,
   },
   {
     title: { ja: "初回はこれがおすすめ", en: "Recommended for Your First Eternity" },

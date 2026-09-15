@@ -231,7 +231,12 @@ function updateMilestoneCard(milestone, availableChoices) {
 
 function updateEternityUi() {
   if (!installEternityUi()) return;
-  const count = Math.max(0, Math.floor(Number(runtime.state.eternityCount) || 0));
+  const countExact = runtime.currentExactIntegerState(
+    runtime.state,
+    "eternityCountExact",
+    "eternityCount",
+  );
+  const count = runtime.numberFromExactInteger(countExact);
   const ready = runtime.canEternity?.() === true;
   const entitlementCount = Math.max(0, Math.floor(Number(runtime.firstTierMilestoneEntitlementCount?.()) || 0));
   const availableChoices = new Set(runtime.availableEternityMilestoneChoices?.() || []);
@@ -248,7 +253,12 @@ function updateEternityUi() {
       .replace("{ip}", runtime.formatUiLogNumber(runtime.ETERNITY_REQUIREMENT_LOG10));
   }
 
-  if (headingCount) headingCount.textContent = `Eternity ${runtime.formatUiNumber(count)}`;
+  if (headingCount) {
+    headingCount.textContent = `Eternity ${runtime.formatHeldUiLogNumber(
+      runtime.log10ExactInteger(countExact),
+      countExact.toString(),
+    )}`;
+  }
   if (currentIp) {
     currentIp.textContent = `${runtime.formatHeldUiLogNumber(
       runtime.currentInfinityPointsLog10(),

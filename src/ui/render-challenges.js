@@ -36,7 +36,7 @@ function updateChallengeRows() {
   const signature = [
     runtime.state.activeChallenge,
     runtime.state.completedChallenges,
-    runtime.state.infinityCount,
+    runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount").toString(),
     runtime.state.infinityUpgradeMask,
     runtime.state.language,
   ].join("|");
@@ -143,7 +143,7 @@ function updateTowerChallengeRows() {
     runtime.state.towerFloor,
     runtime.state.activeTowerChallenge,
     runtime.state.completedTowerChallenges,
-    runtime.state.infinityCount,
+    runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount").toString(),
     runtime.state.language,
     runtime.state.numberFormat,
     runtime.currentScoreLog10(),

@@ -169,10 +169,7 @@ function runGeneration() {
     runtime.state.scoreLog10 = -Infinity;
     runtime.state.generationScore = 0;
     runtime.state.generationScoreLog10 = -Infinity;
-    runtime.state.vertices = 3;
-    runtime.state.ic8VertexUpgradeLevel = 0;
-    runtime.state.speedLevel = 0;
-    runtime.state.gainLevel = 0;
+    runtime.resetNormalUpgradeLevels?.();
     runtime.state.currentGain = 1;
     runtime.state.currentGainLog10 = 0;
     runtime.state.pointProgress = 0;

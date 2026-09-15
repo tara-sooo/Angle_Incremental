@@ -83,13 +83,16 @@ function normalizeTimelineState() {
   );
 }
 
-function normalizedEternityCount() {
-  const count = Number(runtime.state.eternityCount);
-  return Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0;
+function currentExactEternityCount() {
+  return runtime.currentExactIntegerState(
+    runtime.state,
+    "eternityCountExact",
+    "eternityCount",
+  );
 }
 
 function timelineDiscovered() {
-  return normalizedEternityCount() > 0
+  return currentExactEternityCount() > 0n
     || runtime.normalizeUnlockedMainTabs?.(runtime.state.unlockedMainTabs)?.includes("timeline") === true;
 }
 
@@ -115,7 +118,7 @@ function timelineEternityRequirement() {
 function timelineCurrentValue(trackId) {
   if (trackId === "score") return runtime.currentScoreLog10?.() ?? Number(runtime.state.scoreLog10);
   if (trackId === "ip") return runtime.currentInfinityPointsLog10?.() ?? Number(runtime.state.infinityPointsLog10);
-  if (trackId === "eternity") return BigInt(normalizedEternityCount());
+  if (trackId === "eternity") return currentExactEternityCount();
   return null;
 }
 
@@ -193,7 +196,7 @@ function timelineParallelEffectiveLog10(seconds = timelineParallelSecondsSinceIc
 
 function timelineRealBc6000Ic6RewardLog10() {
   if (!timelineNodeIsPurchasedById("Real-BC6000") || runtime.isChallengeCompleted?.(6) !== true) return 0;
-  const rawLog10 = normalizedEternityCount() * IC6_REWARD_LOG10;
+  const rawLog10 = runtime.numberFromExactInteger(currentExactEternityCount()) * IC6_REWARD_LOG10;
   if (rawLog10 <= REAL_BC6000_SOFTCAP_LOG10) return rawLog10;
   return REAL_BC6000_SOFTCAP_LOG10
     + REAL_BC6000_SOFTCAP_STRENGTH
@@ -222,9 +225,11 @@ function timelineRealAd30EternityGainMultiplier() {
 }
 
 function timelineParallelAd30InfinityEffectiveLog10() {
-  const infinityCount = runtime.sanitizeNumber(runtime.state.infinityCount, 0);
-  if (infinityCount <= 0) return -Infinity;
-  const rawLog10 = runtime.log10Value(infinityCount);
+  const infinityCountLog10 = runtime.log10ExactInteger(
+    runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount"),
+  );
+  if (infinityCountLog10 === -Infinity) return -Infinity;
+  const rawLog10 = infinityCountLog10;
   if (!Number.isFinite(rawLog10)) return -Infinity;
   if (rawLog10 <= PARALLEL_AD30_SOFTCAP_LOG10) return rawLog10;
   return PARALLEL_AD30_SOFTCAP_LOG10
