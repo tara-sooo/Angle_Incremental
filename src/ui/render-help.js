@@ -116,6 +116,9 @@ let selectedTopicId = "";
 let lastContextTopicId = "";
 
 function positiveStateValue(key) {
+  if (key === "infinityCount" || key === "eternityCount") {
+    return runtime.currentExactIntegerState(runtime.state, key + "Exact", key) > 0n;
+  }
   return Number(runtime.state?.[key]) > 0;
 }
 

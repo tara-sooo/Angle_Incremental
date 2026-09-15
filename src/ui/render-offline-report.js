@@ -27,7 +27,13 @@ const OFFLINE_REPORT_ENTRIES = Object.freeze([
     labelKey: "offlineReportInfinityCount",
     value: (snapshot) => snapshot.infinityCount,
     unlocked: (snapshot) => snapshot.infinityUnlocked ?? snapshot.infinityCount > 0,
-    format: (value) => runtime.formatUiNumber(value),
+    format: (value, snapshot) => runtime.formatHeldUiLogNumber(
+      runtime.log10ExactInteger(runtime.parseExactInteger(
+        snapshot.infinityCountExact,
+        runtime.parseExactInteger(value, 0n),
+      )),
+      runtime.parseExactInteger(snapshot.infinityCountExact, runtime.parseExactInteger(value, 0n)).toString(),
+    ),
   },
   {
     key: "infinityPoints",
@@ -48,7 +54,13 @@ const OFFLINE_REPORT_ENTRIES = Object.freeze([
     labelKey: "offlineReportEternityCount",
     value: (snapshot) => snapshot.eternityCount,
     unlocked: (snapshot) => snapshot.eternityUnlocked ?? snapshot.eternityCount > 0,
-    format: (value) => runtime.formatUiNumber(value),
+    format: (value, snapshot) => runtime.formatHeldUiLogNumber(
+      runtime.log10ExactInteger(runtime.parseExactInteger(
+        snapshot.eternityCountExact,
+        runtime.parseExactInteger(value, 0n),
+      )),
+      runtime.parseExactInteger(snapshot.eternityCountExact, runtime.parseExactInteger(value, 0n)).toString(),
+    ),
   },
 ]);
 
@@ -67,6 +79,13 @@ function isEntryUnlocked(entry, before, after) {
 
 function increasedEntry(entry, before, after) {
   if (!before || !after || !isEntryUnlocked(entry, before, after)) return false;
+  if (entry.key === "infinityCount" || entry.key === "eternityCount") {
+    const exactKey = entry.key === "infinityCount" ? "infinityCountExact" : "eternityCountExact";
+    const legacyKey = entry.key;
+    const beforeExact = runtime.parseExactInteger(before[exactKey], runtime.parseExactInteger(before[legacyKey], 0n));
+    const afterExact = runtime.parseExactInteger(after[exactKey], runtime.parseExactInteger(after[legacyKey], 0n));
+    return afterExact > beforeExact;
+  }
   const beforeValue = entry.value(before);
   const afterValue = entry.value(after);
   return !Number.isNaN(afterValue) && afterValue > beforeValue;

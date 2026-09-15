@@ -10,6 +10,22 @@ const INFINITY_UPGRADE_COST_SOFTCAP_START_EXPONENT = 0.9;
 const INFINITY_UPGRADE_COST_SOFTCAP_ASYMPTOTE_EXPONENT = 0.8;
 const INFINITY_UPGRADE_COST_POST_SOFTCAP_DECAY = 0.005;
 
+function currentExactInfinityCount() {
+  return runtime.currentExactIntegerState(
+    runtime.state,
+    "infinityCountExact",
+    "infinityCount",
+  );
+}
+
+function normalizedInfinityCount() {
+  return runtime.numberFromExactInteger(currentExactInfinityCount());
+}
+
+function log10ExactInfinityCount() {
+  return runtime.log10ExactInteger(currentExactInfinityCount());
+}
+
 function infinityUpgradeById(id) {
   if (infinityUpgradeSource !== runtime.INFINITY_UPGRADES) {
     infinityUpgradeSource = runtime.INFINITY_UPGRADES;
@@ -55,7 +71,7 @@ function canBuyInfinityUpgrade(id) {
 }
 
 function infinityChallengesUnlocked() {
-  return runtime.state.infinityCount > 0 && hasInfinityUpgrade("4-1");
+  return currentExactInfinityCount() > 0n && hasInfinityUpgrade("4-1");
 }
 
 function infinitySoftcapPower() {
@@ -149,7 +165,7 @@ function infinityPointGainLog10() {
 
 function infinityUpgradeCostExponent() {
   if (!runtime.hasInfinityUpgrade("7-2")) return 1;
-  const infinityCount = Math.max(0, runtime.state.infinityCount);
+  const infinityCount = normalizedInfinityCount();
   const rawExponent = 1 - infinityCount * INFINITY_UPGRADE_COST_PER_INFINITY;
   if (rawExponent >= INFINITY_UPGRADE_COST_SOFTCAP_START_EXPONENT) return rawExponent;
   const postSoftcapInfinities = infinityCount
@@ -220,10 +236,10 @@ function resetBelowInfinity() {
   runtime.state.totalScoreLog10 = -Infinity;
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
-  runtime.state.vertices = 3;
-  runtime.state.ic8VertexUpgradeLevel = 0;
-  runtime.state.speedLevel = 0;
-  runtime.state.gainLevel = 0;
+  runtime.setExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
+  runtime.setExactIntegerState(runtime.state, "ic8VertexUpgradeLevelExact", "ic8VertexUpgradeLevel", 0n);
+  runtime.setExactIntegerState(runtime.state, "speedLevelExact", "speedLevel", 0n);
+  runtime.setExactIntegerState(runtime.state, "gainLevelExact", "gainLevel", 0n);
   runtime.state.currentGain = 1;
   runtime.state.currentGainLog10 = 0;
   runtime.state.pointProgress = 0;
@@ -317,28 +333,43 @@ function recordInfinityRun(
   recordInfinityCountRate(countGain, realElapsed, challenge, towerChallenge);
 }
 
-function infinityCountGain() {
+function infinityCountGainLog10() {
   const baseGain = (isChallengeCompleted(6) ? 2 : 1)
     * (runtime.isAchievementUnlocked(38) ? 2 : 1);
   const timelineMultiplierLog10 = runtime.timelineRealInfinityCountGainMultiplierLog10?.();
-  if (timelineMultiplierLog10 !== undefined) {
-    const gain = runtime.valueFromLog10(runtime.log10Value(baseGain) + timelineMultiplierLog10);
-    return gain === Number.MAX_VALUE ? gain : floorWithFloatingPointTolerance(gain);
-  }
-  return Math.floor(baseGain * (runtime.timelineRealInfinityCountGainMultiplier?.() ?? 1));
+  const multiplierLog10 = timelineMultiplierLog10 === undefined
+    ? runtime.log10Value(runtime.timelineRealInfinityCountGainMultiplier?.() ?? 1)
+    : timelineMultiplierLog10;
+  return runtime.clampLog10(runtime.log10Value(baseGain) + multiplierLog10);
+}
+
+function infinityCountGain() {
+  return runtime.numberFromExactInteger(infinityCountGainExact());
+}
+
+function infinityCountGainExact() {
+  const gain = runtime.valueFromLog10(infinityCountGainLog10());
+  return gain === Number.MAX_VALUE
+    ? runtime.exactIntegerFromLog10(infinityCountGainLog10())
+    : runtime.normalizeExactInteger(Math.max(1, floorWithFloatingPointTolerance(gain)));
 }
 
 function addAggregatedInfinityCount(amount) {
-  const count = Math.max(0, Math.floor(runtime.sanitizeNumber(amount, 0)));
-  if (count <= 0) return 0;
-  runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + count);
+  const count = runtime.parseExactInteger(amount, null);
+  if (count === null || count <= 0n) return 0;
+  runtime.setExactIntegerState(
+    runtime.state,
+    "infinityCountExact",
+    "infinityCount",
+    currentExactInfinityCount() + count,
+  );
   runtime.checkAchievements(true);
-  return count;
+  return runtime.numberFromExactInteger(count);
 }
 
 function runInfinity(forced = false) {
   if (!canInfinity()) return;
-  if (!forced && runtime.state.infinityCount === 0) return;
+  if (!forced && currentExactInfinityCount() === 0n) return;
   if (runtime.state.activeTowerChallenge === 1 && runtime.towerChallengeCanComplete()) {
     runtime.completeTowerChallengeIfReady();
     return;
@@ -385,8 +416,14 @@ function runInfinity(forced = false) {
 
   const gained = runtime.infinityPointGain();
   const gainedLog10 = runtime.infinityPointGainLog10();
-  const countGain = infinityCountGain();
-  runtime.state.infinityCount = Math.max(0, runtime.state.infinityCount + countGain);
+  const countGainExact = infinityCountGainExact();
+  const countGain = runtime.numberFromExactInteger(countGainExact);
+  runtime.setExactIntegerState(
+    runtime.state,
+    "infinityCountExact",
+    "infinityCount",
+    currentExactInfinityCount() + countGainExact,
+  );
   addInfinityPointsLog10(gainedLog10);
   recordInfinityRun(
     scoreLogBeforeReset,
@@ -449,11 +486,17 @@ function toggleInfinityChallenge(index = nextChallengeIndex()) {
     runtime.state.activeChallengeTime = 0;
     resetBelowInfinity();
     if (runtime.state.activeChallenge === 2) {
-      runtime.state.vertices = Math.min(runtime.state.vertices, 200);
+      const vertices = runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
+      runtime.setExactIntegerState(
+        runtime.state,
+        "verticesExact",
+        "vertices",
+        vertices > 200n ? 200n : vertices,
+      );
       runtime.resetVertexProgress();
     } else if (runtime.state.activeChallenge === 8) {
-      runtime.state.vertices = 3;
-      runtime.state.ic8VertexUpgradeLevel = 0;
+      runtime.setExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
+      runtime.setExactIntegerState(runtime.state, "ic8VertexUpgradeLevelExact", "ic8VertexUpgradeLevel", 0n);
       runtime.resetVertexProgress();
     }
   }
@@ -491,6 +534,9 @@ expose("challengeReward", () => challengeReward, (value) => { challengeReward = 
 expose("canInfinity", () => canInfinity, (value) => { canInfinity = value; });
 expose("infinityPointGain", () => infinityPointGain, (value) => { infinityPointGain = value; });
 expose("infinityPointGainLog10", () => infinityPointGainLog10, (value) => { infinityPointGainLog10 = value; });
+expose("currentExactInfinityCount", () => currentExactInfinityCount);
+expose("normalizedInfinityCount", () => normalizedInfinityCount);
+expose("log10ExactInfinityCount", () => log10ExactInfinityCount);
 expose("infinityUpgradeCostExponent", () => infinityUpgradeCostExponent);
 expose("canSpendInfinityPoints", () => canSpendInfinityPoints, (value) => { canSpendInfinityPoints = value; });
 expose("addInfinityPoints", () => addInfinityPoints, (value) => { addInfinityPoints = value; });
@@ -502,7 +548,9 @@ expose("recordInfinityChallengeTime", () => recordInfinityChallengeTime, (value)
 expose("resetBelowInfinity", () => resetBelowInfinity, (value) => { resetBelowInfinity = value; });
 expose("applyStartingCoreBoosts", () => applyStartingCoreBoosts, (value) => { applyStartingCoreBoosts = value; });
 expose("recordInfinityRun", () => recordInfinityRun, (value) => { recordInfinityRun = value; });
+expose("infinityCountGainLog10", () => infinityCountGainLog10);
 expose("infinityCountGain", () => infinityCountGain, (value) => { infinityCountGain = value; });
+expose("infinityCountGainExact", () => infinityCountGainExact);
 expose("addAggregatedInfinityCount", () => addAggregatedInfinityCount, (value) => { addAggregatedInfinityCount = value; });
 expose("runInfinity", () => runInfinity, (value) => { runInfinity = value; });
 expose("buyInfinityUpgrade", () => buyInfinityUpgrade, (value) => { buyInfinityUpgrade = value; });

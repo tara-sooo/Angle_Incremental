@@ -2,7 +2,6 @@ import { runtime } from "../runtime/shared.js";
 
 const MAX_GAME_LOG10 = Number.MAX_VALUE;
 const MAX_NATIVE_VALUE_LOG10 = Math.log10(Number.MAX_VALUE);
-const MAX_GAME_VERTICES = 1_000_000_000_000;
 const MAX_EXACT_BATCH_CORE_HITS = 2048;
 const CORE_HIT_BATCH_APPROX_SEGMENTS = 256;
 const MAX_SAFE_CORE_HIT_SEARCH = Number.MAX_SAFE_INTEGER;
@@ -72,8 +71,10 @@ function coreBoostRequirementWithoutEarlyCap() {
 }
 
 function normalizedSavedVertices(data) {
-  const raw = Math.floor(runtime.sanitizeNumber(data && data.vertices, 3, 3));
-  return Math.min(MAX_GAME_VERTICES, Math.max(3, raw));
+  const savedExact = runtime.parseExactInteger(data && data.verticesExact, null);
+  const legacy = runtime.parseExactInteger(data && data.vertices, 3n);
+  const raw = savedExact === null ? legacy : savedExact;
+  return raw < 3n ? 3n : raw;
 }
 
 function loadedTowerChallengeIsInvalid(data) {
@@ -92,11 +93,19 @@ function restoreVerticesAfterLoad(data) {
     || runtime.state.activeChallenge === 8
     || loadedTowerChallengeIsInvalid(data)
   ) return;
-  runtime.state.vertices = normalizedSavedVertices(data);
+  runtime.setExactIntegerState(
+    runtime.state,
+    "verticesExact",
+    "vertices",
+    normalizedSavedVertices(data),
+  );
   if (runtime.state.totalVertexProgress > runtime.MAX_VERTEX_PROGRESS_TRACKED) {
     runtime.normalizeVertexProgress();
   }
-  runtime.state.lastVertexIndex = Math.floor(runtime.state.pointProgress * runtime.state.vertices) % runtime.state.vertices;
+  const vertices = runtime.numberFromExactInteger(
+    runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n),
+  );
+  runtime.state.lastVertexIndex = Math.floor(runtime.state.pointProgress * vertices) % vertices;
 }
 
 function addCurrentGainForVertexSteps(stepCount) {
@@ -381,7 +390,10 @@ function processManyVerticesExactly(start, end) {
       return processOfflineVerticesInOrder(start, end, plannedBatches);
     }
 
-    if (runtime.state.infinityCount === 0 && projectedScoreLog >= runtime.INFINITY_REQUIREMENT_LOG10) {
+    if (
+      runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") === 0n
+      && projectedScoreLog >= runtime.INFINITY_REQUIREMENT_LOG10
+    ) {
       return processFirstInfinityCrossingBatch(batches, increaseLog10, plannedBatches);
     }
 
@@ -411,7 +423,6 @@ export function installNumericStabilityFixes() {
 
   runtime.MAX_GAME_LOG10 = MAX_GAME_LOG10;
   runtime.MAX_NATIVE_VALUE_LOG10 = MAX_NATIVE_VALUE_LOG10;
-  runtime.MAX_GAME_VERTICES = MAX_GAME_VERTICES;
   runtime.sanitizeLog10 = sanitizeGameLog10;
   runtime.clampLog10 = clampGameLog10;
   runtime.valueFromLog10 = valueFromGameLog10;

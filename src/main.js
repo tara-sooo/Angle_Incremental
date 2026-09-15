@@ -259,7 +259,7 @@ function offlineWorkStatsSnapshot() {
 
 function offlineBulkSimulationAllowed() {
   const state = runtime.state;
-  return state.infinityCount > 0
+  return runtime.currentExactIntegerState(state, "infinityCountExact", "infinityCount") > 0n
     && !state.automationEnabled
     && state.activeChallenge <= 0
     && state.activeTowerChallenge <= 0
@@ -781,7 +781,7 @@ function runLayerAutomation() {
   if (
     infinityAutomationUnlocked
     && runtime.state.autoRunInfinity
-    && runtime.state.infinityCount > 0
+    && runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") > 0n
     && runtime.canInfinity()
     && (runtime.state.activeTowerChallenge <= 0 || runtime.towerChallengeCanComplete())
     && runtime.infinityPointGainLog10() >= Math.max(
@@ -925,17 +925,21 @@ function offlineSnapshot() {
   const state = runtime.state;
   const generationCount = Math.max(0, Math.floor(Number(state.generationCount) || 0));
   const coreBoostCount = Math.max(0, Math.floor(Number(state.coreBoostCount) || 0));
-  const infinityCount = Math.max(0, Math.floor(Number(state.infinityCount) || 0));
-  const eternityCount = Math.max(0, Math.floor(Number(state.eternityCount) || 0));
+  const infinityCountExact = runtime.currentExactIntegerState(state, "infinityCountExact", "infinityCount");
+  const eternityCountExact = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount");
+  const infinityCount = runtime.numberFromExactInteger(infinityCountExact);
+  const eternityCount = runtime.numberFromExactInteger(eternityCountExact);
   return {
     scoreLog10: runtime.currentScoreLog10(),
     generationCount,
     coreBoostCount,
     infinityCount,
+    infinityCountExact: infinityCountExact.toString(),
     infinityPointsLog10: runtime.currentInfinityPointsLog10(),
     infinityPointsExact: typeof state.infinityPointsExact === "string" ? state.infinityPointsExact : "",
     infiniteScoreLog10: runtime.currentInfiniteScoreLog10(),
     eternityCount,
+    eternityCountExact: eternityCountExact.toString(),
     scoreUnlocked: true,
     generationUnlocked: generationCount > 0
       || runtime.currentTotalScoreLog10() >= runtime.log10Value(runtime.GENERATION_UNLOCK_SCORE),
@@ -948,11 +952,17 @@ function offlineSnapshot() {
   };
 }
 
+function exactSnapshotDifference(after, before, exactKey, legacyKey) {
+  const afterValue = runtime.parseExactInteger(after?.[exactKey], runtime.parseExactInteger(after?.[legacyKey], 0n));
+  const beforeValue = runtime.parseExactInteger(before?.[exactKey], runtime.parseExactInteger(before?.[legacyKey], 0n));
+  return afterValue > beforeValue ? afterValue - beforeValue : 0n;
+}
+
 function offlineInfinityAggregationEnabled() {
   return runtime.state.automationEnabled
     && runtime.state.autoRunInfinity
     && runtime.state.autoInfinityPointThresholdLog10 === 0
-    && runtime.state.infinityCount > 0
+    && runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount") > 0n
     && (runtime.infinityAutomationUnlocked?.() || false)
     && runtime.state.activeChallenge <= 0
     && runtime.state.activeTowerChallenge <= 0;
@@ -1142,8 +1152,21 @@ function refreshOfflineReportProgress(
   report.infinityCountAfter = current.infinityCount;
   report.infinityPointsAfterLog10 = current.infinityPointsLog10;
   report.infiniteScoreAfterLog10 = current.infiniteScoreLog10;
-  report.normalInfinityCountGain = Math.max(0, current.infinityCount - before.infinityCount);
-  report.totalInfinityCountGain = report.normalInfinityCountGain + report.aggregatedInfinityCountGain;
+  const normalInfinityCountGainExact = exactSnapshotDifference(
+    current,
+    before,
+    "infinityCountExact",
+    "infinityCount",
+  );
+  report.normalInfinityCountGain = runtime.numberFromExactInteger(normalInfinityCountGainExact);
+  report.normalInfinityCountGainExact = normalInfinityCountGainExact.toString();
+  const aggregatedInfinityCountGainExact = runtime.parseExactInteger(
+    report.aggregatedInfinityCountGainExact,
+    runtime.parseExactInteger(report.aggregatedInfinityCountGain, 0n),
+  );
+  const totalInfinityCountGainExact = normalInfinityCountGainExact + aggregatedInfinityCountGainExact;
+  report.totalInfinityCountGain = runtime.numberFromExactInteger(totalInfinityCountGainExact);
+  report.totalInfinityCountGainExact = totalInfinityCountGainExact.toString();
   const processingElapsed = currentTime - startedAt;
   if (Number.isFinite(processingElapsed) && processingElapsed >= 0) {
     report.processingMilliseconds = processingElapsed;
@@ -1296,8 +1319,11 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           infiniteScoreBeforeLog10: before.infiniteScoreLog10,
           infiniteScoreAfterLog10: before.infiniteScoreLog10,
           normalInfinityCountGain: 0,
+          normalInfinityCountGainExact: "0",
           aggregatedInfinityCountGain: 0,
+          aggregatedInfinityCountGainExact: "0",
           totalInfinityCountGain: 0,
+          totalInfinityCountGainExact: "0",
         };
         beginOfflineWorkBudget(requestedTicks);
         setOfflineProcessing(true);
@@ -1410,7 +1436,13 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     precisionReduced = !clockAnomaly && Boolean(runtime.offlinePrecisionReduced);
 
     const normalAfter = offlineSnapshot();
-    const normalInfinityCountGain = Math.max(0, normalAfter.infinityCount - before.infinityCount);
+    const normalInfinityCountGainExact = exactSnapshotDifference(
+      normalAfter,
+      before,
+      "infinityCountExact",
+      "infinityCount",
+    );
+    const normalInfinityCountGain = runtime.numberFromExactInteger(normalInfinityCountGainExact);
     const aggregation = !clockAnomaly && aggregationEligible
       ? applyOfflineInfinityAggregation(
         simulatedSeconds,
@@ -1420,6 +1452,15 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       )
       : { added: 0, remainder: rateRemainderAtStart };
     const after = offlineSnapshot();
+    const totalInfinityCountGainExact = exactSnapshotDifference(
+      after,
+      before,
+      "infinityCountExact",
+      "infinityCount",
+    );
+    const aggregatedInfinityCountGainExact = totalInfinityCountGainExact > normalInfinityCountGainExact
+      ? totalInfinityCountGainExact - normalInfinityCountGainExact
+      : 0n;
     const effectiveElapsedSeconds = clockAnomaly
       ? 0
       : simulatedSeconds;
@@ -1452,8 +1493,11 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       infiniteScoreBeforeLog10: before.infiniteScoreLog10,
       infiniteScoreAfterLog10: after.infiniteScoreLog10,
       normalInfinityCountGain,
-      aggregatedInfinityCountGain: aggregation.added,
-      totalInfinityCountGain: Math.max(0, after.infinityCount - before.infinityCount),
+      normalInfinityCountGainExact: normalInfinityCountGainExact.toString(),
+      aggregatedInfinityCountGain: runtime.numberFromExactInteger(aggregatedInfinityCountGainExact),
+      aggregatedInfinityCountGainExact: aggregatedInfinityCountGainExact.toString(),
+      totalInfinityCountGain: runtime.numberFromExactInteger(totalInfinityCountGainExact),
+      totalInfinityCountGainExact: totalInfinityCountGainExact.toString(),
     };
     runtime.updateUi();
     if (!runtime.saveGame("manual")) {
@@ -1702,6 +1746,11 @@ function renderGameToText() {
   const points = runtime.polygonPoints();
   const point = runtime.pointPosition();
   const corePoint = runtime.vertexPoint(0);
+  const verticesExact = runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
+  const speedLevelExact = runtime.currentExactIntegerState(runtime.state, "speedLevelExact", "speedLevel");
+  const gainLevelExact = runtime.currentExactIntegerState(runtime.state, "gainLevelExact", "gainLevel");
+  const infinityCountExact = runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount");
+  const eternityCountExact = runtime.currentExactIntegerState(runtime.state, "eternityCountExact", "eternityCount");
   const scoreLog = runtime.currentScoreLog10();
   const finalGainLog = runtime.finalScoreGainLog10();
   const totalScoreLog = runtime.currentTotalScoreLog10();
@@ -1737,6 +1786,7 @@ function renderGameToText() {
     baseGainExpressionDivisor: gainExpression.divisor,
     baseGainExpressionParts: gainExpression.parts,
     vertices: runtime.effectiveVertexCount(),
+    verticesExact: verticesExact.toString(),
     lapSeconds: Number(runtime.lapDuration().toPrecision(6)),
     lapSpeedMultiplier: Number(runtime.lapSpeedMultiplier().toPrecision(6)),
     lapSpeedLog10: Number(runtime.effectiveLapSpeedLog10().toPrecision(6)),
@@ -1750,7 +1800,9 @@ function renderGameToText() {
     coreCount: runtime.coreVertexIndices().length,
     upgrades: {
       speedLevel: runtime.state.speedLevel,
+      speedLevelExact: speedLevelExact.toString(),
       gainLevel: runtime.state.gainLevel,
+      gainLevelExact: gainLevelExact.toString(),
       costs: {
         speed: runtime.formatUiLogNumber(currentCostLogs.speed),
         speedLog10: Number(currentCostLogs.speed.toPrecision(6)),
@@ -1789,6 +1841,7 @@ function renderGameToText() {
     infinity: {
       canInfinity: runtime.canInfinity(),
       count: runtime.state.infinityCount,
+      countExact: infinityCountExact.toString(),
       points: runtime.formatHeldUiLogNumber(infinityPointsLog, runtime.state.infinityPointsExact),
       pointsLog10: Number.isFinite(infinityPointsLog) ? Number(infinityPointsLog.toPrecision(6)) : null,
       pointGain: infinityPointGainLog10 > runtime.log10Value(Number.MAX_VALUE)
@@ -1846,6 +1899,7 @@ function renderGameToText() {
     },
     eternity: {
       count: runtime.state.eternityCount,
+      countExact: eternityCountExact.toString(),
       canEternity: runtime.canEternity(),
       pendingGain: runtime.formatUiLogNumber(eternityGainLog10),
       pendingGainLog10: Number.isFinite(eternityGainLog10) ? Number(eternityGainLog10.toPrecision(6)) : null,

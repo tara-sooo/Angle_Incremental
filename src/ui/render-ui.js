@@ -69,14 +69,30 @@ function formatInfiniteAngleLevel(kind) {
   return `Lv ${level}${freeLevel > 0 ? ` (+${freeLevel})` : ""}`;
 }
 
-function formatNormalUpgradeTotal(level) {
+function formatExactInteger(value, fallback = 0n) {
+  const exact = runtime.parseExactInteger(value, fallback);
+  return runtime.formatHeldUiLogNumber(runtime.log10ExactInteger(exact), exact.toString());
+}
+
+function exactNormalUpgradeValue(kind, fallback = 0n) {
+  return runtime.parseExactInteger(runtime.normalUpgradeLevelExact?.(kind), fallback);
+}
+
+function formatNormalUpgradeTotal(level, exactValue = null) {
+  if (exactValue !== null) return formatExactInteger(exactValue);
   return level < 1000 ? runtime.formatSmallDecimal(level) : runtime.formatUiNumber(level);
 }
 
-function formatNormalUpgradeLevel(rawLevel, effectiveLevel, freeLevel) {
+function formatNormalUpgradeLevel(kind, rawLevel, effectiveLevel, freeLevel, freeExact) {
+  const rawValue = exactNormalUpgradeValue(
+    kind,
+    BigInt(Math.max(0, Math.floor(Number(rawLevel) || 0))),
+  );
+  const rawText = formatExactInteger(rawValue);
+  const freeText = formatExactInteger(freeExact, BigInt(Math.max(0, Math.floor(Number(freeLevel) || 0))));
   return freeLevel > 0
-    ? `Lv ${formatNormalUpgradeTotal(effectiveLevel)} (+${freeLevel})`
-    : formatEffectiveLevel(rawLevel, effectiveLevel);
+    ? `Lv ${formatNormalUpgradeTotal(effectiveLevel)} (+${freeText})`
+    : formatEffectiveLevel(rawText, effectiveLevel, rawValue);
 }
 
 function recoveryReasonText(reason) {
@@ -123,8 +139,12 @@ function recoveryStateSummary(entry) {
     state.infinityPointsLog10,
     runtime.log10Value(Math.max(0, Number(state.infinityPoints) || 0)),
   );
+  const infinityCountExact = runtime.parseExactInteger(
+    state.infinityCountExact,
+    runtime.parseExactInteger(state.infinityCount, 0n),
+  );
   return [
-    `${runtime.t("recoveryInfinity")}: ${runtime.formatUiNumber(state.infinityCount || 0)}`,
+    `${runtime.t("recoveryInfinity")}: ${formatExactInteger(infinityCountExact)}`,
     `${runtime.t("recoveryIp")}: ${runtime.formatHeldUiLogNumber(infinityPointsLog10, state.infinityPointsExact)}`,
     `${runtime.t("recoveryChallenges")}: ${countBits(state.completedChallenges)}/${runtime.INFINITY_CHALLENGE_COUNT}`,
     `${runtime.t("recoveryAchievements")}: ${countAchievementBits(state)}/${runtime.ACHIEVEMENT_COUNT}`,
@@ -591,24 +611,40 @@ function updateUi() {
   runtime.elements.lapValue.textContent = runtime.formatDuration(runtime.lapDuration());
   runtime.elements.lapSpeedValue.textContent = formatMultiplierLog(runtime.effectiveLapSpeedLog10());
   if (runtime.isLapSpeedSoftcapped()) runtime.elements.lapSpeedValue.textContent += " " + runtime.t("lapSpeedSoftcapped");
-  const freeNormalUpgradeLevel = runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0;
+  const freeNormalUpgradeLevelExact = runtime.parseExactInteger(
+    runtime.eternityMilestoneNormalUpgradeBonusLevelExact?.(),
+    0n,
+  );
+  const freeNormalUpgradeLevel = runtime.numberFromExactInteger(freeNormalUpgradeLevelExact);
   const effectiveSpeedLevel = runtime.effectiveSpeedLevel();
   const effectiveVertexCount = runtime.effectiveVertexCount();
   const effectiveGainLevel = runtime.effectiveGainLevel();
   runtime.elements.speedLevel.textContent = formatNormalUpgradeLevel(
+    "speed",
     runtime.state.speedLevel,
     effectiveSpeedLevel,
     freeNormalUpgradeLevel,
+    freeNormalUpgradeLevelExact,
   );
+  const verticesExact = runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
+  const vertices = runtime.numberFromExactInteger(verticesExact);
+  const effectiveVertexText = formatNormalUpgradeTotal(effectiveVertexCount);
   runtime.elements.vertexCount.textContent = freeNormalUpgradeLevel > 0
-    ? `${formatNormalUpgradeTotal(effectiveVertexCount)} ${runtime.t("vertices")} (+${freeNormalUpgradeLevel})`
-    : effectiveVertexCount === runtime.state.vertices
-      ? `${runtime.state.vertices} ${runtime.t("vertices")}`
-      : `${effectiveVertexCount} ${runtime.t("vertices")} (${runtime.state.vertices} + ${effectiveVertexCount - runtime.state.vertices})`;
+    ? `${effectiveVertexText} ${runtime.t("vertices")} (+${formatExactInteger(freeNormalUpgradeLevelExact)})`
+    : effectiveVertexCount === vertices
+      ? `${formatExactInteger(verticesExact)} ${runtime.t("vertices")}`
+      : Number.isFinite(vertices)
+        && Number.isFinite(effectiveVertexCount)
+        && Math.abs(vertices) < Number.MAX_SAFE_INTEGER
+        && Math.abs(effectiveVertexCount) < Number.MAX_SAFE_INTEGER
+        ? `${effectiveVertexText} ${runtime.t("vertices")} (${vertices} + ${effectiveVertexCount - vertices})`
+        : `${effectiveVertexText} ${runtime.t("vertices")} (purchased ${formatExactInteger(verticesExact)})`;
   runtime.elements.gainLevel.textContent = formatNormalUpgradeLevel(
+    "gain",
     runtime.state.gainLevel,
     effectiveGainLevel,
     freeNormalUpgradeLevel,
+    freeNormalUpgradeLevelExact,
   );
   runtime.elements.speedCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.speed)}`;
   runtime.elements.vertexCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.vertex)}`;
@@ -642,9 +678,10 @@ function updateUi() {
   runtime.elements.coreBoostExponent.textContent = formatExponentPreview(runtime.coreBoostGainExponent(), nextCoreBoost.gainExponent);
   runtime.elements.coreBoostButton.disabled = !runtime.canCoreBoost();
 
-  runtime.elements.infinityCount.textContent = runtime.formatUiNumber(runtime.state.infinityCount);
+  const infinityCountExact = runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount");
+  runtime.elements.infinityCount.textContent = formatExactInteger(infinityCountExact);
   const infinityReady = runtime.canInfinity();
-  const infinityUnlocked = runtime.state.infinityCount > 0;
+  const infinityUnlocked = infinityCountExact > 0n;
   runtime.elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";
   runtime.elements.infinityUnlockNote.hidden = infinityUnlocked;
   runtime.elements.infinityUnlockNote.textContent = runtime.t("infinityUnlockNote")
@@ -657,7 +694,7 @@ function updateUi() {
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiLogNumber(runtime.infinityPointGainLog10())} IP`;
-  runtime.elements.infinityButton.disabled = runtime.state.infinityCount === 0 || !runtime.canInfinity();
+  runtime.elements.infinityButton.disabled = infinityCountExact === 0n || !runtime.canInfinity();
   runtime.updateInfinityUpgradeRows();
   const infiniteAngleUnlocked = runtime.state.infiniteAngleUnlocked;
   const infiniteAngleUnlockCostLog10 = runtime.infiniteAngleUnlockCostLog10();
@@ -787,9 +824,10 @@ function formatGainExpression(valueLog10) {
   return `(${base} / ${config.divisor})^${exponent}`;
 }
 
-function formatEffectiveLevel(rawLevel, effectiveLevel) {
-  const label = `${runtime.t("level")} ${rawLevel}`;
-  return effectiveLevel === rawLevel
+function formatEffectiveLevel(rawText, effectiveLevel, rawValue = null) {
+  const label = `${runtime.t("level")} ${rawText}`;
+  const projectedRawValue = rawValue === null ? Number(rawText) : runtime.numberFromExactInteger(rawValue);
+  return effectiveLevel === projectedRawValue
     ? label
     : `${label} → ${runtime.t("effectiveLevel")} ${effectiveLevel < 1000
       ? runtime.formatSmallDecimal(effectiveLevel)

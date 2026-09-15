@@ -60,24 +60,26 @@ function hasPositiveValue(values) {
 function discoverMainTabs() {
   const state = runtime.state;
   const discovered = [];
-  if (state.eternityCount > 0 || state.infinityCount > 0) discovered.push("infinity");
+  const hasEternity = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount") > 0n;
+  const hasInfinity = runtime.currentExactIntegerState(state, "infinityCountExact", "infinityCount") > 0n;
+  if (hasEternity || hasInfinity) discovered.push("infinity");
   if (
-    state.eternityCount > 0
+    hasEternity
     || runtime.infinityChallengesUnlocked?.() === true
     || state.activeChallenge > 0
     || state.completedChallenges !== 0
     || hasPositiveValue(state.fastestInfinityChallengeTimes)
   ) discovered.push("challenges");
   if (
-    state.eternityCount > 0
+    hasEternity
     || runtime.normalAutomationUnlocked?.() === true
     || runtime.isAchievementUnlocked?.(19) === true
     || runtime.infinityAutomationUnlocked?.() === true
     || runtime.infinityUpgradeAutomationUnlocked?.() === true
     || runtime.eternityMilestoneActive?.("8") === true
   ) discovered.push("automation");
-  if (state.eternityCount > 0 || runtime.towerChallengeUnlocked?.(4) === true) discovered.push("eternity");
-  if (state.eternityCount > 0) discovered.push("timeline");
+  if (hasEternity || runtime.towerChallengeUnlocked?.(4) === true) discovered.push("eternity");
+  if (hasEternity) discovered.push("timeline");
   return runtime.markMainTabsUnlocked(discovered) === true;
 }
 
