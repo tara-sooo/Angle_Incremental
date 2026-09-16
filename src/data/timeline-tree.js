@@ -41,8 +41,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "Between the Tigris and Euphrates",
     }),
     description: Object.freeze({
-      ja: "IC6のInfinity数報酬倍率はEternity数に応じて強化される（1 Eternityごとに×2、×1e10以降 SC）",
-      en: "IC6 Infinity count reward multiplier increases by ×2 per Eternity (SC after ×1e10).",
+      ja: "IC6のInfinity数報酬倍率はEternity数に応じて強化される（1 Eternityごとに×1.2、×1e10以降 SC）",
+      en: "IC6 Infinity count reward multiplier increases by ×1.2 per Eternity (SC after ×1e10).",
     }),
   }),
   Object.freeze({
@@ -89,8 +89,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "A Human Declaration Impossible After Death",
     }),
     description: Object.freeze({
-      ja: "現在のInfinity数に応じてEternity獲得量を×(1 + 10^(log10(Infinity数)) / 4)する（Infinity数e15以降 SC）",
-      en: "Multiply Eternity gain by ×(1 + 10^(log10(Infinity count)) / 4) based on current Infinity count (SC after e15 Infinity count).",
+      ja: "現在のInfinity数に応じてEternity獲得量を×(1 + 10^(log10(Infinity数)) / 10)する（Infinity数e15以降 SC）",
+      en: "Multiply Eternity gain by ×(1 + 10^(log10(Infinity count)) / 10) based on current Infinity count (SC after e15 Infinity count).",
     }),
   }),
 ]);
