@@ -52,6 +52,11 @@ function collectViolations(report) {
       violations.push(`offline quiet ${ticks}-tick resume wall ${resume.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineLongResumeWallMs}ms`);
     }
   }
+  for (const [route, resume] of Object.entries(report.offlineStress.timelineResume)) {
+    if (resume.wallMilliseconds > budgets.offlineLongResumeWallMs) {
+      violations.push(`offline Timeline ${route} million-tick resume wall ${resume.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineLongResumeWallMs}ms`);
+    }
+  }
   return violations;
 }
 
@@ -311,36 +316,74 @@ async function measureOfflineStress(page) {
         wallMilliseconds: performance.now() - startedAt,
       };
     }
-    async function measureTimelineOfflineResume() {
-      const requestedTicks = 10000;
+    function configureTimelineOfflineScenario(nodes) {
+      const requestedTicks = runtime.OFFLINE_PROGRESS_MAX_TICKS;
       resetScenario(720);
       state.activeTowerChallenge = 0;
       state.automationEnabled = false;
       state.autoRunInfinity = false;
       state.autoRunGeneration = false;
       state.autoRunCoreBoost = false;
-      state.infinityCount = 1;
-      state.eternityCount = 1;
-      state.completedChallenges = 1 << (8 - 1);
-      state.timelinePurchasedNodes = [{ id: "Parallel-BC16500" }];
-      state.timelineParallelSecondsSinceIc8Clear = 0;
+      state.completedChallenges = (1 << (6 - 1)) | (1 << (8 - 1));
+      state.timelinePurchasedNodes = nodes.map((id) => ({ id }));
+      state.timelineParallelSecondsSinceIc8Clear = 5;
+      state.towerFloor = 10;
+      state.score = Number.MAX_VALUE;
+      state.scoreLog10 = 14000;
+      state.totalScore = Number.MAX_VALUE;
+      state.totalScoreLog10 = 14000;
+      state.generationScore = Number.MAX_VALUE;
+      state.generationScoreLog10 = 14000;
+      state.infiniteCapBroken = true;
+      state.currentGain = 1;
+      state.currentGainLog10 = 0;
+      state.infiniteScore = Number.MAX_VALUE;
+      state.infiniteScoreLog10 = 100;
       state.offlineProgressEnabled = true;
       state.offlineTickCount = requestedTicks;
+      state.totalPlayTime = 0;
+      state.currentInfinityRunTime = 0;
+      state.currentEternityRunTime = 0;
+      state.currentGenerationRunTime = 0;
+      runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 100n);
+      runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 8n);
+      runtime.syncInfinityPointCachesFromExact(10n ** 6n);
+      return requestedTicks;
+    }
+    async function measureTimelineOfflineResume(route, nodes) {
+      const requestedTicks = configureTimelineOfflineScenario(nodes);
       const tickSeconds = runtime.MAX_SIMULATION_STEP_SECONDS;
       const startedAt = performance.now();
       const report = await debug.processOfflineElapsed(
         tickSeconds * requestedTicks,
-        "performance-timeline",
+        `performance-timeline-${route}`,
         { clockSource: "server" },
       );
       return {
+        route,
+        nodes,
         requestedTicks: report?.requestedTicks ?? 0,
         processedTicks: report?.processedTicks ?? 0,
         simulationIterations: report?.simulationIterations ?? 0,
         bulkIterations: report?.bulkIterations ?? 0,
         bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+        precisionReduced: report?.precisionReduced ?? false,
+        work: runtime.offlineWorkStats,
+        before: report?.before ?? null,
+        after: report?.after ?? null,
         timelineSeconds: state.timelineParallelSecondsSinceIc8Clear,
-        expectedTimelineSeconds: tickSeconds * requestedTicks,
+        expectedTimelineSeconds: 5 + tickSeconds * requestedTicks,
+        final: {
+          scoreLog10: runtime.currentScoreLog10(),
+          infiniteScoreLog10: runtime.currentInfiniteScoreLog10(),
+          infinityPointsLog10: runtime.currentInfinityPointsLog10(),
+          parallelTimerEffectLog10: runtime.timelineParallelEffectiveLog10(),
+          realCountEffectLog10: runtime.timelineRealInfinityCountGainMultiplierLog10(),
+          towerScoreExponent: runtime.towerScoreExponent(),
+          infinityPointGainLog10: runtime.infinityPointGainLog10(),
+          eternityGainExact: runtime.eternityGainExact().toString(),
+          infiniteAngleUnlocked: state.infiniteAngleUnlocked,
+        },
         wallMilliseconds: performance.now() - startedAt,
       };
     }
@@ -448,7 +491,16 @@ async function measureOfflineStress(page) {
           100000: await measureQuietOfflineResume(100000),
           1000000: await measureQuietOfflineResume(1000000),
         },
-        timelineResume: await measureTimelineOfflineResume(),
+        timelineResume: {
+          real: await measureTimelineOfflineResume(
+            "real",
+            ["Real-BC16500", "Real-BC6000", "Real-AD30"],
+          ),
+          parallel: await measureTimelineOfflineResume(
+            "parallel",
+            ["Parallel-BC16500", "Parallel-BC6000", "Parallel-AD30"],
+          ),
+        },
       },
     };
   });
@@ -587,13 +639,30 @@ try {
     assert.ok(Number.isFinite(resume.wallMilliseconds), `quiet ${ticks}-tick resume should report finite wall time`);
   }
   const timelineResume = report.offlineStress.timelineResume;
-  assert.equal(timelineResume.requestedTicks, 10000, "Timeline resume should request 10000 ticks");
-  assert.equal(timelineResume.processedTicks, 10000, "Timeline resume should process 10000 ticks");
-  assert.equal(timelineResume.simulationIterations, 10000, "Timeline effects should retain per-tick simulation");
-  assert.equal(timelineResume.bulkIterations, 0, "Timeline effects should not be bulked across changing production state");
+  for (const [route, resume] of Object.entries(timelineResume)) {
+    assert.equal(resume.requestedTicks, 1000000, `${route} Timeline resume should request one million ticks`);
+    assert.equal(resume.processedTicks, 1000000, `${route} Timeline resume should process one million ticks`);
+    assert.ok(resume.simulationIterations < resume.requestedTicks, `${route} Timeline resume should reduce full updates`);
+    assert.ok(resume.bulkIterations > 0, `${route} Timeline resume should use bulk updates`);
+    assert.equal(
+      resume.processedTicks,
+      resume.bulkProcessedTicks + resume.simulationIterations - resume.bulkIterations,
+      `${route} Timeline bulk diagnostics should account for every processed tick`,
+    );
+    assert.ok(resume.work.totalIterations <= resume.work.hardCap, `${route} Timeline work should stay within its hard cap`);
+    assert.equal(resume.precisionReduced, resume.work.precisionReduced, `${route} Timeline precision status should match its work ledger`);
+    assert.equal(resume.final.infiniteAngleUnlocked, true, `${route} Timeline measurement should keep Infinite Angle active`);
+    assert.ok(Number.isFinite(resume.wallMilliseconds), `${route} Timeline resume should report finite wall time`);
+    assert.match(resume.final.eternityGainExact, /^\d+$/, `${route} AD30 gain should be recorded exactly`);
+    assert.ok(BigInt(resume.final.eternityGainExact) > 1n, `${route} AD30 gain should remain active in the representative state`);
+    assert.ok(
+      Math.abs(resume.timelineSeconds - resume.expectedTimelineSeconds) < 1e-6,
+      `${route} Timeline elapsed state should preserve the full offline duration`,
+    );
+  }
   assert.ok(
-    Math.abs(timelineResume.timelineSeconds - timelineResume.expectedTimelineSeconds) < 1e-9,
-    "Timeline elapsed state should preserve the full offline duration",
+    timelineResume.parallel.final.parallelTimerEffectLog10 > 0,
+    "Parallel-BC16500 should expose its accumulated post-IC8 effect",
   );
   assert.deepEqual(violations, [], `offline stress budget violations:\n${violations.join("\n")}`);
 } finally {

@@ -413,7 +413,159 @@ async function testSaveCompatibility() {
 }
 
 function assertClose(actual, expected, tolerance, message) {
+  if (actual === expected) return;
   assert.ok(Math.abs(actual - expected) <= tolerance, `${message}: expected ${expected}, got ${actual}`);
+}
+
+const TIMELINE_BULK_NODE_IDS = [
+  "Real-BC16500",
+  "Parallel-BC16500",
+  "Real-BC6000",
+  "Parallel-BC6000",
+  "Real-AD30",
+  "Parallel-AD30",
+];
+
+function configureQuietTimelineState(instance, nodes) {
+  const { state } = instance.debug;
+  const { runtime } = instance;
+  Object.assign(state, {
+    activeChallenge: 0,
+    activeTowerChallenge: 0,
+    automationEnabled: false,
+    autoRunInfinity: false,
+    autoRunGeneration: false,
+    autoRunCoreBoost: false,
+    completedChallenges: (1 << (6 - 1)) | (1 << (8 - 1)),
+    timelinePurchasedNodes: nodes.map((id) => ({ id })),
+    timelineParallelSecondsSinceIc8Clear: 5,
+    offlineProgressEnabled: true,
+    offlineTickCount: 120,
+    vertices: 3,
+    speedLevel: 30,
+    gainLevel: 0,
+    currentGain: 1,
+    currentGainLog10: 0,
+    pointProgress: 0,
+    totalVertexProgress: 0,
+    score: Number.MAX_VALUE,
+    scoreLog10: 15000,
+    totalScore: Number.MAX_VALUE,
+    totalScoreLog10: 15000,
+    generationScore: Number.MAX_VALUE,
+    generationScoreLog10: 15000,
+    infiniteCapBroken: true,
+    towerFloor: 10,
+    currentInfinityRunTime: 0,
+    currentEternityRunTime: 0,
+    currentGenerationRunTime: 0,
+    totalPlayTime: 0,
+  });
+  runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 100n);
+  runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 8n);
+  runtime.syncInfinityPointCachesFromExact(10n ** 6n);
+  runtime.updateUi = () => {};
+  runtime.saveGame = () => true;
+  runtime.createCheckpoint = () => true;
+}
+
+async function runQuietTimelineResume(nodes, guarded) {
+  const instance = await loadRuntime(candidatePath);
+  configureQuietTimelineState(instance, nodes);
+  const { debug, runtime } = instance;
+  let report;
+  if (guarded) {
+    runtime.beginOfflineWorkBudget(120);
+    runtime.offlineProcessing = true;
+    try {
+      for (let tick = 0; tick < 120; tick += 1) debug.update(runtime.MAX_SIMULATION_STEP_SECONDS, true);
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+    report = { requestedTicks: 120, processedTicks: 120, simulationIterations: 120, bulkIterations: 0 };
+  } else {
+    report = await debug.processOfflineElapsed(
+      120 * runtime.MAX_SIMULATION_STEP_SECONDS,
+      "timeline-bulk",
+      { clockSource: "server" },
+    );
+  }
+  return {
+    report,
+    values: {
+      scoreLog10: runtime.currentScoreLog10(),
+      totalScoreLog10: runtime.currentTotalScoreLog10(),
+      generationScoreLog10: runtime.currentGenerationScoreLog10(),
+      currentGainLog10: runtime.currentGainLog10(),
+      infinityPointsLog10: runtime.currentInfinityPointsLog10(),
+      infiniteScoreLog10: runtime.currentInfiniteScoreLog10(),
+      infinityCountExact: runtime.currentExactIntegerState(
+        debug.state,
+        "infinityCountExact",
+        "infinityCount",
+      ).toString(),
+      timelineSeconds: debug.state.timelineParallelSecondsSinceIc8Clear,
+      parallelTimerEffectLog10: runtime.timelineParallelEffectiveLog10(),
+      realCountEffectLog10: runtime.timelineRealInfinityCountGainMultiplierLog10(),
+      towerScoreExponent: runtime.towerScoreExponent(),
+      infinityCountGainExact: runtime.infinityCountGainExact().toString(),
+      eternityGainExact: runtime.eternityGainExact().toString(),
+    },
+  };
+}
+
+async function testTimelineBulkSimulation() {
+  const policy = await loadRuntime(candidatePath);
+  const { state } = policy.debug;
+  const { runtime } = policy;
+  for (const id of TIMELINE_BULK_NODE_IDS) {
+    state.timelinePurchasedNodes = [{ id }];
+    assert.equal(runtime.timelineBulkSimulationAllowed(), true, `${id} should be audited as bulk-safe`);
+  }
+  state.timelinePurchasedNodes = [{ id: "future-node" }];
+  assert.equal(runtime.timelineBulkSimulationAllowed(), false, "unknown Timeline effects should remain on the guarded path");
+
+  for (const nodes of [
+    ["Real-BC16500", "Real-BC6000", "Real-AD30"],
+    ["Parallel-BC16500", "Parallel-BC6000", "Parallel-AD30"],
+  ]) {
+    const bulk = await runQuietTimelineResume(nodes, false);
+    const guarded = await runQuietTimelineResume(nodes, true);
+    assert.equal(bulk.report.requestedTicks, 120, "bulk comparison should request all configured ticks");
+    assert.equal(bulk.report.processedTicks, 120, "bulk comparison should process all configured ticks");
+    assert.ok(bulk.report.simulationIterations < bulk.report.requestedTicks, "quiet Timeline should use fewer full updates");
+    assert.ok(bulk.report.bulkIterations > 0, "quiet Timeline should use bulk updates");
+    assert.equal(guarded.report.simulationIterations, 120, "guarded Timeline should retain one update per tick");
+    assert.equal(guarded.report.bulkIterations, 0, "guarded Timeline should not report bulk updates");
+    for (const [key, tolerance] of [
+      ["scoreLog10", 1e-9],
+      ["totalScoreLog10", 1e-9],
+      ["generationScoreLog10", 1e-9],
+      ["currentGainLog10", 1e-12],
+      ["infinityPointsLog10", 1e-12],
+      ["infiniteScoreLog10", 1e-12],
+      ["timelineSeconds", 1e-9],
+      ["parallelTimerEffectLog10", 1e-12],
+      ["realCountEffectLog10", 1e-12],
+      ["towerScoreExponent", 1e-12],
+    ]) {
+      assertClose(bulk.values[key], guarded.values[key], tolerance, `${key} should match guarded Timeline processing`);
+    }
+    assert.equal(bulk.values.infinityCountGainExact, guarded.values.infinityCountGainExact, "Infinity gain should match at the next boundary");
+    assert.equal(bulk.values.infinityCountExact, guarded.values.infinityCountExact, "Infinity count should match before the next boundary");
+    assert.equal(bulk.values.eternityGainExact, guarded.values.eternityGainExact, "AD30 Eternity gain should match without performing Eternity");
+  }
+
+  const eventful = await loadRuntime(candidatePath);
+  configureQuietTimelineState(eventful, ["Parallel-BC16500"]);
+  eventful.debug.state.activeChallenge = 1;
+  const eventfulReport = await eventful.debug.processOfflineElapsed(
+    120 * eventful.runtime.MAX_SIMULATION_STEP_SECONDS,
+    "timeline-eventful",
+    { clockSource: "server" },
+  );
+  assert.equal(eventfulReport.simulationIterations, 120, "active challenges should retain the guarded Timeline path");
+  assert.equal(eventfulReport.bulkIterations, 0, "active challenges must not be bulked");
 }
 
 async function testTimelineEffectsAndTimer() {
@@ -670,6 +822,7 @@ async function runTimelineModuleRuntimeTest() {
   await testResetPersistenceAndRespec();
   await testSaveCompatibility();
   await testTimelineEffectsAndTimer();
+  await testTimelineBulkSimulation();
   await testTimelineResetSemantics();
   console.log("Timeline module runtime tests passed");
 }
