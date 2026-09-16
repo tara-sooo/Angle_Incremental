@@ -5,6 +5,17 @@ const MAX_TIMELINE_COUNT = Number.MAX_SAFE_INTEGER;
 const MAX_ETERNITY_REQUIREMENT_EXPONENT = 1024;
 const TIMELINE_TRACK_IDS = Object.freeze(["score", "ip", "eternity"]);
 const TIMELINE_NODE_BY_ID = new Map(TIMELINE_NODES.map((node) => [node.id, node]));
+// Real-BC16500/BC6000 and both AD30 effects are read at reset boundaries;
+// Parallel-BC6000 is static and Parallel-BC16500 advances only its linear timer.
+// Unknown/future effects stay fail-closed.
+const TIMELINE_BULK_SAFE_NODE_IDS = Object.freeze([
+  "Real-BC16500",
+  "Parallel-BC16500",
+  "Real-BC6000",
+  "Parallel-BC6000",
+  "Real-AD30",
+  "Parallel-AD30",
+]);
 const PARALLEL_RAW_SOFTCAP_LOG10 = 10;
 const REAL_BC6000_SOFTCAP_LOG10 = 10;
 const REAL_BC6000_SOFTCAP_STRENGTH = 2;
@@ -166,6 +177,13 @@ function timelineNode(nodeId) {
 function timelineNodeIsPurchasedById(nodeId) {
   const node = timelineNodeById(nodeId);
   return node ? timelineNodeIsPurchased(node) : false;
+}
+
+function timelineBulkSimulationAllowed() {
+  normalizeTimelineState();
+  return runtime.state.timelinePurchasedNodes.every((node) => (
+    TIMELINE_BULK_SAFE_NODE_IDS.includes(node.id)
+  ));
 }
 
 function timelineRealOwned() {
@@ -440,6 +458,7 @@ expose("timelineNodes", () => timelineNodes);
 expose("timelineNode", () => timelineNode);
 expose("timelineNodeIsPurchased", () => timelineNodeIsPurchased);
 expose("timelineNodeIsPurchasedById", () => timelineNodeIsPurchasedById);
+expose("timelineBulkSimulationAllowed", () => timelineBulkSimulationAllowed);
 expose("timelineRealOwned", () => timelineRealOwned);
 expose("timelineParallelOwned", () => timelineParallelOwned);
 expose("timelineParallelSecondsSinceIc8Clear", () => timelineParallelSecondsSinceIc8Clear);

@@ -263,7 +263,7 @@ function offlineBulkSimulationAllowed() {
     && !state.automationEnabled
     && state.activeChallenge <= 0
     && state.activeTowerChallenge <= 0
-    && (!Array.isArray(state.timelinePurchasedNodes) || state.timelinePurchasedNodes.length === 0);
+    && runtime.timelineBulkSimulationAllowed?.() === true;
 }
 
 function offlineBulkTickLimit(tickSeconds, remainingTicks) {
