@@ -515,19 +515,40 @@ async function runTowerModuleRuntimeTest() {
 
     debug.state.scoreLog10 = 1000;
     debug.state.score = Number.MAX_VALUE;
-    assert.equal(runtime.buyAllUpgrades({ refresh: false, save: false }), 3, "TC4 buy-max should allow one level of each normal upgrade");
-    assert.equal(debug.state.speedLevel, 1, "TC4 should allow normal Speed level 1");
-    assert.equal(debug.state.vertices, 4, "TC4 should allow normal Vertex level 1");
-    assert.equal(debug.state.gainLevel, 1, "TC4 should allow normal Gain level 1");
-    assert.equal(runtime.spendNormalUpgrade("speed"), false, "TC4 should block manual normal upgrades above level 1");
-    assert.equal(runtime.buyAllUpgrades({ refresh: false, save: false }), 0, "TC4 should block repeated normal buy-max purchases");
+    assert.deepEqual(
+      [debug.state.speedLevel, debug.state.vertices, debug.state.gainLevel],
+      [0, 3, 0],
+      "TC4 should start with no purchased normal-upgrade levels",
+    );
+    assert.deepEqual(
+      ["speed", "vertex", "gain"].map((kind) => runtime.canBuyNormalUpgrade(kind)),
+      [false, false, false],
+      "TC4 should reject every normal-upgrade kind",
+    );
+    debug.buySpeed();
+    runtime.buyVertex();
+    runtime.buyGain();
+    assert.deepEqual(
+      [debug.state.speedLevel, debug.state.vertices, debug.state.gainLevel],
+      [0, 3, 0],
+      "TC4 manual normal purchases must leave purchased levels unchanged",
+    );
+    assert.equal(runtime.buyAllUpgrades({ refresh: false, save: false }), 0, "TC4 should block normal buy-max purchases");
 
-    assert.equal(runtime.buyAllInfiniteAngleUpgrades({ refresh: false, save: false }), 3, "TC4 IA buy-max should allow one level of each upgrade");
-    assert.equal(debug.state.infiniteAngleSpeedLevel, 1, "TC4 should allow IA Speed level 1");
-    assert.equal(debug.state.infiniteAngleVertexLevel, 1, "TC4 should allow IA Vertex level 1");
-    assert.equal(debug.state.infiniteAngleGainLevel, 1, "TC4 should allow IA Gain level 1");
-    assert.equal(runtime.buyInfiniteAngleUpgrade("speed", { refresh: false, save: false }), false, "TC4 should block manual IA upgrades above level 1");
-    assert.equal(runtime.buyAllInfiniteAngleUpgrades({ refresh: false, save: false }), 0, "TC4 should block repeated IA buy-max purchases");
+    assert.deepEqual(
+      ["speed", "vertex", "gain"].map((kind) => runtime.canBuyInfiniteAngleUpgrade(kind)),
+      [false, false, false],
+      "TC4 should reject every IA upgrade kind",
+    );
+    assert.equal(runtime.buyInfiniteAngleUpgrade("speed", { refresh: false, save: false }), false, "TC4 should block manual IA Speed purchases");
+    assert.equal(runtime.buyInfiniteAngleUpgrade("vertex", { refresh: false, save: false }), false, "TC4 should block manual IA Vertex purchases");
+    assert.equal(runtime.buyInfiniteAngleUpgrade("gain", { refresh: false, save: false }), false, "TC4 should block manual IA Gain purchases");
+    assert.deepEqual(
+      [debug.state.infiniteAngleSpeedLevel, debug.state.infiniteAngleVertexLevel, debug.state.infiniteAngleGainLevel],
+      [0, 0, 0],
+      "TC4 manual IA purchases must leave purchased levels unchanged",
+    );
+    assert.equal(runtime.buyAllInfiniteAngleUpgrades({ refresh: false, save: false }), 0, "TC4 should block IA buy-max purchases");
 
     debug.state.tc4BaseGainLevel = 3;
     debug.state.tc4BaseGainPriceStep = 4;
