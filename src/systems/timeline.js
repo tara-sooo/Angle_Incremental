@@ -19,13 +19,14 @@ const TIMELINE_BULK_SAFE_NODE_IDS = Object.freeze([
 const PARALLEL_RAW_SOFTCAP_LOG10 = 10;
 const REAL_BC6000_SOFTCAP_LOG10 = 10;
 const REAL_BC6000_SOFTCAP_STRENGTH = 2;
-const IC6_REWARD_LOG10 = Math.log10(2);
+// IC6 supplies the canonical x2 base in infinity.js; this is the Timeline factor per Eternity.
+const IC6_REWARD_LOG10 = Math.log10(1.2);
 const REAL_AD30_SCORE_START_LOG10 = 14000;
 const REAL_AD30_SCORE_STEP_LOG10 = 5000;
 const REAL_AD30_POWER_LOG10 = Math.log10(20);
 const PARALLEL_AD30_SOFTCAP_LOG10 = 15;
 const PARALLEL_AD30_SOFTCAP_STRENGTH = 2;
-const PARALLEL_AD30_DIVISOR_LOG10 = Math.log10(4);
+const PARALLEL_AD30_DIVISOR_LOG10 = Math.log10(10);
 const TIMELINE_TRACKS = Object.freeze({
   score: Object.freeze({
     stateKey: "scoreTfClaims",
@@ -268,7 +269,7 @@ function timelineParallelAd30EternityGainMultiplier() {
   if (effectiveLog10 === -Infinity) return 1;
   const effectiveInfinity = runtime.valueFromLog10(effectiveLog10);
   if (effectiveInfinity === Number.MAX_VALUE) return effectiveInfinity;
-  const multiplier = 1 + effectiveInfinity / 4;
+  const multiplier = 1 + effectiveInfinity / 10;
   return Number.isFinite(multiplier) ? multiplier : Number.MAX_VALUE;
 }
 

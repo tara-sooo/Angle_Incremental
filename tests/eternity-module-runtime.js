@@ -92,7 +92,7 @@ async function testCanonicalAd30EternityGain() {
   const parallel = await loadRuntime(candidatePath);
   parallel.debug.state.timelinePurchasedNodes = [{ id: "Parallel-AD30", era: "AD30", route: "Parallel", costTF: 5 }];
   parallel.debug.state.infinityCount = 10 ** 15;
-  const expectedGain = 1 + 10 ** 15 / 4;
+  const expectedGain = 1 + 10 ** 15 / 10;
   assert.equal(parallel.runtime.eternityGain(), expectedGain, "Parallel AD30 should use the linear Infinity count formula before its softcap");
   markEternityReady(parallel.runtime, parallel.debug.state);
   assert.equal(parallel.debug.performEternity({ save: false, update: false }), true);

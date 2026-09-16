@@ -219,7 +219,7 @@ async function testAd30EffectsAndEternityGain() {
       ? rawLog10
       : 15 + 2 * Math.log10(1 + (rawLog10 - 15) / 2);
     const expectedMultiplierLog10 = infinityCount > 0
-      ? Math.log10(1 + 10 ** effectiveLog10 / 4)
+      ? Math.log10(1 + 10 ** effectiveLog10 / 10)
       : 0;
     if (infinityCount > 0) {
       assertClose(
@@ -237,7 +237,7 @@ async function testAd30EffectsAndEternityGain() {
       1e-12,
       `Parallel AD30 multiplier at ${infinityCount}`,
     );
-    assert.equal(runtime.eternityGain(), Math.floor(infinityCount > 0 ? 1 + 10 ** effectiveLog10 / 4 : 1));
+    assert.equal(runtime.eternityGain(), Math.floor(infinityCount > 0 ? 1 + 10 ** effectiveLog10 / 10 : 1));
   }
   state.infinityCount = Number.MAX_VALUE;
   assert.ok(Number.isFinite(runtime.timelineParallelAd30InfinityEffectiveLog10()), "maximum finite Infinity count should stay in log space");
@@ -617,17 +617,21 @@ async function testTimelineEffectsAndTimer() {
   state.eternityCount = 1;
   state.completedChallenges = 1 << (6 - 1);
   runtime.syncInfinityPointCachesFromExact(0n);
-  assertClose(runtime.timelineRealBc6000Ic6RewardLog10(), Math.log10(2), 1e-12, "E=1 should retain the raw IC6 x2 reward");
-  assert.equal(runtime.timelineRealInfinityCountGainMultiplier(), 1, "E=1 should not add a second IC6 x2 outside the base reward");
-  assert.equal(runtime.infinityCountGain(), 2, "E=1 should produce the canonical IC6 reward exactly once");
+  const ic6PerEternityLog10 = Math.log10(1.2);
+  const ic6BaseLog10 = Math.log10(2);
+  assertClose(runtime.timelineRealBc6000Ic6RewardLog10(), ic6PerEternityLog10, 1e-12, "E=1 should expose the raw IC6 x1.2 Timeline reward");
+  assert.equal(runtime.timelineRealInfinityCountGainMultiplier(), 1, "E=1 should not add a second IC6 multiplier outside the canonical base reward");
+  assert.equal(runtime.infinityCountGain(), 2, "E=1 should retain the canonical IC6 x2 base reward");
 
   state.eternityCount = 4;
-  assertClose(runtime.timelineRealBc6000Ic6RewardLog10(), 4 * Math.log10(2), 1e-12, "the raw Real-BC6000 reward should scale with Eternity count");
-  assertClose(runtime.timelineRealInfinityCountGainMultiplierLog10(), 3 * Math.log10(2), 1e-12, "the Timeline multiplier should exclude the existing IC6 x2");
-  assert.equal(runtime.infinityCountGain(), 16, "the final IC6 reward should be 2^E without double counting");
+  assertClose(runtime.timelineRealBc6000Ic6RewardLog10(), 4 * ic6PerEternityLog10, 1e-12, "the raw Real-BC6000 reward should scale with the x1.2 Eternity factor");
+  assertClose(runtime.timelineRealInfinityCountGainMultiplierLog10(), 3 * ic6PerEternityLog10, 1e-12, "the Timeline multiplier should exclude the canonical IC6 base reward");
+  assert.equal(runtime.infinityCountGain(), Math.floor(2 * 1.2 ** 3), "the final IC6 reward should retain the x2 base and x1.2 later Eternity factors");
 
-  state.eternityCount = 34;
-  const realSoftcapRawLog10 = 34 * Math.log10(2);
+  state.eternityCount = 126;
+  assertClose(runtime.timelineRealBc6000Ic6RewardLog10(), 126 * ic6PerEternityLog10, 1e-12, "Real-BC6000 should remain linear before the unchanged e10 threshold");
+  state.eternityCount = 127;
+  const realSoftcapRawLog10 = 127 * ic6PerEternityLog10;
   const realSoftcapEffectiveLog10 = 10 + 2 * Math.log10(1 + (realSoftcapRawLog10 - 10) / 2);
   assertClose(
     runtime.timelineRealBc6000Ic6RewardLog10(),
@@ -637,9 +641,9 @@ async function testTimelineEffectsAndTimer() {
   );
   assertClose(
     runtime.log10Value(runtime.infinityCountGain()),
-    realSoftcapEffectiveLog10,
+    ic6BaseLog10 + realSoftcapEffectiveLog10 - ic6PerEternityLog10,
     1e-9,
-    "the final IC6 reward should retain the effective log value",
+    "the final IC6 reward should combine the canonical base with the softcapped Timeline factor",
   );
 
   state.eternityCount = 1e100;
@@ -776,7 +780,7 @@ async function testTimelineEffectsAndTimer() {
   assert.equal(loadedReal6000.debug.state.timelinePurchasedNodes[0].id, "Real-BC6000", "save/load should preserve BC6000 ownership");
   assertClose(
     loadedReal6000.runtime.timelineRealBc6000Ic6RewardLog10(),
-    4 * Math.log10(2),
+    4 * Math.log10(1.2),
     1e-12,
     "save/load should preserve the active BC6000 reward",
   );

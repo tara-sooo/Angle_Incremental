@@ -1127,6 +1127,14 @@ try {
       { id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 },
       { id: "Parallel-AD30", era: "AD30", route: "Parallel", costTF: 5 },
     ];
+    debug.state.eternityCount = 1;
+    debug.state.completedChallenges = 1 << (6 - 1);
+    debug.runtime.selectTimelineNode?.("Real-BC6000");
+    debug.runtime.updateUi();
+    const realBc6000 = {
+      description: document.getElementById("timelineNodeDetailDescription")?.textContent,
+      effect: document.getElementById("timelineNodeDetailCurrentEffect")?.textContent,
+    };
     debug.state.infinityCount = 10 ** 15;
     debug.runtime.selectTimelineNode?.("Parallel-AD30");
     debug.runtime.updateUi();
@@ -1140,7 +1148,7 @@ try {
       pendingGain: document.getElementById("eternityPendingGain")?.textContent,
       debug: JSON.parse(window.render_game_to_text()).eternity,
     };
-    return { real, parallel };
+    return { real, realBc6000, parallel };
   });
   assert.equal(ad30.real.state, "owned", "owned Real AD30 should be rendered as active");
   assert.equal(ad30.real.otherState, "route-conflict", "Parallel AD30 should conflict with Real AD30");
@@ -1150,14 +1158,16 @@ try {
   assert.match(ad30.real.effect || "", /Current Eternity gain multiplier: ×2/);
   assert.equal(ad30.real.pendingGain, "2", "Real AD30 pending gain should use the canonical gain");
   assert.equal(ad30.real.debug.pendingGain, "2", "debug text should match the Real pending gain");
+  assert.equal(ad30.realBc6000.description, "IC6 Infinity count reward multiplier increases by ×1.2 per Eternity (SC after ×1e10).", "Real BC6000 should expose the updated player-facing formula");
+  assert.match(ad30.realBc6000.effect || "", /Current IC6 Infinity count reward multiplier: ×1.2/);
   assert.equal(ad30.parallel.state, "owned", "owned Parallel AD30 should be rendered as active");
   assert.equal(ad30.parallel.otherState, "route-conflict", "Real AD30 should conflict with Parallel AD30");
   assert.equal(ad30.parallel.name, "A Human Declaration Impossible After Death");
-  assert.equal(ad30.parallel.description, "Multiply Eternity gain by ×(1 + 10^(log10(Infinity count)) / 4) based on current Infinity count (SC after e15 Infinity count).", "Parallel AD30 should expose its original Infinity formula");
+  assert.equal(ad30.parallel.description, "Multiply Eternity gain by ×(1 + 10^(log10(Infinity count)) / 10) based on current Infinity count (SC after e15 Infinity count).", "Parallel AD30 should expose the updated Infinity formula");
   assert.equal(ad30.parallel.prerequisites, "One of the BC6000 nodes");
-  assert.match(ad30.parallel.effect || "", /Current Eternity gain multiplier: ×2\.50e14/);
-  assert.equal(ad30.parallel.pendingGain, "2.50e14", "Parallel AD30 pending gain should use the canonical gain");
-  assert.equal(ad30.parallel.debug.pendingGain, "2.50e14", "debug text should match the Parallel pending gain");
+  assert.match(ad30.parallel.effect || "", /Current Eternity gain multiplier: ×1\.00e14/);
+  assert.equal(ad30.parallel.pendingGain, "1.00e14", "Parallel AD30 pending gain should use the nerfed divisor");
+  assert.equal(ad30.parallel.debug.pendingGain, "1.00e14", "debug text should match the nerfed Parallel pending gain");
 
   await page.setViewportSize({ width: 412, height: 915 });
   await page.click('[data-eternity-tab="timeline"]');
