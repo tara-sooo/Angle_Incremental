@@ -107,8 +107,8 @@ const TOWER_CHALLENGES = Object.freeze([
     targetLog10: TC4_COMPLETION_TARGET_LOG10,
     name: { ja: "TC4 既存品の代替", en: "TC4 Substitute for Existing Products" },
     restriction: {
-      ja: "通常強化とIA強化はレベル1を超えて購入できず、TC4専用強化で1e7777 Scoreを目指す",
-      en: "Normal and Infinite Angle upgrades stop at level 1; use the TC4 upgrades to reach 1e7777 Score.",
+      ja: "通常強化とIA強化は購入できず、TC4専用強化で1e7777 Scoreを目指す",
+      en: "Normal and Infinite Angle upgrades cannot be purchased; use the TC4 upgrades to reach 1e7777 Score.",
     },
     reward: {
       ja: "クリアすると現在のEternity周回でTC4条件を満たす",
@@ -230,26 +230,11 @@ function towerChallengeImplemented(index) {
 }
 
 function towerChallenge4AllowsNormalUpgrade(kind) {
-  if (runtime.state.activeTowerChallenge !== 4) return true;
-  if (kind === "speed" || kind === "gain" || kind === "vertex") {
-    const exactSafeLevel = runtime.normalUpgradeLevelValue?.(kind);
-    if (exactSafeLevel !== undefined) return exactSafeLevel < 1;
-    const legacyLevel = kind === "vertex"
-      ? runtime.state.activeChallenge === 8
-        ? runtime.state.ic8VertexUpgradeLevel
-        : runtime.state.vertices - 3
-      : runtime.state[kind + "Level"];
-    return Math.max(0, Math.floor(Number(legacyLevel) || 0)) < 1;
-  }
-  return false;
+  return runtime.state.activeTowerChallenge !== 4;
 }
 
 function towerChallenge4AllowsInfiniteAngleUpgrade(kind) {
-  if (runtime.state.activeTowerChallenge !== 4) return true;
-  if (kind === "speed") return runtime.state.infiniteAngleSpeedLevel < 1;
-  if (kind === "vertex") return runtime.state.infiniteAngleVertexLevel < 1;
-  if (kind === "gain") return runtime.state.infiniteAngleGainLevel < 1;
-  return false;
+  return runtime.state.activeTowerChallenge !== 4;
 }
 
 function tc4BaseGainPartsBonus() {

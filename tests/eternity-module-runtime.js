@@ -309,11 +309,11 @@ async function testMilestoneThresholdsAndEffects() {
   state.autoBuyInfiniteAngleVertex = true;
   state.autoBuyInfiniteAngleGain = true;
   runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
-  assert.equal(runtime.runEternityMilestoneEightAutomation(), true, "IA automation should use the normal TC4 purchase path");
+  assert.equal(runtime.runEternityMilestoneEightAutomation(), false, "TC4 should block IA automation");
   assert.deepEqual(
     [state.infiniteAngleSpeedLevel, state.infiniteAngleVertexLevel, state.infiniteAngleGainLevel],
-    [1, 1, 1],
-    "TC4 must keep each IA track at its normal one-level restriction",
+    [0, 0, 0],
+    "TC4 IA automation must leave every purchased level unchanged",
   );
 }
 

@@ -2238,7 +2238,7 @@ try {
   assert.equal(towerChallenge4Flow.button, "中止", "an active TC4 should expose the shared stop button");
   assert.equal(towerChallenge4Flow.summary, "TC4 既存品の代替 挑戦中", "the active TC should appear in the group summary");
   assert.equal(towerChallenge4Flow.disabled, false, "an active TC4 should be stoppable");
-  assert.match(towerChallenge4Flow.restriction, /レベル1/);
+  assert.match(towerChallenge4Flow.restriction, /購入できず/);
   const towerChallengeFlow = await page.evaluate(() => {
     const { state, toggleTowerChallenge, completeTowerChallengeIfReady } = window.__angleDebug;
     state.towerFloor = 3;
