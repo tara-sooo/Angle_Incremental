@@ -189,9 +189,12 @@ async function measureOfflineStress(page) {
       totalPlayTime: 1e-6,
     });
 
-    function stateProjection(snapshot) {
+    function stateProjection(snapshot, { omitHistory = false } = {}) {
+      const exactFields = omitHistory
+        ? differentialExactFields.filter((key) => key !== "lastInfinityRuns")
+        : differentialExactFields;
       return {
-        exact: Object.fromEntries(differentialExactFields.map((key) => [key, snapshot[key]])),
+        exact: Object.fromEntries(exactFields.map((key) => [key, snapshot[key]])),
         approximate: Object.fromEntries(
           Object.keys(differentialApproximateFields).map((key) => [key, snapshot[key]]),
         ),
@@ -373,19 +376,53 @@ async function measureOfflineStress(page) {
       runtime.syncInfinityPointCachesFromExact(10n ** 6n);
     }
 
-    function configureAutoInfinityDifferential(ticks) {
-      configureDifferentialBase(ticks);
+    function configureAutoInfinityVariant(
+      ticks,
+      nodes = [],
+      completedChallenges = 0,
+      thresholdLog10 = 0,
+    ) {
+      configureDifferentialBase(ticks, nodes);
       Object.assign(state, {
         automationEnabled: true,
         autoRunInfinity: true,
-        infinityUpgradeMask: 1 << 12,
+        completedChallenges,
+        infinityUpgradeMask: (1 << 1) | (1 << 12),
         achievementMask: 1 << (19 - 1),
-        autoInfinityPointThresholdLog10: 0,
-        autoInfinityPointThreshold: 1,
+        autoInfinityPointThresholdLog10: thresholdLog10,
+        autoInfinityPointThreshold: runtime.valueFromLog10(thresholdLog10),
+        bestInfinityCountPerSecond: 30,
+        infinityCountRateRemainder: 0,
       });
       setLogState("score", 309);
       setLogState("totalScore", 309);
       setLogState("generationScore", 309);
+    }
+
+    function configureAutoInfinityDifferential(ticks) {
+      configureAutoInfinityVariant(ticks);
+    }
+
+    function configureAutoInfinityRemainderDifferential(ticks) {
+      configureAutoInfinityVariant(ticks);
+      state.infinityCountRateRemainder = 0.5;
+    }
+
+    function configureAutoInfinityCustomThresholdDifferential(ticks) {
+      configureAutoInfinityVariant(ticks, [], 0, 1);
+    }
+
+    function configureAutoInfinityIc6Differential(ticks) {
+      configureAutoInfinityVariant(ticks, [], 1 << (6 - 1));
+    }
+
+    function configureAutoInfinityTimelineDifferential(ticks) {
+      configureAutoInfinityVariant(ticks, ["Real-BC16500"]);
+    }
+
+    function configureAutoInfinityAutobuyDifferential(ticks) {
+      configureAutoInfinityVariant(ticks);
+      state.autoBuySpeed = true;
     }
 
     function configureGenerationDifferential(ticks) {
@@ -417,7 +454,12 @@ async function measureOfflineStress(page) {
       setLogState("generationScore", 20);
     }
 
-    async function runDifferential(name, configure, ticks, { reprimeScore = false } = {}) {
+    async function runDifferential(
+      name,
+      configure,
+      ticks,
+      { reprimeScore = false, aggregateHistory = false } = {},
+    ) {
       configure(ticks);
       const startingState = runtime.snapshotRuntimeState();
       const startingNormalAutobuyElapsed = runtime.normalAutobuyElapsed;
@@ -455,7 +497,7 @@ async function measureOfflineStress(page) {
         canonical = {
           before: canonicalBefore,
           after: runtime.offlineSnapshot(),
-          state: stateProjection(runtime.snapshotRuntimeState()),
+          state: stateProjection(runtime.snapshotRuntimeState(), { omitHistory: aggregateHistory }),
           wallTimeMs: performance.now() - canonicalStartedAt,
           fullSimulationIterations: ticks,
           normalAutobuyElapsed: runtime.normalAutobuyElapsed,
@@ -472,7 +514,7 @@ async function measureOfflineStress(page) {
           report,
           before: report?.before ?? null,
           after: report?.after ?? runtime.offlineSnapshot(),
-          state: stateProjection(runtime.snapshotRuntimeState()),
+          state: stateProjection(runtime.snapshotRuntimeState(), { omitHistory: aggregateHistory }),
           wallTimeMs: performance.now() - acceleratedStartedAt,
           diagnostics: runtime.offlineDiagnostics,
           work: runtime.offlineWorkStats,
@@ -509,10 +551,13 @@ async function measureOfflineStress(page) {
         elapsedSeconds: tickSeconds * ticks,
         requestedTicks: ticks,
         policy: {
-          exactStateFields: [...differentialExactFields],
+          exactStateFields: differentialExactFields.filter(
+            (key) => !aggregateHistory || key !== "lastInfinityRuns",
+          ),
           approximateStateFields: { ...differentialApproximateFields },
           exactReportFields: [...differentialReportExactFields],
           approximateReportFields: { ...differentialReportApproximateFields },
+          aggregateHistory,
         },
         canonical,
         accelerated,
@@ -584,6 +629,8 @@ async function measureOfflineStress(page) {
           fullSimulationIterations: runtime.offlineDiagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
           bulkProcessedTicks: runtime.offlineDiagnostics?.bulkProcessedTicks ?? report?.bulkProcessedTicks ?? 0,
           bulkIterations: runtime.offlineDiagnostics?.bulkIterations ?? report?.bulkIterations ?? 0,
+          aggregatedTicks: runtime.offlineDiagnostics?.aggregatedTicks ?? 0,
+          cyclesAggregated: runtime.offlineDiagnostics?.cyclesAggregated ?? 0,
           eventBoundaryCount: runtime.offlineDiagnostics?.eventBoundaryCount ?? 0,
           precisionReduced: runtime.offlineDiagnostics?.precisionReduced ?? false,
           wallTimeMs: runtime.offlineDiagnostics?.wallTimeMs ?? (performance.now() - startedAt),
@@ -815,6 +862,9 @@ async function measureOfflineStress(page) {
           fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
           bulkIterations: report?.bulkIterations ?? 0,
           bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+          aggregatedTicks: diagnostics?.aggregatedTicks ?? 0,
+          cyclesAggregated: diagnostics?.cyclesAggregated ?? 0,
+          cycleFallbackReason: diagnostics?.cycleFallbackReason ?? "",
           eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
           precisionReduced: report?.precisionReduced ?? false,
           work: runtime.offlineWorkStats,
@@ -859,6 +909,8 @@ async function measureOfflineStress(page) {
         fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
         bulkIterations: report?.bulkIterations ?? 0,
         bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+        aggregatedTicks: diagnostics?.aggregatedTicks ?? 0,
+        cyclesAggregated: diagnostics?.cyclesAggregated ?? 0,
         eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
         precisionReduced: diagnostics?.precisionReduced ?? false,
         wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
@@ -919,6 +971,8 @@ async function measureOfflineStress(page) {
         fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
         bulkIterations: report?.bulkIterations ?? 0,
         bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+        aggregatedTicks: diagnostics?.aggregatedTicks ?? 0,
+        cyclesAggregated: diagnostics?.cyclesAggregated ?? 0,
         eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
         precisionReduced: report?.precisionReduced ?? false,
         wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
@@ -942,7 +996,7 @@ async function measureOfflineStress(page) {
         wallMilliseconds: performance.now() - startedAt,
       };
     }
-    async function measureAutoInfinityStress(requestedTicks) {
+    async function measureAutoInfinityStress(requestedTicks, { rateRemainder = 0 } = {}) {
       resetScenario(3);
       state.offlineProgressEnabled = true;
       state.offlineTickCount = requestedTicks;
@@ -954,15 +1008,40 @@ async function measureOfflineStress(page) {
       state.autoRunGeneration = false;
       state.autoRunCoreBoost = false;
       state.autoInfinityPointThresholdLog10 = 0;
+      state.autoInfinityPointThreshold = 1;
       state.activeChallenge = 0;
       state.activeTowerChallenge = 0;
       state.completedChallenges = 0;
       state.completedTowerChallenges = 0;
+      state.eternityMilestoneMask = 0;
+      state.infiniteCapBroken = false;
+      state.autoBuySpeed = false;
+      state.autoBuyVertex = false;
+      state.autoBuyGain = false;
+      state.autoBuyInfinityUpgrades = false;
+      state.autoBuildTower = false;
+      state.autoBuyInfiniteAngleSpeed = false;
+      state.autoBuyInfiniteAngleVertex = false;
+      state.autoBuyInfiniteAngleGain = false;
       state.achievementMask = 0;
+      state.achievementMaskHigh = 0;
       state.infinityCount = 1;
-      state.infinityUpgradeMask = 1 << 12;
+      state.infinityUpgradeMask = (1 << 1) | (1 << 12);
+      state.bestInfinityCountPerSecond = 30;
+      state.infinityCountRateRemainder = rateRemainder;
+      state.totalPlayTime = 0;
+      state.currentInfinityRunTime = 0;
+      state.currentInfinityRealTime = 0;
+      state.currentEternityRunTime = 0;
+      state.currentGenerationRunTime = 0;
+      state.currentInfinityRunHadGeneration = false;
+      state.currentInfinityRunHadCoreBoost = false;
+      state.fastestInfinityTime = 0;
+      state.fastestInfinityRealTime = 0;
+      state.lastInfinityRuns = [];
       state.score = Number.MAX_VALUE;
       state.scoreLog10 = 309;
+      runtime.syncInfinityPointCachesFromExact(0n);
       runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 1n);
       const beforeState = runtime.snapshotRuntimeState();
 
@@ -986,13 +1065,16 @@ async function measureOfflineStress(page) {
         const afterState = runtime.snapshotRuntimeState();
         const diagnostics = runtime.offlineDiagnostics;
         return {
-          baselineOnly: requestedTicks === runtime.OFFLINE_PROGRESS_MAX_TICKS,
+          baselineOnly: false,
           requestedTicks: report?.requestedTicks ?? 0,
           processedTicks: report?.processedTicks ?? 0,
           simulationIterations: report?.simulationIterations ?? 0,
           fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
           bulkIterations: report?.bulkIterations ?? 0,
           bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+          aggregatedTicks: diagnostics?.aggregatedTicks ?? 0,
+          cyclesAggregated: diagnostics?.cyclesAggregated ?? 0,
+          cycleFallbackReason: diagnostics?.cycleFallbackReason ?? "",
           eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
           precisionReduced: diagnostics?.precisionReduced ?? false,
           infinityCountGain: report?.normalInfinityCountGain ?? 0,
@@ -1001,6 +1083,10 @@ async function measureOfflineStress(page) {
           wallMilliseconds: performance.now() - startedAt,
           uiUpdateCalls: debug.uiUpdateCount() - uiUpdatesBefore,
           eventCounts: diagnostics?.eventCounts ?? {},
+          finalInfinityCountExact: afterState.infinityCountExact,
+          infinityCountRateRemainder: afterState.infinityCountRateRemainder,
+          normalInfinityCountGainExact: report?.normalInfinityCountGainExact ?? "0",
+          aggregatedInfinityCountGainExact: report?.aggregatedInfinityCountGainExact ?? "0",
           observedEventCounts: collectObservedEventCounts(beforeState, afterState),
         };
       } finally {
@@ -1086,6 +1172,8 @@ async function measureOfflineStress(page) {
       fullSimulationIterations: offlineDiagnostics?.fullSimulationIterations ?? offlineReport?.simulationIterations ?? 0,
       bulkIterations: offlineReport?.bulkIterations ?? 0,
       bulkProcessedTicks: offlineReport?.bulkProcessedTicks ?? 0,
+      aggregatedTicks: offlineDiagnostics?.aggregatedTicks ?? 0,
+      cyclesAggregated: offlineDiagnostics?.cyclesAggregated ?? 0,
       eventBoundaryCount: offlineDiagnostics?.eventBoundaryCount ?? 0,
       precisionReduced: offlineDiagnostics?.precisionReduced ?? false,
       processingMilliseconds: offlineReport?.processingMilliseconds ?? NaN,
@@ -1105,7 +1193,42 @@ async function measureOfflineStress(page) {
         (ticks) => configureDifferentialBase(ticks, ["Parallel-BC16500", "Parallel-BC6000", "Parallel-AD30"]),
         120,
       ),
-      autoInfinity: await runDifferential("auto-infinity", configureAutoInfinityDifferential, 120, { reprimeScore: true }),
+      autoInfinity: await runDifferential(
+        "auto-infinity",
+        configureAutoInfinityDifferential,
+        120,
+        { reprimeScore: true, aggregateHistory: true },
+      ),
+      autoInfinityRemainder: await runDifferential(
+        "auto-infinity-remainder",
+        configureAutoInfinityRemainderDifferential,
+        120,
+        { reprimeScore: true, aggregateHistory: true },
+      ),
+      autoInfinityCustomThreshold: await runDifferential(
+        "auto-infinity-custom-threshold",
+        configureAutoInfinityCustomThresholdDifferential,
+        12,
+        { reprimeScore: true },
+      ),
+      autoInfinityIc6: await runDifferential(
+        "auto-infinity-ic6",
+        configureAutoInfinityIc6Differential,
+        12,
+        { reprimeScore: true },
+      ),
+      autoInfinityTimeline: await runDifferential(
+        "auto-infinity-timeline-real",
+        configureAutoInfinityTimelineDifferential,
+        12,
+        { reprimeScore: true },
+      ),
+      autoInfinityAutobuy: await runDifferential(
+        "auto-infinity-autobuy",
+        configureAutoInfinityAutobuyDifferential,
+        12,
+        { reprimeScore: true },
+      ),
       generation: await runDifferential("generation", configureGenerationDifferential, 120),
       coreBoost: await runDifferential("core-boost", configureCoreBoostDifferential, 120),
     };
@@ -1114,6 +1237,7 @@ async function measureOfflineStress(page) {
       offlineProcessing,
       offlineStress: {
         autoInfinity: await measureAutoInfinityStress(10000),
+        autoInfinityRemainder: await measureAutoInfinityStress(120, { rateRemainder: 0.5 }),
         autoInfinityMillion: await measureAutoInfinityStress(runtime.OFFLINE_PROGRESS_MAX_TICKS),
         differential,
         generationAutomation: await measureEventfulBaseline("generation", 120, configureGenerationDifferential),
@@ -1172,10 +1296,10 @@ try {
       viewport: { name: "desktop", width: 1280, height: 800 },
       deviceScaleFactor: 1,
       preparation: "unmeasured 3/720/10000 Angle and Infinite Angle updates prime the progressed achievement state used by the original boundary coverage",
-      scenarios: ["offline-processing", "differential-guarded-canonical", "auto-infinity", "auto-infinity-million-baseline", "generation-automation-baseline", "core-boost-automation-baseline", "late-eternity-automation-baseline", "core-hit-boundary", "infinite-angle-exact-work", "long-resume", "quiet-resume-scale", "timeline-enabled"],
+      scenarios: ["offline-processing", "differential-guarded-canonical", "auto-infinity-cycle", "auto-infinity-million", "auto-infinity-fallbacks", "generation-automation-baseline", "core-boost-automation-baseline", "late-eternity-automation-baseline", "core-hit-boundary", "infinite-angle-exact-work", "long-resume", "quiet-resume-scale", "timeline-enabled"],
       baselinePolicy: "eventful scenarios are baseline-only observations; they are not release performance targets",
       differentialPolicy: {
-        exact: "discrete counts, levels, unlocks, masks, challenges, achievements, timers/history, and automation settings",
+        exact: "discrete counts, levels, unlocks, masks, challenges, achievements, timers/history, and automation settings; aggregate-history paths retain only canonical material entries",
         approximate: "log-valued resources within 1e-9 and timer/progress values within 1e-6",
       },
     },
@@ -1214,25 +1338,47 @@ try {
     report.offlineProcessing.processedTicks,
     report.offlineProcessing.bulkProcessedTicks
       + report.offlineProcessing.simulationIterations
-      - report.offlineProcessing.bulkIterations,
-    "the real quiet offline path should account for bulk and single-tick iterations",
+      - report.offlineProcessing.bulkIterations
+      + report.offlineProcessing.aggregatedTicks,
+    "the real quiet offline path should account for bulk, single-tick, and aggregated ticks",
   );
 
   const autoInfinity = report.offlineStress.autoInfinity;
   assert.equal(autoInfinity.requestedTicks, 10000, "Auto Infinity stress should request 10000 ticks");
   assert.equal(autoInfinity.processedTicks, 10000, "Auto Infinity stress should process 10000 ticks exactly");
-  assert.equal(autoInfinity.infinityCountGain, 10000, "Auto Infinity stress should run once per tick");
-  assert.equal(autoInfinity.simulationIterations, 10000, "Auto Infinity should retain one simulation iteration per reset event");
+  assert.equal(autoInfinity.infinityCountGain, 2, "Auto Infinity stress should retain canonical probe gain separately");
+  assert.equal(autoInfinity.simulationIterations, 2, "Auto Infinity stress should use two canonical probe iterations");
   assert.equal(autoInfinity.bulkIterations, 0, "Auto Infinity should not use bulk iterations across reset events");
-  assert.equal(autoInfinity.eventBoundaryCount, 10000, "Auto Infinity should expose one event boundary per reset event");
-  assert.equal(autoInfinity.eventCounts.infinityExecutions, 10000, "Auto Infinity diagnostics should count every reset event");
+  assert.equal(autoInfinity.aggregatedTicks, 9998, "Auto Infinity should account for skipped ticks as aggregated work");
+  assert.equal(autoInfinity.cyclesAggregated, 9998, "Auto Infinity should aggregate the remaining stable cycles");
+  assert.equal(autoInfinity.eventBoundaryCount, 2, "Auto Infinity should expose the directly processed boundaries");
+  assert.equal(autoInfinity.eventCounts.infinityExecutions, 2, "Auto Infinity diagnostics should count direct reset events");
+  assert.equal(autoInfinity.aggregatedInfinityCountGainExact, "9998", "Auto Infinity should report exact aggregated count gain");
+  assert.equal(autoInfinity.finalInfinityCountExact, "10001", "Auto Infinity should preserve the final exact count");
   const autoInfinityMillion = report.offlineStress.autoInfinityMillion;
-  assert.equal(autoInfinityMillion.baselineOnly, true, "the Auto Infinity million-tick run should be marked baseline-only");
+  assert.equal(autoInfinityMillion.baselineOnly, false, "the Auto Infinity million-tick run should measure the supported path");
   assert.equal(autoInfinityMillion.requestedTicks, 1000000, "Auto Infinity million stress should request one million ticks");
   assert.equal(autoInfinityMillion.processedTicks, 1000000, "Auto Infinity million stress should process one million ticks exactly");
-  assert.equal(autoInfinityMillion.fullSimulationIterations, 1000000, "Auto Infinity million stress should remain eventful");
+  assert.equal(autoInfinityMillion.fullSimulationIterations, 2, "Auto Infinity million stress should use bounded canonical work");
+  assert.equal(autoInfinityMillion.aggregatedTicks, 999998, "Auto Infinity million stress should aggregate the remaining ticks");
+  assert.equal(autoInfinityMillion.cyclesAggregated, 999998, "Auto Infinity million stress should aggregate the remaining cycles");
   assert.equal(autoInfinityMillion.bulkIterations, 0, "Auto Infinity million stress should not bulk across reset events");
-  assert.equal(autoInfinityMillion.eventCounts.infinityExecutions, 1000000, "Auto Infinity million diagnostics should count every reset event");
+  assert.equal(autoInfinityMillion.eventCounts.infinityExecutions, 2, "Auto Infinity million diagnostics should count direct reset events");
+  assert.equal(autoInfinityMillion.aggregatedInfinityCountGainExact, "999998", "Auto Infinity million should report exact aggregated count gain");
+  assert.equal(autoInfinityMillion.finalInfinityCountExact, "1000001", "Auto Infinity million should preserve the final exact count");
+  const autoInfinityRemainder = report.offlineStress.autoInfinityRemainder;
+  assert.equal(autoInfinityRemainder.cyclesAggregated, 118, "Auto Infinity should preserve a fractional rate remainder while aggregating cycles");
+  assert.equal(autoInfinityRemainder.aggregatedTicks, 118, "Auto Infinity remainder aggregation should account for skipped ticks");
+  assert.equal(autoInfinityRemainder.eventCounts.infinityExecutions, 2, "Auto Infinity remainder aggregation should retain direct event counts");
+  assert.equal(autoInfinityRemainder.aggregatedInfinityCountGainExact, "118", "Auto Infinity remainder aggregation should use exact count gain");
+  assert.equal(autoInfinityRemainder.infinityCountRateRemainder, 0.5, "Auto Infinity should carry the rate remainder forward");
+  for (const name of ["autoInfinityCustomThreshold", "autoInfinityIc6", "autoInfinityTimeline", "autoInfinityAutobuy"]) {
+    const fallback = report.offlineStress.differential[name];
+    assert.equal(fallback.comparison.matched, true, `${name} should match the guarded canonical fallback`);
+    assert.equal(fallback.accelerated.diagnostics.cyclesAggregated, 0, `${name} should not aggregate unsupported cycles`);
+    assert.equal(fallback.accelerated.diagnostics.aggregatedTicks, 0, `${name} should not skip unsupported ticks`);
+    assert.notEqual(fallback.accelerated.diagnostics.cycleFallbackReason, "", `${name} should record a fallback reason`);
+  }
   for (const [name, baseline] of Object.entries({
     generation: report.offlineStress.generationAutomation,
     coreBoost: report.offlineStress.coreBoostAutomation,
@@ -1257,8 +1403,8 @@ try {
   );
   for (const [name, result] of Object.entries(report.offlineStress.differential)) {
     assert.equal(result.comparison.matched, true, `${name} differential should match the guarded canonical simulation: ${JSON.stringify(result.comparison.mismatches)}`);
-    assert.equal(result.accelerated.diagnostics.requestedTicks, 120, `${name} differential should expose requested tick diagnostics`);
-    assert.equal(result.accelerated.diagnostics.processedTicks, 120, `${name} differential should expose processed tick diagnostics`);
+    assert.equal(result.accelerated.diagnostics.requestedTicks, result.requestedTicks, `${name} differential should expose requested tick diagnostics`);
+    assert.equal(result.accelerated.diagnostics.processedTicks, result.requestedTicks, `${name} differential should expose processed tick diagnostics`);
     assert.ok(result.accelerated.work.totalIterations <= result.accelerated.work.hardCap, `${name} differential work should stay within its hard cap`);
     assert.equal(result.accelerated.diagnostics.precisionReduced, result.accelerated.work.precisionReduced, `${name} differential precision status should match its work ledger`);
   }
@@ -1294,7 +1440,8 @@ try {
     assert.ok(resume.bulkIterations > 0, `${name} long resume should use bulk iterations`);
     assert.equal(
       resume.processedTicks,
-      resume.bulkProcessedTicks + resume.simulationIterations - resume.bulkIterations,
+      resume.bulkProcessedTicks + resume.simulationIterations - resume.bulkIterations
+        + (resume.aggregatedTicks ?? 0),
       `${name} long resume should account for bulk and single-tick iterations`,
     );
     assert.ok(resume.work.totalIterations <= resume.work.hardCap, `${name} offline work must stay within its hard cap`);
@@ -1332,7 +1479,8 @@ try {
     assert.ok(resume.bulkIterations > 0, `quiet ${ticks}-tick resume should use bulk iterations`);
     assert.equal(
       resume.processedTicks,
-      resume.bulkProcessedTicks + resume.simulationIterations - resume.bulkIterations,
+      resume.bulkProcessedTicks + resume.simulationIterations - resume.bulkIterations
+        + (resume.aggregatedTicks ?? 0),
       `quiet ${ticks}-tick resume should account for bulk and single-tick iterations`,
     );
     assert.ok(Number.isFinite(resume.wallMilliseconds), `quiet ${ticks}-tick resume should report finite wall time`);
@@ -1345,7 +1493,8 @@ try {
     assert.ok(resume.bulkIterations > 0, `${route} Timeline resume should use bulk updates`);
     assert.equal(
       resume.processedTicks,
-      resume.bulkProcessedTicks + resume.simulationIterations - resume.bulkIterations,
+      resume.bulkProcessedTicks + resume.simulationIterations - resume.bulkIterations
+        + (resume.aggregatedTicks ?? 0),
       `${route} Timeline bulk diagnostics should account for every processed tick`,
     );
     assert.ok(resume.work.totalIterations <= resume.work.hardCap, `${route} Timeline work should stay within its hard cap`);

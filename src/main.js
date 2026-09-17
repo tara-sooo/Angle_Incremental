@@ -113,6 +113,9 @@ function beginOfflineDiagnostics(requestedTicks) {
     fullSimulationIterations: 0,
     bulkProcessedTicks: 0,
     bulkIterations: 0,
+    aggregatedTicks: 0,
+    cyclesAggregated: 0,
+    cycleFallbackReason: "",
     eventBoundaryCount: 0,
     wallTimeMs: 0,
     precisionReduced: false,
@@ -134,6 +137,9 @@ function offlineDiagnosticsSnapshot() {
     fullSimulationIterations: offlineDiagnostics.fullSimulationIterations,
     bulkProcessedTicks: offlineDiagnostics.bulkProcessedTicks,
     bulkIterations: offlineDiagnostics.bulkIterations,
+    aggregatedTicks: offlineDiagnostics.aggregatedTicks,
+    cyclesAggregated: offlineDiagnostics.cyclesAggregated,
+    cycleFallbackReason: offlineDiagnostics.cycleFallbackReason,
     eventBoundaryCount: offlineDiagnostics.eventBoundaryCount,
     wallTimeMs: offlineDiagnostics.wallTimeMs,
     precisionReduced: offlineDiagnostics.precisionReduced,
@@ -1064,6 +1070,212 @@ function applyOfflineInfinityAggregation(
   };
 }
 
+const OFFLINE_INFINITY_CYCLE_IGNORED_FIELDS = Object.freeze([
+  "infinityCount",
+  "infinityCountExact",
+  "infinityPoints",
+  "infinityPointsLog10",
+  "infinityPointsExact",
+  "lastInfinityRuns",
+  "totalPlayTime",
+  "currentInfinityRunTime",
+  "currentInfinityRealTime",
+  "currentEternityRunTime",
+  "currentGenerationRunTime",
+]);
+
+function offlineInfinityCycleStateSignatureFromSnapshot(snapshot) {
+  const normalized = { ...snapshot };
+  const latestInfinityRun = Array.isArray(normalized.lastInfinityRuns)
+    ? normalized.lastInfinityRuns[0] || null
+    : null;
+  OFFLINE_INFINITY_CYCLE_IGNORED_FIELDS.forEach((field) => delete normalized[field]);
+  return JSON.stringify({ state: normalized, latestInfinityRun });
+}
+
+function offlineInfinityCycleGainLog10Matches(expected, actual) {
+  if (Object.is(expected, actual)) return true;
+  return Number.isFinite(expected)
+    && Number.isFinite(actual)
+    && Math.abs(expected - actual) <= 1e-12;
+}
+
+function offlineInfinityCyclePathEligible(tickSeconds, requestedTicks, bestRate, rateRemainder) {
+  if (!offlineInfinityAggregationEnabled() || requestedTicks < 2 || !runtime.canInfinity()) return false;
+  if (!Number.isFinite(tickSeconds) || tickSeconds <= 0) return false;
+  if (!Number.isFinite(bestRate) || bestRate <= 0) return false;
+  if (!Number.isFinite(rateRemainder) || rateRemainder < 0 || rateRemainder >= 1) return false;
+  if (runtime.OFFLINE_INFINITY_AGGREGATION_EFFICIENCY !== 1) return false;
+  if (Math.abs(bestRate * tickSeconds - 1) > 1e-6) return false;
+  if (runtime.state.infiniteAngleUnlocked) return false;
+  if (Array.isArray(runtime.state.timelinePurchasedNodes) && runtime.state.timelinePurchasedNodes.length > 0) return false;
+  if (runtime.state.eternityMilestoneMask !== 0) return false;
+  return ![
+    "autoBuySpeed",
+    "autoBuyVertex",
+    "autoBuyGain",
+    "autoBuyInfinityUpgrades",
+    "autoBuildTower",
+    "autoRunGeneration",
+    "autoRunCoreBoost",
+    "autoBuyInfiniteAngleSpeed",
+    "autoBuyInfiniteAngleVertex",
+    "autoBuyInfiniteAngleGain",
+  ].some((field) => runtime.state[field]);
+}
+
+function applyOfflineInfinityCycleAggregation(
+  remainingTicks,
+  tickSeconds,
+  bestRate,
+  rateRemainder,
+  cycleInputState,
+  cycleIpGainLog10,
+) {
+  const remainingSeconds = tickSeconds * remainingTicks;
+  const target = bestRate * remainingSeconds * runtime.OFFLINE_INFINITY_AGGREGATION_EFFICIENCY
+    + Math.max(0, rateRemainder);
+  if (!Number.isFinite(target) || target <= 0) {
+    return { used: false, cyclesAggregated: 0, reason: "invalid-target" };
+  }
+  const cyclesAggregated = Math.floor(target + Math.max(1, Math.abs(target)) * Number.EPSILON * 8);
+  if (cyclesAggregated <= 0 || cyclesAggregated !== remainingTicks) {
+    return { used: false, cyclesAggregated: 0, reason: "cycle-count-out-of-range" };
+  }
+  const cycleIpGainExact = runtime.exactInfinityPointsFromLog10(cycleIpGainLog10);
+  if (cycleIpGainExact <= 0n) return { used: false, cyclesAggregated: 0, reason: "invalid-ip-gain" };
+
+  const actualState = runtime.snapshotRuntimeState();
+  const countBefore = runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount");
+  const ipBefore = runtime.currentExactInfinityPoints();
+  const countAdded = BigInt(cyclesAggregated);
+  const ipAdded = cycleIpGainExact * countAdded;
+  let safe = false;
+  try {
+    runtime.state.totalPlayTime += remainingSeconds;
+    runtime.setExactIntegerState(
+      runtime.state,
+      "infinityCountExact",
+      "infinityCount",
+      countBefore + countAdded,
+    );
+    runtime.syncInfinityPointCachesFromExact(ipBefore + ipAdded);
+    runtime.state.score = cycleInputState.score;
+    runtime.state.scoreLog10 = cycleInputState.scoreLog10;
+    runtime.state.totalScore = cycleInputState.totalScore;
+    runtime.state.totalScoreLog10 = cycleInputState.totalScoreLog10;
+    runtime.state.generationScore = cycleInputState.generationScore;
+    runtime.state.generationScoreLog10 = cycleInputState.generationScoreLog10;
+    runtime.checkAchievements(false);
+    safe = runtime.infinityCountGainExact() === 1n
+      && offlineInfinityCycleGainLog10Matches(
+        cycleIpGainLog10,
+        runtime.infinityPointGainLog10(),
+      );
+  } finally {
+    runtime.restoreRuntimeState(actualState);
+  }
+  if (!safe) return { used: false, cyclesAggregated: 0, reason: "formula-changed" };
+
+  runtime.setExactIntegerState(
+    runtime.state,
+    "infinityCountExact",
+    "infinityCount",
+    countBefore + countAdded,
+  );
+  runtime.syncInfinityPointCachesFromExact(ipBefore + ipAdded);
+  runtime.state.totalPlayTime += remainingSeconds;
+  runtime.state.currentEternityRunTime += remainingSeconds;
+  runtime.state.currentInfinityRunTime = 0;
+  runtime.state.currentInfinityRealTime = 0;
+  runtime.state.currentGenerationRunTime = 0;
+  if (runtime.normalAutomationUnlocked?.() && runtime.state.automationEnabled) {
+    normalAutobuyElapsed += remainingSeconds;
+    if (normalAutobuyElapsed >= runtime.AUTOBUY_INTERVAL_SECONDS) {
+      normalAutobuyElapsed %= runtime.AUTOBUY_INTERVAL_SECONDS;
+      if (runtime.AUTOBUY_INTERVAL_SECONDS - normalAutobuyElapsed <= 1e-9) normalAutobuyElapsed = 0;
+    }
+  } else {
+    normalAutobuyElapsed = 0;
+  }
+  runtime.state.pointProgress = 0;
+  runtime.state.totalVertexProgress = 0;
+  runtime.state.lastVertexIndex = 0;
+  runtime.state.infinityCountRateRemainder = Math.max(0, target - cyclesAggregated);
+  runtime.checkAchievements(true);
+  return {
+    used: true,
+    cyclesAggregated,
+    aggregatedCountExact: countAdded,
+    aggregatedTicks: remainingTicks,
+  };
+}
+
+function tryOfflineInfinityCyclePath(tickSeconds, requestedTicks, bestRate, rateRemainder) {
+  const fallback = (processedTicks, reason = "ineligible") => ({
+    used: false,
+    processedTicks,
+    simulationIterations: processedTicks,
+    eventBoundaryCount: processedTicks,
+    aggregatedTicks: 0,
+    cyclesAggregated: 0,
+    aggregatedCountExact: 0n,
+    reason,
+  });
+  if (!offlineInfinityCyclePathEligible(tickSeconds, requestedTicks, bestRate, rateRemainder)) {
+    return fallback(0, "eligibility-guard");
+  }
+
+  const firstInputState = runtime.snapshotRuntimeState();
+  const firstIpGainLog10 = runtime.infinityPointGainLog10();
+  update(tickSeconds, true);
+  const firstAfter = runtime.snapshotRuntimeState();
+  const firstCountGain = exactSnapshotDifference(
+    firstAfter,
+    firstInputState,
+    "infinityCountExact",
+    "infinityCount",
+  );
+  if (firstCountGain !== 1n || !Number.isFinite(firstIpGainLog10)) return fallback(1, "first-cycle-gain");
+  if (!runtime.canInfinity()) return fallback(1, "reset-not-ready");
+
+  const secondInputState = runtime.snapshotRuntimeState();
+  const secondIpGainLog10 = runtime.infinityPointGainLog10();
+  update(tickSeconds, true);
+  const secondAfter = runtime.snapshotRuntimeState();
+  const secondCountGain = exactSnapshotDifference(
+    secondAfter,
+    firstAfter,
+    "infinityCountExact",
+    "infinityCount",
+  );
+  const stable = secondCountGain === firstCountGain
+    && offlineInfinityCycleGainLog10Matches(firstIpGainLog10, secondIpGainLog10)
+    && offlineInfinityCycleStateSignatureFromSnapshot(firstAfter) === offlineInfinityCycleStateSignatureFromSnapshot(secondAfter);
+  if (!stable) return fallback(2, "cycle-not-stable");
+
+  const remainingTicks = requestedTicks - 2;
+  if (remainingTicks <= 0) return fallback(2, "no-remaining-cycles");
+  const aggregation = applyOfflineInfinityCycleAggregation(
+    remainingTicks,
+    tickSeconds,
+    bestRate,
+    rateRemainder,
+    secondInputState,
+    secondIpGainLog10,
+  );
+  if (!aggregation.used) return fallback(2, aggregation.reason);
+  return {
+    used: true,
+    processedTicks: requestedTicks,
+    simulationIterations: 2,
+    eventBoundaryCount: 2,
+    aggregatedTicks: aggregation.aggregatedTicks,
+    cyclesAggregated: aggregation.cyclesAggregated,
+    aggregatedCountExact: aggregation.aggregatedCountExact,
+  };
+}
+
 function offlineProgressNumericallySafe(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return false;
   if (!Number.isFinite(runtime.state.totalPlayTime + seconds)) return false;
@@ -1349,6 +1561,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     let simulationIterations = 0;
     let bulkIterations = 0;
     let bulkProcessedTicks = 0;
+    let aggregatedTicks = 0;
+    let cyclesAggregated = 0;
+    let cycleAggregatedCountExact = 0n;
     let precisionReduced = false;
     let eventBoundaryCount = 0;
     offlineDiagnostics = null;
@@ -1420,6 +1635,24 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           let lastBatchFinishedAt = null;
           let budgetStartedAt = monotonicClockNow();
           let lastProgressUiAt = budgetStartedAt;
+          const cyclePath = tryOfflineInfinityCyclePath(
+            tickSeconds,
+            requestedTicks,
+            bestRateAtStart,
+            rateRemainderAtStart,
+          );
+          processedTicks = cyclePath.processedTicks;
+          simulationIterations += cyclePath.simulationIterations;
+          eventBoundaryCount += cyclePath.eventBoundaryCount;
+          aggregatedTicks += cyclePath.aggregatedTicks || 0;
+          cyclesAggregated += cyclePath.cyclesAggregated || 0;
+          cycleAggregatedCountExact += cyclePath.aggregatedCountExact || 0n;
+          offlineDiagnostics.processedTicks = processedTicks;
+          offlineDiagnostics.fullSimulationIterations = simulationIterations;
+          offlineDiagnostics.aggregatedTicks = aggregatedTicks;
+          offlineDiagnostics.cyclesAggregated = cyclesAggregated;
+          offlineDiagnostics.cycleFallbackReason = cyclePath.reason || "";
+          offlineDiagnostics.eventBoundaryCount = eventBoundaryCount;
           while (processedTicks < requestedTicks) {
             const batchStartedAt = monotonicClockNow();
             const remainingTicks = requestedTicks - processedTicks;
@@ -1448,6 +1681,8 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             offlineDiagnostics.fullSimulationIterations = simulationIterations;
             offlineDiagnostics.bulkProcessedTicks = bulkProcessedTicks;
             offlineDiagnostics.bulkIterations = bulkIterations;
+            offlineDiagnostics.aggregatedTicks = aggregatedTicks;
+            offlineDiagnostics.cyclesAggregated = cyclesAggregated;
             offlineDiagnostics.eventBoundaryCount = eventBoundaryCount;
             offlineDiagnostics.precisionReduced = precisionReduced;
             const batchFinishedAt = monotonicClockNow();
@@ -1515,6 +1750,14 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
               zeroClockTicksSinceYield = 0;
             }
           }
+          if (processingMilliseconds <= 0) {
+            const elapsedProcessing = monotonicClockNow() - startedAt;
+            if (Number.isFinite(elapsedProcessing) && elapsedProcessing >= 0) {
+              processingMilliseconds = elapsedProcessing;
+            }
+          }
+          progressReport.aggregatedTicks = aggregatedTicks;
+          progressReport.cyclesAggregated = cyclesAggregated;
         } finally {
           runtime.state.showFloatingText = offlineFloatingTextSetting;
           setOfflineProcessingLock(false);
@@ -1530,20 +1773,27 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       offlineDiagnostics.fullSimulationIterations = simulationIterations;
       offlineDiagnostics.bulkProcessedTicks = bulkProcessedTicks;
       offlineDiagnostics.bulkIterations = bulkIterations;
+      offlineDiagnostics.aggregatedTicks = aggregatedTicks;
+      offlineDiagnostics.cyclesAggregated = cyclesAggregated;
       offlineDiagnostics.eventBoundaryCount = eventBoundaryCount;
       offlineDiagnostics.wallTimeMs = processingMilliseconds;
       offlineDiagnostics.precisionReduced = precisionReduced;
     }
 
     const normalAfter = offlineSnapshot();
-    const normalInfinityCountGainExact = exactSnapshotDifference(
+    const totalObservedInfinityCountGainExact = exactSnapshotDifference(
       normalAfter,
       before,
       "infinityCountExact",
       "infinityCount",
     );
+    const normalInfinityCountGainExact = cycleAggregatedCountExact > 0n
+      ? totalObservedInfinityCountGainExact > cycleAggregatedCountExact
+        ? totalObservedInfinityCountGainExact - cycleAggregatedCountExact
+        : 0n
+      : totalObservedInfinityCountGainExact;
     const normalInfinityCountGain = runtime.numberFromExactInteger(normalInfinityCountGainExact);
-    const aggregation = !clockAnomaly && aggregationEligible
+    const aggregation = !clockAnomaly && aggregationEligible && cyclesAggregated === 0
       ? applyOfflineInfinityAggregation(
         simulatedSeconds,
         normalInfinityCountGain,
@@ -1558,7 +1808,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       "infinityCountExact",
       "infinityCount",
     );
-    const aggregatedInfinityCountGainExact = totalInfinityCountGainExact > normalInfinityCountGainExact
+    const aggregatedInfinityCountGainExact = cycleAggregatedCountExact > 0n
+      ? cycleAggregatedCountExact
+      : totalInfinityCountGainExact > normalInfinityCountGainExact
       ? totalInfinityCountGainExact - normalInfinityCountGainExact
       : 0n;
     const effectiveElapsedSeconds = clockAnomaly
