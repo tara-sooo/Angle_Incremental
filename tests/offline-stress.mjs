@@ -387,7 +387,7 @@ async function measureOfflineStress(page) {
         automationEnabled: true,
         autoRunInfinity: true,
         completedChallenges,
-        infinityUpgradeMask: 1 << 12,
+        infinityUpgradeMask: (1 << 1) | (1 << 12),
         achievementMask: 1 << (19 - 1),
         autoInfinityPointThresholdLog10: thresholdLog10,
         autoInfinityPointThreshold: runtime.valueFromLog10(thresholdLog10),
@@ -1026,7 +1026,7 @@ async function measureOfflineStress(page) {
       state.achievementMask = 0;
       state.achievementMaskHigh = 0;
       state.infinityCount = 1;
-      state.infinityUpgradeMask = 1 << 12;
+      state.infinityUpgradeMask = (1 << 1) | (1 << 12);
       state.bestInfinityCountPerSecond = 30;
       state.infinityCountRateRemainder = rateRemainder;
       state.totalPlayTime = 0;

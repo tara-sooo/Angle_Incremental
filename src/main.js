@@ -1109,7 +1109,6 @@ function offlineInfinityCyclePathEligible(tickSeconds, requestedTicks, bestRate,
   if (Math.abs(bestRate * tickSeconds - 1) > 1e-6) return false;
   if (runtime.state.infiniteAngleUnlocked) return false;
   if (Array.isArray(runtime.state.timelinePurchasedNodes) && runtime.state.timelinePurchasedNodes.length > 0) return false;
-  if (runtime.normalAutomationUnlocked?.() === true) return false;
   if (runtime.state.eternityMilestoneMask !== 0) return false;
   return ![
     "autoBuySpeed",
@@ -1190,6 +1189,15 @@ function applyOfflineInfinityCycleAggregation(
   runtime.state.currentInfinityRunTime = 0;
   runtime.state.currentInfinityRealTime = 0;
   runtime.state.currentGenerationRunTime = 0;
+  if (runtime.normalAutomationUnlocked?.() && runtime.state.automationEnabled) {
+    normalAutobuyElapsed += remainingSeconds;
+    if (normalAutobuyElapsed >= runtime.AUTOBUY_INTERVAL_SECONDS) {
+      normalAutobuyElapsed %= runtime.AUTOBUY_INTERVAL_SECONDS;
+      if (runtime.AUTOBUY_INTERVAL_SECONDS - normalAutobuyElapsed <= 1e-9) normalAutobuyElapsed = 0;
+    }
+  } else {
+    normalAutobuyElapsed = 0;
+  }
   runtime.state.pointProgress = 0;
   runtime.state.totalVertexProgress = 0;
   runtime.state.lastVertexIndex = 0;
