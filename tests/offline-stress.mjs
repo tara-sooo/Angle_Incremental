@@ -64,6 +64,540 @@ async function measureOfflineStress(page) {
   return page.evaluate(async () => {
     const debug = window.__angleDebug;
     const { runtime, state } = debug;
+    const differentialExactFields = Object.freeze([
+      "vertices",
+      "verticesExact",
+      "ic8VertexUpgradeLevel",
+      "ic8VertexUpgradeLevelExact",
+      "speedLevel",
+      "speedLevelExact",
+      "gainLevel",
+      "gainLevelExact",
+      "lastVertexIndex",
+      "generationCount",
+      "coreBoostCount",
+      "infinityCount",
+      "infinityCountExact",
+      "infinityPointsExact",
+      "eternityCount",
+      "eternityCountExact",
+      "scoreTfClaims",
+      "ipTfClaims",
+      "eternityTfClaims",
+      "infiniteAngleUnlocked",
+      "infiniteAngleSpeedLevel",
+      "infiniteAngleVertexLevel",
+      "infiniteAngleGainLevel",
+      "infiniteAngleLastVertexIndex",
+      "infinityUpgradeMask",
+      "ipGainUpgradeLevel",
+      "infiniteAngleUpgradeLevel",
+      "softcapUpgradeLevel",
+      "tc4BaseGainLevel",
+      "tc4BaseGainPriceStep",
+      "tc4InfinityScoreVertexGainLevel",
+      "tc4InfinityScoreVertexGainPriceStep",
+      "tc4FreeCoreBoostLevel",
+      "tc4FreeCoreBoostPriceStep",
+      "towerFloor",
+      "activeChallenge",
+      "completedChallenges",
+      "activeTowerChallenge",
+      "completedTowerChallenges",
+      "infiniteCapBroken",
+      "achievementMask",
+      "achievementMaskHigh",
+      "eternityMilestoneMask",
+      "eternityMilestoneChoice",
+      "timelinePurchasedNodes",
+      "unlockedMainTabs",
+      "fastestInfinityChallengeTimes",
+      "fastestTowerChallengeTimes",
+      "fastestInfinityTime",
+      "fastestInfinityRealTime",
+      "fastestEternityTime",
+      "fastestEternityRealTime",
+      "lastInfinityRuns",
+      "lastEternityRuns",
+      "noGenerationCoreBoostReached",
+      "currentInfinityRunHadGeneration",
+      "currentInfinityRunHadCoreBoost",
+      "automationEnabled",
+      "autoBuySpeed",
+      "autoBuyVertex",
+      "autoBuyGain",
+      "autoBuyInfinityUpgrades",
+      "autoBuildTower",
+      "autoRunGeneration",
+      "autoRunCoreBoost",
+      "autoRunInfinity",
+      "autoBuyInfiniteAngleSpeed",
+      "autoBuyInfiniteAngleVertex",
+      "autoBuyInfiniteAngleGain",
+      "offlineProgressEnabled",
+      "offlineTickCount",
+      "timeFluxCapacityLevel",
+      "timeFluxGainLevel",
+    ]);
+    const differentialApproximateFields = Object.freeze({
+      scoreLog10: 1e-9,
+      totalScoreLog10: 1e-9,
+      generationScoreLog10: 1e-9,
+      previousGenerationScoreLog10: 1e-9,
+      generationScoreMultiplierLog10: 1e-9,
+      currentGainLog10: 1e-9,
+      generationCostFactor: 1e-12,
+      infiniteScoreLog10: 1e-9,
+      infiniteAngleCurrentGainLog10: 1e-9,
+      infinityPointsLog10: 1e-9,
+      timeFlux: 1e-9,
+      pointProgress: 1e-6,
+      totalVertexProgress: 1e-6,
+      infiniteAnglePointProgress: 1e-6,
+      infiniteAngleTotalVertexProgress: 1e-6,
+      totalPlayTime: 1e-6,
+      totalRealPlayTime: 1e-6,
+      currentInfinityRunTime: 1e-6,
+      currentInfinityRealTime: 1e-6,
+      currentEternityRunTime: 1e-6,
+      currentEternityRealTime: 1e-6,
+      currentGenerationRunTime: 1e-6,
+      activeChallengeTime: 1e-6,
+      activeTowerChallengeTime: 1e-6,
+      timelineParallelSecondsSinceIc8Clear: 1e-6,
+      ic8VertexDecayElapsed: 1e-6,
+      lastEarnedLog10: 1e-9,
+    });
+    const differentialReportExactFields = Object.freeze([
+      "generationCount",
+      "coreBoostCount",
+      "infinityCountExact",
+      "infinityPointsExact",
+      "eternityCountExact",
+      "scoreUnlocked",
+      "generationUnlocked",
+      "coreBoostUnlocked",
+      "infinityUnlocked",
+      "infiniteAngleUnlocked",
+      "eternityUnlocked",
+    ]);
+    const differentialReportApproximateFields = Object.freeze({
+      scoreLog10: 1e-9,
+      infinityPointsLog10: 1e-9,
+      infiniteScoreLog10: 1e-9,
+      timeFlux: 1e-9,
+      totalPlayTime: 1e-6,
+    });
+
+    function stateProjection(snapshot) {
+      return {
+        exact: Object.fromEntries(differentialExactFields.map((key) => [key, snapshot[key]])),
+        approximate: Object.fromEntries(
+          Object.keys(differentialApproximateFields).map((key) => [key, snapshot[key]]),
+        ),
+      };
+    }
+
+    function exactMismatch(expected, actual, path, mismatches) {
+      if (mismatches.length >= 20 || Object.is(expected, actual)) return;
+      if (typeof expected !== typeof actual || Array.isArray(expected) !== Array.isArray(actual)) {
+        mismatches.push({ path, expected, actual, policy: "exact" });
+        return;
+      }
+      if (expected === null || actual === null) {
+        mismatches.push({ path, expected, actual, policy: "exact" });
+        return;
+      }
+      if (Array.isArray(expected)) {
+        if (expected.length !== actual.length) {
+          mismatches.push({
+            path: path + ".length",
+            expected: expected.length,
+            actual: actual.length,
+            policy: "exact",
+          });
+          return;
+        }
+        expected.forEach((value, index) => exactMismatch(value, actual[index], path + "[" + index + "]", mismatches));
+        return;
+      }
+      if (expected && typeof expected === "object") {
+        const keys = [...new Set([...Object.keys(expected), ...Object.keys(actual)])].sort();
+        keys.forEach((key) => exactMismatch(expected[key], actual[key], path + "." + key, mismatches));
+        return;
+      }
+      mismatches.push({ path, expected, actual, policy: "exact" });
+    }
+
+    function approximateMismatch(expected, actual, path, tolerance, mismatches) {
+      if (mismatches.length >= 20 || Object.is(expected, actual)) return;
+      if (
+        typeof expected !== "number"
+        || typeof actual !== "number"
+        || !Number.isFinite(expected)
+        || !Number.isFinite(actual)
+        || Math.abs(expected - actual) > tolerance
+      ) {
+        mismatches.push({ path, expected, actual, tolerance, policy: "approximate" });
+      }
+    }
+
+    function compareProjection(expected, actual, path, mismatches) {
+      differentialExactFields.forEach((key) => exactMismatch(
+        expected.exact[key],
+        actual.exact[key],
+        path + ".exact." + key,
+        mismatches,
+      ));
+      Object.entries(differentialApproximateFields).forEach(([key, tolerance]) => approximateMismatch(
+        expected.approximate[key],
+        actual.approximate[key],
+        path + ".approximate." + key,
+        tolerance,
+        mismatches,
+      ));
+    }
+
+    function compareOfflineSnapshot(expected, actual, path, mismatches) {
+      if (!expected || !actual) {
+        exactMismatch(expected, actual, path, mismatches);
+        return;
+      }
+      differentialReportExactFields.forEach((key) => exactMismatch(
+        expected[key],
+        actual[key],
+        path + "." + key,
+        mismatches,
+      ));
+      Object.entries(differentialReportApproximateFields).forEach(([key, tolerance]) => approximateMismatch(
+        expected[key],
+        actual[key],
+        path + "." + key,
+        tolerance,
+        mismatches,
+      ));
+    }
+
+    function setLogState(prefix, log10) {
+      state[prefix + "Log10"] = log10;
+      state[prefix] = runtime.valueFromLog10(log10);
+    }
+
+    function configureDifferentialBase(ticks, nodes = []) {
+      resetScenario(3);
+      Object.assign(state, {
+        activeChallenge: 0,
+        activeTowerChallenge: 0,
+        automationEnabled: false,
+        autoBuySpeed: false,
+        autoBuyVertex: false,
+        autoBuyGain: false,
+        autoBuyInfinityUpgrades: false,
+        autoBuildTower: false,
+        autoRunGeneration: false,
+        autoRunCoreBoost: false,
+        autoRunInfinity: false,
+        autoBuyInfiniteAngleSpeed: false,
+        autoBuyInfiniteAngleVertex: false,
+        autoBuyInfiniteAngleGain: false,
+        completedChallenges: (1 << (6 - 1)) | (1 << (8 - 1)),
+        completedTowerChallenges: 0,
+        timelinePurchasedNodes: nodes.map((id) => ({ id })),
+        timelineParallelSecondsSinceIc8Clear: 5,
+        towerFloor: 10,
+        infiniteCapBroken: true,
+        generationCount: 0,
+        coreBoostCount: 0,
+        infinityUpgradeMask: 0,
+        ipGainUpgradeLevel: 0,
+        infiniteAngleUpgradeLevel: 0,
+        softcapUpgradeLevel: 0,
+        speedLevel: 0,
+        gainLevel: 0,
+        pointProgress: 0,
+        totalVertexProgress: 0,
+        infiniteAngleUnlocked: nodes.length > 0,
+        infiniteAngleSpeedLevel: 0,
+        infiniteAngleVertexLevel: 0,
+        infiniteAngleGainLevel: 0,
+        infiniteAnglePointProgress: 0,
+        infiniteAngleTotalVertexProgress: 0,
+        currentGain: 1,
+        currentGainLog10: 0,
+        infinityCount: 1,
+        eternityCount: 8,
+        infinityPoints: 0,
+        infinityPointsLog10: -Infinity,
+        infinityPointsExact: "0",
+        lastInfinityRuns: [],
+        lastEternityRuns: [],
+        fastestInfinityChallengeTimes: Array(8).fill(0),
+        fastestTowerChallengeTimes: Array(4).fill(0),
+        fastestInfinityTime: 0,
+        fastestInfinityRealTime: 0,
+        fastestEternityTime: 0,
+        fastestEternityRealTime: 0,
+        achievementMask: 0,
+        achievementMaskHigh: 0,
+        eternityMilestoneMask: 0,
+        eternityMilestoneChoice: "",
+        unlockedMainTabs: [],
+        totalPlayTime: 0,
+        totalRealPlayTime: 0,
+        currentInfinityRunTime: 0,
+        currentInfinityRealTime: 0,
+        currentEternityRunTime: 0,
+        currentEternityRealTime: 0,
+        currentGenerationRunTime: 0,
+        activeChallengeTime: 0,
+        activeTowerChallengeTime: 0,
+        bestInfinityCountPerSecond: 0,
+        infinityCountRateRemainder: 0,
+        offlineProgressEnabled: true,
+        offlineTickCount: ticks,
+        showFloatingText: false,
+        noGenerationCoreBoostReached: false,
+        currentInfinityRunHadGeneration: false,
+        currentInfinityRunHadCoreBoost: false,
+      });
+      setLogState("score", 100);
+      setLogState("totalScore", 100);
+      setLogState("generationScore", 100);
+      setLogState("infiniteScore", nodes.length > 0 ? 50 : -Infinity);
+      runtime.setExactIntegerState(state, "verticesExact", "vertices", 3n);
+      runtime.setExactIntegerState(state, "ic8VertexUpgradeLevelExact", "ic8VertexUpgradeLevel", 0n);
+      runtime.setExactIntegerState(state, "speedLevelExact", "speedLevel", 0n);
+      runtime.setExactIntegerState(state, "gainLevelExact", "gainLevel", 0n);
+      runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 1n);
+      runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 8n);
+      runtime.syncInfinityPointCachesFromExact(10n ** 6n);
+    }
+
+    function configureAutoInfinityDifferential(ticks) {
+      configureDifferentialBase(ticks);
+      Object.assign(state, {
+        automationEnabled: true,
+        autoRunInfinity: true,
+        infinityUpgradeMask: 1 << 12,
+        achievementMask: 1 << (19 - 1),
+        autoInfinityPointThresholdLog10: 0,
+        autoInfinityPointThreshold: 1,
+      });
+      setLogState("score", 309);
+      setLogState("totalScore", 309);
+      setLogState("generationScore", 309);
+    }
+
+    function configureGenerationDifferential(ticks) {
+      configureDifferentialBase(ticks);
+      Object.assign(state, {
+        automationEnabled: true,
+        autoRunGeneration: true,
+        achievementMask: 1 << (19 - 1),
+        autoGenerationScoreMultiplierThreshold: 0,
+        autoGenerationCostMultiplierThreshold: 0,
+        autoGenerationMinimumSeconds: 0,
+        autoGenerationLegacyOrMode: false,
+      });
+      setLogState("score", 7);
+      setLogState("totalScore", 7);
+      setLogState("generationScore", 7);
+    }
+
+    function configureCoreBoostDifferential(ticks) {
+      configureDifferentialBase(ticks);
+      Object.assign(state, {
+        generationCount: 1,
+        automationEnabled: true,
+        autoRunCoreBoost: true,
+        achievementMask: 1 << (19 - 1),
+      });
+      setLogState("score", 20);
+      setLogState("totalScore", 20);
+      setLogState("generationScore", 20);
+    }
+
+    async function runDifferential(name, configure, ticks, { reprimeScore = false } = {}) {
+      configure(ticks);
+      const startingState = runtime.snapshotRuntimeState();
+      const startingNormalAutobuyElapsed = runtime.normalAutobuyElapsed;
+      const originalUpdateUi = runtime.updateUi;
+      const originalSaveGame = runtime.saveGame;
+      const originalCreateCheckpoint = runtime.createCheckpoint;
+      const originalUpdateOfflineReportUi = runtime.updateOfflineReportUi;
+      const originalResetBelowInfinity = reprimeScore ? runtime.resetBelowInfinity : null;
+      if (reprimeScore) {
+        runtime.resetBelowInfinity = (...args) => {
+          const result = originalResetBelowInfinity(...args);
+          setLogState("score", 309);
+          return result;
+        };
+      }
+      const tickSeconds = runtime.MAX_SIMULATION_STEP_SECONDS;
+      const restoreStartingState = () => {
+        runtime.restoreRuntimeState(startingState);
+        runtime.normalAutobuyElapsed = startingNormalAutobuyElapsed;
+        runtime.offlineReport = null;
+        runtime.offlineProcessing = false;
+      };
+      let canonical;
+      let accelerated;
+      try {
+        runtime.updateUi = () => {};
+        runtime.saveGame = () => true;
+        runtime.createCheckpoint = () => true;
+        runtime.updateOfflineReportUi = () => {};
+
+        restoreStartingState();
+        const canonicalBefore = runtime.offlineSnapshot();
+        const canonicalStartedAt = performance.now();
+        for (let tick = 0; tick < ticks; tick += 1) debug.update(tickSeconds);
+        canonical = {
+          before: canonicalBefore,
+          after: runtime.offlineSnapshot(),
+          state: stateProjection(runtime.snapshotRuntimeState()),
+          wallTimeMs: performance.now() - canonicalStartedAt,
+          fullSimulationIterations: ticks,
+          normalAutobuyElapsed: runtime.normalAutobuyElapsed,
+        };
+
+        restoreStartingState();
+        const acceleratedStartedAt = performance.now();
+        const report = await debug.processOfflineElapsed(
+          tickSeconds * ticks,
+          "differential-" + name,
+          { clockSource: "server" },
+        );
+        accelerated = {
+          report,
+          before: report?.before ?? null,
+          after: report?.after ?? runtime.offlineSnapshot(),
+          state: stateProjection(runtime.snapshotRuntimeState()),
+          wallTimeMs: performance.now() - acceleratedStartedAt,
+          diagnostics: runtime.offlineDiagnostics,
+          work: runtime.offlineWorkStats,
+          normalAutobuyElapsed: runtime.normalAutobuyElapsed,
+        };
+      } finally {
+        runtime.updateUi = originalUpdateUi;
+        runtime.saveGame = originalSaveGame;
+        runtime.createCheckpoint = originalCreateCheckpoint;
+        runtime.updateOfflineReportUi = originalUpdateOfflineReportUi;
+        if (reprimeScore) runtime.resetBelowInfinity = originalResetBelowInfinity;
+      }
+
+      const mismatches = [];
+      compareProjection(
+        canonical.state,
+        accelerated.state,
+        "state",
+        mismatches,
+      );
+      compareOfflineSnapshot(canonical.before, accelerated.before, "report.before", mismatches);
+      compareOfflineSnapshot(canonical.after, accelerated.after, "report.after", mismatches);
+      if (Math.abs(canonical.normalAutobuyElapsed - accelerated.normalAutobuyElapsed) > 1e-9) {
+        mismatches.push({
+          path: "normalAutobuyElapsed",
+          expected: canonical.normalAutobuyElapsed,
+          actual: accelerated.normalAutobuyElapsed,
+          tolerance: 1e-9,
+          policy: "approximate",
+        });
+      }
+      return {
+        name,
+        elapsedSeconds: tickSeconds * ticks,
+        requestedTicks: ticks,
+        policy: {
+          exactStateFields: [...differentialExactFields],
+          approximateStateFields: { ...differentialApproximateFields },
+          exactReportFields: [...differentialReportExactFields],
+          approximateReportFields: { ...differentialReportApproximateFields },
+        },
+        canonical,
+        accelerated,
+        comparison: {
+          matched: mismatches.length === 0,
+          mismatches,
+        },
+      };
+    }
+
+    function collectObservedEventCounts(before, after) {
+      const countDelta = (key) => Math.max(
+        0,
+        Math.floor(Number(after?.[key]) || 0) - Math.floor(Number(before?.[key]) || 0),
+      );
+      const exactDelta = (key) => {
+        try {
+          return Number(
+            BigInt(String(after?.[key] ?? 0)) - BigInt(String(before?.[key] ?? 0)),
+          );
+        } catch {
+          return 0;
+        }
+      };
+      const bitCount = (value) => {
+        let bits = Math.floor(Number(value) || 0) >>> 0;
+        let count = 0;
+        while (bits !== 0) {
+          count += bits & 1;
+          bits >>>= 1;
+        }
+        return count;
+      };
+      return {
+        infinityExecutions: Math.max(0, exactDelta("infinityCountExact")),
+        generationResets: countDelta("generationCount"),
+        coreBoostResets: countDelta("coreBoostCount"),
+        towerBuilds: countDelta("towerFloor"),
+        automaticUnlocks: Number(Boolean(after?.infiniteAngleUnlocked) && !Boolean(before?.infiniteAngleUnlocked)),
+        automaticCompletions: bitCount(after?.completedChallenges) - bitCount(before?.completedChallenges)
+          + bitCount(after?.completedTowerChallenges) - bitCount(before?.completedTowerChallenges),
+      };
+    }
+
+    async function measureEventfulBaseline(name, ticks, configure, { reprimeScore = false } = {}) {
+      configure(ticks);
+      const beforeState = runtime.snapshotRuntimeState();
+      const originalResetBelowInfinity = reprimeScore ? runtime.resetBelowInfinity : null;
+      if (reprimeScore) {
+        runtime.resetBelowInfinity = (...args) => {
+          const result = originalResetBelowInfinity(...args);
+          setLogState("score", 309);
+          return result;
+        };
+      }
+      const startedAt = performance.now();
+      try {
+        const report = await debug.processOfflineElapsed(
+          runtime.MAX_SIMULATION_STEP_SECONDS * ticks,
+          "baseline-" + name,
+          { clockSource: "server" },
+        );
+        const afterState = runtime.snapshotRuntimeState();
+        return {
+          name,
+          baselineOnly: true,
+          requestedTicks: report?.requestedTicks ?? 0,
+          processedTicks: report?.processedTicks ?? 0,
+          fullSimulationIterations: runtime.offlineDiagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
+          bulkProcessedTicks: runtime.offlineDiagnostics?.bulkProcessedTicks ?? report?.bulkProcessedTicks ?? 0,
+          bulkIterations: runtime.offlineDiagnostics?.bulkIterations ?? report?.bulkIterations ?? 0,
+          eventBoundaryCount: runtime.offlineDiagnostics?.eventBoundaryCount ?? 0,
+          precisionReduced: runtime.offlineDiagnostics?.precisionReduced ?? false,
+          wallTimeMs: runtime.offlineDiagnostics?.wallTimeMs ?? (performance.now() - startedAt),
+          wallMilliseconds: performance.now() - startedAt,
+          eventCounts: runtime.offlineDiagnostics?.eventCounts ?? {},
+          observedEventCounts: collectObservedEventCounts(beforeState, afterState),
+          before: report?.before ?? null,
+          after: report?.after ?? null,
+        };
+      } finally {
+        if (reprimeScore) runtime.resetBelowInfinity = originalResetBelowInfinity;
+      }
+    }
+
     function resetScenario(vertices) {
       state.activeChallenge = 0;
       state.vertices = vertices;
@@ -118,6 +652,11 @@ async function measureOfflineStress(page) {
       state.infiniteScoreLog10 = -Infinity;
       state.offlineProgressEnabled = true;
       state.offlineTickCount = 1000;
+      state.completedChallenges = 0;
+      state.completedTowerChallenges = 0;
+      state.eternityMilestoneMask = 0;
+      state.timelinePurchasedNodes = [];
+      runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 0n);
     }
     async function measureCoreHitBoundary(track) {
       const coreHits = 48000;
@@ -268,14 +807,19 @@ async function measureOfflineStress(page) {
           reason,
           { clockSource: "server" },
         );
+        const diagnostics = runtime.offlineDiagnostics;
         return {
           requestedTicks: report?.requestedTicks ?? 0,
           processedTicks: report?.processedTicks ?? 0,
           simulationIterations: report?.simulationIterations ?? 0,
+          fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
           bulkIterations: report?.bulkIterations ?? 0,
           bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+          eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
           precisionReduced: report?.precisionReduced ?? false,
           work: runtime.offlineWorkStats,
+          wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
+          eventCounts: diagnostics?.eventCounts ?? {},
           wallMilliseconds: performance.now() - startedAt,
         };
       };
@@ -307,12 +851,18 @@ async function measureOfflineStress(page) {
         `performance-quiet-${requestedTicks}`,
         { clockSource: "server" },
       );
+      const diagnostics = runtime.offlineDiagnostics;
       return {
         requestedTicks: report?.requestedTicks ?? 0,
         processedTicks: report?.processedTicks ?? 0,
         simulationIterations: report?.simulationIterations ?? 0,
+        fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
         bulkIterations: report?.bulkIterations ?? 0,
         bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+        eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+        precisionReduced: diagnostics?.precisionReduced ?? false,
+        wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
+        eventCounts: diagnostics?.eventCounts ?? {},
         wallMilliseconds: performance.now() - startedAt,
       };
     }
@@ -359,15 +909,20 @@ async function measureOfflineStress(page) {
         `performance-timeline-${route}`,
         { clockSource: "server" },
       );
+      const diagnostics = runtime.offlineDiagnostics;
       return {
         route,
         nodes,
         requestedTicks: report?.requestedTicks ?? 0,
         processedTicks: report?.processedTicks ?? 0,
         simulationIterations: report?.simulationIterations ?? 0,
+        fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
         bulkIterations: report?.bulkIterations ?? 0,
         bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+        eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
         precisionReduced: report?.precisionReduced ?? false,
+        wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
+        eventCounts: diagnostics?.eventCounts ?? {},
         work: runtime.offlineWorkStats,
         before: report?.before ?? null,
         after: report?.after ?? null,
@@ -387,10 +942,10 @@ async function measureOfflineStress(page) {
         wallMilliseconds: performance.now() - startedAt,
       };
     }
-    async function measureAutoInfinityStress() {
+    async function measureAutoInfinityStress(requestedTicks) {
       resetScenario(3);
       state.offlineProgressEnabled = true;
-      state.offlineTickCount = 10000;
+      state.offlineTickCount = requestedTicks;
       state.speedLevel = 0;
       state.gainLevel = 0;
       state.infiniteAngleUnlocked = false;
@@ -401,10 +956,15 @@ async function measureOfflineStress(page) {
       state.autoInfinityPointThresholdLog10 = 0;
       state.activeChallenge = 0;
       state.activeTowerChallenge = 0;
+      state.completedChallenges = 0;
+      state.completedTowerChallenges = 0;
+      state.achievementMask = 0;
       state.infinityCount = 1;
       state.infinityUpgradeMask = 1 << 12;
       state.score = Number.MAX_VALUE;
       state.scoreLog10 = 309;
+      runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 1n);
+      const beforeState = runtime.snapshotRuntimeState();
 
       const originalResetBelowInfinity = runtime.resetBelowInfinity;
       const uiUpdatesBefore = debug.uiUpdateCount();
@@ -416,23 +976,75 @@ async function measureOfflineStress(page) {
       };
       try {
         const startedAt = performance.now();
-        const report = await debug.processOfflineElapsed(10000 / 30, "performance-auto-infinity", {
+        const report = await debug.processOfflineElapsed(
+          requestedTicks * runtime.MAX_SIMULATION_STEP_SECONDS,
+          "performance-auto-infinity-" + requestedTicks,
+          {
           clockSource: "server",
-        });
+          },
+        );
+        const afterState = runtime.snapshotRuntimeState();
+        const diagnostics = runtime.offlineDiagnostics;
         return {
+          baselineOnly: requestedTicks === runtime.OFFLINE_PROGRESS_MAX_TICKS,
           requestedTicks: report?.requestedTicks ?? 0,
           processedTicks: report?.processedTicks ?? 0,
           simulationIterations: report?.simulationIterations ?? 0,
+          fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
           bulkIterations: report?.bulkIterations ?? 0,
           bulkProcessedTicks: report?.bulkProcessedTicks ?? 0,
+          eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+          precisionReduced: diagnostics?.precisionReduced ?? false,
           infinityCountGain: report?.normalInfinityCountGain ?? 0,
           processingMilliseconds: report?.processingMilliseconds ?? NaN,
+          wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
           wallMilliseconds: performance.now() - startedAt,
           uiUpdateCalls: debug.uiUpdateCount() - uiUpdatesBefore,
+          eventCounts: diagnostics?.eventCounts ?? {},
+          observedEventCounts: collectObservedEventCounts(beforeState, afterState),
         };
       } finally {
         runtime.resetBelowInfinity = originalResetBelowInfinity;
       }
+    }
+
+    function configureLateEternityBaseline(ticks) {
+      configureDifferentialBase(ticks, [
+        "Parallel-BC16500",
+        "Parallel-BC6000",
+        "Parallel-AD30",
+      ]);
+      Object.assign(state, {
+        completedChallenges: (1 << 8) - 1,
+        completedTowerChallenges: (1 << 4) - 1,
+        eternityMilestoneMask: (1 << 8) - 1,
+        automationEnabled: true,
+        autoBuySpeed: true,
+        autoBuyVertex: true,
+        autoBuyGain: true,
+        autoBuyInfinityUpgrades: true,
+        autoBuildTower: true,
+        autoRunGeneration: true,
+        autoRunCoreBoost: true,
+        autoRunInfinity: true,
+        autoBuyInfiniteAngleSpeed: true,
+        autoBuyInfiniteAngleVertex: true,
+        autoBuyInfiniteAngleGain: true,
+        infinityUpgradeMask: 1 << 12,
+        achievementMask: 1 << (19 - 1),
+        autoInfinityPointThresholdLog10: 0,
+        autoInfinityPointThreshold: 1,
+        towerFloor: 12,
+        infiniteAngleUnlocked: true,
+        fastestInfinityTime: 60,
+      });
+      setLogState("score", 309);
+      setLogState("totalScore", 309);
+      setLogState("generationScore", 309);
+      setLogState("infiniteScore", 100);
+      runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 1000000n);
+      runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 100n);
+      runtime.syncInfinityPointCachesFromExact(10n ** 300n);
     }
 
     function primeRegressionState() {
@@ -466,19 +1078,52 @@ async function measureOfflineStress(page) {
     state.timelinePurchasedNodes = [];
     const offlineStartedAt = performance.now();
     const offlineReport = await debug.processOfflineElapsed(100000 / 30, "performance", { clockSource: "server" });
+    const offlineDiagnostics = runtime.offlineDiagnostics;
     const offlineProcessing = {
       requestedTicks: offlineReport?.requestedTicks ?? 0,
       processedTicks: offlineReport?.processedTicks ?? 0,
       simulationIterations: offlineReport?.simulationIterations ?? 0,
+      fullSimulationIterations: offlineDiagnostics?.fullSimulationIterations ?? offlineReport?.simulationIterations ?? 0,
       bulkIterations: offlineReport?.bulkIterations ?? 0,
       bulkProcessedTicks: offlineReport?.bulkProcessedTicks ?? 0,
+      eventBoundaryCount: offlineDiagnostics?.eventBoundaryCount ?? 0,
+      precisionReduced: offlineDiagnostics?.precisionReduced ?? false,
       processingMilliseconds: offlineReport?.processingMilliseconds ?? NaN,
+      wallTimeMs: offlineDiagnostics?.wallTimeMs ?? (performance.now() - offlineStartedAt),
+      eventCounts: offlineDiagnostics?.eventCounts ?? {},
       wallMilliseconds: performance.now() - offlineStartedAt,
     };
+    const differential = {
+      quiet: await runDifferential("quiet", (ticks) => configureDifferentialBase(ticks), 120),
+      timelineReal: await runDifferential(
+        "timeline-real",
+        (ticks) => configureDifferentialBase(ticks, ["Real-BC16500", "Real-BC6000", "Real-AD30"]),
+        120,
+      ),
+      timelineParallel: await runDifferential(
+        "timeline-parallel",
+        (ticks) => configureDifferentialBase(ticks, ["Parallel-BC16500", "Parallel-BC6000", "Parallel-AD30"]),
+        120,
+      ),
+      autoInfinity: await runDifferential("auto-infinity", configureAutoInfinityDifferential, 120, { reprimeScore: true }),
+      generation: await runDifferential("generation", configureGenerationDifferential, 120),
+      coreBoost: await runDifferential("core-boost", configureCoreBoostDifferential, 120),
+    };
+    const rendered = JSON.parse(window.render_game_to_text());
     return {
       offlineProcessing,
       offlineStress: {
-        autoInfinity: await measureAutoInfinityStress(),
+        autoInfinity: await measureAutoInfinityStress(10000),
+        autoInfinityMillion: await measureAutoInfinityStress(runtime.OFFLINE_PROGRESS_MAX_TICKS),
+        differential,
+        generationAutomation: await measureEventfulBaseline("generation", 120, configureGenerationDifferential),
+        coreBoostAutomation: await measureEventfulBaseline("core-boost", 120, configureCoreBoostDifferential),
+        lateEternityAutomation: await measureEventfulBaseline(
+          "late-eternity",
+          120,
+          configureLateEternityBaseline,
+          { reprimeScore: true },
+        ),
         coreHitBoundary: {
           angle: await measureCoreHitBoundary("angle"),
           infiniteAngle: await measureCoreHitBoundary("infiniteAngle"),
@@ -502,6 +1147,7 @@ async function measureOfflineStress(page) {
           ),
         },
       },
+      playerFacingOfflineReportKeys: Object.keys(rendered.timeFlux?.report ?? {}),
     };
   });
 }
@@ -526,7 +1172,12 @@ try {
       viewport: { name: "desktop", width: 1280, height: 800 },
       deviceScaleFactor: 1,
       preparation: "unmeasured 3/720/10000 Angle and Infinite Angle updates prime the progressed achievement state used by the original boundary coverage",
-      scenarios: ["offline-processing", "auto-infinity", "core-hit-boundary", "infinite-angle-exact-work", "long-resume", "quiet-resume-scale", "timeline-enabled"],
+      scenarios: ["offline-processing", "differential-guarded-canonical", "auto-infinity", "auto-infinity-million-baseline", "generation-automation-baseline", "core-boost-automation-baseline", "late-eternity-automation-baseline", "core-hit-boundary", "infinite-angle-exact-work", "long-resume", "quiet-resume-scale", "timeline-enabled"],
+      baselinePolicy: "eventful scenarios are baseline-only observations; they are not release performance targets",
+      differentialPolicy: {
+        exact: "discrete counts, levels, unlocks, masks, challenges, achievements, timers/history, and automation settings",
+        approximate: "log-valued resources within 1e-9 and timer/progress values within 1e-6",
+      },
     },
     budgets,
     ...data,
@@ -553,6 +1204,13 @@ try {
   );
   assert.ok(report.offlineProcessing.bulkIterations > 0, "the real quiet offline path should use bulk iterations");
   assert.equal(
+    report.offlineProcessing.fullSimulationIterations,
+    report.offlineProcessing.simulationIterations,
+    "the internal full-simulation diagnostic should mirror the existing iteration count",
+  );
+  assert.ok(report.offlineProcessing.eventBoundaryCount >= 0, "the offline path should expose an event-boundary count");
+  assert.ok(Number.isFinite(report.offlineProcessing.wallTimeMs), "the offline path should expose finite diagnostic wall time");
+  assert.equal(
     report.offlineProcessing.processedTicks,
     report.offlineProcessing.bulkProcessedTicks
       + report.offlineProcessing.simulationIterations
@@ -566,6 +1224,47 @@ try {
   assert.equal(autoInfinity.infinityCountGain, 10000, "Auto Infinity stress should run once per tick");
   assert.equal(autoInfinity.simulationIterations, 10000, "Auto Infinity should retain one simulation iteration per reset event");
   assert.equal(autoInfinity.bulkIterations, 0, "Auto Infinity should not use bulk iterations across reset events");
+  assert.equal(autoInfinity.eventBoundaryCount, 10000, "Auto Infinity should expose one event boundary per reset event");
+  assert.equal(autoInfinity.eventCounts.infinityExecutions, 10000, "Auto Infinity diagnostics should count every reset event");
+  const autoInfinityMillion = report.offlineStress.autoInfinityMillion;
+  assert.equal(autoInfinityMillion.baselineOnly, true, "the Auto Infinity million-tick run should be marked baseline-only");
+  assert.equal(autoInfinityMillion.requestedTicks, 1000000, "Auto Infinity million stress should request one million ticks");
+  assert.equal(autoInfinityMillion.processedTicks, 1000000, "Auto Infinity million stress should process one million ticks exactly");
+  assert.equal(autoInfinityMillion.fullSimulationIterations, 1000000, "Auto Infinity million stress should remain eventful");
+  assert.equal(autoInfinityMillion.bulkIterations, 0, "Auto Infinity million stress should not bulk across reset events");
+  assert.equal(autoInfinityMillion.eventCounts.infinityExecutions, 1000000, "Auto Infinity million diagnostics should count every reset event");
+  for (const [name, baseline] of Object.entries({
+    generation: report.offlineStress.generationAutomation,
+    coreBoost: report.offlineStress.coreBoostAutomation,
+    lateEternity: report.offlineStress.lateEternityAutomation,
+  })) {
+    assert.equal(baseline.baselineOnly, true, `${name} automation should be marked baseline-only`);
+    assert.equal(baseline.requestedTicks, 120, `${name} automation should request its configured ticks`);
+    assert.equal(baseline.processedTicks, 120, `${name} automation should process its configured ticks`);
+    assert.ok(baseline.fullSimulationIterations > 0, `${name} automation should report full simulation work`);
+    assert.ok(baseline.eventBoundaryCount > 0, `${name} automation should expose event boundaries`);
+    assert.ok(Number.isFinite(baseline.wallTimeMs), `${name} automation should report finite diagnostic wall time`);
+  }
+  assert.ok(report.offlineStress.generationAutomation.eventCounts.generationResets > 0, "Generation baseline should observe a Generation reset");
+  assert.ok(report.offlineStress.coreBoostAutomation.eventCounts.coreBoostResets > 0, "Core Boost baseline should observe a Core Boost reset");
+  assert.ok(
+    report.offlineStress.lateEternityAutomation.eventCounts.infinityExecutions > 0
+      || report.offlineStress.lateEternityAutomation.eventCounts.generationResets > 0
+      || report.offlineStress.lateEternityAutomation.eventCounts.coreBoostResets > 0
+      || report.offlineStress.lateEternityAutomation.eventCounts.towerBuilds > 0
+      || report.offlineStress.lateEternityAutomation.eventCounts.infiniteAnglePurchases > 0,
+    "late-Eternity automation baseline should observe at least one practical event",
+  );
+  for (const [name, result] of Object.entries(report.offlineStress.differential)) {
+    assert.equal(result.comparison.matched, true, `${name} differential should match the guarded canonical simulation: ${JSON.stringify(result.comparison.mismatches)}`);
+    assert.equal(result.accelerated.diagnostics.requestedTicks, 120, `${name} differential should expose requested tick diagnostics`);
+    assert.equal(result.accelerated.diagnostics.processedTicks, 120, `${name} differential should expose processed tick diagnostics`);
+    assert.ok(result.accelerated.work.totalIterations <= result.accelerated.work.hardCap, `${name} differential work should stay within its hard cap`);
+    assert.equal(result.accelerated.diagnostics.precisionReduced, result.accelerated.work.precisionReduced, `${name} differential precision status should match its work ledger`);
+  }
+  for (const key of ["fullSimulationIterations", "eventBoundaryCount", "wallTimeMs", "eventCounts"]) {
+    assert.equal(report.playerFacingOfflineReportKeys.includes(key), false, `player-facing offline reports must omit ${key}`);
+  }
   for (const [track, boundary] of Object.entries(report.offlineStress.coreHitBoundary)) {
     assert.equal(boundary.coreHits, 48000, `${track} boundary should use 48000 core hits`);
     assert.equal(boundary.requestedTicks, 1, `${track} boundary should fit in one offline tick`);

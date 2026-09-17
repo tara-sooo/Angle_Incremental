@@ -68,11 +68,23 @@ let localClockAnomaly = false;
 let localClockAnchor = null;
 let offlineProcessPromise = null;
 let offlineWorkLedger = null;
+let offlineDiagnostics = null;
 const OFFLINE_PROCESS_TIME_BUDGET_MS = 8;
 const OFFLINE_PROCESS_INITIAL_BATCH_TICKS = 64;
 const OFFLINE_PROCESS_TARGET_BATCH_MS = 2;
 const OFFLINE_PROCESS_PROGRESS_UPDATE_INTERVAL_MS = 100;
 const OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT = 4096;
+const OFFLINE_EVENT_KEYS = Object.freeze([
+  "infinityExecutions",
+  "generationResets",
+  "coreBoostResets",
+  "normalUpgradePurchases",
+  "infinityUpgradePurchases",
+  "infiniteAnglePurchases",
+  "towerBuilds",
+  "automaticUnlocks",
+  "automaticCompletions",
+]);
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
   : (callback) => window.setTimeout(() => callback(currentFrameTime()), 1000 / 60);
@@ -88,6 +100,45 @@ const baseSaveGame = runtime.saveGame;
 
 function simulationBatchActive() {
   return simulationBatchDepth > 0;
+}
+
+function createOfflineEventCounts() {
+  return Object.fromEntries(OFFLINE_EVENT_KEYS.map((key) => [key, 0]));
+}
+
+function beginOfflineDiagnostics(requestedTicks) {
+  offlineDiagnostics = {
+    requestedTicks,
+    processedTicks: 0,
+    fullSimulationIterations: 0,
+    bulkProcessedTicks: 0,
+    bulkIterations: 0,
+    eventBoundaryCount: 0,
+    wallTimeMs: 0,
+    precisionReduced: false,
+    eventCounts: createOfflineEventCounts(),
+  };
+}
+
+function recordOfflineEvent(name, count = 1) {
+  if (!offlineProcessing || !offlineDiagnostics || !OFFLINE_EVENT_KEYS.includes(name)) return;
+  const normalizedCount = Math.max(0, Math.floor(Number(count) || 0));
+  offlineDiagnostics.eventCounts[name] += normalizedCount;
+}
+
+function offlineDiagnosticsSnapshot() {
+  if (!offlineDiagnostics) return null;
+  return {
+    requestedTicks: offlineDiagnostics.requestedTicks,
+    processedTicks: offlineDiagnostics.processedTicks,
+    fullSimulationIterations: offlineDiagnostics.fullSimulationIterations,
+    bulkProcessedTicks: offlineDiagnostics.bulkProcessedTicks,
+    bulkIterations: offlineDiagnostics.bulkIterations,
+    eventBoundaryCount: offlineDiagnostics.eventBoundaryCount,
+    wallTimeMs: offlineDiagnostics.wallTimeMs,
+    precisionReduced: offlineDiagnostics.precisionReduced,
+    eventCounts: { ...offlineDiagnostics.eventCounts },
+  };
 }
 
 function beginOfflineWorkBudget(requestedTicks = runtime.OFFLINE_PROGRESS_MAX_TICKS) {
@@ -715,18 +766,20 @@ async function checkForRemoteUpdate() {
 
 function runAutobuyers() {
   if (!runtime.normalAutomationUnlocked?.() || !runtime.state.automationEnabled) return;
-  runtime.buyAllUpgrades({
+  const normalPurchases = runtime.buyAllUpgrades({
     refresh: false,
     save: false,
     allowSpeed: runtime.state.autoBuySpeed,
     allowVertex: runtime.state.autoBuyVertex,
     allowGain: runtime.state.autoBuyGain,
   });
+  recordOfflineEvent("normalUpgradePurchases", normalPurchases);
   if (runtime.state.autoBuyInfinityUpgrades) {
-    runtime.buyAllInfinityUpgrades({
+    const infinityPurchases = runtime.buyAllInfinityUpgrades({
       refresh: false,
       save: false,
     });
+    recordOfflineEvent("infinityUpgradePurchases", infinityPurchases);
   }
 }
 
@@ -759,14 +812,22 @@ function shouldAutoRunGeneration() {
 
 function runEternityMilestoneAutomation({ refresh = false, save = true } = {}) {
   let changed = false;
-  if (
+  const unlocked = (
     runtime.eternityMilestoneActive?.("5") === true
     && runtime.unlockInfiniteAngle?.({ refresh, save: false }) === true
-  ) changed = true;
-  if (
+  );
+  if (unlocked) {
+    changed = true;
+    recordOfflineEvent("automaticUnlocks");
+  }
+  const capBroken = (
     runtime.eternityMilestoneActive?.("6") === true
     && runtime.breakInfiniteCap?.({ refresh, save: false }) === true
-  ) changed = true;
+  );
+  if (capBroken) {
+    changed = true;
+    recordOfflineEvent("automaticCompletions");
+  }
   if (changed && save) runtime.saveGame("manual");
   return changed;
 }
@@ -793,16 +854,19 @@ function runLayerAutomation() {
     )
   ) {
     runtime.runInfinity(false);
+    recordOfflineEvent("infinityExecutions");
     return true;
   }
 
   if (generationCoreAutomationUnlocked && runtime.state.autoRunCoreBoost && runtime.canCoreBoost()) {
     runtime.runCoreBoost();
+    recordOfflineEvent("coreBoostResets");
     return true;
   }
 
   if (generationCoreAutomationUnlocked && runtime.state.autoRunGeneration && shouldAutoRunGeneration()) {
     runtime.runGeneration();
+    recordOfflineEvent("generationResets");
     return true;
   }
 
@@ -812,7 +876,10 @@ function runLayerAutomation() {
 function runEternityMilestoneEightAutomation() {
   if (runtime.eternityMilestoneActive?.("8") !== true || !runtime.state.automationEnabled) return false;
   let changed = false;
-  if (runtime.state.autoBuildTower && runtime.buildTower({ refresh: false, save: false })) changed = true;
+  if (runtime.state.autoBuildTower && runtime.buildTower({ refresh: false, save: false })) {
+    recordOfflineEvent("towerBuilds");
+    changed = true;
+  }
   const purchases = runtime.buyAllInfiniteAngleUpgrades({
     refresh: false,
     save: false,
@@ -820,6 +887,7 @@ function runEternityMilestoneEightAutomation() {
     allowVertex: runtime.state.autoBuyInfiniteAngleVertex,
     allowGain: runtime.state.autoBuyInfiniteAngleGain,
   });
+  recordOfflineEvent("infiniteAnglePurchases", purchases);
   return changed || purchases > 0;
 }
 
@@ -871,7 +939,10 @@ function update(dt, allowOffline = false) {
       if (runtime.passVertex(vertex % vertices)) return;
     }
   }
-  if (runtime.completeTowerChallengeIfReady()) return;
+  if (runtime.completeTowerChallengeIfReady()) {
+    recordOfflineEvent("automaticCompletions");
+    return;
+  }
   if (runLayerAutomation()) return;
 
   runtime.normalizeVertexProgress();
@@ -1030,6 +1101,7 @@ function snapshotOfflineTransaction() {
     offlineBaselineTimestamp,
     offlineBaselineServerTimestamp,
     offlineReport,
+    offlineDiagnostics: offlineDiagnosticsSnapshot(),
     lastTime,
   };
 }
@@ -1042,6 +1114,12 @@ function restoreOfflineTransaction(snapshot, error, retryBaseline) {
   }
   normalAutobuyElapsed = snapshot.normalAutobuyElapsed;
   offlineReport = snapshot.offlineReport;
+  offlineDiagnostics = snapshot.offlineDiagnostics
+    ? {
+      ...snapshot.offlineDiagnostics,
+      eventCounts: { ...snapshot.offlineDiagnostics.eventCounts },
+    }
+    : null;
   setOfflineProcessing(false);
   try {
     setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
@@ -1213,6 +1291,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         : runtime.currentSaveFingerprint?.() || "",
     };
     if (!runtime.state.offlineProgressEnabled) {
+      offlineDiagnostics = null;
       offlineReport = null;
       setOfflineBaseline(
         localClockNow(),
@@ -1271,6 +1350,8 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     let bulkIterations = 0;
     let bulkProcessedTicks = 0;
     let precisionReduced = false;
+    let eventBoundaryCount = 0;
+    offlineDiagnostics = null;
 
     if (!clockAnomaly) {
       const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
@@ -1287,6 +1368,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         requestedTicks = 0;
         processedTicks = 0;
         precisionReduced = false;
+        beginOfflineDiagnostics(0);
       } else {
         const tickSeconds = simulatedSeconds / requestedTicks;
         const startedAt = monotonicClockNow();
@@ -1325,6 +1407,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           totalInfinityCountGain: 0,
           totalInfinityCountGainExact: "0",
         };
+        beginOfflineDiagnostics(requestedTicks);
         beginOfflineWorkBudget(requestedTicks);
         setOfflineProcessing(true);
         setOfflineProcessingLock(true);
@@ -1357,8 +1440,16 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             if (currentBatchTicks > 1) {
               bulkIterations += 1;
               bulkProcessedTicks += currentBatchTicks;
+            } else {
+              eventBoundaryCount += 1;
             }
             precisionReduced = Boolean(runtime.offlinePrecisionReduced);
+            offlineDiagnostics.processedTicks = processedTicks;
+            offlineDiagnostics.fullSimulationIterations = simulationIterations;
+            offlineDiagnostics.bulkProcessedTicks = bulkProcessedTicks;
+            offlineDiagnostics.bulkIterations = bulkIterations;
+            offlineDiagnostics.eventBoundaryCount = eventBoundaryCount;
+            offlineDiagnostics.precisionReduced = precisionReduced;
             const batchFinishedAt = monotonicClockNow();
             const batchElapsed = batchFinishedAt - batchStartedAt;
             const validBatchElapsed = Number.isFinite(batchElapsed) && batchElapsed > 0;
@@ -1434,6 +1525,15 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     }
 
     precisionReduced = !clockAnomaly && Boolean(runtime.offlinePrecisionReduced);
+    if (offlineDiagnostics) {
+      offlineDiagnostics.processedTicks = processedTicks;
+      offlineDiagnostics.fullSimulationIterations = simulationIterations;
+      offlineDiagnostics.bulkProcessedTicks = bulkProcessedTicks;
+      offlineDiagnostics.bulkIterations = bulkIterations;
+      offlineDiagnostics.eventBoundaryCount = eventBoundaryCount;
+      offlineDiagnostics.wallTimeMs = processingMilliseconds;
+      offlineDiagnostics.precisionReduced = precisionReduced;
+    }
 
     const normalAfter = offlineSnapshot();
     const normalInfinityCountGainExact = exactSnapshotDifference(
@@ -2108,6 +2208,8 @@ expose("beginOfflineWorkBudget", () => beginOfflineWorkBudget);
 expose("offlineCoreHitPlan", () => offlineCoreHitPlan);
 expose("offlineWorkStats", () => offlineWorkStatsSnapshot());
 expose("offlinePrecisionReduced", () => Boolean(offlineWorkLedger?.precisionReduced));
+expose("offlineDiagnostics", () => offlineDiagnosticsSnapshot());
+expose("offlineSnapshot", () => offlineSnapshot);
 expose("serverClockSource", () => serverClockSource);
 expose("serverClockAnomaly", () => serverClockAnomaly);
 expose("serverClockAvailable", () => serverClockAvailable);
