@@ -18,6 +18,14 @@ const candidateOnly = classifyRuns(
 assert.equal(candidateOnly.classification, "local-performance-regression");
 assert.deepEqual(candidateOnly.candidateOnlyFailures, ["desktop/DPR1/angle/3 simulation p95"]);
 
+const repeatedStrictBudgetOnly = classifyRuns(
+  repeatedRuns("desktop/DPR1/angle/720 simulation p95"),
+  cleanRuns(),
+);
+assert.equal(repeatedStrictBudgetOnly.classification, "local-performance-regression");
+assert.equal(repeatedStrictBudgetOnly.hostedCiRequired, false);
+assert.notEqual(repeatedStrictBudgetOnly.classification, "hosted-ci-hold");
+
 const stableCandidateAndBaselineFailures = classifyRuns(
   repeatedRuns("desktop/DPR1/angle/3 simulation p95"),
   repeatedRuns("desktop/DPR1/angle/720 simulation p95"),
