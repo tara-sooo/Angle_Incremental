@@ -218,11 +218,15 @@ function coreScoreLogForFirstHits(batches, hitLimit, increaseLog10, plannedBatch
   }, -Infinity);
 }
 
+function projectedScoreLogFromRawGain(rawGainLog) {
+  const rawScoreLog = runtime.combineLog10(runtime.rawCurrentScoreLog10(), rawGainLog);
+  const cappedRawScoreLog = runtime.clampLog10(runtime.applyInfinitySoftcap(rawScoreLog));
+  return runtime.effectiveScoreLog10FromRaw(cappedRawScoreLog);
+}
+
 function projectedScoreLogAfterCoreHits(batches, hitLimit, increaseLog10, plannedBatches = null) {
   const scoreLog = coreScoreLogForFirstHits(batches, hitLimit, increaseLog10, plannedBatches);
-  return runtime.clampLog10(
-    runtime.applyInfinitySoftcap(runtime.combineLog10(runtime.currentScoreLog10(), scoreLog)),
-  );
+  return projectedScoreLogFromRawGain(scoreLog);
 }
 
 function firstInfinityCrossingCoreHit(batches, increaseLog10, plannedBatches = null) {
@@ -381,9 +385,7 @@ function processManyVerticesExactly(start, end) {
       ),
       -Infinity,
     );
-    const projectedScoreLog = runtime.clampLog10(
-      runtime.applyInfinitySoftcap(runtime.combineLog10(runtime.currentScoreLog10(), scoreLog)),
-    );
+    const projectedScoreLog = projectedScoreLogFromRawGain(scoreLog);
     if (plannedBatches !== batches
       && plannedBatches.every((batch) => batch.plan.mode === "exact")
       && scoreAchievementNeedsOrderedProcessing(projectedScoreLog)) {

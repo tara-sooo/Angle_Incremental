@@ -681,6 +681,85 @@ async function runNumericStabilityModuleRuntimeTest() {
     }
   }
 
+  {
+    const runScoreExponentScenario = async (towerFloor, offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      state.vertices = 3;
+      state.speedLevel = 0;
+      state.gainLevel = 0;
+      state.generationCount = 0;
+      state.coreBoostCount = 0;
+      state.infinityCount = 1;
+      state.infinityUpgradeMask = 0;
+      state.activeChallenge = 0;
+      state.activeTowerChallenge = 0;
+      state.completedChallenges = 0;
+      state.achievementMask = [7, 18, 29].reduce((mask, id) => mask | (1 << (id - 1)), 0) >>> 0;
+      state.achievementMaskHigh = 0;
+      state.infiniteAngleUnlocked = false;
+      state.infiniteCapBroken = true;
+      state.towerFloor = towerFloor;
+      state.showFloatingText = false;
+      state.lightEffects = true;
+      state.totalVertexProgress = 2;
+      state.pointProgress = 2 / 3;
+      state.lastVertexIndex = 2;
+      const exponent = runtime.effectiveScoreExponent();
+      const rawCurrentScoreLog10 = (2450 - 0.02) / exponent;
+      const rawVertexGainLog10 = 2450 / exponent;
+      setLogResource(state, "score", rawCurrentScoreLog10);
+      setLogResource(state, "totalScore", -Infinity);
+      setLogResource(state, "generationScore", -Infinity);
+      setLogResource(state, "currentGain", -Infinity);
+
+      const achievement35Bit = 1 << (35 - 32);
+      runtime.vertexGainIncreaseLog10 = () => rawVertexGainLog10
+        + ((state.achievementMaskHigh & achievement35Bit) ? Math.log10(1.01) : 0);
+      let batchUsed = false;
+      const baseProcessManyVertices = runtime.processManyVertices;
+      runtime.processManyVertices = (...args) => {
+        batchUsed = true;
+        return baseProcessManyVertices(...args);
+      };
+
+      runtime.offlineProcessing = offline;
+      try {
+        debug.update(runtime.lapDuration() * 6 / state.vertices, true);
+      } finally {
+        runtime.offlineProcessing = false;
+      }
+      return {
+        exponent,
+        batchUsed,
+        rawScoreLog10: state.scoreLog10,
+        scoreLog10: runtime.currentScoreLog10(),
+        achievementMask: state.achievementMask,
+        achievementMaskHigh: state.achievementMaskHigh,
+        currentGainLog10: runtime.currentGainLog10(),
+      };
+    };
+
+    for (const [towerFloor, label] of [[0, "effective exponent 1"], [20, "effective exponent greater than 1"]]) {
+      const exact = await runScoreExponentScenario(towerFloor, false);
+      const batched = await runScoreExponentScenario(towerFloor, true);
+      assert.equal(exact.exponent, towerFloor === 0 ? 1 : 2, label + ": exponent fixture");
+      assert.equal(exact.batchUsed, false, label + ": exact processing should not use the batch path");
+      assert.equal(batched.batchUsed, true, label + ": offline processing should use the batch path");
+      assertClose(batched.rawScoreLog10, exact.rawScoreLog10, 1e-10, label + ": raw Score");
+      assertClose(batched.scoreLog10, exact.scoreLog10, 1e-10, label + ": effective Score");
+      assert.equal(batched.achievementMask, exact.achievementMask, label + ": achievement state");
+      assert.equal(
+        batched.achievementMaskHigh & (1 << (35 - 32)),
+        1 << (35 - 32),
+        label + ": Achievement 35 should unlock",
+      );
+      assert.equal(batched.achievementMaskHigh, exact.achievementMaskHigh, label + ": achievement timing");
+      assertClose(batched.currentGainLog10, exact.currentGainLog10, 1e-10, label + ": current gain");
+    }
+  }
+
   for (const coreHits of [4, 8]) {
     const runSmallOfflineBatch = async (offline) => {
       const instance = await loadRuntime(candidatePath);
