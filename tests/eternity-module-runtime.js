@@ -220,6 +220,48 @@ async function testMilestoneThresholdsAndEffects() {
   assert.equal(state.scoreLog10, 20, "milestone 3 must preserve score through CB");
   assert.equal(state.generationCount, 2, "milestone 3 must preserve Generation count through CB");
 
+  {
+    const automation = await loadRuntime(candidatePath);
+    const automationState = automation.debug.state;
+    const automationRuntime = automation.runtime;
+    automationState.eternityCount = 8;
+    automationState.generationCount = 1;
+    automationState.previousGenerationScoreLog10 = 6;
+    automationState.previousGenerationScore = 1e6;
+    automationState.generationScoreLog10 = 10;
+    automationState.generationScore = 1e10;
+    automationState.currentGenerationRunTime = 60;
+    setScore(automationState, 20);
+
+    automationRuntime.runGeneration();
+    assert.equal(automationState.currentGenerationRunTime, 0, "Milestone 3 must reset the timer after a manual Generation");
+    assert.equal(automationState.scoreLog10, 20, "Milestone 3 must preserve score during the manual Generation");
+    assert.equal(automationState.generationScoreLog10, 10, "Milestone 3 must preserve Generation progress during the manual Generation");
+
+    automationState.automationEnabled = true;
+    automationState.autoRunGeneration = true;
+    automationState.autoRunCoreBoost = false;
+    automationState.autoRunInfinity = false;
+    automationState.achievementMask = 1 << (19 - 1);
+    automationState.autoGenerationScoreMultiplierThreshold = 0;
+    automationState.autoGenerationCostMultiplierThreshold = 0;
+    automationState.autoGenerationMinimumSeconds = 60;
+    automationState.autoGenerationLegacyOrMode = false;
+    automationState.generationScoreLog10 = 20;
+    automationState.generationScore = 1e20;
+    automationState.currentGenerationRunTime = 60;
+
+    assert.equal(automationRuntime.shouldAutoRunGeneration(), true, "Milestone 3 should allow Auto Generation after the minimum seconds");
+    assert.equal(automationRuntime.runLayerAutomation(), true, "Auto Generation should use the shared Generation action");
+    assert.equal(automationState.currentGenerationRunTime, 0, "Milestone 3 must reset the timer after an automatic Generation");
+    assert.equal(automationState.scoreLog10, 20, "Milestone 3 must preserve score during the automatic Generation");
+    assert.equal(automationState.generationScoreLog10, 20, "Milestone 3 must preserve Generation progress during the automatic Generation");
+
+    automationState.generationScoreLog10 = 30;
+    automationState.generationScore = 1e30;
+    assert.equal(automationRuntime.shouldAutoRunGeneration(), false, "the next Auto Generation must wait for the minimum seconds again");
+  }
+
   state.eternityCount = 11;
   state.coreBoostCount = 2;
   assert.equal(runtime.coreBoostRequirementLog10(), 80, "CB cost must remain unchanged before milestone 4");
