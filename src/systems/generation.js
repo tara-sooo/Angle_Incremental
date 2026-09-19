@@ -176,8 +176,8 @@ function runGeneration() {
     runtime.state.totalVertexProgress = 0;
     runtime.state.lastVertexIndex = 0;
     runtime.state.floatingTexts = [];
-    runtime.state.currentGenerationRunTime = 0;
   }
+  runtime.state.currentGenerationRunTime = 0;
   if (!runtime.eternityMilestonePreservesGenerationReset?.()) applyResetStartScore();
   runtime.checkAchievements(true);
   runtime.updateUi();
