@@ -70,7 +70,6 @@ const TC4_A_FORM_IDS = Object.freeze([
 // This is the explicit review ledger for every source use found by
 // `rg -n coreBoostCount src`. Free CB is only allowed to affect benefit rows.
 const CORE_BOOST_SOURCE_USE_MANIFEST = Object.freeze([
-  ["src/patches/numeric-stability.js", "coreBoostRequirementWithoutEarlyCap", "requirement/reset/history"],
   ["src/main.js", "render_game_to_text state.count", "requirement/reset/history"],
   ["src/systems/infinity.js", "resetBelowInfinity", "requirement/reset/history"],
   ["src/systems/infinity.js", "applyStartingCoreBoosts", "requirement/reset/history"],

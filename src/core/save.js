@@ -1012,11 +1012,50 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.floatingTexts = [];
 }
 
+function normalizedSavedVertices(data) {
+  const savedExact = runtime.parseExactInteger(data && data.verticesExact, null);
+  const legacy = runtime.parseExactInteger(data && data.vertices, 3n);
+  const raw = savedExact === null ? legacy : savedExact;
+  return raw < 3n ? 3n : raw;
+}
+
+function loadedTowerChallengeIsInvalid(data) {
+  const activeTowerChallenge = Math.min(
+    runtime.TOWER_CHALLENGE_COUNT || 0,
+    Math.max(0, Math.floor(runtime.sanitizeNumber(data && data.activeTowerChallenge, 0))),
+  );
+  return activeTowerChallenge > 0
+    && (!runtime.towerChallengeImplemented?.(activeTowerChallenge)
+      || !runtime.towerChallengeUnlocked?.(activeTowerChallenge));
+}
+
+function restoreVerticesAfterLoad(data) {
+  if (
+    runtime.state.activeChallenge === 2
+    || runtime.state.activeChallenge === 8
+    || loadedTowerChallengeIsInvalid(data)
+  ) return;
+  runtime.setExactIntegerState(
+    runtime.state,
+    "verticesExact",
+    "vertices",
+    normalizedSavedVertices(data),
+  );
+  if (runtime.state.totalVertexProgress > runtime.MAX_VERTEX_PROGRESS_TRACKED) {
+    runtime.normalizeVertexProgress();
+  }
+  const vertices = runtime.numberFromExactInteger(
+    runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n),
+  );
+  runtime.state.lastVertexIndex = Math.floor(runtime.state.pointProgress * vertices) % vertices;
+}
+
 function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   const snapshot = snapshotRuntimeState();
   try {
     applySaveDataUnsafe(data, saveVersion);
     runtime.applyStartingCoreBoosts();
+    restoreVerticesAfterLoad(data);
   } catch (error) {
     restoreRuntimeState(snapshot);
     throw error;

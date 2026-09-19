@@ -24,12 +24,20 @@ function coreBoostRequirementGrowthPower() {
 }
 
 function coreBoostRequirementLog10() {
-  const multiplier = coreBoostRequirementGrowthPower() ** runtime.state.coreBoostCount;
-  if (!Number.isFinite(multiplier)) return runtime.MAX_TRACKED_LOG10;
-  const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
-  const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
-  const cappedLog10 = Math.min(challengeAdjustedLog10, runtime.MAX_TRACKED_LOG10);
-  return runtime.eternityMilestoneCoreBoostRequirementLog10?.(cappedLog10) ?? cappedLog10;
+  const count = Math.max(0, Math.floor(runtime.state.coreBoostCount));
+  const growthPower = typeof runtime.coreBoostRequirementGrowthPower === "function"
+    ? runtime.coreBoostRequirementGrowthPower()
+    : 2;
+  const multiplier = growthPower ** count;
+  if (Number.isFinite(multiplier)) {
+    const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
+    const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
+    if (Number.isFinite(challengeAdjustedLog10)) {
+      return runtime.eternityMilestoneCoreBoostRequirementLog10?.(challengeAdjustedLog10)
+        ?? challengeAdjustedLog10;
+    }
+  }
+  return runtime.MAX_GAME_LOG10;
 }
 
 function coreBoostRequirement() {

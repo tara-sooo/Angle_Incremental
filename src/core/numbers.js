@@ -85,7 +85,7 @@ function log10ExactInteger(value) {
   const leading = Number(text.slice(0, leadingDigits)) / (10 ** (leadingDigits - 1));
   return Math.min(
     Math.log10(leading) + text.length - 1,
-    runtime.MAX_TRACKED_LOG10,
+    runtime.MAX_GAME_LOG10,
   );
 }
 
@@ -181,14 +181,14 @@ function sanitizeNumber(value, fallback, min = 0) {
 function sanitizeLog10(value, fallback = -Infinity) {
   const parsed = parseSavedNumber(value);
   if (parsed === -Infinity) return -Infinity;
-  if (parsed === Infinity) return runtime.MAX_TRACKED_LOG10;
-  return Number.isFinite(parsed) ? Math.min(parsed, runtime.MAX_TRACKED_LOG10) : fallback;
+  if (parsed === Infinity) return runtime.MAX_GAME_LOG10;
+  return Number.isFinite(parsed) ? Math.min(parsed, runtime.MAX_GAME_LOG10) : fallback;
 }
 
 function clampLog10(value) {
   if (value === -Infinity) return -Infinity;
-  if (!Number.isFinite(value)) return value === Infinity ? runtime.MAX_TRACKED_LOG10 : -Infinity;
-  return Math.min(value, runtime.MAX_TRACKED_LOG10);
+  if (!Number.isFinite(value)) return value === Infinity ? runtime.MAX_GAME_LOG10 : -Infinity;
+  return Math.min(value, runtime.MAX_GAME_LOG10);
 }
 
 function logFromSavedValue(value, fallback = -Infinity) {
@@ -277,12 +277,14 @@ function sanitizeEternityRunRecords(value) {
 function valueFromLog10(log) {
   log = clampLog10(log);
   if (log === -Infinity) return 0;
-  return Number.isFinite(log) && log <= 308 ? 10 ** log : Number.MAX_VALUE;
+  if (log >= runtime.MAX_NATIVE_VALUE_LOG10) return Number.MAX_VALUE;
+  const value = 10 ** log;
+  return Number.isFinite(value) ? value : Number.MAX_VALUE;
 }
 
 function subtractLog10(currentLog, amountLog) {
   if (currentLog === -Infinity || amountLog === -Infinity) return currentLog;
-  if (currentLog === Infinity) return runtime.MAX_TRACKED_LOG10;
+  if (currentLog === Infinity) return runtime.MAX_GAME_LOG10;
   if (amountLog > currentLog) return currentLog;
   if (currentLog - amountLog > 15) return currentLog;
   const remainingFactor = 1 - 10 ** (amountLog - currentLog);
@@ -297,7 +299,7 @@ function log10Value(value) {
 function combineLog10(a, b) {
   if (a === -Infinity) return b;
   if (b === -Infinity) return a;
-  if (a === Infinity || b === Infinity) return runtime.MAX_TRACKED_LOG10;
+  if (a === Infinity || b === Infinity) return runtime.MAX_GAME_LOG10;
   const high = Math.max(a, b);
   const low = Math.min(a, b);
   if (high - low > 15) return high;
