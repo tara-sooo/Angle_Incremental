@@ -502,6 +502,10 @@ async function measureOfflineStress(page) {
       state.activeChallenge = 5;
     }
 
+    function configureGenerationSingleTickDifferential(ticks) {
+      configureGenerationDifferential(ticks);
+    }
+
     async function runDifferential(
       name,
       configure,
@@ -680,11 +684,15 @@ async function measureOfflineStress(page) {
           aggregatedTicks: runtime.offlineDiagnostics?.aggregatedTicks ?? 0,
           cyclesAggregated: runtime.offlineDiagnostics?.cyclesAggregated ?? 0,
           eventBoundaryCount: runtime.offlineDiagnostics?.eventBoundaryCount ?? 0,
+          eventBoundaryIterations: runtime.offlineDiagnostics?.eventBoundaryIterations ?? 0,
+          guardedFallbackIterations: runtime.offlineDiagnostics?.guardedFallbackIterations ?? 0,
+          predictionInvalidations: runtime.offlineDiagnostics?.predictionInvalidations ?? 0,
           eventProbeIterations: runtime.offlineDiagnostics?.eventProbeIterations ?? 0,
           precisionReduced: runtime.offlineDiagnostics?.precisionReduced ?? false,
           wallTimeMs: runtime.offlineDiagnostics?.wallTimeMs ?? (performance.now() - startedAt),
           wallMilliseconds: performance.now() - startedAt,
           eventCounts: runtime.offlineDiagnostics?.eventCounts ?? {},
+          eventFamilyCounts: runtime.offlineDiagnostics?.eventFamilyCounts ?? {},
           observedEventCounts: collectObservedEventCounts(beforeState, afterState),
           before: report?.before ?? null,
           after: report?.after ?? null,
@@ -915,11 +923,15 @@ async function measureOfflineStress(page) {
           cyclesAggregated: diagnostics?.cyclesAggregated ?? 0,
           cycleFallbackReason: diagnostics?.cycleFallbackReason ?? "",
           eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+          eventBoundaryIterations: diagnostics?.eventBoundaryIterations ?? 0,
+          guardedFallbackIterations: diagnostics?.guardedFallbackIterations ?? 0,
+          predictionInvalidations: diagnostics?.predictionInvalidations ?? 0,
           eventProbeIterations: diagnostics?.eventProbeIterations ?? 0,
           precisionReduced: report?.precisionReduced ?? false,
           work: runtime.offlineWorkStats,
           wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
           eventCounts: diagnostics?.eventCounts ?? {},
+          eventFamilyCounts: diagnostics?.eventFamilyCounts ?? {},
           wallMilliseconds: performance.now() - startedAt,
         };
       };
@@ -995,8 +1007,12 @@ async function measureOfflineStress(page) {
           bulkProcessedTicks: diagnostics?.bulkProcessedTicks ?? 0,
           fallbackIterations,
           eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+          eventBoundaryIterations: diagnostics?.eventBoundaryIterations ?? 0,
+          guardedFallbackIterations: diagnostics?.guardedFallbackIterations ?? 0,
+          predictionInvalidations: diagnostics?.predictionInvalidations ?? 0,
           precisionReduced: diagnostics?.precisionReduced ?? false,
           eventCounts: diagnostics?.eventCounts ?? {},
+          eventFamilyCounts: diagnostics?.eventFamilyCounts ?? {},
           work,
           wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
           wallMilliseconds: performance.now() - startedAt,
@@ -1046,9 +1062,13 @@ async function measureOfflineStress(page) {
         aggregatedTicks: diagnostics?.aggregatedTicks ?? 0,
         cyclesAggregated: diagnostics?.cyclesAggregated ?? 0,
         eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+        eventBoundaryIterations: diagnostics?.eventBoundaryIterations ?? 0,
+        guardedFallbackIterations: diagnostics?.guardedFallbackIterations ?? 0,
+        predictionInvalidations: diagnostics?.predictionInvalidations ?? 0,
         precisionReduced: diagnostics?.precisionReduced ?? false,
         wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
         eventCounts: diagnostics?.eventCounts ?? {},
+        eventFamilyCounts: diagnostics?.eventFamilyCounts ?? {},
         wallMilliseconds: performance.now() - startedAt,
       };
     }
@@ -1108,9 +1128,13 @@ async function measureOfflineStress(page) {
         aggregatedTicks: diagnostics?.aggregatedTicks ?? 0,
         cyclesAggregated: diagnostics?.cyclesAggregated ?? 0,
         eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+        eventBoundaryIterations: diagnostics?.eventBoundaryIterations ?? 0,
+        guardedFallbackIterations: diagnostics?.guardedFallbackIterations ?? 0,
+        predictionInvalidations: diagnostics?.predictionInvalidations ?? 0,
         precisionReduced: report?.precisionReduced ?? false,
         wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
         eventCounts: diagnostics?.eventCounts ?? {},
+        eventFamilyCounts: diagnostics?.eventFamilyCounts ?? {},
         work: runtime.offlineWorkStats,
         before: report?.before ?? null,
         after: report?.after ?? null,
@@ -1210,6 +1234,9 @@ async function measureOfflineStress(page) {
           cyclesAggregated: diagnostics?.cyclesAggregated ?? 0,
           cycleFallbackReason: diagnostics?.cycleFallbackReason ?? "",
           eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+          eventBoundaryIterations: diagnostics?.eventBoundaryIterations ?? 0,
+          guardedFallbackIterations: diagnostics?.guardedFallbackIterations ?? 0,
+          predictionInvalidations: diagnostics?.predictionInvalidations ?? 0,
           precisionReduced: diagnostics?.precisionReduced ?? false,
           infinityCountGain: report?.normalInfinityCountGain ?? 0,
           processingMilliseconds: report?.processingMilliseconds ?? NaN,
@@ -1217,6 +1244,7 @@ async function measureOfflineStress(page) {
           wallMilliseconds: performance.now() - startedAt,
           uiUpdateCalls: debug.uiUpdateCount() - uiUpdatesBefore,
           eventCounts: diagnostics?.eventCounts ?? {},
+          eventFamilyCounts: diagnostics?.eventFamilyCounts ?? {},
           finalInfinityCountExact: afterState.infinityCountExact,
           infinityCountRateRemainder: afterState.infinityCountRateRemainder,
           normalInfinityCountGainExact: report?.normalInfinityCountGainExact ?? "0",
@@ -1309,11 +1337,15 @@ async function measureOfflineStress(page) {
       aggregatedTicks: offlineDiagnostics?.aggregatedTicks ?? 0,
       cyclesAggregated: offlineDiagnostics?.cyclesAggregated ?? 0,
       eventBoundaryCount: offlineDiagnostics?.eventBoundaryCount ?? 0,
+      eventBoundaryIterations: offlineDiagnostics?.eventBoundaryIterations ?? 0,
+      guardedFallbackIterations: offlineDiagnostics?.guardedFallbackIterations ?? 0,
+      predictionInvalidations: offlineDiagnostics?.predictionInvalidations ?? 0,
       eventProbeIterations: offlineDiagnostics?.eventProbeIterations ?? 0,
       precisionReduced: offlineDiagnostics?.precisionReduced ?? false,
       processingMilliseconds: offlineReport?.processingMilliseconds ?? NaN,
       wallTimeMs: offlineDiagnostics?.wallTimeMs ?? (performance.now() - offlineStartedAt),
       eventCounts: offlineDiagnostics?.eventCounts ?? {},
+      eventFamilyCounts: offlineDiagnostics?.eventFamilyCounts ?? {},
       wallMilliseconds: performance.now() - offlineStartedAt,
     };
     const differential = {
@@ -1393,6 +1425,11 @@ async function measureOfflineStress(page) {
         "generation-unsupported-challenge",
         configureGenerationUnsupportedChallengeDifferential,
         24,
+      ),
+      generationSingleTickGuard: await runDifferential(
+        "generation-single-tick-guard",
+        configureGenerationSingleTickDifferential,
+        1,
       ),
     };
     const rendered = JSON.parse(window.render_game_to_text());
@@ -1518,6 +1555,10 @@ try {
     "the full-simulation diagnostic should include committed and speculative iterations",
   );
   assert.ok(report.offlineProcessing.eventBoundaryCount >= 0, "the offline path should expose an event-boundary count");
+  assert.ok(report.offlineProcessing.eventBoundaryIterations >= 0, "the offline path should expose committed event-boundary iterations");
+  assert.ok(report.offlineProcessing.guardedFallbackIterations >= 0, "the offline path should expose guarded fallback iterations");
+  assert.ok(report.offlineProcessing.predictionInvalidations >= 0, "the offline path should expose prediction invalidations");
+  assert.ok(report.offlineProcessing.eventFamilyCounts, "the offline path should expose event-family counts");
   assert.ok(Number.isFinite(report.offlineProcessing.wallTimeMs), "the offline path should expose finite diagnostic wall time");
   assert.equal(
     report.offlineProcessing.processedTicks,
@@ -1537,6 +1578,8 @@ try {
   assert.equal(autoInfinity.aggregatedTicks, 9998, "Auto Infinity should account for skipped ticks as aggregated work");
   assert.equal(autoInfinity.cyclesAggregated, 9998, "Auto Infinity should aggregate the remaining stable cycles");
   assert.equal(autoInfinity.eventBoundaryCount, 2, "Auto Infinity should expose the directly processed boundaries");
+  assert.equal(autoInfinity.eventBoundaryIterations, 2, "Auto Infinity should expose two committed cycle boundaries");
+  assert.equal(autoInfinity.eventFamilyCounts.autoInfinity, 2, "Auto Infinity should expose family event counts");
   assert.equal(autoInfinity.eventCounts.infinityExecutions, 2, "Auto Infinity diagnostics should count direct reset events");
   assert.equal(autoInfinity.aggregatedInfinityCountGainExact, "9998", "Auto Infinity should report exact aggregated count gain");
   assert.equal(autoInfinity.finalInfinityCountExact, "10001", "Auto Infinity should preserve the final exact count");
@@ -1564,6 +1607,19 @@ try {
     assert.equal(fallback.accelerated.diagnostics.aggregatedTicks, 0, `${name} should not skip unsupported ticks`);
     assert.notEqual(fallback.accelerated.diagnostics.cycleFallbackReason, "", `${name} should record a fallback reason`);
   }
+  assert.ok(
+    report.offlineStress.differential.generationUnsupportedChallenge.accelerated.diagnostics.guardedFallbackIterations > 0,
+    "unsupported challenge automation should use guarded fallback iterations",
+  );
+  assert.equal(
+    report.offlineStress.differential.generationSingleTickGuard.accelerated.diagnostics.eventBoundaryIterations,
+    0,
+    "a one-tick interval should not enter the event-boundary engine",
+  );
+  assert.ok(
+    report.offlineStress.differential.generationSingleTickGuard.accelerated.diagnostics.guardedFallbackIterations > 0,
+    "a zero-candidate interval should use guarded fallback",
+  );
   for (const [name, baseline] of Object.entries({
     generation: report.offlineStress.generationAutomation,
     coreBoost: report.offlineStress.coreBoostAutomation,
@@ -1575,14 +1631,23 @@ try {
     assert.equal(baseline.processedTicks, 120, `${name} automation should process its configured ticks`);
     assert.ok(baseline.fullSimulationIterations > 0, `${name} automation should report full simulation work`);
     assert.ok(baseline.eventBoundaryCount > 0, `${name} automation should expose event boundaries`);
+    if (["generation", "coreBoost", "generationCoreBoost"].includes(name)) {
+      assert.ok(baseline.eventBoundaryIterations > 0, `${name} automation should expose committed event-boundary iterations`);
+    }
     assert.ok(Number.isFinite(baseline.wallTimeMs), `${name} automation should report finite diagnostic wall time`);
   }
   assert.ok(report.offlineStress.generationAutomation.eventCounts.generationResets > 0, "Generation baseline should observe a Generation reset");
+  assert.ok(report.offlineStress.generationAutomation.eventFamilyCounts.generationCoreBoost > 0, "Generation baseline should expose the shared family");
   assert.ok(report.offlineStress.coreBoostAutomation.eventCounts.coreBoostResets > 0, "Core Boost baseline should observe a Core Boost reset");
+  assert.ok(report.offlineStress.coreBoostAutomation.eventFamilyCounts.generationCoreBoost > 0, "Core Boost baseline should expose the shared family");
   assert.ok(
     report.offlineStress.generationCoreBoostAutomation.eventCounts.generationResets > 0
       && report.offlineStress.generationCoreBoostAutomation.eventCounts.coreBoostResets > 0,
     "combined baseline should observe both canonical reset events",
+  );
+  assert.ok(
+    report.offlineStress.generationCoreBoostAutomation.eventFamilyCounts.generationCoreBoost > 0,
+    "combined automation should expose the shared family",
   );
   assert.ok(
     report.offlineStress.lateEternityAutomation.eventCounts.infinityExecutions > 0
@@ -1598,6 +1663,9 @@ try {
     assert.equal(result.accelerated.diagnostics.processedTicks, result.requestedTicks, `${name} differential should expose processed tick diagnostics`);
     assert.ok(result.accelerated.work.totalIterations <= result.accelerated.work.hardCap, `${name} differential work should stay within its hard cap`);
     assert.equal(result.accelerated.diagnostics.precisionReduced, result.accelerated.work.precisionReduced, `${name} differential precision status should match its work ledger`);
+    assert.ok(result.accelerated.diagnostics.eventBoundaryIterations >= 0, `${name} should report event-boundary iterations`);
+    assert.ok(result.accelerated.diagnostics.guardedFallbackIterations >= 0, `${name} should report guarded fallback iterations`);
+    assert.ok(result.accelerated.diagnostics.predictionInvalidations >= 0, `${name} should report prediction invalidations`);
   }
   for (const result of Object.values(report.offlineStress.differential)) {
     assert.equal(
@@ -1607,7 +1675,16 @@ try {
       "differential diagnostics should separate committed and probe iterations",
     );
   }
-  for (const key of ["fullSimulationIterations", "eventBoundaryCount", "wallTimeMs", "eventCounts"]) {
+  for (const key of [
+    "fullSimulationIterations",
+    "eventBoundaryCount",
+    "eventBoundaryIterations",
+    "guardedFallbackIterations",
+    "predictionInvalidations",
+    "wallTimeMs",
+    "eventCounts",
+    "eventFamilyCounts",
+  ]) {
     assert.equal(report.playerFacingOfflineReportKeys.includes(key), false, `player-facing offline reports must omit ${key}`);
   }
   for (const [track, boundary] of Object.entries(report.offlineStress.coreHitBoundary)) {
@@ -1682,6 +1759,8 @@ try {
     );
     assert.ok(measurement.bulkIterations > 0, "automation million runs should use stable bulk intervals");
     assert.ok(measurement.eventBoundaryCount > 0, "automation million runs should commit event boundaries");
+    assert.ok(measurement.eventBoundaryIterations > 0, "automation million runs should report event-boundary iterations");
+    assert.ok(measurement.predictionInvalidations >= measurement.eventBoundaryIterations, "automation million runs should invalidate boundary predictions");
     assert.equal(
       measurement.processedTicks,
       measurement.bulkProcessedTicks + measurement.simulationIterations - measurement.bulkIterations,
