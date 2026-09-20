@@ -1968,6 +1968,10 @@ canvas {
   overflow-wrap: anywhere;
 }
 
+.help-section-body + .help-section-body {
+  margin-top: 0.75rem;
+}
+
 .settings-grid {
   display: grid;
   grid-template-columns: minmax(300px, 420px) minmax(260px, 360px);
