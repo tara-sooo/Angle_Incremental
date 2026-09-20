@@ -238,71 +238,63 @@ const TEXT = {
     helpTopicNotation: "数値表記と設定",
     helpBodyAngle: [
       "The AngleではPointが図形の頂点を巡り、核に到達するとScoreを獲得します。",
-      "周回速度は核への到達頻度、角の追加は図形と獲得量、頂点獲得量は1回ごとの増加を強化します。Scoreで通常強化を購入し、Pointが早く核へ戻る組み合わせを試してください。",
+      "周回速度は核への到達頻度、角の追加は図形と獲得量、頂点獲得量は1回ごとの増加を強化します。Scoreで通常強化を購入し、3種類の効果を組み合わせて周回を伸ばします。",
     ],
     helpBodyGeneration: [
-      "Generationは最初のリセット層です。累計Score 1,000,000で初回が解放され、以降は今回のGeneration周回で前回の記録を上回る必要があります。",
-      "実行するとScore、通常強化、頂点進行など下位の進行をリセットし、Generation回数と世代の強化を残します。現在の周回が伸びにくくなったときの再出発として使います。",
+      "Generationは最初のリセット層です。累計Score 1,000,000で初回が解放され、2回目以降は今回の周回で前回の記録を上回ると実行できます。",
+      "実行するとScore、通常強化、頂点進行など下位の進行をリセットし、Generation回数と世代の強化を残します。",
     ],
     helpBodyCoreBoost: [
-      "Core BoostはGenerationより大きなリセットです。通常は1.00e20 Scoreで実行でき、下位の進行をやり直す代わりにThe Angleを強化します。",
-      "CB回数が増えるほど次の要求は重くなります。現在の要求と効果を画面で確認し、Generationだけでは伸びにくくなったら使います。",
+      "Core BoostはGenerationより大きなリセットです。通常は1.00e20 Scoreで実行でき、下位の進行をリセットしてThe Angleを強化します。CB回数が増えるほど次の要求が重くなります。",
     ],
     helpBodyInfinity: [
-      "Infinityは次の大きなリセット層です。初回は1.80e308 Scoreに到達すると実行でき、以降はボタンまたは解放済みの自動化から実行します。",
-      "ScoreからCore Boostまでの進行をリセットし、IPやInfinity Upgradesなどの恒久進行を残します。得たIPで次の周回を短くし、表示される報酬を見ながら目標を選びます。",
+      "Infinityは次の大きなリセット層です。初回は1.80e308 Scoreに到達すると実行でき、以降はボタンまたは解放済みの自動化で開始します。",
+      "ScoreからCore Boostまでの進行をリセットし、IP、Infinity Upgradesなどの恒久進行を残します。",
     ],
     helpBodyInfinityUpgrades: [
-      "Infinity UpgradeはIPで購入する恒久強化です。ツリーの前提を満たして購入し、通常のInfinityでは失われません。",
-      "自動購入やInfinity Challengesなどの機能を解放するUpgradeもあります。各カードの効果と前提を見て、次の周回に役立つ道を選びます。",
+      "Infinity UpgradeはIPで購入する恒久強化です。ツリーの前提を満たすと購入でき、通常のInfinityでは失われません。Upgradeには自動化やInfinity Challengeを解放するものもあります。",
     ],
     helpBodyInfinityChallenges: [
       "Infinity Challengeは通常と異なるルールでInfinityを目指す特別な周回です。解放後、各Challengeの制約下でInfinityに到達するとクリアになります。",
-      "初回クリアの報酬は恒久的に残り、クリア後も再挑戦できます。制約、目標、報酬はChallengeカードで確認し、画面が許す場合はTower Challengeと組み合わせます。",
+      "初回クリアの報酬は恒久的に残り、クリア済みのChallengeには再挑戦できます。",
     ],
     helpBodyBreakCap: [
-      "Break Infinite CapはInfinity後のScore進行を広げる恒久解放です。1.00e350 Scoreに達したら実行でき、Infinityを超えた後の伸び方が改善します。",
-      "通常のリセットで失われず、以降のIP獲得ルールも変わります。実行条件と現在の効果はBreak画面で確認してください。",
+      "Break Infinite CapはInfinity後のScore進行を広げる恒久解放です。1.00e350 Scoreで実行でき、Infinity後の強い減速を取り除いて以降のIP獲得を改善します。通常のリセットで失われません。",
     ],
     helpBodyInfiniteAngle: [
       "Infinite Angleは通常の図形とは別に進むもう一つの角です。1.00e20 IPの一回払いで解放し、IAの核に到達するとInfinity Scoreを獲得します。",
-      "Infinityでは現在のIA周回とInfinity Scoreをリセットしますが、解放状態とIA強化は残ります。通常の進行と並行して、どちらを伸ばすかを選びます。",
+      "Infinityでは現在のIA周回とInfinity Scoreをリセットしますが、解放状態とIA強化は残ります。",
     ],
     helpBodyTower: [
       "TowerはIPを使って階を建て、通常のScore獲得を強化する恒久進行です。建設すると階数と効果が増え、Infinity後も残ります。",
-      "次の階にはTower Challengeなどの条件があることがあります。必要IP、効果、条件はTower画面で確認し、挑戦可能になったら先へ進みます。",
+      "次の階にはTower Challengeなどの条件があることがあります。条件を満たすと、さらにTowerを建設できます。",
     ],
     helpBodyTowerChallenges: [
-      "Tower ChallengeはTowerの次の階を開ける特別な挑戦です。開始するとInfinity以下の進行がリセットされ、各Challenge固有のルールで目標を目指します。",
-      "個別の制約、目標、報酬はカードに表示されます。TC4のクリアはEternityへの準備に関わるため、専用の条件を確認してから周回を始めます。",
+      "Tower ChallengeはTowerの次の階を開ける特別な挑戦です。開始するとInfinity以下の進行がリセットされ、Challengeごとのルールで目標を目指します。制約、目標、報酬はChallengeごとに異なり、クリアすると対応するTower進行が解放されます。",
     ],
     helpBodyEternity: [
       "Eternityは現在の時代を終えるリセットです。現在の周回でTC4をクリアし、IPが1.80e308以上になると実行できます。",
       "ScoreからTower・Infinite Angle・Infinityまでの時代の進行をリセットし、Eternity回数を増やします。実績、Milestone、Timeline、Time Fragments、設定、統計などの恒久進行は残ります。",
     ],
     helpBodyEternityMilestones: [
-      "Eternity MilestonesはEternityを重ねるほど増える恒久的な利便性と強化です。最初の3回は未取得の3種類から1つずつ選び、以降はEternity回数で自動的に解放されます。",
-      "効果や条件はMilestone画面にまとまっています。選択できる最初の3つは、次に伸ばしたい進行に合わせて選んでください。",
+      "Eternity MilestonesはEternityを重ねるほど増える恒久的な利便性と強化です。最初の3回は未取得の3種類から1つずつ選び、以降はEternity回数で解放されます。",
     ],
     helpBodyTimeline: [
       "Timelineは最初のEternity後に見つかり、Time Fragmentsを集めて専用ノードを購入する恒久進行です。Score、IP、Eternityの各トラックからTFを獲得します。",
       "同じ時代ではRealとParallelのどちらか一方を選びます。Respecは購入済みノードを外してTFを戻しますが、現在のEternity周回をやり直すので、周回を区切るタイミングで使います。",
     ],
     helpBodyResets: [
-      "リセットは下位の進行を使って上位の強化を得る仕組みです。Generation、Core Boost、Infinity、Eternityの順に広い範囲をリセットします。",
-      "実行前にボタンや画面の説明で失われる進行を確認してください。上位の回数、恒久報酬、設定、統計などは層ごとのルールに従って保持されます。",
+      "リセットは下位の進行を新しい上位の強化へ交換する仕組みです。リセットする範囲は層ごとに異なり、上位の回数や恒久報酬など一部の進行は保持されます。",
     ],
     helpBodyAutomation: [
-      "Automationは解放済みの購入やリセットを自動で行います。Automation画面で全体スイッチと機能ごとのスイッチを設定し、必要なら実行条件を調整します。",
-      "新しい自動化は進行に応じて解放され、制約のあるChallenge中は安全のため停止することがあります。まず手動で流れを確認してから、周回の繰り返しを任せてください。",
+      "Automationは解放済みの購入やリセットを自動で行います。全体スイッチと機能ごとのスイッチを設定し、対応する機能では実行条件も調整できます。制約のあるChallenge中は停止する自動化があります。",
     ],
     helpBodyOffline: [
-      "Offline ProgressをSettingsで有効にすると、離れている間の時間を使ってゲームを進め、解放済みのAutomationを適用します。戻ったときにレポートで処理時間と変化を確認できます。",
-      "設定を無効にしていた時間は後から処理されません。長時間離れる前に必要な自動化とティック設定を確認し、戻った後はレポートの結果を確認してください。",
+      "Offline ProgressをSettingsで有効にすると、離れている間の時間を使ってゲームを進め、解放済みのAutomationを適用します。設定を無効にしていた時間は後から処理されず、戻ったときに処理時間と変化がレポートに表示されます。",
     ],
     helpBodyNotation: [
       "Notationでは数値の表示形式、時間単位、上部バーの表示を選べます。大きな数値でも読みやすい形式に切り替えられます。",
-      "設定は表示だけを変え、計算結果やセーブ内容は変えません。入力欄がある場合は現在の数値形式で入力し、読みづらいときはScientificやDetailedを試してください。",
+      "設定は表示だけを変え、計算結果やセーブ内容は変えません。大きな値を入力するときは現在の数値形式を使います。",
     ],
     level: "レベル",
     effectiveLevel: "実効",
@@ -651,43 +643,39 @@ const TEXT = {
     helpTopicNotation: "Number format and settings",
     helpBodyAngle: [
       "The Angle moves the Point around its vertices and awards Score when the Point reaches the core.",
-      "Lap speed makes core visits happen more often, extra angles improve the shape and its gains, and vertex gain raises each step. Spend Score on normal upgrades and try combinations that bring the Point back to the core sooner.",
+      "Lap speed makes core visits happen more often, extra angles improve the shape and its gains, and vertex gain raises each step. Spend Score on normal upgrades and combine their three effects to extend the run.",
     ],
     helpBodyGeneration: [
       "Generation is the first reset layer. It unlocks at 1,000,000 total Score, and later runs require the current Generation run to beat the previous one.",
-      "Generating restarts Score, normal upgrades, and lower progress while keeping the Generation count and its permanent improvements. Use it as a fresh start when the current run has slowed down.",
+      "Generating restarts Score, normal upgrades, and lower progress while keeping the Generation count and its permanent improvements.",
     ],
     helpBodyCoreBoost: [
-      "Core Boost is a larger reset than Generation. It normally becomes available at 1.00e20 Score; it restarts lower progress while making The Angle stronger.",
-      "Each CB makes the next requirement harder. Check the current requirement and effect in the game, then use it when Generation alone is no longer moving the run forward.",
+      "Core Boost is a larger reset than Generation. It normally becomes available at 1.00e20 Score; it resets lower progress while making The Angle stronger. Each CB makes the next requirement harder.",
     ],
     helpBodyInfinity: [
       "Infinity is the next major reset layer. The first Infinity becomes available at 1.80e308 Score; later runs can be started from the button or unlocked automation.",
-      "It resets progress through Core Boost but keeps IP, Infinity Upgrades, and other permanent progression. Spend IP to shorten future runs and use the displayed reward information to choose your next goal.",
+      "It resets progress through Core Boost but keeps IP, Infinity Upgrades, and other permanent progression.",
     ],
     helpBodyInfinityUpgrades: [
-      "Infinity Upgrades are permanent improvements bought with IP. Meet the tree prerequisites and choose purchases that help the next run; ordinary Infinity resets do not remove them.",
-      "Some upgrades unlock automation or Infinity Challenges. Read each card's effect and prerequisites instead of trying to memorize the tree.",
+      "Infinity Upgrades are permanent improvements bought with IP. Meet the tree prerequisites; ordinary Infinity resets do not remove them. Some upgrades unlock automation or Infinity Challenges.",
     ],
     helpBodyInfinityChallenges: [
       "Infinity Challenges are special runs with different rules. After they unlock, reach Infinity under a challenge's restriction to clear it.",
-      "First clears grant permanent rewards, and cleared challenges can be replayed. The challenge card is the source for its restriction, goal, and reward; Tower Challenges can be combined when the UI allows it.",
+      "First clears grant permanent rewards, and cleared challenges can be replayed.",
     ],
     helpBodyBreakCap: [
-      "Break Infinite Cap expands Score progression after Infinity. At 1.00e350 Score, perform the break to remove the strong post-Infinity slowdown and improve the later IP path.",
-      "It survives normal resets, including Infinity. The current requirement and effect are shown in the Break panel, so use that panel rather than memorizing its calculation.",
+      "Break Infinite Cap expands Score progression after Infinity. At 1.00e350 Score, perform the break to remove the strong post-Infinity slowdown and improve later IP gain. It survives normal resets, including Infinity.",
     ],
     helpBodyInfiniteAngle: [
       "Infinite Angle is a second figure that progresses separately from the normal one. Unlock it with a one-time 1.00e20 IP purchase and reach its core to earn Infinity Score.",
-      "Infinity restarts the current IA run and Infinity Score but keeps the unlock and IA upgrades. Run it alongside the normal figure and choose which progress to improve next.",
+      "Infinity restarts the current IA run and Infinity Score but keeps the unlock and IA upgrades.",
     ],
     helpBodyTower: [
       "Tower is permanent IP-funded progress that strengthens normal Score gain. Build floors to increase its effect, and Tower remains after Infinity.",
-      "Some floors require a Tower Challenge. Check the Tower screen for the next cost, effect, and gate, then build when the requirement is met.",
+      "Some floors require a Tower Challenge. Completing the requirement unlocks further Tower construction.",
     ],
     helpBodyTowerChallenges: [
-      "Tower Challenges open the next parts of the Tower. Starting one resets Infinity-and-below progress, and each challenge asks you to reach its goal under its own rules.",
-      "The challenge card shows its restriction, goal, and reward. TC4 is also part of the preparation for Eternity, so check its card before committing a run.",
+      "Tower Challenges open the next parts of the Tower. Starting one resets Infinity-and-below progress, and each challenge asks you to reach its goal under its own rules. Restrictions, goals, and rewards differ by challenge, and clearing one unlocks the corresponding Tower progress.",
     ],
     helpBodyEternity: [
       "Eternity ends the current era with a major reset. It becomes available after the current run clears TC4 and reaches at least 1.80e308 IP.",
@@ -695,27 +683,23 @@ const TEXT = {
     ],
     helpBodyEternityMilestones: [
       "Eternity Milestones add permanent quality-of-life and progression benefits. During the first three Eternities, choose one unowned starter milestone per run; later milestones activate from the Eternity count.",
-      "Use the Milestone screen for current requirements and effects. Choose the early options that support the next part of your progression instead of copying every effect into Help.",
     ],
     helpBodyTimeline: [
       "Timeline appears after the first Eternity. Earn Time Fragments from its Score, IP, and Eternity tracks, then spend them on nodes that shape future runs.",
       "Real and Parallel are exclusive within an era. Respec returns spent TF by removing purchased nodes, but it also restarts the current Eternity run, so use it between runs.",
     ],
     helpBodyResets: [
-      "Resets trade lower-layer progress for stronger higher-layer progress. Generation, Core Boost, Infinity, and Eternity reset increasingly larger parts of the game.",
-      "Before confirming one, read the button and page summary to see what will be lost. Counts, permanent rewards, settings, and statistics follow the retention rules of their layer.",
+      "Resets trade lower-layer progress for stronger higher-layer progress. Each layer resets a different scope, while some counts and permanent rewards remain available for the next run.",
     ],
     helpBodyAutomation: [
-      "Automation repeats unlocked purchases and resets. Use the Automation page to enable the master switch, choose individual systems, and set thresholds where available.",
-      "Automation unlocks as progression advances and may pause during restricted challenges. Learn the manual loop first, then let automation handle repeatable runs.",
+      "Automation repeats unlocked purchases and resets. Enable the master switch, choose individual systems, and set thresholds where available. Some automation pauses during restricted challenges.",
     ],
     helpBodyOffline: [
-      "Enable Offline Progress in Settings to apply away-time progress and unlocked automation when you return. The report shows how much time was processed and what changed.",
-      "Time spent while the option is disabled is not applied later. Before leaving, check the automation and tick settings you want the return simulation to use.",
+      "Enable Offline Progress in Settings to apply away-time progress and unlocked automation when you return. Time spent while it is disabled is not applied later, and the return report shows processed time and changes.",
     ],
     helpBodyNotation: [
       "Notation controls number formats, time units, and top-bar display options. Choose the format that makes large values easiest to read.",
-      "These settings change presentation only; they do not change calculations or saves. Use the current number format when entering large thresholds, and switch to Scientific or Detailed when Compact is unclear.",
+      "These settings change presentation only; they do not change calculations or saves. Use the current number format when entering large values.",
     ],
     level: "Level",
     effectiveLevel: "Effective",
