@@ -44,6 +44,32 @@ src/
 
 This preserves the original runtime's live mutable bindings and reset behavior without relying on `window` globals or dynamic classic-script injection. The browser entrypoint is ESM-only; direct links must load `index.html`.
 
+## Offline Progress v2 boundary
+
+Offline resume processing in `src/main.js` selects a path from the current
+state. `automationEnabled` is not a blanket reason to disable every v2 path;
+each family must pass its own eligibility predicate and event probe.
+
+| State family | v2 behavior | Guarded fallback |
+| --- | --- | --- |
+| Quiet production and supported quiet Timeline routes | Bulk advance through the existing numeric-safe batch path. | Active challenges, unsafe numeric ranges, or a failed bulk predicate use bounded canonical updates. |
+| Stable Auto Infinity at the zero threshold | Execute two canonical Infinity boundaries, prove the cycle is stable, then aggregate the remaining exact cycles. | Custom thresholds, Timeline/milestone/Infinite Angle state, purchases, challenges, or an unstable formula stay on event boundaries or canonical fallback. |
+| Generation/Core Boost automation | Probe for the first changed boundary, bulk-advance before it, and commit the canonical reset ordering. | Challenges, Timeline, milestones, purchase interference, numeric failure, or dense events use guarded canonical batches. |
+| Normal/IU/Infinite Angle/tower purchases and shipped milestone transitions | Probe for the first canonical action, commit it through the normal action path, then re-evaluate predictions. | An unknown or unsupported predicate defaults to canonical guarded simulation; no action is reimplemented in the offline engine. |
+
+Every event boundary snapshots and restores state during speculative probes,
+commits gameplay mutations through the canonical update/action functions, and
+records prediction invalidation separately from committed work. Internal path,
+event, cycle, fallback, ledger, and timing diagnostics belong to developer
+reports; the player-facing offline result remains the existing before/after
+progress report.
+
+To add an event family safely, first define its canonical action and eligibility
+predicate, then add a guarded-vs-accelerated differential case covering nearby
+and invalidated boundaries. Add a one-million-tick browser scenario with exact
+discrete-state assertions, structural work accounting, and a regression case
+for the guarded fallback before changing its release boundary.
+
 ## Verification
 
 - `tests/runtime-harness-esm.js` loads the canonical module runtime in a VM with a deterministic DOM and storage surface.
