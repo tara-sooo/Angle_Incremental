@@ -76,6 +76,8 @@ const OFFLINE_PROCESS_TARGET_BATCH_MS = 2;
 const OFFLINE_PROCESS_PROGRESS_UPDATE_INTERVAL_MS = 100;
 const OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT = 4096;
 const OFFLINE_EVENT_BOUNDARY_MAX_ITERATIONS = 16384;
+// ponytail: dense event runs fall back to 32 canonical ticks; add event-specific aggregation only if measurements justify it.
+const OFFLINE_EVENT_DENSE_FALLBACK_TICKS = 32;
 const OFFLINE_EVENT_KEYS = Object.freeze([
   "infinityExecutions",
   "generationResets",
@@ -119,6 +121,9 @@ const OFFLINE_EVENT_SIGNATURE_KEYS = Object.freeze([
   "infinityUpgradeMask",
   "ipGainUpgradeLevel",
   "infiniteAngleUpgradeLevel",
+  "infiniteAngleSpeedLevel",
+  "infiniteAngleVertexLevel",
+  "infiniteAngleGainLevel",
   "softcapUpgradeLevel",
   "tc4BaseGainLevel",
   "tc4BaseGainPriceStep",
@@ -1034,6 +1039,7 @@ function update(dt, allowOffline = false) {
     normalAutobuyElapsed += dt;
     if (normalAutobuyElapsed >= runtime.AUTOBUY_INTERVAL_SECONDS) {
       normalAutobuyElapsed %= runtime.AUTOBUY_INTERVAL_SECONDS;
+      if (runtime.AUTOBUY_INTERVAL_SECONDS - normalAutobuyElapsed <= 1e-9) normalAutobuyElapsed = 0;
       runAutobuyers();
     }
   } else {
@@ -1420,6 +1426,37 @@ function offlineGenerationCoreEventPathEligible(tickSeconds, remainingTicks) {
   ].some((field) => state[field]);
 }
 
+function offlineAutomationEventPathEligible(tickSeconds, remainingTicks) {
+  const state = runtime.state;
+  if (!Number.isFinite(tickSeconds) || tickSeconds <= 0 || remainingTicks < 2) return false;
+  const normalPurchaseAutomation = state.automationEnabled
+    && runtime.normalAutomationUnlocked?.() === true
+    && [
+      "autoBuySpeed",
+      "autoBuyVertex",
+      "autoBuyGain",
+      "autoBuyInfinityUpgrades",
+    ].some((field) => state[field]);
+  const infiniteAnglePurchaseAutomation = state.automationEnabled
+    && runtime.eternityMilestoneActive?.("8") === true
+    && [
+      "autoBuildTower",
+      "autoBuyInfiniteAngleSpeed",
+      "autoBuyInfiniteAngleVertex",
+      "autoBuyInfiniteAngleGain",
+    ].some((field) => state[field]);
+  const purchaseAutomation = normalPurchaseAutomation || infiniteAnglePurchaseAutomation;
+  const combinedResetAutomation = state.automationEnabled
+    && state.autoRunInfinity
+    && (purchaseAutomation || state.autoRunGeneration || state.autoRunCoreBoost);
+  const milestoneTransition = (
+    (runtime.eternityMilestoneActive?.("5") === true && !state.infiniteAngleUnlocked)
+    || (runtime.eternityMilestoneActive?.("6") === true && !state.infiniteCapBroken)
+    || (runtime.eternityMilestoneActive?.("7") === true && state.activeTowerChallenge > 0)
+  ) && (!state.autoRunInfinity || purchaseAutomation || state.autoRunGeneration || state.autoRunCoreBoost);
+  return purchaseAutomation || combinedResetAutomation || milestoneTransition;
+}
+
 function snapshotOfflineEventProbe() {
   return {
     state: runtime.snapshotRuntimeState(),
@@ -1475,11 +1512,29 @@ function inspectOfflineGenerationCoreEventFamily(tickSeconds, remainingTicks, ba
   };
 }
 
+function inspectOfflineEventFamily(tickSeconds, remainingTicks, batchTicks) {
+  if (offlineAutomationEventPathEligible(tickSeconds, remainingTicks)) {
+    // Automation probes search the whole remaining segment for the first canonical
+    // action; limiting this to the render batch turns idle automation into O(ticks).
+    const candidateTicks = remainingTicks;
+    if (candidateTicks < 2 || !offlineProgressNumericallySafe(tickSeconds * candidateTicks)) {
+      return { eligible: true, safe: false, reason: "numeric-guard" };
+    }
+    return {
+      eligible: true,
+      safe: true,
+      candidateTicks,
+      family: "otherAutomation",
+    };
+  }
+  return inspectOfflineGenerationCoreEventFamily(tickSeconds, remainingTicks, batchTicks);
+}
+
 function runOfflineEventBoundaryEngine({
   tickSeconds,
   remainingTicks,
   batchTicks,
-  eventFamily = inspectOfflineGenerationCoreEventFamily,
+  eventFamily = inspectOfflineEventFamily,
   eventBoundaryIterations = 0,
   cyclePath = null,
 }) {
@@ -1553,61 +1608,62 @@ function runOfflineEventBoundaryEngine({
     }
   };
 
-  if (!probe(family.candidateTicks)) {
-    if (probeFailure) {
-      restoreOfflineEventProbe(startingSnapshot);
+  const probeFailureResult = () => {
+    restoreOfflineEventProbe(startingSnapshot);
+    return {
+      used: false,
+      handled: false,
+      eligible: true,
+      safe: false,
+      disableFamily: true,
+      reason: probeFailure,
+      eventProbeIterations,
+      eventBoundaryIterations: 0,
+      predictionInvalidations: 1,
+    };
+  };
+
+  let low = 0;
+  let high = 0;
+  let searchTicks = 1;
+  while (high === 0) {
+    const candidateTicks = Math.min(family.candidateTicks, searchTicks);
+    if (probe(candidateTicks)) {
+      high = candidateTicks;
+      break;
+    }
+    if (probeFailure) return probeFailureResult();
+    low = candidateTicks;
+    if (low >= family.candidateTicks) {
+      update(tickSeconds * family.candidateTicks, true);
       return {
-        used: false,
-        handled: false,
+        used: true,
+        handled: true,
+        safe: true,
         eligible: true,
-        safe: false,
-        disableFamily: true,
-        reason: probeFailure,
-        eventProbeIterations,
+        family: family.family,
+        processedTicks: family.candidateTicks,
+        simulationIterations: 1,
+        bulkIterations: family.candidateTicks > 1 ? 1 : 0,
+        bulkProcessedTicks: family.candidateTicks > 1 ? family.candidateTicks : 0,
+        eventBoundaryCount: 0,
         eventBoundaryIterations: 0,
-        predictionInvalidations: 1,
+        predictionInvalidations: 0,
+        eventProbeIterations,
       };
     }
-    update(tickSeconds * family.candidateTicks, true);
-    return {
-      used: true,
-      handled: true,
-      safe: true,
-      eligible: true,
-      family: family.family,
-      processedTicks: family.candidateTicks,
-      simulationIterations: 1,
-      bulkIterations: family.candidateTicks > 1 ? 1 : 0,
-      bulkProcessedTicks: family.candidateTicks > 1 ? family.candidateTicks : 0,
-      eventBoundaryCount: 0,
-      eventBoundaryIterations: 0,
-      predictionInvalidations: 0,
-      eventProbeIterations,
-    };
+    searchTicks = Math.min(family.candidateTicks, searchTicks * 2);
   }
 
-  let low = 1;
-  let high = family.candidateTicks;
-  while (low < high) {
+  while (low + 1 < high) {
     const middle = Math.floor((low + high) / 2);
     if (probe(middle)) high = middle;
     else if (probeFailure) {
-      restoreOfflineEventProbe(startingSnapshot);
-      return {
-        used: false,
-        handled: false,
-        eligible: true,
-        safe: false,
-        disableFamily: true,
-        reason: probeFailure,
-        eventProbeIterations,
-        eventBoundaryIterations: 0,
-        predictionInvalidations: 1,
-      };
-    } else low = middle + 1;
+      return probeFailureResult();
+    } else low = middle;
   }
 
-  if (!Number.isInteger(low) || low < 1 || low > family.candidateTicks) {
+  if (!Number.isInteger(high) || high < 1 || high > family.candidateTicks) {
     restoreOfflineEventProbe(startingSnapshot);
     return {
       used: false,
@@ -1622,21 +1678,24 @@ function runOfflineEventBoundaryEngine({
     };
   }
   restoreOfflineEventProbe(startingSnapshot);
-  update(tickSeconds * low, true);
+  const preBoundaryTicks = high - 1;
+  if (preBoundaryTicks > 0) update(tickSeconds * preBoundaryTicks, true);
+  update(tickSeconds, true);
   return {
     used: true,
     handled: true,
     safe: true,
     eligible: true,
     family: family.family,
-    processedTicks: low,
-    simulationIterations: 1,
-    bulkIterations: low > 1 ? 1 : 0,
-    bulkProcessedTicks: low > 1 ? low : 0,
+    processedTicks: high,
+    simulationIterations: preBoundaryTicks > 0 ? 2 : 1,
+    bulkIterations: preBoundaryTicks > 1 ? 1 : 0,
+    bulkProcessedTicks: preBoundaryTicks > 1 ? preBoundaryTicks : 0,
     eventBoundaryCount: 1,
     eventBoundaryIterations: 1,
     predictionInvalidations: 1,
     eventProbeIterations,
+    denseEvent: family.family === "otherAutomation" && high <= 4,
   };
 }
 
@@ -2005,11 +2064,25 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           let budgetStartedAt = monotonicClockNow();
           let lastProgressUiAt = budgetStartedAt;
           let eventPathDisabled = false;
+          let denseEventBoundaryStreak = 0;
+          let denseEventFallbackTicks = 0;
+          const noteEventStep = (eventStep) => {
+            if (eventStep?.disableFamily) eventPathDisabled = true;
+            if (eventStep?.denseEvent) {
+              denseEventBoundaryStreak += 1;
+              if (denseEventBoundaryStreak >= 3) {
+                denseEventFallbackTicks = OFFLINE_EVENT_DENSE_FALLBACK_TICKS;
+                denseEventBoundaryStreak = 0;
+              }
+            } else if (eventStep?.handled) {
+              denseEventBoundaryStreak = 0;
+            }
+          };
           const initialEventStep = runOfflineEventBoundaryEngine({
             tickSeconds,
             remainingTicks: requestedTicks,
             batchTicks: Math.max(64, batchTicks),
-            eventFamily: inspectOfflineGenerationCoreEventFamily,
+            eventFamily: inspectOfflineEventFamily,
             eventBoundaryIterations,
             cyclePath: () => tryOfflineInfinityCyclePath(
               tickSeconds,
@@ -2018,7 +2091,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
               rateRemainderAtStart,
             ),
           });
-          if (initialEventStep.disableFamily) eventPathDisabled = true;
+          noteEventStep(initialEventStep);
           processedTicks = initialEventStep.processedTicks || 0;
           simulationIterations += initialEventStep.simulationIterations || 0;
           eventBoundaryCount += initialEventStep.eventBoundaryCount || 0;
@@ -2048,20 +2121,22 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             const batchStartedAt = monotonicClockNow();
             const remainingTicks = requestedTicks - processedTicks;
             let eventStep = null;
-            if (!eventPathDisabled) {
+            if (!eventPathDisabled && denseEventFallbackTicks <= 0) {
               eventStep = runOfflineEventBoundaryEngine({
                 tickSeconds,
                 remainingTicks,
                 batchTicks: Math.max(64, batchTicks),
-                eventFamily: inspectOfflineGenerationCoreEventFamily,
+                eventFamily: inspectOfflineEventFamily,
                 eventBoundaryIterations,
               });
-              if (eventStep.disableFamily) eventPathDisabled = true;
+              noteEventStep(eventStep);
             }
             const clockHasNotAdvanced = lastBatchFinishedAt !== null
               && batchStartedAt === lastBatchFinishedAt;
             const currentBatchTicks = eventStep?.handled
               ? eventStep.processedTicks
+              : denseEventFallbackTicks > 0
+                ? 1
               : Math.min(
                 batchTicks,
                 remainingTicks,
@@ -2089,6 +2164,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
               } else {
                 eventBoundaryCount += 1;
               }
+            }
+            if (!eventStep?.handled && denseEventFallbackTicks > 0) {
+              denseEventFallbackTicks -= currentBatchTicks;
             }
             processedTicks = batchEnd;
             precisionReduced = Boolean(runtime.offlinePrecisionReduced);

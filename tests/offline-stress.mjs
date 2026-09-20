@@ -10,6 +10,7 @@ const budgets = Object.freeze({
   offlineCoreHitWallMs: 250,
   offlineCoreHitErrorLog10: 0.001,
   offlineLongResumeWallMs: 5000,
+  offlineLateEternityAutomationMillionWallMs: 5000,
 });
 
 function collectViolations(report) {
@@ -51,6 +52,10 @@ function collectViolations(report) {
     if (resume.wallMilliseconds > budgets.offlineLongResumeWallMs) {
       violations.push(`offline quiet ${ticks}-tick resume wall ${resume.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineLongResumeWallMs}ms`);
     }
+  }
+  const lateEternityMillion = report.offlineStress.lateEternityAutomationMillion;
+  if (lateEternityMillion.wallMilliseconds > budgets.offlineLateEternityAutomationMillionWallMs) {
+    violations.push(`offline late-Eternity automation million wall ${lateEternityMillion.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineLateEternityAutomationMillionWallMs}ms`);
   }
   for (const [route, resume] of Object.entries(report.offlineStress.timelineResume)) {
     if (resume.wallMilliseconds > budgets.offlineLongResumeWallMs) {
@@ -189,14 +194,17 @@ async function measureOfflineStress(page) {
       totalPlayTime: 1e-6,
     });
 
-    function stateProjection(snapshot, { omitHistory = false } = {}) {
+    function stateProjection(
+      snapshot,
+      { omitHistory = false, approximateFields = differentialApproximateFields } = {},
+    ) {
       const exactFields = omitHistory
         ? differentialExactFields.filter((key) => key !== "lastInfinityRuns")
         : differentialExactFields;
       return {
         exact: Object.fromEntries(exactFields.map((key) => [key, snapshot[key]])),
         approximate: Object.fromEntries(
-          Object.keys(differentialApproximateFields).map((key) => [key, snapshot[key]]),
+          Object.keys(approximateFields).map((key) => [key, snapshot[key]]),
         ),
       };
     }
@@ -245,14 +253,20 @@ async function measureOfflineStress(page) {
       }
     }
 
-    function compareProjection(expected, actual, path, mismatches) {
+    function compareProjection(
+      expected,
+      actual,
+      path,
+      mismatches,
+      approximateFields = differentialApproximateFields,
+    ) {
       differentialExactFields.forEach((key) => exactMismatch(
         expected.exact[key],
         actual.exact[key],
         path + ".exact." + key,
         mismatches,
       ));
-      Object.entries(differentialApproximateFields).forEach(([key, tolerance]) => approximateMismatch(
+      Object.entries(approximateFields).forEach(([key, tolerance]) => approximateMismatch(
         expected.approximate[key],
         actual.approximate[key],
         path + ".approximate." + key,
@@ -261,7 +275,13 @@ async function measureOfflineStress(page) {
       ));
     }
 
-    function compareOfflineSnapshot(expected, actual, path, mismatches) {
+    function compareOfflineSnapshot(
+      expected,
+      actual,
+      path,
+      mismatches,
+      approximateFields = differentialReportApproximateFields,
+    ) {
       if (!expected || !actual) {
         exactMismatch(expected, actual, path, mismatches);
         return;
@@ -272,7 +292,7 @@ async function measureOfflineStress(page) {
         path + "." + key,
         mismatches,
       ));
-      Object.entries(differentialReportApproximateFields).forEach(([key, tolerance]) => approximateMismatch(
+      Object.entries(approximateFields).forEach(([key, tolerance]) => approximateMismatch(
         expected[key],
         actual[key],
         path + "." + key,
@@ -510,8 +530,21 @@ async function measureOfflineStress(page) {
       name,
       configure,
       ticks,
-      { reprimeScore = false, aggregateHistory = false } = {},
+      {
+        reprimeScore = false,
+        aggregateHistory = false,
+        omitApproximateStateFields = [],
+        omitApproximateReportFields = [],
+      } = {},
     ) {
+      const approximateStateFields = Object.fromEntries(
+        Object.entries(differentialApproximateFields)
+          .filter(([key]) => !omitApproximateStateFields.includes(key)),
+      );
+      const approximateReportFields = Object.fromEntries(
+        Object.entries(differentialReportApproximateFields)
+          .filter(([key]) => !omitApproximateReportFields.includes(key)),
+      );
       configure(ticks);
       const startingState = runtime.snapshotRuntimeState();
       const startingNormalAutobuyElapsed = runtime.normalAutobuyElapsed;
@@ -549,7 +582,10 @@ async function measureOfflineStress(page) {
         canonical = {
           before: canonicalBefore,
           after: runtime.offlineSnapshot(),
-          state: stateProjection(runtime.snapshotRuntimeState(), { omitHistory: aggregateHistory }),
+          state: stateProjection(runtime.snapshotRuntimeState(), {
+            omitHistory: aggregateHistory,
+            approximateFields: approximateStateFields,
+          }),
           wallTimeMs: performance.now() - canonicalStartedAt,
           fullSimulationIterations: ticks,
           normalAutobuyElapsed: runtime.normalAutobuyElapsed,
@@ -566,7 +602,10 @@ async function measureOfflineStress(page) {
           report,
           before: report?.before ?? null,
           after: report?.after ?? runtime.offlineSnapshot(),
-          state: stateProjection(runtime.snapshotRuntimeState(), { omitHistory: aggregateHistory }),
+          state: stateProjection(runtime.snapshotRuntimeState(), {
+            omitHistory: aggregateHistory,
+            approximateFields: approximateStateFields,
+          }),
           wallTimeMs: performance.now() - acceleratedStartedAt,
           diagnostics: runtime.offlineDiagnostics,
           work: runtime.offlineWorkStats,
@@ -586,9 +625,22 @@ async function measureOfflineStress(page) {
         accelerated.state,
         "state",
         mismatches,
+        approximateStateFields,
       );
-      compareOfflineSnapshot(canonical.before, accelerated.before, "report.before", mismatches);
-      compareOfflineSnapshot(canonical.after, accelerated.after, "report.after", mismatches);
+      compareOfflineSnapshot(
+        canonical.before,
+        accelerated.before,
+        "report.before",
+        mismatches,
+        approximateReportFields,
+      );
+      compareOfflineSnapshot(
+        canonical.after,
+        accelerated.after,
+        "report.after",
+        mismatches,
+        approximateReportFields,
+      );
       if (Math.abs(canonical.normalAutobuyElapsed - accelerated.normalAutobuyElapsed) > 1e-9) {
         mismatches.push({
           path: "normalAutobuyElapsed",
@@ -606,9 +658,9 @@ async function measureOfflineStress(page) {
           exactStateFields: differentialExactFields.filter(
             (key) => !aggregateHistory || key !== "lastInfinityRuns",
           ),
-          approximateStateFields: { ...differentialApproximateFields },
+          approximateStateFields,
           exactReportFields: [...differentialReportExactFields],
-          approximateReportFields: { ...differentialReportApproximateFields },
+          approximateReportFields,
           aggregateHistory,
         },
         canonical,
@@ -700,6 +752,46 @@ async function measureOfflineStress(page) {
       } finally {
         if (reprimeScore) runtime.resetBelowInfinity = originalResetBelowInfinity;
       }
+    }
+
+    async function measureLateEternityAutomationMillion() {
+      const requestedTicks = runtime.OFFLINE_PROGRESS_MAX_TICKS;
+      configureLateEternityAutomationMillion(requestedTicks);
+      const startedAt = performance.now();
+      const report = await debug.processOfflineElapsed(
+        runtime.MAX_SIMULATION_STEP_SECONDS * requestedTicks,
+        "performance-late-eternity-automation-million",
+        { clockSource: "server" },
+      );
+      const diagnostics = runtime.offlineDiagnostics;
+      return {
+        requestedTicks: report?.requestedTicks ?? 0,
+        processedTicks: report?.processedTicks ?? 0,
+        simulationIterations: report?.simulationIterations ?? 0,
+        fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
+        bulkIterations: diagnostics?.bulkIterations ?? 0,
+        bulkProcessedTicks: diagnostics?.bulkProcessedTicks ?? 0,
+        eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+        eventBoundaryIterations: diagnostics?.eventBoundaryIterations ?? 0,
+        guardedFallbackIterations: diagnostics?.guardedFallbackIterations ?? 0,
+        predictionInvalidations: diagnostics?.predictionInvalidations ?? 0,
+        eventProbeIterations: diagnostics?.eventProbeIterations ?? 0,
+        precisionReduced: diagnostics?.precisionReduced ?? false,
+        wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
+        wallMilliseconds: performance.now() - startedAt,
+        eventCounts: diagnostics?.eventCounts ?? {},
+        eventFamilyCounts: diagnostics?.eventFamilyCounts ?? {},
+        work: runtime.offlineWorkStats,
+        final: {
+          infinityCountExact: state.infinityCountExact,
+          generationCount: state.generationCount,
+          coreBoostCount: state.coreBoostCount,
+          towerFloor: state.towerFloor,
+          infiniteAngleSpeedLevel: state.infiniteAngleSpeedLevel,
+          infiniteAngleVertexLevel: state.infiniteAngleVertexLevel,
+          infiniteAngleGainLevel: state.infiniteAngleGainLevel,
+        },
+      };
     }
 
     function resetScenario(vertices) {
@@ -1295,6 +1387,82 @@ async function measureOfflineStress(page) {
       runtime.syncInfinityPointCachesFromExact(10n ** 300n);
     }
 
+    function configureLateEternityAutomationMillion(ticks) {
+      configureLateEternityBaseline(ticks);
+      Object.assign(state, {
+        autoBuySpeed: false,
+        autoBuyVertex: false,
+        autoBuyGain: false,
+        autoRunGeneration: false,
+        autoRunCoreBoost: false,
+        towerFloor: 11,
+        autoInfinityPointThresholdLog10: 1000,
+        autoInfinityPointThreshold: runtime.valueFromLog10(1000),
+        autoGenerationScoreMultiplierThreshold: 1e300,
+        autoGenerationCostMultiplierThreshold: 1e300,
+        autoGenerationMinimumSeconds: 1e9,
+      });
+    }
+
+    function configurePurchaseAutomationDifferential(ticks, kind) {
+      configureDifferentialBase(ticks);
+      const usesInfiniteAngle = kind === "infinite-angle" || kind === "tower" || kind === "tc4";
+      const usesInfinityUpgradeAutomation = kind === "infinity-upgrade";
+      Object.assign(state, {
+        automationEnabled: true,
+        achievementMask: 1 << (19 - 1),
+        infinityUpgradeMask: 1 << 1,
+        autoBuySpeed: kind === "normal",
+        autoBuyVertex: kind === "normal",
+        autoBuyGain: kind === "normal",
+        autoBuyInfinityUpgrades: usesInfinityUpgradeAutomation,
+        autoBuildTower: kind === "tower",
+        autoRunGeneration: false,
+        autoRunCoreBoost: false,
+        autoRunInfinity: false,
+        autoBuyInfiniteAngleSpeed: usesInfiniteAngle,
+        autoBuyInfiniteAngleVertex: usesInfiniteAngle,
+        autoBuyInfiniteAngleGain: usesInfiniteAngle,
+        infiniteAngleUnlocked: usesInfiniteAngle || usesInfinityUpgradeAutomation,
+        infiniteCapBroken: true,
+        activeChallenge: ["normal", "tower", "tc4"].includes(kind) ? 6 : 0,
+        activeTowerChallenge: kind === "tc4" ? 4 : 0,
+        towerFloor: usesInfiniteAngle ? (kind === "tc4" ? 12 : 11) : 10,
+        completedTowerChallenges: usesInfiniteAngle ? (1 << 4) - 1 : 0,
+        eternityCount: usesInfinityUpgradeAutomation ? 20 : usesInfiniteAngle ? 81 : 8,
+        eternityMilestoneMask: usesInfiniteAngle ? 7 : 0,
+      });
+      setLogState("score", kind === "tc4" ? -Infinity : kind === "normal" ? 20 : 100);
+      setLogState("totalScore", kind === "tc4" ? -Infinity : kind === "normal" ? 20 : 100);
+      setLogState("generationScore", kind === "tc4" ? -Infinity : kind === "normal" ? 20 : 100);
+      setLogState("infiniteScore", -Infinity);
+      runtime.setExactIntegerState(
+        state,
+        "eternityCountExact",
+        "eternityCount",
+        BigInt(usesInfinityUpgradeAutomation ? 20 : usesInfiniteAngle ? 81 : 8),
+      );
+      runtime.syncInfinityPointCachesFromExact(10n ** 300n);
+    }
+
+    function configureMilestoneTransitionDifferential(ticks) {
+      configureDifferentialBase(ticks);
+      Object.assign(state, {
+        automationEnabled: false,
+        eternityCount: 44,
+        infiniteAngleUnlocked: false,
+        infiniteCapBroken: false,
+        activeTowerChallenge: 1,
+        towerFloor: 3,
+        completedTowerChallenges: 0,
+      });
+      setLogState("score", 1200);
+      setLogState("totalScore", 1200);
+      setLogState("generationScore", 1200);
+      runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 44n);
+      runtime.syncInfinityPointCachesFromExact(10n ** 300n);
+    }
+
     function primeRegressionState() {
       for (const vertices of [3, 720, 10000]) {
         resetScenario(vertices);
@@ -1396,6 +1564,50 @@ async function measureOfflineStress(page) {
         12,
         { reprimeScore: true },
       ),
+      normalAutobuy: await runDifferential(
+        "normal-autobuy",
+        (ticks) => configurePurchaseAutomationDifferential(ticks, "normal"),
+        3,
+        { omitApproximateStateFields: ["lastEarnedLog10"] },
+      ),
+      infinityUpgradeAutobuy: await runDifferential(
+        "infinity-upgrade-autobuy",
+        (ticks) => configurePurchaseAutomationDifferential(ticks, "infinity-upgrade"),
+        3,
+      ),
+      infiniteAngleTowerAutobuy: await runDifferential(
+        "infinite-angle-tower-autobuy",
+        (ticks) => configurePurchaseAutomationDifferential(ticks, "tower"),
+        2,
+        {
+          omitApproximateStateFields: [
+            "scoreLog10",
+            "totalScoreLog10",
+            "generationScoreLog10",
+            "lastEarnedLog10",
+          ],
+          omitApproximateReportFields: ["scoreLog10"],
+        },
+      ),
+      milestoneTransitions: await runDifferential(
+        "milestone-transitions",
+        configureMilestoneTransitionDifferential,
+        12,
+      ),
+      tc4Restriction: await runDifferential(
+        "tc4-restriction",
+        (ticks) => configurePurchaseAutomationDifferential(ticks, "tc4"),
+        1,
+        {
+          omitApproximateStateFields: [
+            "scoreLog10",
+            "totalScoreLog10",
+            "generationScoreLog10",
+            "lastEarnedLog10",
+          ],
+          omitApproximateReportFields: ["scoreLog10"],
+        },
+      ),
       generation: await runDifferential("generation", configureGenerationDifferential, 120),
       coreBoost: await runDifferential("core-boost", configureCoreBoostDifferential, 120),
       generationCoreBoost: await runDifferential(
@@ -1451,8 +1663,8 @@ async function measureOfflineStress(page) {
           "late-eternity",
           120,
           configureLateEternityBaseline,
-          { reprimeScore: true },
         ),
+        lateEternityAutomationMillion: await measureLateEternityAutomationMillion(),
         coreHitBoundary: {
           angle: await measureCoreHitBoundary("angle"),
           infiniteAngle: await measureCoreHitBoundary("infiniteAngle"),
@@ -1512,6 +1724,7 @@ try {
         "generation-automation-baseline",
         "core-boost-automation-baseline",
         "late-eternity-automation-baseline",
+        "late-eternity-automation-million",
         "generation-core-boost-automation-million",
         "core-hit-boundary",
         "infinite-angle-exact-work",
@@ -1600,13 +1813,18 @@ try {
   assert.equal(autoInfinityRemainder.eventCounts.infinityExecutions, 2, "Auto Infinity remainder aggregation should retain direct event counts");
   assert.equal(autoInfinityRemainder.aggregatedInfinityCountGainExact, "118", "Auto Infinity remainder aggregation should use exact count gain");
   assert.equal(autoInfinityRemainder.infinityCountRateRemainder, 0.5, "Auto Infinity should carry the rate remainder forward");
-  for (const name of ["autoInfinityCustomThreshold", "autoInfinityIc6", "autoInfinityTimeline", "autoInfinityAutobuy"]) {
+  for (const name of ["autoInfinityCustomThreshold", "autoInfinityIc6", "autoInfinityTimeline"]) {
     const fallback = report.offlineStress.differential[name];
     assert.equal(fallback.comparison.matched, true, `${name} should match the guarded canonical fallback`);
     assert.equal(fallback.accelerated.diagnostics.cyclesAggregated, 0, `${name} should not aggregate unsupported cycles`);
     assert.equal(fallback.accelerated.diagnostics.aggregatedTicks, 0, `${name} should not skip unsupported ticks`);
     assert.notEqual(fallback.accelerated.diagnostics.cycleFallbackReason, "", `${name} should record a fallback reason`);
   }
+  const autoInfinityAutobuy = report.offlineStress.differential.autoInfinityAutobuy;
+  assert.equal(autoInfinityAutobuy.comparison.matched, true, "Auto Infinity with normal autobuy should match canonical ordering");
+  assert.equal(autoInfinityAutobuy.accelerated.diagnostics.cyclesAggregated, 0, "Auto Infinity with normal autobuy should not use the incompatible cycle shortcut");
+  assert.ok(autoInfinityAutobuy.accelerated.diagnostics.eventCounts.normalUpgradePurchases > 0, "Auto Infinity with normal autobuy should record canonical purchases");
+  assert.ok(autoInfinityAutobuy.accelerated.diagnostics.predictionInvalidations > 0, "Auto Infinity with normal autobuy should invalidate reset predictions");
   assert.ok(
     report.offlineStress.differential.generationUnsupportedChallenge.accelerated.diagnostics.guardedFallbackIterations > 0,
     "unsupported challenge automation should use guarded fallback iterations",
@@ -1657,6 +1875,55 @@ try {
       || report.offlineStress.lateEternityAutomation.eventCounts.infiniteAnglePurchases > 0,
     "late-Eternity automation baseline should observe at least one practical event",
   );
+  const lateEternityAutomationMillion = report.offlineStress.lateEternityAutomationMillion;
+  assert.equal(lateEternityAutomationMillion.requestedTicks, 1000000, "late-Eternity automation million should request one million ticks");
+  assert.equal(lateEternityAutomationMillion.processedTicks, 1000000, "late-Eternity automation million should process one million ticks");
+  assert.ok(
+    lateEternityAutomationMillion.fullSimulationIterations < lateEternityAutomationMillion.requestedTicks,
+    "late-Eternity automation million should reduce full simulation iterations",
+  );
+  assert.ok(lateEternityAutomationMillion.bulkIterations > 0, "late-Eternity automation million should use bulk iterations");
+  assert.equal(
+    lateEternityAutomationMillion.processedTicks,
+    lateEternityAutomationMillion.bulkProcessedTicks
+      + lateEternityAutomationMillion.simulationIterations
+      - lateEternityAutomationMillion.bulkIterations,
+    "late-Eternity automation million should account for bulk and boundary iterations",
+  );
+  assert.equal(
+    lateEternityAutomationMillion.fullSimulationIterations,
+    lateEternityAutomationMillion.simulationIterations
+      + lateEternityAutomationMillion.eventProbeIterations,
+    "late-Eternity automation million should separate committed and probe iterations",
+  );
+  assert.ok(lateEternityAutomationMillion.eventBoundaryIterations > 0, "late-Eternity automation million should commit event boundaries");
+  assert.ok(
+    lateEternityAutomationMillion.predictionInvalidations >= lateEternityAutomationMillion.eventBoundaryIterations,
+    "late-Eternity automation million should invalidate predictions at event boundaries",
+  );
+  assert.ok(
+    lateEternityAutomationMillion.eventCounts.infinityUpgradePurchases > 0
+      && lateEternityAutomationMillion.eventCounts.infiniteAnglePurchases > 0
+      && lateEternityAutomationMillion.eventCounts.towerBuilds > 0,
+    "late-Eternity automation million should exercise Infinity Upgrade, Infinite Angle, and tower automation",
+  );
+  assert.ok(Number.isFinite(lateEternityAutomationMillion.wallMilliseconds), "late-Eternity automation million should report finite wall time");
+  assert.ok(report.offlineStress.differential.normalAutobuy.accelerated.diagnostics.eventCounts.normalUpgradePurchases > 0, "normal autobuy differential should purchase normal upgrades");
+  assert.ok(report.offlineStress.differential.infinityUpgradeAutobuy.accelerated.diagnostics.eventCounts.infinityUpgradePurchases > 0, "Infinity Upgrade autobuy differential should purchase Infinity Upgrades");
+  assert.ok(
+    report.offlineStress.differential.infiniteAngleTowerAutobuy.accelerated.diagnostics.eventCounts.infiniteAnglePurchases > 0
+      && report.offlineStress.differential.infiniteAngleTowerAutobuy.accelerated.diagnostics.eventCounts.towerBuilds > 0,
+    "Infinite Angle and tower autobuy differential should use canonical purchases and builds",
+  );
+  assert.ok(
+    report.offlineStress.differential.milestoneTransitions.accelerated.diagnostics.eventCounts.automaticUnlocks > 0
+      && report.offlineStress.differential.milestoneTransitions.accelerated.diagnostics.eventCounts.automaticCompletions > 0,
+    "EM5/EM6/EM7 differential should record canonical one-shot transitions",
+  );
+  const tc4Restriction = report.offlineStress.differential.tc4Restriction;
+  assert.equal(tc4Restriction.accelerated.diagnostics.eventCounts.normalUpgradePurchases, 0, "TC4 should block normal autobuy purchases");
+  assert.equal(tc4Restriction.accelerated.diagnostics.eventCounts.infiniteAnglePurchases, 0, "TC4 should block Infinite Angle autobuy purchases");
+  assert.equal(tc4Restriction.accelerated.diagnostics.eventCounts.towerBuilds, 0, "TC4 should block tower builds while active");
   for (const [name, result] of Object.entries(report.offlineStress.differential)) {
     assert.equal(result.comparison.matched, true, `${name} differential should match the guarded canonical simulation: ${JSON.stringify(result.comparison.mismatches)}`);
     assert.equal(result.accelerated.diagnostics.requestedTicks, result.requestedTicks, `${name} differential should expose requested tick diagnostics`);
