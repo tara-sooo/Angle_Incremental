@@ -260,7 +260,7 @@ function resetEternityProgression() {
   runtime.normalizeTowerChallenge4State?.();
 }
 
-function applyEternityMilestoneCompletionState() {
+function normalizeEternityMilestoneCompletionState() {
   if (eternityMilestoneActive("2")) {
     runtime.state.completedChallenges |= 1 << (7 - 1);
   }
@@ -270,7 +270,7 @@ function applyEternityMilestoneCompletionState() {
 }
 
 function applyEternityRunStartState() {
-  applyEternityMilestoneCompletionState();
+  normalizeEternityMilestoneCompletionState();
   if (eternityMilestoneActive("9")) runtime.syncInfinityPointCachesFromExact(1000n);
 }
 
@@ -323,6 +323,7 @@ expose("canEternity", () => canEternity);
 expose("shouldForceEternity", () => shouldForceEternity);
 expose("recordEternityRun", () => recordEternityRun, (value) => { recordEternityRun = value; });
 expose("resetEternityProgression", () => resetEternityProgression);
+expose("normalizeEternityMilestoneCompletionState", () => normalizeEternityMilestoneCompletionState);
 expose("applyEternityRunStartState", () => applyEternityRunStartState);
 expose("performEternity", () => performEternity);
 expose("maybeForceEternity", () => maybeForceEternity);

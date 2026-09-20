@@ -1054,6 +1054,7 @@ function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   const snapshot = snapshotRuntimeState();
   try {
     applySaveDataUnsafe(data, saveVersion);
+    runtime.normalizeEternityMilestoneCompletionState?.();
     runtime.applyStartingCoreBoosts();
     restoreVerticesAfterLoad(data);
   } catch (error) {
