@@ -557,6 +557,51 @@ async function runNumericStabilityModuleRuntimeTest() {
   }
 
   {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    const { state } = instance.debug;
+    const scoreLog10 = 308 + Math.log10(1.79);
+    const coreHits = 100_000_000_000_000;
+    const targetVertexSteps = coreHits * 3;
+    prepareVertexScenario(instance, {
+      scoreLog10,
+      currentGainLog10: -Infinity,
+      infiniteCapBroken: false,
+    });
+    state.infinityCount = 0;
+    state.infinityCountExact = "0";
+    state.vertices = 3;
+    runtime.vertexGainIncreaseLog10 = () => 277.9;
+    runtime.beginOfflineWorkBudget(1);
+    const individualCoreGainLog10 = 277.9 + Math.log10(targetVertexSteps);
+    assert.ok(
+      scoreLog10 - individualCoreGainLog10 > 15,
+      "the tiny-core-hit fixture must keep each individual hit below log-space significance",
+    );
+
+    let usedBatch;
+    runtime.offlineProcessing = true;
+    try {
+      usedBatch = runtime.processManyVertices(1, targetVertexSteps);
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+
+    assert.equal(usedBatch, true, "the tiny-core-hit fixture must use the batched path");
+    assert.equal(state.infinityCount, 1, "aggregate tiny core hits must complete the first Infinity");
+    assert.equal(state.infinityCountExact, "1", "aggregate tiny core hits must record one exact Infinity");
+    assert.equal(state.lastInfinityRuns[0].ipGain, 1, "the first crossing must not include post-threshold IP gain");
+    assert.ok(
+      state.lastInfinityRuns[0].scoreLog10 >= runtime.INFINITY_REQUIREMENT_LOG10 - 1e-12,
+      "the recorded first crossing must reach the Infinity threshold",
+    );
+    assert.ok(
+      runtime.offlineWorkStats.totalIterations <= runtime.offlineWorkStats.hardCap,
+      "the tiny-core-hit fixture must stay within the bounded batch work budget",
+    );
+  }
+
+  {
     const runAchievementOrderingScenario = async (offline) => {
       const instance = await loadRuntime(candidatePath);
       const { runtime, debug } = instance;
