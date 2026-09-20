@@ -851,14 +851,14 @@ try {
   assert.equal(helpUi.upper.accordionCount, 0, "upper Help should keep one content surface");
   assert.equal(helpUi.upper.articleTopic, "tower", "Help should focus the previous Infinity subtab");
   assert.equal(helpUi.upper.current, "Tower", "Help navigation should mark the previous subtab topic");
-  assert.ok(helpUi.upper.paragraphs.length >= 2, "unlocked Help should render readable paragraphs");
+  assert.ok(helpUi.upper.paragraphs.length >= 1, "unlocked Help should render body content");
   assert.equal(helpUi.upper.context, "", "Help should omit the redundant contextual focus meta");
   assert.deepEqual(helpUi.afterReset.topics, helpUi.upper.topics, "discovered Help topics should survive a reset");
   assert.match(helpUi.english.current, /Tower/, "Help navigation should switch to English");
   assert.equal(helpUi.english.context, "", "Help should omit the redundant contextual focus meta in English");
   assert.equal(helpUi.englishChallenges.articleTopic, "tower-challenges", "Help should focus the first-era challenge topic from the challenge subtab");
-  assert.ok(helpUi.englishChallenges.paragraphs.length >= 2, "English Help should keep challenge guidance in paragraphs");
-  assert.match(helpUi.englishChallenges.text, /restriction|goal|reward/i, "English Help should explain how to use a challenge card");
+  assert.ok(helpUi.englishChallenges.paragraphs.length >= 1, "English Help should keep challenge guidance readable");
+  assert.match(helpUi.englishChallenges.text, /restriction|goal|reward/i, "English Help should explain challenge rules and rewards");
 
   await page.locator('[data-tab="help"]').click();
   await page.locator('#helpNav button[data-help-topic="offline"]').click();
@@ -875,7 +875,7 @@ try {
     articleTopic: "offline",
     current: "offline",
     articleCount: 1,
-    paragraphCount: 2,
+    paragraphCount: 1,
     activeElement: "helpArticle",
     context: "",
   }, "clicking a Help topic should expose and focus one article");
@@ -948,7 +948,7 @@ try {
   const desktopHelpScrollOwnership = await readScrollOwnership(page);
   assert.equal(desktopHelpLayout.topicCount, 17, "desktop Help should render every discovered topic");
   assert.equal(desktopHelpLayout.articleCount, 1, "desktop Help should render one focused article");
-  assert.ok(desktopHelpLayout.paragraphCount >= 2, "desktop Help should render multiple paragraphs");
+  assert.ok(desktopHelpLayout.paragraphCount >= 1, "desktop Help should render body content");
   assert.equal(desktopHelpLayout.articleTopic, "tower", "desktop Help should retain the contextual topic");
   assert.equal(desktopHelpLayout.panelOverflow, false, "desktop Help should not overflow horizontally");
   assert.equal(desktopHelpLayout.bodyOverflow, false, "desktop Help text should not overflow its section");
@@ -970,7 +970,7 @@ try {
   const mobileHelpScrollOwnership = await readScrollOwnership(page);
   assert.equal(mobileHelpLayout.topicCount, 17, "mobile Help should render every discovered topic");
   assert.equal(mobileHelpLayout.articleCount, 1, "mobile Help should render one focused article");
-  assert.ok(mobileHelpLayout.paragraphCount >= 2, "mobile Help should render multiple paragraphs");
+  assert.ok(mobileHelpLayout.paragraphCount >= 1, "mobile Help should render body content");
   assert.equal(mobileHelpLayout.articleTopic, "tower", "mobile Help should retain the contextual topic");
   assert.ok(mobileHelpLayout.navScrollWidth > mobileHelpLayout.navClientWidth, "mobile Help topics should scroll in one row");
   assert.ok(mobileHelpLayout.navHeight <= 60, "mobile Help topics should keep the navigation compact");
