@@ -12,9 +12,24 @@ const budgets = Object.freeze({
   offlineLongResumeWallMs: 5000,
   offlineLateEternityAutomationMillionWallMs: 5000,
 });
+const structuralBudgets = Object.freeze({
+  autoInfinityMillionFullSimulationIterations: 64,
+  generationCoreAutomationMillionFullSimulationIterations: 250000,
+  lateEternityAutomationMillionFullSimulationIterations: 250000,
+  quietMillionFullSimulationIterations: 50000,
+  timelineMillionFullSimulationIterations: 50000,
+  longResumeFullSimulationIterations: 50000,
+});
 
 function collectViolations(report) {
   const violations = [];
+  const checkFullSimulationBudget = (name, measurement, maximum) => {
+    if (measurement?.fullSimulationIterations > maximum) {
+      violations.push(
+        `${name} full simulation iterations ${measurement.fullSimulationIterations} > ${maximum}`,
+      );
+    }
+  };
   if (report.offlineProcessing.wallMilliseconds > budgets.offlineProcessingWallMs) {
     violations.push(`offline processing wall ${report.offlineProcessing.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineProcessingWallMs}ms`);
   }
@@ -61,6 +76,42 @@ function collectViolations(report) {
     if (resume.wallMilliseconds > budgets.offlineLongResumeWallMs) {
       violations.push(`offline Timeline ${route} million-tick resume wall ${resume.wallMilliseconds.toFixed(3)}ms > ${budgets.offlineLongResumeWallMs}ms`);
     }
+  }
+  checkFullSimulationBudget(
+    "offline Auto Infinity million",
+    report.offlineStress.autoInfinityMillion,
+    structuralBudgets.autoInfinityMillionFullSimulationIterations,
+  );
+  for (const [mode, measurement] of Object.entries(report.offlineStress.generationCoreAutomationMillion)) {
+    checkFullSimulationBudget(
+      `offline ${mode} automation million`,
+      measurement,
+      structuralBudgets.generationCoreAutomationMillionFullSimulationIterations,
+    );
+  }
+  checkFullSimulationBudget(
+    "offline late-Eternity automation million",
+    report.offlineStress.lateEternityAutomationMillion,
+    structuralBudgets.lateEternityAutomationMillionFullSimulationIterations,
+  );
+  checkFullSimulationBudget(
+    "offline quiet million",
+    report.offlineStress.quietResume?.["1000000"],
+    structuralBudgets.quietMillionFullSimulationIterations,
+  );
+  for (const [route, measurement] of Object.entries(report.offlineStress.timelineResume)) {
+    checkFullSimulationBudget(
+      `offline Timeline ${route} million`,
+      measurement,
+      structuralBudgets.timelineMillionFullSimulationIterations,
+    );
+  }
+  for (const [name, measurement] of Object.entries(report.offlineStress.longResumeWork)) {
+    checkFullSimulationBudget(
+      `offline ${name} long resume`,
+      measurement,
+      structuralBudgets.longResumeFullSimulationIterations,
+    );
   }
   return violations;
 }
@@ -445,6 +496,23 @@ async function measureOfflineStress(page) {
       state.autoBuySpeed = true;
     }
 
+    function configureExactCountersBeyondSafeIntegerDifferential(ticks) {
+      configureDifferentialBase(ticks);
+      const maxSafeInteger = BigInt(Number.MAX_SAFE_INTEGER);
+      runtime.setExactIntegerState(
+        state,
+        "infinityCountExact",
+        "infinityCount",
+        maxSafeInteger + 123n,
+      );
+      runtime.setExactIntegerState(
+        state,
+        "eternityCountExact",
+        "eternityCount",
+        maxSafeInteger + 456n,
+      );
+    }
+
     function configureGenerationDifferential(ticks) {
       configureDifferentialBase(ticks);
       Object.assign(state, {
@@ -670,6 +738,56 @@ async function measureOfflineStress(page) {
           mismatches,
         },
       };
+    }
+
+    async function measureEventfulSaveLoadRoundTrip() {
+      const ticks = 24;
+      const originalState = runtime.snapshotRuntimeState();
+      const originalOfflineReport = runtime.offlineReport;
+      const originalProcessOfflineElapsed = runtime.processOfflineElapsed;
+      try {
+        configureLateEternityBaseline(ticks);
+        await debug.processOfflineElapsed(
+          runtime.MAX_SIMULATION_STEP_SECONDS * ticks,
+          "save-load-eventful-round-trip",
+          { clockSource: "server" },
+        );
+        const expected = runtime.offlineSnapshot();
+        const expectedExact = {
+          infinityCountExact: state.infinityCountExact,
+          eternityCountExact: state.eternityCountExact,
+          generationCount: state.generationCount,
+          coreBoostCount: state.coreBoostCount,
+          towerFloor: state.towerFloor,
+        };
+        const saved = runtime.saveGame("manual");
+        runtime.processOfflineElapsed = async () => ({ skipped: true });
+        runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 0n);
+        runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 0n);
+        state.generationCount = 0;
+        state.coreBoostCount = 0;
+        state.towerFloor = 0;
+        const loaded = await runtime.loadGame({ allowDuringLoadRecovery: true });
+        const actual = runtime.offlineSnapshot();
+        return {
+          saved,
+          loaded,
+          expected,
+          actual,
+          expectedExact,
+          actualExact: {
+            infinityCountExact: state.infinityCountExact,
+            eternityCountExact: state.eternityCountExact,
+            generationCount: state.generationCount,
+            coreBoostCount: state.coreBoostCount,
+            towerFloor: state.towerFloor,
+          },
+        };
+      } finally {
+        runtime.processOfflineElapsed = originalProcessOfflineElapsed;
+        runtime.restoreRuntimeState(originalState);
+        runtime.offlineReport = originalOfflineReport;
+      }
     }
 
     function collectObservedEventCounts(before, after) {
@@ -1633,6 +1751,11 @@ async function measureOfflineStress(page) {
         24,
         { reprimeScore: true, aggregateHistory: true },
       ),
+      exactCountersBeyondSafeInteger: await runDifferential(
+        "exact-counters-beyond-safe-integer",
+        configureExactCountersBeyondSafeIntegerDifferential,
+        24,
+      ),
       generationUnsupportedChallenge: await runDifferential(
         "generation-unsupported-challenge",
         configureGenerationUnsupportedChallengeDifferential,
@@ -1652,6 +1775,27 @@ async function measureOfflineStress(page) {
         autoInfinityRemainder: await measureAutoInfinityStress(120, { rateRemainder: 0.5 }),
         autoInfinityMillion: await measureAutoInfinityStress(runtime.OFFLINE_PROGRESS_MAX_TICKS),
         differential,
+        eventOrdering: {
+          infinityBeforeGeneration: {
+            matched: differential.autoInfinityGeneration.comparison.matched,
+            requestedTicks: differential.autoInfinityGeneration.requestedTicks,
+            eventCounts: differential.autoInfinityGeneration.accelerated.diagnostics.eventCounts,
+            eventFamilyCounts: differential.autoInfinityGeneration.accelerated.diagnostics.eventFamilyCounts,
+          },
+          infinityBeforeCoreBoost: {
+            matched: differential.autoInfinityCoreBoost.comparison.matched,
+            requestedTicks: differential.autoInfinityCoreBoost.requestedTicks,
+            eventCounts: differential.autoInfinityCoreBoost.accelerated.diagnostics.eventCounts,
+            eventFamilyCounts: differential.autoInfinityCoreBoost.accelerated.diagnostics.eventFamilyCounts,
+          },
+          infinityBeforeGenerationAndCoreBoost: {
+            matched: differential.autoInfinityGenerationCoreBoost.comparison.matched,
+            requestedTicks: differential.autoInfinityGenerationCoreBoost.requestedTicks,
+            eventCounts: differential.autoInfinityGenerationCoreBoost.accelerated.diagnostics.eventCounts,
+            eventFamilyCounts: differential.autoInfinityGenerationCoreBoost.accelerated.diagnostics.eventFamilyCounts,
+          },
+        },
+        eventfulSaveLoadRoundTrip: await measureEventfulSaveLoadRoundTrip(),
         generationAutomation: await measureEventfulBaseline("generation", 120, configureGenerationDifferential),
         coreBoostAutomation: await measureEventfulBaseline("core-boost", 120, configureCoreBoostDifferential),
         generationCoreBoostAutomation: await measureEventfulBaseline(
@@ -1739,6 +1883,7 @@ try {
       },
     },
     budgets,
+    structuralBudgets,
     ...data,
   };
   const violations = collectViolations(report);
@@ -1825,6 +1970,31 @@ try {
   assert.equal(autoInfinityAutobuy.accelerated.diagnostics.cyclesAggregated, 0, "Auto Infinity with normal autobuy should not use the incompatible cycle shortcut");
   assert.ok(autoInfinityAutobuy.accelerated.diagnostics.eventCounts.normalUpgradePurchases > 0, "Auto Infinity with normal autobuy should record canonical purchases");
   assert.ok(autoInfinityAutobuy.accelerated.diagnostics.predictionInvalidations > 0, "Auto Infinity with normal autobuy should invalidate reset predictions");
+  for (const [name, ordering] of Object.entries(report.offlineStress.eventOrdering)) {
+    assert.equal(ordering.matched, true, `${name} should match the canonical event order`);
+    assert.equal(ordering.eventCounts.infinityExecutions, ordering.requestedTicks, `${name} should execute Infinity first at every shared boundary`);
+    assert.equal(ordering.eventCounts.generationResets, 0, `${name} should not run Generation before the ready Infinity reset`);
+    assert.equal(ordering.eventCounts.coreBoostResets, 0, `${name} should not run Core Boost before the ready Infinity reset`);
+    assert.equal(ordering.eventFamilyCounts.autoInfinity, ordering.requestedTicks, `${name} should classify the winning family as Auto Infinity`);
+  }
+  const exactCounters = report.offlineStress.differential.exactCountersBeyondSafeInteger;
+  assert.equal(exactCounters.comparison.matched, true, "exact counters beyond Number.MAX_SAFE_INTEGER should match the canonical path");
+  assert.equal(
+    exactCounters.accelerated.after.infinityCountExact,
+    String(BigInt(Number.MAX_SAFE_INTEGER) + 123n),
+    "Infinity count must remain exact beyond Number.MAX_SAFE_INTEGER",
+  );
+  assert.equal(
+    exactCounters.accelerated.after.eternityCountExact,
+    String(BigInt(Number.MAX_SAFE_INTEGER) + 456n),
+    "Eternity count must remain exact beyond Number.MAX_SAFE_INTEGER",
+  );
+  const eventfulSaveLoad = report.offlineStress.eventfulSaveLoadRoundTrip;
+  assert.equal(eventfulSaveLoad.saved, true, "event-heavy offline progress should save successfully");
+  assert.equal(eventfulSaveLoad.loaded, true, "event-heavy offline progress should load successfully");
+  assert.deepEqual(eventfulSaveLoad.actualExact, eventfulSaveLoad.expectedExact, "event-heavy save/load should preserve exact discrete state");
+  assert.equal(eventfulSaveLoad.actual.infinityCountExact, eventfulSaveLoad.expected.infinityCountExact, "event-heavy save/load should preserve Infinity count");
+  assert.equal(eventfulSaveLoad.actual.eternityCountExact, eventfulSaveLoad.expected.eternityCountExact, "event-heavy save/load should preserve Eternity count");
   assert.ok(
     report.offlineStress.differential.generationUnsupportedChallenge.accelerated.diagnostics.guardedFallbackIterations > 0,
     "unsupported challenge automation should use guarded fallback iterations",
