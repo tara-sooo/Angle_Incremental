@@ -75,6 +75,7 @@ const OFFLINE_PROCESS_INITIAL_BATCH_TICKS = 64;
 const OFFLINE_PROCESS_TARGET_BATCH_MS = 2;
 const OFFLINE_PROCESS_PROGRESS_UPDATE_INTERVAL_MS = 100;
 const OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT = 4096;
+const OFFLINE_EVENT_BOUNDARY_MAX_ITERATIONS = 16384;
 const OFFLINE_EVENT_KEYS = Object.freeze([
   "infinityExecutions",
   "generationResets",
@@ -86,6 +87,16 @@ const OFFLINE_EVENT_KEYS = Object.freeze([
   "automaticUnlocks",
   "automaticCompletions",
 ]);
+const OFFLINE_EVENT_FAMILY_KEYS = Object.freeze([
+  "autoInfinity",
+  "generationCoreBoost",
+  "otherAutomation",
+]);
+const OFFLINE_EVENT_FAMILY_BY_KEY = Object.freeze({
+  infinityExecutions: "autoInfinity",
+  generationResets: "generationCoreBoost",
+  coreBoostResets: "generationCoreBoost",
+});
 const OFFLINE_EVENT_SIGNATURE_KEYS = Object.freeze([
   "verticesExact",
   "vertices",
@@ -170,6 +181,10 @@ function createOfflineEventCounts() {
   return Object.fromEntries(OFFLINE_EVENT_KEYS.map((key) => [key, 0]));
 }
 
+function createOfflineEventFamilyCounts() {
+  return Object.fromEntries(OFFLINE_EVENT_FAMILY_KEYS.map((key) => [key, 0]));
+}
+
 function beginOfflineDiagnostics(requestedTicks) {
   offlineDiagnostics = {
     requestedTicks,
@@ -182,10 +197,14 @@ function beginOfflineDiagnostics(requestedTicks) {
     cyclesAggregated: 0,
     cycleFallbackReason: "",
     eventBoundaryCount: 0,
+    eventBoundaryIterations: 0,
+    guardedFallbackIterations: 0,
+    predictionInvalidations: 0,
     eventProbeIterations: 0,
     wallTimeMs: 0,
     precisionReduced: false,
     eventCounts: createOfflineEventCounts(),
+    eventFamilyCounts: createOfflineEventFamilyCounts(),
   };
 }
 
@@ -193,6 +212,8 @@ function recordOfflineEvent(name, count = 1) {
   if (offlineEventProbeActive || !offlineProcessing || !offlineDiagnostics || !OFFLINE_EVENT_KEYS.includes(name)) return;
   const normalizedCount = Math.max(0, Math.floor(Number(count) || 0));
   offlineDiagnostics.eventCounts[name] += normalizedCount;
+  const family = OFFLINE_EVENT_FAMILY_BY_KEY[name] || "otherAutomation";
+  offlineDiagnostics.eventFamilyCounts[family] += normalizedCount;
 }
 
 function offlineDiagnosticsSnapshot() {
@@ -208,10 +229,14 @@ function offlineDiagnosticsSnapshot() {
     cyclesAggregated: offlineDiagnostics.cyclesAggregated,
     cycleFallbackReason: offlineDiagnostics.cycleFallbackReason,
     eventBoundaryCount: offlineDiagnostics.eventBoundaryCount,
+    eventBoundaryIterations: offlineDiagnostics.eventBoundaryIterations,
+    guardedFallbackIterations: offlineDiagnostics.guardedFallbackIterations,
+    predictionInvalidations: offlineDiagnostics.predictionInvalidations,
     eventProbeIterations: offlineDiagnostics.eventProbeIterations,
     wallTimeMs: offlineDiagnostics.wallTimeMs,
     precisionReduced: offlineDiagnostics.precisionReduced,
     eventCounts: { ...offlineDiagnostics.eventCounts },
+    eventFamilyCounts: { ...offlineDiagnostics.eventFamilyCounts },
   };
 }
 
@@ -220,6 +245,7 @@ function cloneOfflineDiagnostics(value) {
   return {
     ...value,
     eventCounts: { ...(value.eventCounts || {}) },
+    eventFamilyCounts: { ...(value.eventFamilyCounts || {}) },
   };
 }
 
@@ -1313,6 +1339,7 @@ function tryOfflineInfinityCyclePath(tickSeconds, requestedTicks, bestRate, rate
     processedTicks,
     simulationIterations: processedTicks,
     eventBoundaryCount: processedTicks,
+    eventBoundaryIterations: processedTicks,
     aggregatedTicks: 0,
     cyclesAggregated: 0,
     aggregatedCountExact: 0n,
@@ -1366,6 +1393,7 @@ function tryOfflineInfinityCyclePath(tickSeconds, requestedTicks, bestRate, rate
     processedTicks: requestedTicks,
     simulationIterations: 2,
     eventBoundaryCount: 2,
+    eventBoundaryIterations: 2,
     aggregatedTicks: aggregation.aggregatedTicks,
     cyclesAggregated: aggregation.cyclesAggregated,
     aggregatedCountExact: aggregation.aggregatedCountExact,
@@ -1430,65 +1458,184 @@ function probeOfflineEventInterval(snapshot, seconds, baselineSignature) {
   return changed;
 }
 
-function tryOfflineGenerationCoreEventPath(tickSeconds, remainingTicks, batchTicks) {
-  const eligible = offlineGenerationCoreEventPathEligible(tickSeconds, remainingTicks);
-  if (!eligible) return { used: false, safe: false, eligible: false, reason: "eligibility-guard" };
-
+function inspectOfflineGenerationCoreEventFamily(tickSeconds, remainingTicks, batchTicks) {
+  if (!offlineGenerationCoreEventPathEligible(tickSeconds, remainingTicks)) {
+    return { eligible: false, safe: false, reason: "eligibility-guard" };
+  }
   const requestedBatchTicks = Number.isFinite(batchTicks) ? Math.floor(batchTicks) : 64;
-  const candidateTicks = Math.min(
-    remainingTicks,
-    Math.max(2, requestedBatchTicks),
-  );
+  const candidateTicks = Math.min(remainingTicks, Math.max(2, requestedBatchTicks));
   if (candidateTicks < 2 || !offlineProgressNumericallySafe(tickSeconds * candidateTicks)) {
-    return { used: false, safe: false, eligible: true, reason: "numeric-guard" };
+    return { eligible: true, safe: false, reason: "numeric-guard" };
+  }
+  return {
+    eligible: true,
+    safe: true,
+    candidateTicks,
+    family: "generationCoreBoost",
+  };
+}
+
+function runOfflineEventBoundaryEngine({
+  tickSeconds,
+  remainingTicks,
+  batchTicks,
+  eventFamily = inspectOfflineGenerationCoreEventFamily,
+  eventBoundaryIterations = 0,
+  cyclePath = null,
+}) {
+  if (typeof cyclePath === "function") {
+    const cycleResult = cyclePath();
+    if (cycleResult.used || cycleResult.processedTicks > 0) {
+      return {
+        ...cycleResult,
+        handled: true,
+        family: "autoInfinity",
+        eventBoundaryIterations: cycleResult.eventBoundaryIterations
+          ?? cycleResult.eventBoundaryCount
+          ?? 0,
+        predictionInvalidations: cycleResult.predictionInvalidations || 0,
+      };
+    }
+  }
+
+  const family = eventFamily(tickSeconds, remainingTicks, batchTicks);
+  if (!family.eligible) {
+    return {
+      used: false,
+      handled: false,
+      eligible: false,
+      safe: false,
+      reason: family.reason,
+      eventBoundaryIterations: 0,
+      predictionInvalidations: 0,
+    };
+  }
+  if (!family.safe) {
+    return {
+      used: false,
+      handled: false,
+      eligible: true,
+      safe: false,
+      disableFamily: true,
+      reason: family.reason,
+      eventBoundaryIterations: 0,
+      predictionInvalidations: 1,
+    };
+  }
+  if (eventBoundaryIterations >= OFFLINE_EVENT_BOUNDARY_MAX_ITERATIONS) {
+    return {
+      used: false,
+      handled: false,
+      eligible: true,
+      safe: false,
+      disableFamily: true,
+      reason: "event-boundary-limit",
+      eventBoundaryIterations: 0,
+      predictionInvalidations: 1,
+    };
   }
 
   const startingSnapshot = snapshotOfflineEventProbe();
   const baselineSignature = offlineEventStateSignature(startingSnapshot.state);
   let eventProbeIterations = 0;
+  let probeFailure = "";
   const probe = (ticks) => {
     eventProbeIterations += 1;
-    return probeOfflineEventInterval(
-      startingSnapshot,
-      tickSeconds * ticks,
-      baselineSignature,
-    );
+    try {
+      return probeOfflineEventInterval(
+        startingSnapshot,
+        tickSeconds * ticks,
+        baselineSignature,
+      );
+    } catch {
+      probeFailure = "probe-failed";
+      return false;
+    }
   };
 
-  if (!probe(candidateTicks)) {
-    update(tickSeconds * candidateTicks, true);
+  if (!probe(family.candidateTicks)) {
+    if (probeFailure) {
+      restoreOfflineEventProbe(startingSnapshot);
+      return {
+        used: false,
+        handled: false,
+        eligible: true,
+        safe: false,
+        disableFamily: true,
+        reason: probeFailure,
+        eventProbeIterations,
+        eventBoundaryIterations: 0,
+        predictionInvalidations: 1,
+      };
+    }
+    update(tickSeconds * family.candidateTicks, true);
     return {
       used: true,
+      handled: true,
       safe: true,
       eligible: true,
-      processedTicks: candidateTicks,
+      family: family.family,
+      processedTicks: family.candidateTicks,
       simulationIterations: 1,
-      bulkIterations: candidateTicks > 1 ? 1 : 0,
-      bulkProcessedTicks: candidateTicks > 1 ? candidateTicks : 0,
+      bulkIterations: family.candidateTicks > 1 ? 1 : 0,
+      bulkProcessedTicks: family.candidateTicks > 1 ? family.candidateTicks : 0,
       eventBoundaryCount: 0,
+      eventBoundaryIterations: 0,
+      predictionInvalidations: 0,
       eventProbeIterations,
     };
   }
 
   let low = 1;
-  let high = candidateTicks;
+  let high = family.candidateTicks;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
     if (probe(middle)) high = middle;
-    else low = middle + 1;
+    else if (probeFailure) {
+      restoreOfflineEventProbe(startingSnapshot);
+      return {
+        used: false,
+        handled: false,
+        eligible: true,
+        safe: false,
+        disableFamily: true,
+        reason: probeFailure,
+        eventProbeIterations,
+        eventBoundaryIterations: 0,
+        predictionInvalidations: 1,
+      };
+    } else low = middle + 1;
   }
 
+  if (!Number.isInteger(low) || low < 1 || low > family.candidateTicks) {
+    restoreOfflineEventProbe(startingSnapshot);
+    return {
+      used: false,
+      handled: false,
+      eligible: true,
+      safe: false,
+      disableFamily: true,
+      reason: "invalid-boundary",
+      eventProbeIterations,
+      eventBoundaryIterations: 0,
+      predictionInvalidations: 1,
+    };
+  }
   restoreOfflineEventProbe(startingSnapshot);
   update(tickSeconds * low, true);
   return {
     used: true,
+    handled: true,
     safe: true,
     eligible: true,
+    family: family.family,
     processedTicks: low,
     simulationIterations: 1,
     bulkIterations: low > 1 ? 1 : 0,
     bulkProcessedTicks: low > 1 ? low : 0,
     eventBoundaryCount: 1,
+    eventBoundaryIterations: 1,
+    predictionInvalidations: 1,
     eventProbeIterations,
   };
 }
@@ -1547,6 +1694,7 @@ function restoreOfflineTransaction(snapshot, error, retryBaseline) {
     ? {
       ...snapshot.offlineDiagnostics,
       eventCounts: { ...snapshot.offlineDiagnostics.eventCounts },
+      eventFamilyCounts: { ...snapshot.offlineDiagnostics.eventFamilyCounts },
     }
     : null;
   setOfflineProcessing(false);
@@ -1783,6 +1931,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     let cycleAggregatedCountExact = 0n;
     let precisionReduced = false;
     let eventBoundaryCount = 0;
+    let eventBoundaryIterations = 0;
+    let guardedFallbackIterations = 0;
+    let predictionInvalidations = 0;
     let eventProbeIterations = 0;
     offlineDiagnostics = null;
 
@@ -1854,41 +2005,62 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           let budgetStartedAt = monotonicClockNow();
           let lastProgressUiAt = budgetStartedAt;
           let eventPathDisabled = false;
-          const cyclePath = tryOfflineInfinityCyclePath(
+          const initialEventStep = runOfflineEventBoundaryEngine({
             tickSeconds,
-            requestedTicks,
-            bestRateAtStart,
-            rateRemainderAtStart,
-          );
-          processedTicks = cyclePath.processedTicks;
-          simulationIterations += cyclePath.simulationIterations;
-          eventBoundaryCount += cyclePath.eventBoundaryCount;
-          aggregatedTicks += cyclePath.aggregatedTicks || 0;
-          cyclesAggregated += cyclePath.cyclesAggregated || 0;
-          cycleAggregatedCountExact += cyclePath.aggregatedCountExact || 0n;
+            remainingTicks: requestedTicks,
+            batchTicks: Math.max(64, batchTicks),
+            eventFamily: inspectOfflineGenerationCoreEventFamily,
+            eventBoundaryIterations,
+            cyclePath: () => tryOfflineInfinityCyclePath(
+              tickSeconds,
+              requestedTicks,
+              bestRateAtStart,
+              rateRemainderAtStart,
+            ),
+          });
+          if (initialEventStep.disableFamily) eventPathDisabled = true;
+          processedTicks = initialEventStep.processedTicks || 0;
+          simulationIterations += initialEventStep.simulationIterations || 0;
+          eventBoundaryCount += initialEventStep.eventBoundaryCount || 0;
+          eventBoundaryIterations += initialEventStep.eventBoundaryIterations || 0;
+          guardedFallbackIterations += initialEventStep.guardedFallbackIterations || 0;
+          predictionInvalidations += initialEventStep.predictionInvalidations || 0;
+          eventProbeIterations += initialEventStep.eventProbeIterations || 0;
+          bulkIterations += initialEventStep.bulkIterations || 0;
+          bulkProcessedTicks += initialEventStep.bulkProcessedTicks || 0;
+          aggregatedTicks += initialEventStep.aggregatedTicks || 0;
+          cyclesAggregated += initialEventStep.cyclesAggregated || 0;
+          cycleAggregatedCountExact += initialEventStep.aggregatedCountExact || 0n;
           offlineDiagnostics.processedTicks = processedTicks;
           offlineDiagnostics.simulationIterations = simulationIterations;
-          offlineDiagnostics.fullSimulationIterations = simulationIterations;
+          offlineDiagnostics.fullSimulationIterations = simulationIterations + eventProbeIterations;
+          offlineDiagnostics.eventBoundaryIterations = eventBoundaryIterations;
+          offlineDiagnostics.guardedFallbackIterations = guardedFallbackIterations;
+          offlineDiagnostics.predictionInvalidations = predictionInvalidations;
           offlineDiagnostics.eventProbeIterations = eventProbeIterations;
+          offlineDiagnostics.bulkProcessedTicks = bulkProcessedTicks;
+          offlineDiagnostics.bulkIterations = bulkIterations;
           offlineDiagnostics.aggregatedTicks = aggregatedTicks;
           offlineDiagnostics.cyclesAggregated = cyclesAggregated;
-          offlineDiagnostics.cycleFallbackReason = cyclePath.reason || "";
+          offlineDiagnostics.cycleFallbackReason = initialEventStep.reason || "";
           offlineDiagnostics.eventBoundaryCount = eventBoundaryCount;
           while (processedTicks < requestedTicks) {
             const batchStartedAt = monotonicClockNow();
             const remainingTicks = requestedTicks - processedTicks;
             let eventStep = null;
             if (!eventPathDisabled) {
-              eventStep = tryOfflineGenerationCoreEventPath(
+              eventStep = runOfflineEventBoundaryEngine({
                 tickSeconds,
                 remainingTicks,
-                Math.max(64, batchTicks),
-              );
-              if (eventStep.eligible === true && eventStep.safe === false) eventPathDisabled = true;
+                batchTicks: Math.max(64, batchTicks),
+                eventFamily: inspectOfflineGenerationCoreEventFamily,
+                eventBoundaryIterations,
+              });
+              if (eventStep.disableFamily) eventPathDisabled = true;
             }
             const clockHasNotAdvanced = lastBatchFinishedAt !== null
               && batchStartedAt === lastBatchFinishedAt;
-            const currentBatchTicks = eventStep?.used
+            const currentBatchTicks = eventStep?.handled
               ? eventStep.processedTicks
               : Math.min(
                 batchTicks,
@@ -1899,15 +2071,18 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
                   : remainingTicks,
               );
             const batchEnd = processedTicks + currentBatchTicks;
-            if (eventStep?.used) {
+            if (eventStep?.handled) {
               simulationIterations += eventStep.simulationIterations;
               eventProbeIterations += eventStep.eventProbeIterations;
               bulkIterations += eventStep.bulkIterations;
               bulkProcessedTicks += eventStep.bulkProcessedTicks;
               eventBoundaryCount += eventStep.eventBoundaryCount;
+              eventBoundaryIterations += eventStep.eventBoundaryIterations || 0;
+              predictionInvalidations += eventStep.predictionInvalidations || 0;
             } else {
               update(tickSeconds * currentBatchTicks, true);
               simulationIterations += 1;
+              guardedFallbackIterations += 1;
               if (currentBatchTicks > 1) {
                 bulkIterations += 1;
                 bulkProcessedTicks += currentBatchTicks;
@@ -1920,6 +2095,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
             offlineDiagnostics.processedTicks = processedTicks;
             offlineDiagnostics.simulationIterations = simulationIterations;
             offlineDiagnostics.fullSimulationIterations = simulationIterations + eventProbeIterations;
+            offlineDiagnostics.eventBoundaryIterations = eventBoundaryIterations;
+            offlineDiagnostics.guardedFallbackIterations = guardedFallbackIterations;
+            offlineDiagnostics.predictionInvalidations = predictionInvalidations;
             offlineDiagnostics.eventProbeIterations = eventProbeIterations;
             offlineDiagnostics.bulkProcessedTicks = bulkProcessedTicks;
             offlineDiagnostics.bulkIterations = bulkIterations;
@@ -2014,6 +2192,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       offlineDiagnostics.processedTicks = processedTicks;
       offlineDiagnostics.simulationIterations = simulationIterations;
       offlineDiagnostics.fullSimulationIterations = simulationIterations + eventProbeIterations;
+      offlineDiagnostics.eventBoundaryIterations = eventBoundaryIterations;
+      offlineDiagnostics.guardedFallbackIterations = guardedFallbackIterations;
+      offlineDiagnostics.predictionInvalidations = predictionInvalidations;
       offlineDiagnostics.eventProbeIterations = eventProbeIterations;
       offlineDiagnostics.bulkProcessedTicks = bulkProcessedTicks;
       offlineDiagnostics.bulkIterations = bulkIterations;
