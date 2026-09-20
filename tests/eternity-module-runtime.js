@@ -822,6 +822,62 @@ async function testQualifiedLoadAndImportDoNotAutoEternity() {
   assert.equal(importTarget.runtime.canEternity(), true, "imported qualified state should remain ready for explicit Eternity");
 }
 
+async function loadSaveWithEternityCount(eternityCount, configure) {
+  const source = await loadRuntime(candidatePath);
+  const { debug, runtime } = source;
+  runtime.setExactIntegerState(debug.state, "eternityCountExact", "eternityCount", BigInt(eternityCount));
+  configure?.(runtime, debug.state);
+  const saveData = runtime.serializeSaveData();
+  saveData.savedAt = Date.now();
+  saveData.serverSavedAt = 0;
+  return loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(saveData)]]));
+}
+
+async function testLoadNormalizesPersistentMilestoneCompletion() {
+  const challengeTimes = [1, 2, 3, 4, 5, 6, 100, 8];
+  const em2 = await loadSaveWithEternityCount(5, (runtime, state) => {
+    runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 1n);
+    Object.assign(state, {
+      infinityUpgradeMask: 1 << 5,
+      completedChallenges: 0,
+      activeChallenge: 7,
+      activeChallengeTime: 12,
+      fastestInfinityChallengeTimes: challengeTimes,
+    });
+  });
+  assert.equal(em2.runtime.eternityMilestoneActive("2"), true, "EM2 should remain active after load");
+  assert.equal(em2.debug.state.completedChallenges, 1 << (7 - 1), "EM2 load should restore the IC7 completion bit");
+  assert.equal(em2.debug.state.activeChallenge, 7, "EM2 normalization must not clear a valid active IC");
+  assert.ok(em2.debug.state.activeChallengeTime >= 12, "EM2 normalization must preserve active IC time");
+  assert.deepEqual(Array.from(em2.debug.state.fastestInfinityChallengeTimes), challengeTimes, "EM2 normalization must preserve IC clear times");
+
+  const allChallengesMask = (1 << 8) - 1;
+  const em6Empty = await loadSaveWithEternityCount(27, (runtime, state) => {
+    Object.assign(state, {
+      completedChallenges: 0,
+      completedTowerChallenges: 1 << 1,
+    });
+  });
+  assert.equal(em6Empty.debug.state.completedChallenges, allChallengesMask, "EM6 load should complete IC1 through IC8 from an empty mask");
+  assert.equal(em6Empty.debug.state.completedTowerChallenges, 1 << 1, "EM6 normalization must not alter Tower Challenge state");
+
+  const em6Partial = await loadSaveWithEternityCount(27, (runtime, state) => {
+    Object.assign(state, {
+      completedChallenges: (1 << 0) | (1 << 7),
+      fastestInfinityChallengeTimes: challengeTimes,
+    });
+  });
+  assert.equal(em6Partial.debug.state.completedChallenges, allChallengesMask, "EM6 load should fill a partial IC mask");
+  assert.deepEqual(Array.from(em6Partial.debug.state.fastestInfinityChallengeTimes), challengeTimes, "EM6 normalization must preserve IC clear times");
+
+  const em9 = await loadSaveWithEternityCount(108, (runtime) => {
+    runtime.syncInfinityPointCachesFromExact(500n);
+  });
+  assert.equal(em9.runtime.eternityMilestoneActive("9"), true, "EM9 should remain active after load");
+  assert.equal(em9.runtime.currentExactInfinityPoints(), 500n, "load must not re-grant EM9's run-start IP");
+  assert.equal(em9.debug.state.infinityPointsExact, "500", "load must preserve the current exact IP below the EM9 grant");
+}
+
 async function testInfinityCompletionMakesEternityAvailable() {
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
@@ -1026,6 +1082,7 @@ async function runEternityModuleRuntimeTest() {
   await testMilestoneThresholdsAndEffects();
   await testMilestoneEightCoexistsWithLayerAutomation();
   await testMilestoneTwoCompletionState();
+  await testLoadNormalizesPersistentMilestoneCompletion();
   await testMilestoneFiveInfinityUpgradeAutomation();
   await testMilestoneSixCompletionState();
   await testMilestoneFiveAndSixAutomationBoundaries();
