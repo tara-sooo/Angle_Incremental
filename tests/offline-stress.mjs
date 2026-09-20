@@ -454,6 +454,54 @@ async function measureOfflineStress(page) {
       setLogState("generationScore", 20);
     }
 
+    function configureGenerationCoreBoostDifferential(ticks) {
+      configureDifferentialBase(ticks);
+      Object.assign(state, {
+        generationCount: 1,
+        automationEnabled: true,
+        autoRunGeneration: true,
+        autoRunCoreBoost: true,
+        achievementMask: 1 << (19 - 1),
+        autoGenerationScoreMultiplierThreshold: 0,
+        autoGenerationCostMultiplierThreshold: 0,
+        autoGenerationMinimumSeconds: 0,
+        autoGenerationLegacyOrMode: false,
+      });
+      setLogState("score", 20);
+      setLogState("totalScore", 20);
+      setLogState("generationScore", 20);
+    }
+
+    function configureAutoInfinityGenerationDifferential(ticks) {
+      configureAutoInfinityVariant(ticks);
+      Object.assign(state, {
+        autoRunGeneration: true,
+        autoGenerationScoreMultiplierThreshold: 0,
+        autoGenerationCostMultiplierThreshold: 0,
+        autoGenerationMinimumSeconds: 0,
+        autoGenerationLegacyOrMode: false,
+      });
+    }
+
+    function configureAutoInfinityCoreBoostDifferential(ticks) {
+      configureAutoInfinityVariant(ticks);
+      Object.assign(state, {
+        generationCount: 1,
+        autoRunCoreBoost: true,
+      });
+    }
+
+    function configureAutoInfinityGenerationCoreBoostDifferential(ticks) {
+      configureAutoInfinityGenerationDifferential(ticks);
+      state.generationCount = 1;
+      state.autoRunCoreBoost = true;
+    }
+
+    function configureGenerationUnsupportedChallengeDifferential(ticks) {
+      configureGenerationDifferential(ticks);
+      state.activeChallenge = 5;
+    }
+
     async function runDifferential(
       name,
       configure,
@@ -632,6 +680,7 @@ async function measureOfflineStress(page) {
           aggregatedTicks: runtime.offlineDiagnostics?.aggregatedTicks ?? 0,
           cyclesAggregated: runtime.offlineDiagnostics?.cyclesAggregated ?? 0,
           eventBoundaryCount: runtime.offlineDiagnostics?.eventBoundaryCount ?? 0,
+          eventProbeIterations: runtime.offlineDiagnostics?.eventProbeIterations ?? 0,
           precisionReduced: runtime.offlineDiagnostics?.precisionReduced ?? false,
           wallTimeMs: runtime.offlineDiagnostics?.wallTimeMs ?? (performance.now() - startedAt),
           wallMilliseconds: performance.now() - startedAt,
@@ -866,6 +915,7 @@ async function measureOfflineStress(page) {
           cyclesAggregated: diagnostics?.cyclesAggregated ?? 0,
           cycleFallbackReason: diagnostics?.cycleFallbackReason ?? "",
           eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+          eventProbeIterations: diagnostics?.eventProbeIterations ?? 0,
           precisionReduced: report?.precisionReduced ?? false,
           work: runtime.offlineWorkStats,
           wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
@@ -877,6 +927,90 @@ async function measureOfflineStress(page) {
         four: await measure(4, "performance-four-hit-offline-work"),
         eight: await measure(8, "performance-eight-hit-offline-work"),
         high: await measure(16, "performance-high-load-offline-work"),
+      };
+    }
+
+    function configureGenerationCoreAutomationMillion(mode) {
+      resetScenario(3);
+      Object.assign(state, {
+        activeChallenge: 0,
+        activeTowerChallenge: 0,
+        automationEnabled: true,
+        autoRunInfinity: false,
+        autoRunGeneration: mode === "generation" || mode === "combined",
+        autoRunCoreBoost: mode === "coreBoost" || mode === "combined",
+        autoGenerationScoreMultiplierThreshold: 0,
+        autoGenerationCostMultiplierThreshold: 0,
+        autoGenerationMinimumSeconds: 0,
+        autoGenerationLegacyOrMode: false,
+        achievementMask: 1 << (19 - 1),
+        infinityCount: 1,
+        generationCount: mode === "generation" ? 0 : 1,
+        coreBoostCount: 0,
+        infiniteAngleUnlocked: false,
+        speedLevel: 0,
+        gainLevel: 0,
+        offlineProgressEnabled: true,
+        offlineTickCount: runtime.OFFLINE_PROGRESS_MAX_TICKS,
+        timelinePurchasedNodes: [],
+      });
+      state.autoBuySpeed = false;
+      state.autoBuyVertex = false;
+      state.autoBuyGain = false;
+      state.autoBuyInfinityUpgrades = false;
+      state.autoBuildTower = false;
+      state.autoBuyInfiniteAngleSpeed = false;
+      state.autoBuyInfiniteAngleVertex = false;
+      state.autoBuyInfiniteAngleGain = false;
+      runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 1n);
+      runtime.setExactIntegerState(state, "speedLevelExact", "speedLevel", 0n);
+      runtime.setExactIntegerState(state, "gainLevelExact", "gainLevel", 0n);
+      setLogState("score", mode === "generation" ? 8 : 20);
+      setLogState("totalScore", mode === "generation" ? 8 : 20);
+      setLogState("generationScore", mode === "generation" ? 8 : 20);
+      return 1 / 30;
+    }
+
+    async function measureGenerationCoreAutomationMillion() {
+      const measure = async (mode) => {
+        const tickSeconds = configureGenerationCoreAutomationMillion(mode);
+        const startedAt = performance.now();
+        const report = await debug.processOfflineElapsed(
+          tickSeconds * runtime.OFFLINE_PROGRESS_MAX_TICKS,
+          "performance-" + mode + "-automation-million",
+          { clockSource: "server" },
+        );
+        const diagnostics = runtime.offlineDiagnostics;
+        const work = runtime.offlineWorkStats;
+        const fallbackIterations = (work?.tracks?.angle?.fallbackIterations ?? 0)
+          + (work?.tracks?.infiniteAngle?.fallbackIterations ?? 0);
+        return {
+          mode,
+          requestedTicks: report?.requestedTicks ?? 0,
+          processedTicks: report?.processedTicks ?? 0,
+          simulationIterations: report?.simulationIterations ?? 0,
+          fullSimulationIterations: diagnostics?.fullSimulationIterations ?? report?.simulationIterations ?? 0,
+          eventProbeIterations: diagnostics?.eventProbeIterations ?? 0,
+          bulkIterations: diagnostics?.bulkIterations ?? 0,
+          bulkProcessedTicks: diagnostics?.bulkProcessedTicks ?? 0,
+          fallbackIterations,
+          eventBoundaryCount: diagnostics?.eventBoundaryCount ?? 0,
+          precisionReduced: diagnostics?.precisionReduced ?? false,
+          eventCounts: diagnostics?.eventCounts ?? {},
+          work,
+          wallTimeMs: diagnostics?.wallTimeMs ?? (performance.now() - startedAt),
+          wallMilliseconds: performance.now() - startedAt,
+          final: {
+            generationCount: state.generationCount,
+            coreBoostCount: state.coreBoostCount,
+            infinityCountExact: state.infinityCountExact,
+          },
+        };
+      };
+      return {
+        generation: await measure("generation"),
+        coreBoost: await measure("coreBoost"),
+        combined: await measure("combined"),
       };
     }
     async function measureQuietOfflineResume(requestedTicks) {
@@ -1175,6 +1309,7 @@ async function measureOfflineStress(page) {
       aggregatedTicks: offlineDiagnostics?.aggregatedTicks ?? 0,
       cyclesAggregated: offlineDiagnostics?.cyclesAggregated ?? 0,
       eventBoundaryCount: offlineDiagnostics?.eventBoundaryCount ?? 0,
+      eventProbeIterations: offlineDiagnostics?.eventProbeIterations ?? 0,
       precisionReduced: offlineDiagnostics?.precisionReduced ?? false,
       processingMilliseconds: offlineReport?.processingMilliseconds ?? NaN,
       wallTimeMs: offlineDiagnostics?.wallTimeMs ?? (performance.now() - offlineStartedAt),
@@ -1231,6 +1366,34 @@ async function measureOfflineStress(page) {
       ),
       generation: await runDifferential("generation", configureGenerationDifferential, 120),
       coreBoost: await runDifferential("core-boost", configureCoreBoostDifferential, 120),
+      generationCoreBoost: await runDifferential(
+        "generation-core-boost",
+        configureGenerationCoreBoostDifferential,
+        120,
+      ),
+      autoInfinityGeneration: await runDifferential(
+        "auto-infinity-generation",
+        configureAutoInfinityGenerationDifferential,
+        24,
+        { reprimeScore: true, aggregateHistory: true },
+      ),
+      autoInfinityCoreBoost: await runDifferential(
+        "auto-infinity-core-boost",
+        configureAutoInfinityCoreBoostDifferential,
+        24,
+        { reprimeScore: true, aggregateHistory: true },
+      ),
+      autoInfinityGenerationCoreBoost: await runDifferential(
+        "auto-infinity-generation-core-boost",
+        configureAutoInfinityGenerationCoreBoostDifferential,
+        24,
+        { reprimeScore: true, aggregateHistory: true },
+      ),
+      generationUnsupportedChallenge: await runDifferential(
+        "generation-unsupported-challenge",
+        configureGenerationUnsupportedChallengeDifferential,
+        24,
+      ),
     };
     const rendered = JSON.parse(window.render_game_to_text());
     return {
@@ -1242,6 +1405,11 @@ async function measureOfflineStress(page) {
         differential,
         generationAutomation: await measureEventfulBaseline("generation", 120, configureGenerationDifferential),
         coreBoostAutomation: await measureEventfulBaseline("core-boost", 120, configureCoreBoostDifferential),
+        generationCoreBoostAutomation: await measureEventfulBaseline(
+          "generation-core-boost",
+          120,
+          configureGenerationCoreBoostDifferential,
+        ),
         lateEternityAutomation: await measureEventfulBaseline(
           "late-eternity",
           120,
@@ -1254,6 +1422,7 @@ async function measureOfflineStress(page) {
         },
         infiniteAngleExactWork: measureInfiniteAngleExactWorkBudget(),
         longResumeWork: await measureLongOfflineResumeWork(),
+        generationCoreAutomationMillion: await measureGenerationCoreAutomationMillion(),
         quietResume: {
           1000: await measureQuietOfflineResume(1000),
           10000: await measureQuietOfflineResume(10000),
@@ -1296,7 +1465,23 @@ try {
       viewport: { name: "desktop", width: 1280, height: 800 },
       deviceScaleFactor: 1,
       preparation: "unmeasured 3/720/10000 Angle and Infinite Angle updates prime the progressed achievement state used by the original boundary coverage",
-      scenarios: ["offline-processing", "differential-guarded-canonical", "auto-infinity-cycle", "auto-infinity-million", "auto-infinity-fallbacks", "generation-automation-baseline", "core-boost-automation-baseline", "late-eternity-automation-baseline", "core-hit-boundary", "infinite-angle-exact-work", "long-resume", "quiet-resume-scale", "timeline-enabled"],
+      scenarios: [
+        "offline-processing",
+        "differential-guarded-canonical",
+        "auto-infinity-cycle",
+        "auto-infinity-million",
+        "auto-infinity-fallbacks",
+        "generation-core-boost-event-differentials",
+        "generation-automation-baseline",
+        "core-boost-automation-baseline",
+        "late-eternity-automation-baseline",
+        "generation-core-boost-automation-million",
+        "core-hit-boundary",
+        "infinite-angle-exact-work",
+        "long-resume",
+        "quiet-resume-scale",
+        "timeline-enabled",
+      ],
       baselinePolicy: "eventful scenarios are baseline-only observations; they are not release performance targets",
       differentialPolicy: {
         exact: "discrete counts, levels, unlocks, masks, challenges, achievements, timers/history, and automation settings; aggregate-history paths retain only canonical material entries",
@@ -1329,8 +1514,8 @@ try {
   assert.ok(report.offlineProcessing.bulkIterations > 0, "the real quiet offline path should use bulk iterations");
   assert.equal(
     report.offlineProcessing.fullSimulationIterations,
-    report.offlineProcessing.simulationIterations,
-    "the internal full-simulation diagnostic should mirror the existing iteration count",
+    report.offlineProcessing.simulationIterations + report.offlineProcessing.eventProbeIterations,
+    "the full-simulation diagnostic should include committed and speculative iterations",
   );
   assert.ok(report.offlineProcessing.eventBoundaryCount >= 0, "the offline path should expose an event-boundary count");
   assert.ok(Number.isFinite(report.offlineProcessing.wallTimeMs), "the offline path should expose finite diagnostic wall time");
@@ -1382,6 +1567,7 @@ try {
   for (const [name, baseline] of Object.entries({
     generation: report.offlineStress.generationAutomation,
     coreBoost: report.offlineStress.coreBoostAutomation,
+    generationCoreBoost: report.offlineStress.generationCoreBoostAutomation,
     lateEternity: report.offlineStress.lateEternityAutomation,
   })) {
     assert.equal(baseline.baselineOnly, true, `${name} automation should be marked baseline-only`);
@@ -1393,6 +1579,11 @@ try {
   }
   assert.ok(report.offlineStress.generationAutomation.eventCounts.generationResets > 0, "Generation baseline should observe a Generation reset");
   assert.ok(report.offlineStress.coreBoostAutomation.eventCounts.coreBoostResets > 0, "Core Boost baseline should observe a Core Boost reset");
+  assert.ok(
+    report.offlineStress.generationCoreBoostAutomation.eventCounts.generationResets > 0
+      && report.offlineStress.generationCoreBoostAutomation.eventCounts.coreBoostResets > 0,
+    "combined baseline should observe both canonical reset events",
+  );
   assert.ok(
     report.offlineStress.lateEternityAutomation.eventCounts.infinityExecutions > 0
       || report.offlineStress.lateEternityAutomation.eventCounts.generationResets > 0
@@ -1407,6 +1598,14 @@ try {
     assert.equal(result.accelerated.diagnostics.processedTicks, result.requestedTicks, `${name} differential should expose processed tick diagnostics`);
     assert.ok(result.accelerated.work.totalIterations <= result.accelerated.work.hardCap, `${name} differential work should stay within its hard cap`);
     assert.equal(result.accelerated.diagnostics.precisionReduced, result.accelerated.work.precisionReduced, `${name} differential precision status should match its work ledger`);
+  }
+  for (const result of Object.values(report.offlineStress.differential)) {
+    assert.equal(
+      result.accelerated.diagnostics.fullSimulationIterations,
+      result.accelerated.diagnostics.simulationIterations
+        + result.accelerated.diagnostics.eventProbeIterations,
+      "differential diagnostics should separate committed and probe iterations",
+    );
   }
   for (const key of ["fullSimulationIterations", "eventBoundaryCount", "wallTimeMs", "eventCounts"]) {
     assert.equal(report.playerFacingOfflineReportKeys.includes(key), false, `player-facing offline reports must omit ${key}`);
@@ -1470,6 +1669,38 @@ try {
     longResumeWork.high.work.tracks.angle.fallbackIterations <= 1000000
       && longResumeWork.high.work.tracks.infiniteAngle.fallbackIterations <= 1000000,
     "high-load fallback work should stay bounded by the resume length",
+  );
+  const generationCoreAutomationMillion = report.offlineStress.generationCoreAutomationMillion;
+  for (const measurement of Object.values(generationCoreAutomationMillion)) {
+    assert.equal(measurement.requestedTicks, 1000000, "automation million runs should request one million ticks");
+    assert.equal(measurement.processedTicks, 1000000, "automation million runs should process one million ticks");
+    assert.ok(measurement.simulationIterations < measurement.requestedTicks, "automation million runs should reduce committed updates");
+    assert.equal(
+      measurement.fullSimulationIterations,
+      measurement.simulationIterations + measurement.eventProbeIterations,
+      "automation million runs should account for speculative probe iterations",
+    );
+    assert.ok(measurement.bulkIterations > 0, "automation million runs should use stable bulk intervals");
+    assert.ok(measurement.eventBoundaryCount > 0, "automation million runs should commit event boundaries");
+    assert.equal(
+      measurement.processedTicks,
+      measurement.bulkProcessedTicks + measurement.simulationIterations - measurement.bulkIterations,
+      "automation million runs should account for bulk and boundary commits",
+    );
+    assert.ok(Number.isFinite(measurement.wallMilliseconds), "automation million runs should report finite wall time");
+  }
+  assert.ok(
+    generationCoreAutomationMillion.generation.eventCounts.generationResets > 0,
+    "Generation-heavy automation should execute Generation",
+  );
+  assert.ok(
+    generationCoreAutomationMillion.coreBoost.eventCounts.coreBoostResets > 0,
+    "Core-Boost-heavy automation should execute Core Boost",
+  );
+  assert.ok(
+    generationCoreAutomationMillion.combined.eventCounts.generationResets > 0
+      && generationCoreAutomationMillion.combined.eventCounts.coreBoostResets > 0,
+    "combined automation should execute both canonical reset paths",
   );
   const quietResume = report.offlineStress.quietResume;
   for (const [ticks, resume] of Object.entries(quietResume)) {

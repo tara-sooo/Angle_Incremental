@@ -69,6 +69,7 @@ let localClockAnchor = null;
 let offlineProcessPromise = null;
 let offlineWorkLedger = null;
 let offlineDiagnostics = null;
+let offlineEventProbeActive = false;
 const OFFLINE_PROCESS_TIME_BUDGET_MS = 8;
 const OFFLINE_PROCESS_INITIAL_BATCH_TICKS = 64;
 const OFFLINE_PROCESS_TARGET_BATCH_MS = 2;
@@ -84,6 +85,69 @@ const OFFLINE_EVENT_KEYS = Object.freeze([
   "towerBuilds",
   "automaticUnlocks",
   "automaticCompletions",
+]);
+const OFFLINE_EVENT_SIGNATURE_KEYS = Object.freeze([
+  "verticesExact",
+  "vertices",
+  "ic8VertexUpgradeLevelExact",
+  "ic8VertexUpgradeLevel",
+  "speedLevelExact",
+  "speedLevel",
+  "gainLevelExact",
+  "gainLevel",
+  "generationCount",
+  "coreBoostCount",
+  "infinityCountExact",
+  "infinityCount",
+  "infinityPointsExact",
+  "eternityCountExact",
+  "eternityCount",
+  "generationScoreMultiplierLog10",
+  "generationCostFactor",
+  "previousGenerationScoreLog10",
+  "infinityUpgradeMask",
+  "ipGainUpgradeLevel",
+  "infiniteAngleUpgradeLevel",
+  "softcapUpgradeLevel",
+  "tc4BaseGainLevel",
+  "tc4BaseGainPriceStep",
+  "tc4InfinityScoreVertexGainLevel",
+  "tc4InfinityScoreVertexGainPriceStep",
+  "tc4FreeCoreBoostLevel",
+  "tc4FreeCoreBoostPriceStep",
+  "towerFloor",
+  "activeChallenge",
+  "completedChallenges",
+  "activeTowerChallenge",
+  "completedTowerChallenges",
+  "infiniteCapBroken",
+  "infiniteAngleUnlocked",
+  "scoreUnlocked",
+  "generationUnlocked",
+  "coreBoostUnlocked",
+  "infinityUnlocked",
+  "eternityUnlocked",
+  "unlockedMainTabs",
+  "achievementMask",
+  "achievementMaskHigh",
+  "eternityMilestoneMask",
+  "eternityMilestoneChoice",
+  "timelinePurchasedNodes",
+  "noGenerationCoreBoostReached",
+  "currentInfinityRunHadGeneration",
+  "currentInfinityRunHadCoreBoost",
+  "automationEnabled",
+  "autoBuySpeed",
+  "autoBuyVertex",
+  "autoBuyGain",
+  "autoBuyInfinityUpgrades",
+  "autoBuildTower",
+  "autoRunGeneration",
+  "autoRunCoreBoost",
+  "autoRunInfinity",
+  "autoBuyInfiniteAngleSpeed",
+  "autoBuyInfiniteAngleVertex",
+  "autoBuyInfiniteAngleGain",
 ]);
 const requestNextFrame = window.requestAnimationFrame
   ? window.requestAnimationFrame.bind(window)
@@ -110,6 +174,7 @@ function beginOfflineDiagnostics(requestedTicks) {
   offlineDiagnostics = {
     requestedTicks,
     processedTicks: 0,
+    simulationIterations: 0,
     fullSimulationIterations: 0,
     bulkProcessedTicks: 0,
     bulkIterations: 0,
@@ -117,6 +182,7 @@ function beginOfflineDiagnostics(requestedTicks) {
     cyclesAggregated: 0,
     cycleFallbackReason: "",
     eventBoundaryCount: 0,
+    eventProbeIterations: 0,
     wallTimeMs: 0,
     precisionReduced: false,
     eventCounts: createOfflineEventCounts(),
@@ -124,7 +190,7 @@ function beginOfflineDiagnostics(requestedTicks) {
 }
 
 function recordOfflineEvent(name, count = 1) {
-  if (!offlineProcessing || !offlineDiagnostics || !OFFLINE_EVENT_KEYS.includes(name)) return;
+  if (offlineEventProbeActive || !offlineProcessing || !offlineDiagnostics || !OFFLINE_EVENT_KEYS.includes(name)) return;
   const normalizedCount = Math.max(0, Math.floor(Number(count) || 0));
   offlineDiagnostics.eventCounts[name] += normalizedCount;
 }
@@ -134,6 +200,7 @@ function offlineDiagnosticsSnapshot() {
   return {
     requestedTicks: offlineDiagnostics.requestedTicks,
     processedTicks: offlineDiagnostics.processedTicks,
+    simulationIterations: offlineDiagnostics.simulationIterations,
     fullSimulationIterations: offlineDiagnostics.fullSimulationIterations,
     bulkProcessedTicks: offlineDiagnostics.bulkProcessedTicks,
     bulkIterations: offlineDiagnostics.bulkIterations,
@@ -141,10 +208,25 @@ function offlineDiagnosticsSnapshot() {
     cyclesAggregated: offlineDiagnostics.cyclesAggregated,
     cycleFallbackReason: offlineDiagnostics.cycleFallbackReason,
     eventBoundaryCount: offlineDiagnostics.eventBoundaryCount,
+    eventProbeIterations: offlineDiagnostics.eventProbeIterations,
     wallTimeMs: offlineDiagnostics.wallTimeMs,
     precisionReduced: offlineDiagnostics.precisionReduced,
     eventCounts: { ...offlineDiagnostics.eventCounts },
   };
+}
+
+function cloneOfflineDiagnostics(value) {
+  if (!value) return null;
+  return {
+    ...value,
+    eventCounts: { ...(value.eventCounts || {}) },
+  };
+}
+
+function offlineEventStateSignature(snapshot = runtime.snapshotRuntimeState()) {
+  return JSON.stringify(
+    OFFLINE_EVENT_SIGNATURE_KEYS.map((key) => [key, snapshot[key]]),
+  );
 }
 
 function beginOfflineWorkBudget(requestedTicks = runtime.OFFLINE_PROGRESS_MAX_TICKS) {
@@ -314,6 +396,18 @@ function offlineWorkStatsSnapshot() {
   };
 }
 
+function cloneOfflineWorkLedger(value = offlineWorkLedger) {
+  if (!value) return null;
+  return {
+    ...value,
+    activeTrackNames: [...value.activeTrackNames],
+    shared: { ...value.shared },
+    tracks: Object.fromEntries(
+      Object.entries(value.tracks).map(([name, track]) => [name, { ...track }]),
+    ),
+  };
+}
+
 function offlineBulkSimulationAllowed() {
   const state = runtime.state;
   return runtime.currentExactIntegerState(state, "infinityCountExact", "infinityCount") > 0n
@@ -350,6 +444,7 @@ function queueSimulationSave(reason = "auto") {
 }
 
 function batchedUpdateUi(...args) {
+  if (offlineEventProbeActive) return undefined;
   if (simulationBatchActive() || offlineProcessing) {
     simulationUiPending = true;
     return undefined;
@@ -361,6 +456,7 @@ function batchedUpdateUi(...args) {
 }
 
 function batchedSaveGame(reason = "auto", options = {}) {
+  if (offlineEventProbeActive) return true;
   if (simulationBatchActive()) {
     queueSimulationSave(reason);
     return true;
@@ -1276,6 +1372,127 @@ function tryOfflineInfinityCyclePath(tickSeconds, requestedTicks, bestRate, rate
   };
 }
 
+function offlineGenerationCoreEventPathEligible(tickSeconds, remainingTicks) {
+  const state = runtime.state;
+  if (!Number.isFinite(tickSeconds) || tickSeconds <= 0 || remainingTicks < 2) return false;
+  if (!state.automationEnabled || runtime.isAchievementUnlocked?.(19) !== true) return false;
+  if (!state.autoRunGeneration && !state.autoRunCoreBoost) return false;
+  if (state.activeChallenge > 0 || state.activeTowerChallenge > 0) return false;
+  if (state.eternityMilestoneMask !== 0) return false;
+  if (Array.isArray(state.timelinePurchasedNodes) && state.timelinePurchasedNodes.length > 0) return false;
+  return ![
+    "autoBuySpeed",
+    "autoBuyVertex",
+    "autoBuyGain",
+    "autoBuyInfinityUpgrades",
+    "autoBuildTower",
+    "autoBuyInfiniteAngleSpeed",
+    "autoBuyInfiniteAngleVertex",
+    "autoBuyInfiniteAngleGain",
+  ].some((field) => state[field]);
+}
+
+function snapshotOfflineEventProbe() {
+  return {
+    state: runtime.snapshotRuntimeState(),
+    normalAutobuyElapsed,
+    offlineDiagnostics: cloneOfflineDiagnostics(offlineDiagnostics),
+    offlineWorkLedger: cloneOfflineWorkLedger(),
+    offlineReport,
+    simulationUiPending,
+    simulationSaveReason,
+  };
+}
+
+function restoreOfflineEventProbe(snapshot) {
+  runtime.restoreRuntimeState(snapshot.state);
+  normalAutobuyElapsed = snapshot.normalAutobuyElapsed;
+  offlineDiagnostics = cloneOfflineDiagnostics(snapshot.offlineDiagnostics);
+  offlineWorkLedger = cloneOfflineWorkLedger(snapshot.offlineWorkLedger);
+  offlineReport = snapshot.offlineReport;
+  simulationUiPending = snapshot.simulationUiPending;
+  simulationSaveReason = snapshot.simulationSaveReason;
+}
+
+function probeOfflineEventInterval(snapshot, seconds, baselineSignature) {
+  let changed = false;
+  offlineEventProbeActive = true;
+  try {
+    update(seconds, true);
+    changed = offlineEventStateSignature() !== baselineSignature;
+  } finally {
+    try {
+      restoreOfflineEventProbe(snapshot);
+    } finally {
+      offlineEventProbeActive = false;
+    }
+  }
+  return changed;
+}
+
+function tryOfflineGenerationCoreEventPath(tickSeconds, remainingTicks, batchTicks) {
+  const eligible = offlineGenerationCoreEventPathEligible(tickSeconds, remainingTicks);
+  if (!eligible) return { used: false, safe: false, eligible: false, reason: "eligibility-guard" };
+
+  const requestedBatchTicks = Number.isFinite(batchTicks) ? Math.floor(batchTicks) : 64;
+  const candidateTicks = Math.min(
+    remainingTicks,
+    Math.max(2, requestedBatchTicks),
+  );
+  if (candidateTicks < 2 || !offlineProgressNumericallySafe(tickSeconds * candidateTicks)) {
+    return { used: false, safe: false, eligible: true, reason: "numeric-guard" };
+  }
+
+  const startingSnapshot = snapshotOfflineEventProbe();
+  const baselineSignature = offlineEventStateSignature(startingSnapshot.state);
+  let eventProbeIterations = 0;
+  const probe = (ticks) => {
+    eventProbeIterations += 1;
+    return probeOfflineEventInterval(
+      startingSnapshot,
+      tickSeconds * ticks,
+      baselineSignature,
+    );
+  };
+
+  if (!probe(candidateTicks)) {
+    update(tickSeconds * candidateTicks, true);
+    return {
+      used: true,
+      safe: true,
+      eligible: true,
+      processedTicks: candidateTicks,
+      simulationIterations: 1,
+      bulkIterations: candidateTicks > 1 ? 1 : 0,
+      bulkProcessedTicks: candidateTicks > 1 ? candidateTicks : 0,
+      eventBoundaryCount: 0,
+      eventProbeIterations,
+    };
+  }
+
+  let low = 1;
+  let high = candidateTicks;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (probe(middle)) high = middle;
+    else low = middle + 1;
+  }
+
+  restoreOfflineEventProbe(startingSnapshot);
+  update(tickSeconds * low, true);
+  return {
+    used: true,
+    safe: true,
+    eligible: true,
+    processedTicks: low,
+    simulationIterations: 1,
+    bulkIterations: low > 1 ? 1 : 0,
+    bulkProcessedTicks: low > 1 ? low : 0,
+    eventBoundaryCount: 1,
+    eventProbeIterations,
+  };
+}
+
 function offlineProgressNumericallySafe(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return false;
   if (!Number.isFinite(runtime.state.totalPlayTime + seconds)) return false;
@@ -1566,6 +1783,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     let cycleAggregatedCountExact = 0n;
     let precisionReduced = false;
     let eventBoundaryCount = 0;
+    let eventProbeIterations = 0;
     offlineDiagnostics = null;
 
     if (!clockAnomaly) {
@@ -1635,6 +1853,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           let lastBatchFinishedAt = null;
           let budgetStartedAt = monotonicClockNow();
           let lastProgressUiAt = budgetStartedAt;
+          let eventPathDisabled = false;
           const cyclePath = tryOfflineInfinityCyclePath(
             tickSeconds,
             requestedTicks,
@@ -1648,7 +1867,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           cyclesAggregated += cyclePath.cyclesAggregated || 0;
           cycleAggregatedCountExact += cyclePath.aggregatedCountExact || 0n;
           offlineDiagnostics.processedTicks = processedTicks;
+          offlineDiagnostics.simulationIterations = simulationIterations;
           offlineDiagnostics.fullSimulationIterations = simulationIterations;
+          offlineDiagnostics.eventProbeIterations = eventProbeIterations;
           offlineDiagnostics.aggregatedTicks = aggregatedTicks;
           offlineDiagnostics.cyclesAggregated = cyclesAggregated;
           offlineDiagnostics.cycleFallbackReason = cyclePath.reason || "";
@@ -1656,29 +1877,50 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           while (processedTicks < requestedTicks) {
             const batchStartedAt = monotonicClockNow();
             const remainingTicks = requestedTicks - processedTicks;
+            let eventStep = null;
+            if (!eventPathDisabled) {
+              eventStep = tryOfflineGenerationCoreEventPath(
+                tickSeconds,
+                remainingTicks,
+                Math.max(64, batchTicks),
+              );
+              if (eventStep.eligible === true && eventStep.safe === false) eventPathDisabled = true;
+            }
             const clockHasNotAdvanced = lastBatchFinishedAt !== null
               && batchStartedAt === lastBatchFinishedAt;
-            const currentBatchTicks = Math.min(
-              batchTicks,
-              remainingTicks,
-              offlineBulkTickLimit(tickSeconds, remainingTicks),
-              clockHasNotAdvanced
-                ? Math.max(1, OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT - zeroClockTicksSinceYield)
-                : remainingTicks,
-            );
+            const currentBatchTicks = eventStep?.used
+              ? eventStep.processedTicks
+              : Math.min(
+                batchTicks,
+                remainingTicks,
+                offlineBulkTickLimit(tickSeconds, remainingTicks),
+                clockHasNotAdvanced
+                  ? Math.max(1, OFFLINE_PROCESS_ZERO_CLOCK_TICK_LIMIT - zeroClockTicksSinceYield)
+                  : remainingTicks,
+              );
             const batchEnd = processedTicks + currentBatchTicks;
-            update(tickSeconds * currentBatchTicks, true);
-            processedTicks = batchEnd;
-            simulationIterations += 1;
-            if (currentBatchTicks > 1) {
-              bulkIterations += 1;
-              bulkProcessedTicks += currentBatchTicks;
+            if (eventStep?.used) {
+              simulationIterations += eventStep.simulationIterations;
+              eventProbeIterations += eventStep.eventProbeIterations;
+              bulkIterations += eventStep.bulkIterations;
+              bulkProcessedTicks += eventStep.bulkProcessedTicks;
+              eventBoundaryCount += eventStep.eventBoundaryCount;
             } else {
-              eventBoundaryCount += 1;
+              update(tickSeconds * currentBatchTicks, true);
+              simulationIterations += 1;
+              if (currentBatchTicks > 1) {
+                bulkIterations += 1;
+                bulkProcessedTicks += currentBatchTicks;
+              } else {
+                eventBoundaryCount += 1;
+              }
             }
+            processedTicks = batchEnd;
             precisionReduced = Boolean(runtime.offlinePrecisionReduced);
             offlineDiagnostics.processedTicks = processedTicks;
-            offlineDiagnostics.fullSimulationIterations = simulationIterations;
+            offlineDiagnostics.simulationIterations = simulationIterations;
+            offlineDiagnostics.fullSimulationIterations = simulationIterations + eventProbeIterations;
+            offlineDiagnostics.eventProbeIterations = eventProbeIterations;
             offlineDiagnostics.bulkProcessedTicks = bulkProcessedTicks;
             offlineDiagnostics.bulkIterations = bulkIterations;
             offlineDiagnostics.aggregatedTicks = aggregatedTicks;
@@ -1770,7 +2012,9 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     precisionReduced = !clockAnomaly && Boolean(runtime.offlinePrecisionReduced);
     if (offlineDiagnostics) {
       offlineDiagnostics.processedTicks = processedTicks;
-      offlineDiagnostics.fullSimulationIterations = simulationIterations;
+      offlineDiagnostics.simulationIterations = simulationIterations;
+      offlineDiagnostics.fullSimulationIterations = simulationIterations + eventProbeIterations;
+      offlineDiagnostics.eventProbeIterations = eventProbeIterations;
       offlineDiagnostics.bulkProcessedTicks = bulkProcessedTicks;
       offlineDiagnostics.bulkIterations = bulkIterations;
       offlineDiagnostics.aggregatedTicks = aggregatedTicks;
