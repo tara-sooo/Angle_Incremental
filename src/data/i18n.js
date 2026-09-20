@@ -280,8 +280,8 @@ const TEXT = {
       "Eternity MilestonesはEternityを重ねるほど増える恒久的な利便性と強化です。最初の3回は未取得の3種類から1つずつ選び、以降はEternity回数で解放されます。",
     ],
     helpBodyTimeline: [
-      "Timelineは最初のEternity後に見つかり、Time Fragmentsを集めて専用ノードを購入する恒久進行です。Score、IP、Eternityの各トラックからTFを獲得します。",
-      "同じ時代ではRealとParallelのどちらか一方を選びます。Respecは購入済みノードを外してTFを戻しますが、現在のEternity周回をやり直すので、周回を区切るタイミングで使います。",
+      "Timelineは最初のEternity後に解放されます。Score、IP、Eternityの各トラックで条件を満たすとTime Fragments（TF）を獲得でき、Score・IP・EternityはTF獲得で消費されません。TFはTimelineノードの購入に使います。",
+      "同じ時代ではRealとParallelのどちらか一方だけを選べます。Respecは購入済みノードを外してTFを返し、現在のEternity周回をリセットします。",
     ],
     helpBodyResets: [
       "リセットは下位の進行を新しい上位の強化へ交換する仕組みです。リセットする範囲は層ごとに異なり、上位の回数や恒久報酬など一部の進行は保持されます。",
@@ -685,8 +685,8 @@ const TEXT = {
       "Eternity Milestones add permanent quality-of-life and progression benefits. During the first three Eternities, choose one unowned starter milestone per run; later milestones activate from the Eternity count.",
     ],
     helpBodyTimeline: [
-      "Timeline appears after the first Eternity. Earn Time Fragments from its Score, IP, and Eternity tracks, then spend them on nodes that shape future runs.",
-      "Real and Parallel are exclusive within an era. Respec returns spent TF by removing purchased nodes, but it also restarts the current Eternity run, so use it between runs.",
+      "Timeline unlocks after the first Eternity. Meeting the requirements on the Score, IP, and Eternity tracks grants Time Fragments (TF); Score, IP, and Eternity are not consumed when you claim TF. Spend TF on Timeline nodes.",
+      "Within an era, choose either Real or Parallel. Respec removes purchased nodes, refunds their TF, and resets the current Eternity run.",
     ],
     helpBodyResets: [
       "Resets trade lower-layer progress for stronger higher-layer progress. Each layer resets a different scope, while some counts and permanent rewards remain available for the next run.",
