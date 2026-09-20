@@ -555,6 +555,9 @@ function processFirstInfinityCrossingBatch(batches, increaseLog10, plannedBatche
 
   addCurrentGainForVertexSteps(crossing.step);
   const crossingScoreLog = runtime.finalScoreGainFromBaseLog10(runtime.currentGainLog10());
+  if (projectedScoreLogFromRawGain(crossingScoreLog) < runtime.INFINITY_REQUIREMENT_LOG10) {
+    return addFirstInfinityThresholdScore();
+  }
   return runtime.addScore(runtime.valueFromLog10(crossingScoreLog), crossingScoreLog);
 }
 
