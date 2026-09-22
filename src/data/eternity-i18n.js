@@ -1,6 +1,4 @@
-import { runtime } from "../runtime/shared.js";
-
-const ETERNITY_TEXT = {
+export const ETERNITY_TEXT = {
   ja: {
     eternity: "Eternity",
     eternityTab: "Eternity",
@@ -156,7 +154,3 @@ const ETERNITY_TEXT = {
     eternityMilestone10Effect: "Perform Break Eternity",
   },
 };
-
-Object.entries(ETERNITY_TEXT).forEach(([language, strings]) => {
-  if (runtime.TEXT?.[language]) Object.assign(runtime.TEXT[language], strings);
-});

@@ -1,4 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { ETERNITY_TEXT } from "./eternity-i18n.js";
 
 // Localized UI strings and translation lookup.
 
@@ -407,6 +408,7 @@ const TEXT = {
     topBarProgressOption: "進捗状況",
     topBarBlankOption: "ブランク",
     topBarHiddenOption: "隠す",
+    ...ETERNITY_TEXT.ja,
   },
   en: {
     tabAngle: "Angle",
@@ -812,6 +814,7 @@ const TEXT = {
     topBarProgressOption: "Progress",
     topBarBlankOption: "Blank",
     topBarHiddenOption: "Hide",
+    ...ETERNITY_TEXT.en,
   },
 };
 

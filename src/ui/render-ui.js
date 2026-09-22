@@ -1,5 +1,6 @@
 import { runtime, expose } from "../runtime/shared.js";
 import { bindDoubleActivation } from "./node-activation.js?v=0.13.2";
+import { updateEternityUi } from "./render-eternity.js";
 
 // Shared form helpers and the UI update orchestrator.
 
@@ -577,7 +578,10 @@ function updateTimelineUi() {
 }
 
 function updateUi() {
-  if (runtime.offlineProcessing) return;
+  if (runtime.offlineProcessing) {
+    updateEternityUi();
+    return;
+  }
   const currentCostLogs = runtime.costLogs();
   const unlockedAchievementsNow = runtime.checkAchievements(true);
   const discoveredMainTabs = runtime.discoverMainTabs?.() === true;
@@ -782,6 +786,7 @@ function updateUi() {
     rootStyle.setProperty("--fps-counter-height", `${fpsHeight}px`);
   }
   updateSaveRecoveryUi();
+  updateEternityUi();
 }
 
 function setSaveStatus(text) {

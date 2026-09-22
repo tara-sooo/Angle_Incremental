@@ -4,6 +4,11 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const mainSource = fs.readFileSync(path.join(root, "src", "main.js"), "utf8");
+const i18nSource = fs.readFileSync(path.join(root, "src", "data", "i18n.js"), "utf8");
+const eternityI18nSource = fs.readFileSync(path.join(root, "src", "data", "eternity-i18n.js"), "utf8");
+const eventsSource = fs.readFileSync(path.join(root, "src", "ui", "events.js"), "utf8");
+const renderEternitySource = fs.readFileSync(path.join(root, "src", "ui", "render-eternity.js"), "utf8");
+const renderUiSource = fs.readFileSync(path.join(root, "src", "ui", "render-ui.js"), "utf8");
 const imports = [...mainSource.matchAll(/^import "\.\/([^\"]+)";$/gm)]
   .map((entry) => `src/${entry[1]}`);
 const expectedOrder = [
@@ -25,6 +30,7 @@ const expectedOrder = [
   "src/ui/render-automation.js",
   "src/ui/render-offline-report.js",
   "src/ui/render-help.js",
+  "src/ui/render-eternity.js",
   "src/ui/render-ui.js",
   "src/systems/angle.js",
   "src/systems/generation.js",
@@ -42,9 +48,19 @@ assert.deepStrictEqual(
   "ESM side-effect imports must match the canonical runtime order",
 );
 assert.match(mainSource, /^import \{ runtime, expose \} from "\.\/runtime\/shared\.js";/m);
+assert.match(mainSource, /^import "\.\/ui\/render-eternity\.js";$/m);
+assert.match(i18nSource, /^import \{ ETERNITY_TEXT \} from "\.\/eternity-i18n\.js";$/m);
+assert.match(eternityI18nSource, /^export const ETERNITY_TEXT = \{/m);
+assert.doesNotMatch(eternityI18nSource, /runtime|Object\.assign/);
+assert.doesNotMatch(eventsSource, /render-eternity/);
+assert.match(renderUiSource, /^import \{ updateEternityUi \} from "\.\/render-eternity\.js";$/m);
+assert.match(renderUiSource, /updateEternityUi\(\);/);
+assert.doesNotMatch(renderEternitySource, /wrapUpdateUi|runtime\.updateUi\s*=/);
 
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.match(indexSource, /<script type="module" src="src\/main\.js[^\"]*"><\/script>/);
+assert.match(indexSource, /"\.\/src\/data\/eternity-i18n\.js": "\.\/src\/data\/eternity-i18n\.js\?v=0\.13\.2"/);
+assert.match(indexSource, /"\.\/src\/ui\/render-eternity\.js": "\.\/src\/ui\/render-eternity\.js\?v=0\.13\.2"/);
 assert.equal(fs.existsSync(path.join(root, "game.js")), false, "the removed classic entrypoint must stay absent");
 
 for (const moduleName of [
