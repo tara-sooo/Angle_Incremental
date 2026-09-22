@@ -1,5 +1,4 @@
 import { runtime, expose } from "../runtime/shared.js";
-import "../data/eternity-i18n.js?v=0.13.2";
 
 const FIRST_TIER_IDS = Object.freeze(["1-1", "1-2", "1-3"]);
 const MILESTONES = Object.freeze([
@@ -19,7 +18,6 @@ const MILESTONES = Object.freeze([
 
 let eternityRoot = null;
 let eternityTab = null;
-let wrappedUpdateUi = false;
 
 function installEternityStyles() {
   if (document.getElementById("eternityUiStyles")) return;
@@ -229,7 +227,7 @@ function updateMilestoneCard(milestone, availableChoices) {
   }
 }
 
-function updateEternityUi() {
+export function updateEternityUi() {
   if (!installEternityUi()) return;
   const countExact = runtime.currentExactIntegerState(
     runtime.state,
@@ -292,19 +290,7 @@ function updateEternityUi() {
   }
 }
 
-function wrapUpdateUi() {
-  if (wrappedUpdateUi || typeof runtime.updateUi !== "function") return;
-  const baseUpdateUi = runtime.updateUi;
-  runtime.updateUi = (...args) => {
-    const result = baseUpdateUi(...args);
-    updateEternityUi();
-    return result;
-  };
-  wrappedUpdateUi = true;
-}
-
 installEternityUi();
-wrapUpdateUi();
 
 expose("installEternityUi", () => installEternityUi);
 expose("updateEternityUi", () => updateEternityUi);

@@ -21,3 +21,14 @@
 - Reusable lesson: when changing a runtime UI builder, search profile and variant modules for assignments that replace the runtime function; update every active builder or introduce one shared hook only when it removes real duplication.
 - Verification: search assignments to the runtime builder and exercise the shipped balance profile through browser interaction coverage.
 - Last verified: 2026-09-12
+
+### EXP-ARCH-003 — Version checks must follow canonical ESM ownership
+
+- Status: active
+- Scope: ESM composition; import maps; `tests/version-consistency.mjs`
+- Learned from: Issue #430
+- Context: moving Eternity i18n and renderer loading to the canonical composition path made the version check report a missing cache buster on the old side-effect importer.
+- Cause: the check enforced an incidental importer instead of the canonical module and import-map surface.
+- Reusable lesson: when moving a versioned ESM dependency, update checks to validate its new canonical owner and import-map entry; do not preserve a side-effect import solely to satisfy a stale check.
+- Verification: run `npm run check:version` and inspect the owner/import-map path after import-graph changes.
+- Last verified: 2026-09-22
