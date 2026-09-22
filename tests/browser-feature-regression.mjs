@@ -380,10 +380,6 @@ async function runTimelineCopyRegression(browser, origin, httpFailures) {
       const nodeIds = [
         "Real-BC16500",
         "Parallel-BC16500",
-        "Real-BC6000",
-        "Parallel-BC6000",
-        "Real-AD30",
-        "Parallel-AD30",
       ];
       const ownedNodes = nodeIds.map((id) => {
         const node = runtime.timelineNode(id);
@@ -442,38 +438,36 @@ async function runTimelineCopyRegression(browser, origin, httpFailures) {
       switchEternitySubtab("timeline");
       window.advanceTime(0);
       const unpurchased = readNode("Real-BC16500");
-      const missingPrerequisite = readNode("Real-BC6000");
       const japanese = readLanguage("ja");
       const english = readLanguage("en");
+      const renderedNodeIds = Array.from(
+        document.querySelectorAll(".timeline-node[data-timeline-node]"),
+        (node) => node.dataset.timelineNode,
+      );
 
       Object.assign(state, originalState);
       runtime.appliedLanguage = "";
       switchEternitySubtab(originalEternitySubtab);
       switchMainTab(originalMainTab);
       window.advanceTime(0);
-      return { unpurchased, missingPrerequisite, japanese, english };
+      return { unpurchased, japanese, english, renderedNodeIds };
     });
 
     assert.equal(timelineCopy.unpurchased.currentEffectHidden, true, "unpurchased Timeline nodes should hide current effects");
     assert.equal(timelineCopy.unpurchased.currentEffect, "", "unpurchased Timeline nodes should not render inactive copy");
-    assert.equal(timelineCopy.missingPrerequisite.prerequisites, "BC16500のいずれかのノード", "Japanese any-prerequisite detail should use the era label");
-    assert.equal(timelineCopy.missingPrerequisite.cardStatus, "いずれかの前提ノードが必要", "Japanese missing any-prerequisite status should be natural");
+    assert.deepEqual(
+      timelineCopy.renderedNodeIds,
+      ["Real-BC16500", "Parallel-BC16500"],
+      "0.14.0 Timeline should render only the two BC16500 nodes",
+    );
 
     const japaneseDescriptions = {
       "Real-BC16500": "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）",
       "Parallel-BC16500": "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×10.00B SC）",
-      "Real-BC6000": "IC6のInfinity数報酬倍率はEternity数に応じて強化される（1 Eternityごとに×1.2、×1e10以降 SC）",
-      "Parallel-BC6000": "Towerのスコア累乗の増加量を+^0.05/Floorから+^0.07/Floorに変更する",
-      "Real-AD30": "現在のスコアに応じてEternity獲得量を×(1 + 20^((log10(スコア)-14000)/5000))する",
-      "Parallel-AD30": "現在のInfinity数に応じてEternity獲得量を×(1 + 10^(log10(Infinity数)) / 10)する（Infinity数e15以降 SC）",
     };
     const englishDescriptions = {
       "Real-BC16500": "Infinity count gain is strengthened based on current IP (original gain × (1 + log10(IP))).",
       "Parallel-BC16500": "After clearing IC8, IP gain increases by ×3 each second (SC at ×10.00B).",
-      "Real-BC6000": "IC6 Infinity count reward multiplier increases by ×1.2 per Eternity (SC after ×1e10).",
-      "Parallel-BC6000": "Change the Tower score exponent increase from +^0.05/Floor to +^0.07/Floor.",
-      "Real-AD30": "Multiply Eternity gain by ×(1 + 20^((log10(Score)-14000)/5000)) based on current Score.",
-      "Parallel-AD30": "Multiply Eternity gain by ×(1 + 10^(log10(Infinity count)) / 10) based on current Infinity count (SC after e15 Infinity count).",
     };
     assert.deepEqual(
       Object.fromEntries(Object.entries(timelineCopy.japanese.nodes).map(([id, node]) => [id, node.description])),
@@ -489,10 +483,6 @@ async function runTimelineCopyRegression(browser, origin, httpFailures) {
     assert.match(timelineCopy.japanese.scoreRequirement, / スコア$/, "Japanese score requirement should use スコア");
     assert.equal(timelineCopy.english.scoreTrack, "Score", "English Timeline score track should use Score");
     assert.match(timelineCopy.english.scoreRequirement, / Score$/, "English score requirement should use Score");
-    assert.equal(timelineCopy.japanese.nodes["Real-BC6000"].prerequisites, "BC16500のいずれかのノード", "Japanese BC6000 prerequisites should use the era label");
-    assert.equal(timelineCopy.japanese.nodes["Real-AD30"].prerequisites, "BC6000のいずれかのノード", "Japanese AD30 prerequisites should use the era label");
-    assert.equal(timelineCopy.english.nodes["Real-BC6000"].prerequisites, "One of the BC16500 nodes", "English BC6000 prerequisites should use the era label");
-    assert.equal(timelineCopy.english.nodes["Real-AD30"].prerequisites, "One of the BC6000 nodes", "English AD30 prerequisites should use the era label");
     assert.equal(
       Object.values(timelineCopy.japanese.nodes).every((node) => !node.currentEffectHidden),
       true,
@@ -503,9 +493,6 @@ async function runTimelineCopyRegression(browser, origin, httpFailures) {
       true,
       "owned English Timeline nodes should show current effects",
     );
-    assert.match(timelineCopy.japanese.nodes["Parallel-BC6000"].currentEffect, /^現在のTowerスコア累乗: \^/, "Japanese current effect should use スコア累乗");
-    assert.match(timelineCopy.english.nodes["Parallel-BC6000"].currentEffect, /^Current Tower score exponent: \^/, "English current effect should use score exponent wording");
-
     const japaneseVisibleCopy = Object.values(timelineCopy.japanese.nodes)
       .flatMap((node) => [node.description, node.currentEffect, node.prerequisites, node.cardStatus])
       .join("\n");

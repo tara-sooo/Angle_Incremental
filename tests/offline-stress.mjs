@@ -1469,8 +1469,6 @@ async function measureOfflineStress(page) {
     function configureLateEternityBaseline(ticks) {
       configureDifferentialBase(ticks, [
         "Parallel-BC16500",
-        "Parallel-BC6000",
-        "Parallel-AD30",
       ]);
       Object.assign(state, {
         completedChallenges: (1 << 8) - 1,
@@ -1638,12 +1636,12 @@ async function measureOfflineStress(page) {
       quiet: await runDifferential("quiet", (ticks) => configureDifferentialBase(ticks), 120),
       timelineReal: await runDifferential(
         "timeline-real",
-        (ticks) => configureDifferentialBase(ticks, ["Real-BC16500", "Real-BC6000", "Real-AD30"]),
+        (ticks) => configureDifferentialBase(ticks, ["Real-BC16500"]),
         120,
       ),
       timelineParallel: await runDifferential(
         "timeline-parallel",
-        (ticks) => configureDifferentialBase(ticks, ["Parallel-BC16500", "Parallel-BC6000", "Parallel-AD30"]),
+        (ticks) => configureDifferentialBase(ticks, ["Parallel-BC16500"]),
         120,
       ),
       autoInfinity: await runDifferential(
@@ -1825,11 +1823,11 @@ async function measureOfflineStress(page) {
         timelineResume: {
           real: await measureTimelineOfflineResume(
             "real",
-            ["Real-BC16500", "Real-BC6000", "Real-AD30"],
+            ["Real-BC16500"],
           ),
           parallel: await measureTimelineOfflineResume(
             "parallel",
-            ["Parallel-BC16500", "Parallel-BC6000", "Parallel-AD30"],
+            ["Parallel-BC16500"],
           ),
         },
       },
@@ -2248,8 +2246,7 @@ try {
     assert.equal(resume.precisionReduced, resume.work.precisionReduced, `${route} Timeline precision status should match its work ledger`);
     assert.equal(resume.final.infiniteAngleUnlocked, true, `${route} Timeline measurement should keep Infinite Angle active`);
     assert.ok(Number.isFinite(resume.wallMilliseconds), `${route} Timeline resume should report finite wall time`);
-    assert.match(resume.final.eternityGainExact, /^\d+$/, `${route} AD30 gain should be recorded exactly`);
-    assert.ok(BigInt(resume.final.eternityGainExact) > 1n, `${route} AD30 gain should remain active in the representative state`);
+    assert.equal(resume.final.eternityGainExact, "1", `${route} Timeline resume should keep the canonical Eternity gain`);
     assert.ok(
       Math.abs(resume.timelineSeconds - resume.expectedTimelineSeconds) < 1e-6,
       `${route} Timeline elapsed state should preserve the full offline duration`,

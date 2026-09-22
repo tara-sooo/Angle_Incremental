@@ -140,8 +140,7 @@ function towerNextFloorCostLog10() {
 }
 
 function towerScoreExponent() {
-  const step = runtime.timelineNodeIsPurchasedById?.("Parallel-BC6000") ? 0.07 : runtime.TOWER_SCORE_EXPONENT_STEP;
-  return 1 + towerFloor() * step;
+  return 1 + towerFloor() * runtime.TOWER_SCORE_EXPONENT_STEP;
 }
 
 function towerChallenge3RelaxedPower(

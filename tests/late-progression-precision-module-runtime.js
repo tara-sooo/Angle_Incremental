@@ -58,15 +58,6 @@ async function runLateProgressionPrecisionModuleRuntimeTest() {
   );
   assert.ok(Number.isFinite(state.infinityCount), "the legacy Infinity projection must remain finite");
 
-  state.timelinePurchasedNodes = [{ id: "Real-AD30" }, { id: "Parallel-AD30" }];
-  state.scoreLog10 = 19000;
-  state.score = Number.MAX_VALUE;
-  const ad30Gain = runtime.eternityGain();
-  const ad30GainExact = runtime.eternityGainExact();
-  assert.ok(ad30GainExact > safeInteger, "AD30-scale Eternity gain should remain a large exact integer");
-  assert.ok(Number.isFinite(ad30Gain), "AD30-scale Eternity gain should not overflow");
-  assert.equal(runtime.numberFromExactInteger(ad30GainExact), ad30Gain, "displayed and granted AD30 gain should share the same finite amount");
-
   runtime.setExactIntegerState(state, "speedLevelExact", "speedLevel", 1_000_000_000_000_000_000n);
   runtime.setExactIntegerState(state, "verticesExact", "vertices", 1_000_000_000_000_000_001n);
   const purchasedSpeedBefore = runtime.currentExactNormalUpgradeLevel("speed");

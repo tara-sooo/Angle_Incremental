@@ -133,12 +133,7 @@ function canEternity() {
 }
 
 function rawEternityGain() {
-  const realMultiplier = runtime.timelineRealAd30EternityGainMultiplier?.() ?? 1;
-  const parallelMultiplier = runtime.timelineParallelAd30EternityGainMultiplier?.() ?? 1;
-  const rawGain = realMultiplier >= Number.MAX_VALUE / parallelMultiplier
-    ? Number.MAX_VALUE
-    : realMultiplier * parallelMultiplier;
-  return Number.isFinite(rawGain) ? rawGain : Number.MAX_VALUE;
+  return 1;
 }
 
 function eternityGain() {
@@ -146,11 +141,7 @@ function eternityGain() {
 }
 
 function eternityGainLog10() {
-  const realLog = runtime.timelineRealAd30EternityGainMultiplierLog10?.()
-    ?? runtime.log10Value(runtime.timelineRealAd30EternityGainMultiplier?.() ?? 1);
-  const parallelLog = runtime.timelineParallelAd30EternityGainMultiplierLog10?.()
-    ?? runtime.log10Value(runtime.timelineParallelAd30EternityGainMultiplier?.() ?? 1);
-  return runtime.clampLog10(Math.max(0, realLog + parallelLog));
+  return 0;
 }
 
 function eternityGainExact() {
