@@ -5,28 +5,18 @@ const MAX_TIMELINE_COUNT = Number.MAX_SAFE_INTEGER;
 const MAX_ETERNITY_REQUIREMENT_EXPONENT = 1024;
 const TIMELINE_TRACK_IDS = Object.freeze(["score", "ip", "eternity"]);
 const TIMELINE_NODE_BY_ID = new Map(TIMELINE_NODES.map((node) => [node.id, node]));
-// Real-BC16500/BC6000 and both AD30 effects are read at reset boundaries;
-// Parallel-BC6000 is static and Parallel-BC16500 advances only its linear timer.
-// Unknown/future effects stay fail-closed.
-const TIMELINE_BULK_SAFE_NODE_IDS = Object.freeze([
-  "Real-BC16500",
-  "Parallel-BC16500",
+// 0.14.0 defers these IDs; dropping them during normalization refunds their old TF cost.
+const DEFERRED_TIMELINE_NODE_IDS = Object.freeze([
   "Real-BC6000",
   "Parallel-BC6000",
   "Real-AD30",
   "Parallel-AD30",
 ]);
+const TIMELINE_BULK_SAFE_NODE_IDS = Object.freeze([
+  "Real-BC16500",
+  "Parallel-BC16500",
+]);
 const PARALLEL_RAW_SOFTCAP_LOG10 = 10;
-const REAL_BC6000_SOFTCAP_LOG10 = 10;
-const REAL_BC6000_SOFTCAP_STRENGTH = 2;
-// IC6 supplies the canonical x2 base in infinity.js; this is the Timeline factor per Eternity.
-const IC6_REWARD_LOG10 = Math.log10(1.2);
-const REAL_AD30_SCORE_START_LOG10 = 14000;
-const REAL_AD30_SCORE_STEP_LOG10 = 5000;
-const REAL_AD30_POWER_LOG10 = Math.log10(20);
-const PARALLEL_AD30_SOFTCAP_LOG10 = 15;
-const PARALLEL_AD30_SOFTCAP_STRENGTH = 2;
-const PARALLEL_AD30_DIVISOR_LOG10 = Math.log10(10);
 const TIMELINE_TRACKS = Object.freeze({
   score: Object.freeze({
     stateKey: "scoreTfClaims",
@@ -69,6 +59,7 @@ function normalizeTimelinePurchasedNodes(value) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return nodes;
     const id = typeof entry.id === "string" ? entry.id.trim() : "";
     if (!id || seen.has(id)) return nodes;
+    if (DEFERRED_TIMELINE_NODE_IDS.includes(id)) return nodes;
     seen.add(id);
     const definition = timelineNodeById(id);
     const normalized = {
@@ -213,66 +204,6 @@ function timelineParallelEffectiveLog10(seconds = timelineParallelSecondsSinceIc
     + 10 * Math.log10(1 + (rawLog10 - PARALLEL_RAW_SOFTCAP_LOG10) / 10);
 }
 
-function timelineRealBc6000Ic6RewardLog10() {
-  if (!timelineNodeIsPurchasedById("Real-BC6000") || runtime.isChallengeCompleted?.(6) !== true) return 0;
-  const rawLog10 = runtime.numberFromExactInteger(currentExactEternityCount()) * IC6_REWARD_LOG10;
-  if (rawLog10 <= REAL_BC6000_SOFTCAP_LOG10) return rawLog10;
-  return REAL_BC6000_SOFTCAP_LOG10
-    + REAL_BC6000_SOFTCAP_STRENGTH
-      * Math.log10(1 + (rawLog10 - REAL_BC6000_SOFTCAP_LOG10) / REAL_BC6000_SOFTCAP_STRENGTH);
-}
-
-function timelineRealAd30EternityGainMultiplierLog10() {
-  if (!timelineNodeIsPurchasedById("Real-AD30")) return 0;
-  const scoreLog10 = runtime.currentScoreLog10?.() ?? -Infinity;
-  if (!Number.isFinite(scoreLog10)) return 0;
-  const exponentLog10 = (scoreLog10 - REAL_AD30_SCORE_START_LOG10)
-    / REAL_AD30_SCORE_STEP_LOG10
-    * REAL_AD30_POWER_LOG10;
-  return runtime.combineLog10(0, exponentLog10);
-}
-
-function timelineRealAd30EternityGainMultiplier() {
-  if (!timelineNodeIsPurchasedById("Real-AD30")) return 1;
-  const scoreLog10 = runtime.currentScoreLog10?.() ?? -Infinity;
-  if (!Number.isFinite(scoreLog10)) return 1;
-  const powerLog10 = (scoreLog10 - REAL_AD30_SCORE_START_LOG10)
-    / REAL_AD30_SCORE_STEP_LOG10
-    * REAL_AD30_POWER_LOG10;
-  const power = runtime.valueFromLog10(powerLog10);
-  return power === Number.MAX_VALUE ? power : 1 + power;
-}
-
-function timelineParallelAd30InfinityEffectiveLog10() {
-  const infinityCountLog10 = runtime.log10ExactInteger(
-    runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount"),
-  );
-  if (infinityCountLog10 === -Infinity) return -Infinity;
-  const rawLog10 = infinityCountLog10;
-  if (!Number.isFinite(rawLog10)) return -Infinity;
-  if (rawLog10 <= PARALLEL_AD30_SOFTCAP_LOG10) return rawLog10;
-  return PARALLEL_AD30_SOFTCAP_LOG10
-    + PARALLEL_AD30_SOFTCAP_STRENGTH
-      * Math.log10(1 + (rawLog10 - PARALLEL_AD30_SOFTCAP_LOG10) / PARALLEL_AD30_SOFTCAP_STRENGTH);
-}
-
-function timelineParallelAd30EternityGainMultiplierLog10() {
-  if (!timelineNodeIsPurchasedById("Parallel-AD30")) return 0;
-  const effectiveLog10 = timelineParallelAd30InfinityEffectiveLog10();
-  if (effectiveLog10 === -Infinity) return 0;
-  return runtime.combineLog10(0, effectiveLog10 - PARALLEL_AD30_DIVISOR_LOG10);
-}
-
-function timelineParallelAd30EternityGainMultiplier() {
-  if (!timelineNodeIsPurchasedById("Parallel-AD30")) return 1;
-  const effectiveLog10 = timelineParallelAd30InfinityEffectiveLog10();
-  if (effectiveLog10 === -Infinity) return 1;
-  const effectiveInfinity = runtime.valueFromLog10(effectiveLog10);
-  if (effectiveInfinity === Number.MAX_VALUE) return effectiveInfinity;
-  const multiplier = 1 + effectiveInfinity / 10;
-  return Number.isFinite(multiplier) ? multiplier : Number.MAX_VALUE;
-}
-
 function timelineRealBc16500InfinityCountGainMultiplier() {
   if (!timelineRealOwned()) return 1;
   const currentIpLog10 = runtime.currentInfinityPointsLog10?.() ?? -Infinity;
@@ -281,20 +212,12 @@ function timelineRealBc16500InfinityCountGainMultiplier() {
 
 function timelineRealInfinityCountGainMultiplierLog10() {
   normalizeTimelineState();
-  let multiplierLog10 = runtime.log10Value(timelineRealBc16500InfinityCountGainMultiplier());
-  const rewardLog10 = timelineRealBc6000Ic6RewardLog10();
-  if (rewardLog10 > 0) multiplierLog10 += Math.max(0, rewardLog10 - IC6_REWARD_LOG10);
-  return multiplierLog10;
+  return runtime.log10Value(timelineRealBc16500InfinityCountGainMultiplier());
 }
 
 function timelineRealInfinityCountGainMultiplier() {
   normalizeTimelineState();
-  const multiplier = timelineRealBc16500InfinityCountGainMultiplier();
-  const rewardLog10 = timelineRealBc6000Ic6RewardLog10();
-  const extraLog10 = rewardLog10 > 0 ? Math.max(0, rewardLog10 - IC6_REWARD_LOG10) : 0;
-  return extraLog10 > 0
-    ? runtime.valueFromLog10(runtime.log10Value(multiplier) + extraLog10)
-    : multiplier;
+  return timelineRealBc16500InfinityCountGainMultiplier();
 }
 
 function timelineIpGainMultiplierLog10() {
@@ -465,12 +388,6 @@ expose("timelineParallelOwned", () => timelineParallelOwned);
 expose("timelineParallelSecondsSinceIc8Clear", () => timelineParallelSecondsSinceIc8Clear);
 expose("timelineParallelRawLog10", () => timelineParallelRawLog10);
 expose("timelineParallelEffectiveLog10", () => timelineParallelEffectiveLog10);
-expose("timelineRealBc6000Ic6RewardLog10", () => timelineRealBc6000Ic6RewardLog10);
-expose("timelineRealAd30EternityGainMultiplierLog10", () => timelineRealAd30EternityGainMultiplierLog10);
-expose("timelineRealAd30EternityGainMultiplier", () => timelineRealAd30EternityGainMultiplier);
-expose("timelineParallelAd30InfinityEffectiveLog10", () => timelineParallelAd30InfinityEffectiveLog10);
-expose("timelineParallelAd30EternityGainMultiplierLog10", () => timelineParallelAd30EternityGainMultiplierLog10);
-expose("timelineParallelAd30EternityGainMultiplier", () => timelineParallelAd30EternityGainMultiplier);
 expose("timelineRealInfinityCountGainMultiplierLog10", () => timelineRealInfinityCountGainMultiplierLog10);
 expose("timelineRealInfinityCountGainMultiplier", () => timelineRealInfinityCountGainMultiplier);
 expose("timelineIpGainMultiplierLog10", () => timelineIpGainMultiplierLog10);

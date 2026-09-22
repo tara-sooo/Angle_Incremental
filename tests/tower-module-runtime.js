@@ -97,10 +97,6 @@ async function runTowerModuleRuntimeTest() {
     assert.equal(runtime.towerScoreExponent(), 1.25, "the normal Tower exponent should remain +0.05 per floor");
     debug.state.timelinePurchasedNodes = [{ id: "Parallel-BC16500", era: "BC16500", route: "Parallel", costTF: 1 }];
     assert.equal(runtime.towerScoreExponent(), 1.25, "Parallel-BC16500 should not change the Tower exponent");
-    debug.state.timelinePurchasedNodes = [{ id: "Parallel-BC6000", era: "BC6000", route: "Parallel", costTF: 1 }];
-    assert.equal(runtime.towerScoreExponent(), 1.35, "Parallel-BC6000 should use +0.07 per floor");
-    debug.state.timelinePurchasedNodes = [{ id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 }];
-    assert.equal(runtime.towerScoreExponent(), 1.25, "Real-BC6000 should not change the Tower exponent");
   }
 
   {
