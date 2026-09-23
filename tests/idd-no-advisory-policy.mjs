@@ -112,8 +112,12 @@ for (const source of [claim, claimLite]) {
     'A5 must expose the explicit maintainer-prepared branch marker');
   assert.match(source, /live remote (?:branch )?head[\s\S]{0,120}(?:marker )?`?head`?/i,
     'prepared branch authorization must bind the live remote head');
-  assert.match(source, /merge-base --is-ancestor origin\/next origin\/<branch>/,
-    'prepared branch authorization must prove current next ancestry');
+  assert.match(source, /base-sha=<40-hex-sha>/,
+    'prepared branch marker must bind the prepared base commit');
+  assert.match(source, /merge-base --is-ancestor <base-sha> origin\/<branch>/,
+    'prepared branch base must be an ancestor of the marked branch head');
+  assert.match(source, /merge-base --is-ancestor <base-sha> origin\/next/,
+    'prepared branch base must remain in current next history');
   assert.match(source, /branch[- ]reuse[\s\S]{0,80}(?:authorization )?only/i,
     'prepared branch marker must not become claim or merge authority');
   assert.match(source, /activation-nonce/i,
