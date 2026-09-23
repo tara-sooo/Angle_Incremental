@@ -95,8 +95,10 @@ async function checkForRemoteUpdate() {
 expose("updateCheckInFlight", () => updateCheckInFlight, (value) => { updateCheckInFlight = value; });
 expose("shouldShowUpdateModal", () => shouldShowUpdateModal, (value) => { shouldShowUpdateModal = value; });
 expose("closeUpdateModal", () => closeUpdateModal, (value) => { closeUpdateModal = value; });
-expose("showUpdateModalIfNeeded", () => showUpdateModalIfNeeded, (value) => { showUpdateModalIfNeeded = value; });
+expose("showUpdateModalIfNeeded", () => showUpdateModalIfNeeded);
 expose("storedUpdateReloadTime", () => storedUpdateReloadTime, (value) => { storedUpdateReloadTime = value; });
 expose("markUpdateDeferred", () => markUpdateDeferred, (value) => { markUpdateDeferred = value; });
 expose("reloadForRemoteUpdate", () => reloadForRemoteUpdate, (value) => { reloadForRemoteUpdate = value; });
-expose("checkForRemoteUpdate", () => checkForRemoteUpdate, (value) => { checkForRemoteUpdate = value; });
+expose("checkForRemoteUpdate", () => checkForRemoteUpdate);
+
+export { showUpdateModalIfNeeded, checkForRemoteUpdate };

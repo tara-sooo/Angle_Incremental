@@ -22,7 +22,7 @@ function dormantTimeFluxValue(value, fallback) {
   return runtime.sanitizeNumber(value, fallback);
 }
 
-function clampOfflineTickCount(value) {
+export function clampOfflineTickCount(value) {
   return Math.min(
     runtime.OFFLINE_PROGRESS_MAX_TICKS,
     Math.max(runtime.OFFLINE_PROGRESS_MIN_TICKS, Math.floor(runtime.sanitizeNumber(
@@ -865,7 +865,7 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
     Math.min(0.9999999999999999, runtime.sanitizeNumber(data.infinityCountRateRemainder, 0)),
   );
   runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(data.offlineProgressEnabled, true);
-  runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
+  runtime.state.offlineTickCount = clampOfflineTickCount(data.offlineTickCount);
   runtime.state.timeFluxCapacityLevel = dormantTimeFluxValue(data.timeFluxCapacityLevel, 0);
   runtime.state.timeFluxGainLevel = dormantTimeFluxValue(data.timeFluxGainLevel, 0);
   runtime.state.timeFlux = dormantTimeFluxValue(data.timeFlux, 0);
@@ -1555,7 +1555,7 @@ function resetSave() {
 }
 
 expose("legacyInfinityUpgradeRefundLog10", () => legacyInfinityUpgradeRefundLog10, (value) => { legacyInfinityUpgradeRefundLog10 = value; });
-expose("clampOfflineTickCount", () => clampOfflineTickCount, (value) => { clampOfflineTickCount = value; });
+expose("clampOfflineTickCount", () => clampOfflineTickCount);
 expose("applySaveData", () => applySaveData, (value) => { applySaveData = value; });
 expose("serializeSaveData", () => serializeSaveData, (value) => { serializeSaveData = value; });
 expose("saveGame", () => saveGame, (value) => { saveGame = value; });
@@ -1582,7 +1582,9 @@ expose("restorePreImportSave", () => restorePreImportSave, (value) => { restoreP
 expose("restoreCheckpoint", () => restoreCheckpoint, (value) => { restoreCheckpoint = value; });
 expose("restoreUndoSave", () => restoreUndoSave, (value) => { restoreUndoSave = value; });
 expose("quarantineSave", () => quarantineSave, (value) => { quarantineSave = value; });
-expose("loadGame", () => loadGame, (value) => { loadGame = value; });
+expose("loadGame", () => loadGame);
 expose("retryLoad", () => retryLoad, (value) => { retryLoad = value; });
 expose("restoreQuarantineSave", () => restoreQuarantineSave, (value) => { restoreQuarantineSave = value; });
 expose("resetSave", () => resetSave, (value) => { resetSave = value; });
+
+export { loadGame };

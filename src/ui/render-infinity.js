@@ -127,9 +127,11 @@ function buySelectedInfinityUpgrade() {
 }
 
 expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => { selectedInfinityUpgradeId = value; });
-expose("createInfinityUpgradeRows", () => createInfinityUpgradeRows, (value) => { createInfinityUpgradeRows = value; });
+expose("createInfinityUpgradeRows", () => createInfinityUpgradeRows);
 expose("selectInfinityUpgrade", () => selectInfinityUpgrade);
 expose("infinityUpgradeStateText", () => infinityUpgradeStateText);
 expose("updateInfinityUpgradeDetail", () => updateInfinityUpgradeDetail);
 expose("updateInfinityUpgradeRows", () => updateInfinityUpgradeRows);
 expose("buySelectedInfinityUpgrade", () => buySelectedInfinityUpgrade);
+
+export { createInfinityUpgradeRows, updateInfinityUpgradeRows };

@@ -13,14 +13,15 @@
 
 ### EXP-ARCH-002 — Balance profiles can replace runtime UI builders
 
-- Status: active
+- Status: superseded
+- Superseded by: Issues #430/#431; the current tree has no balance profile or `balanceCreateInfinityUpgradeRows` override.
 - Scope: balance profile/runtime overrides; Infinity Upgrade UI; `src/systems/balance.js`, `src/ui/render-infinity.js`, `src/systems/balance-ui.js`
 - Learned from: Issue #364
 - Context: a UI interaction added only to the canonical Infinity Upgrade renderer would not reach the shipped tree.
 - Cause: the balance profile assigns `runtime.createInfinityUpgradeRows = runtime.balanceCreateInfinityUpgradeRows` during installation, replacing the renderer selected by `main.js`.
-- Reusable lesson: when changing a runtime UI builder, search profile and variant modules for assignments that replace the runtime function; update every active builder or introduce one shared hook only when it removes real duplication.
-- Verification: search assignments to the runtime builder and exercise the shipped balance profile through browser interaction coverage.
-- Last verified: 2026-09-12
+- Reusable lesson: historical; if a balance profile is reintroduced, check for an active builder override before changing the canonical renderer.
+- Verification: `rg -n 'balanceCreateInfinityUpgradeRows|runtime\.createInfinityUpgradeRows' src tests scripts` finds no active implementation.
+- Last verified: 2026-09-23
 
 ### EXP-ARCH-003 — Version checks must follow canonical ESM ownership
 

@@ -5,67 +5,69 @@ import "./data/i18n.js";
 import "./data/infinity-data.js";
 import "./core/state.js";
 import "./core/numbers.js";
-import "./core/save.js";
+import { loadGame } from "./core/save.js";
 import "./core/save-code.js";
 import "./systems/achievements.js";
 import "./systems/tower.js";
-import "./ui/render-canvas.js";
-import "./ui/render-topbar.js";
-import "./ui/render-challenges.js";
-import "./ui/render-infinity.js";
-import "./ui/render-achievements.js";
-import "./ui/render-automation.js";
-import "./ui/render-offline-report.js";
-import "./ui/render-help.js";
-import "./ui/render-eternity.js";
+import { draw, drawInfiniteAngle, resizeCanvas, resizeInfiniteAngleCanvas } from "./ui/render-canvas.js";
+import { createChallengeRows, createTowerChallengeRows } from "./ui/render-challenges.js";
+import { createInfinityUpgradeRows } from "./ui/render-infinity.js";
+import { createAchievementRows } from "./ui/render-achievements.js";
 import "./ui/render-ui.js";
 import "./systems/angle.js";
 import "./systems/generation.js";
 import "./systems/core-boost.js";
 import "./systems/infinity.js";
 import "./systems/infinite-angle.js";
-import "./ui/events.js";
+import {
+  bindEvents,
+  switchMainTab,
+  switchEternitySubtab,
+  switchInfinitySubtab,
+  switchChallengeSubtab,
+  switchStatisticsSubtab,
+} from "./ui/events.js";
 import "./systems/eternity.js";
 import "./systems/timeline.js";
 import "./core/offline-progress.js";
-import "./runtime/clock.js";
-import "./runtime/update-check.js";
+import { syncServerClock } from "./runtime/clock.js";
+import { showUpdateModalIfNeeded, checkForRemoteUpdate } from "./runtime/update-check.js";
 import "./runtime/automation.js";
 import "./runtime/browser-lifecycle.js";
-import "./runtime/game-loop.js";
+import { requestNextFrame, frame } from "./runtime/game-loop.js";
 import "./runtime/debug-adapter.js";
 
 let japaneseFontReady = false;
 
 async function initializeGame() {
-  await runtime.syncServerClock();
-  runtime.bindEvents();
-  runtime.createChallengeRows();
-  runtime.createTowerChallengeRows();
-  runtime.createInfinityUpgradeRows();
-  runtime.createAchievementRows();
-  await runtime.loadGame();
-  runtime.switchMainTab(runtime.activeMainTab);
-  runtime.switchEternitySubtab(runtime.activeEternitySubtab);
-  runtime.switchInfinitySubtab(runtime.activeInfinitySubtab);
-  runtime.switchChallengeSubtab(runtime.activeChallengeSubtab);
-  runtime.switchStatisticsSubtab(runtime.activeStatisticsSubtab);
-  runtime.resizeCanvas();
-  runtime.resizeInfiniteAngleCanvas();
+  await syncServerClock();
+  bindEvents();
+  createChallengeRows();
+  createTowerChallengeRows();
+  createInfinityUpgradeRows();
+  createAchievementRows();
+  await loadGame();
+  switchMainTab(runtime.activeMainTab);
+  switchEternitySubtab(runtime.activeEternitySubtab);
+  switchInfinitySubtab(runtime.activeInfinitySubtab);
+  switchChallengeSubtab(runtime.activeChallengeSubtab);
+  switchStatisticsSubtab(runtime.activeStatisticsSubtab);
+  resizeCanvas();
+  resizeInfiniteAngleCanvas();
   runtime.updateUi();
-  runtime.showUpdateModalIfNeeded();
-  runtime.checkForRemoteUpdate();
+  showUpdateModalIfNeeded();
+  checkForRemoteUpdate();
   if (document.fonts) {
     document.fonts.ready.then(() => {
       japaneseFontReady = true;
       runtime.updateUi();
-      runtime.draw();
-      runtime.drawInfiniteAngle();
+      draw();
+      drawInfiniteAngle();
     });
   } else {
     japaneseFontReady = true;
   }
-  runtime.requestNextFrame(runtime.frame);
+  requestNextFrame(frame);
 }
 
 expose("japaneseFontReady", () => japaneseFontReady, (value) => { japaneseFontReady = value; });

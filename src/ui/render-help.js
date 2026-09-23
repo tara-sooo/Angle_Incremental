@@ -251,4 +251,6 @@ function updateHelpUi() {
   return true;
 }
 
-expose("updateHelpUi", () => updateHelpUi, (value) => { updateHelpUi = value; });
+expose("updateHelpUi", () => updateHelpUi);
+
+export { updateHelpUi };

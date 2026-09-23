@@ -3,6 +3,13 @@ import { formatExactInteger } from "./format-exact-integer.js";
 import { updateSaveRecoveryUi } from "./render-save-recovery.js";
 import { updateTimelineUi } from "./render-timeline.js";
 import { updateEternityUi } from "./render-eternity.js";
+import { updateTopBar } from "./render-topbar.js";
+import { updateChallengeRows, updateTowerChallengeRows } from "./render-challenges.js";
+import { updateInfinityUpgradeRows } from "./render-infinity.js";
+import { updateAchievementRows } from "./render-achievements.js";
+import { updateAutomationUi, updateStatisticsUi } from "./render-automation.js";
+import { updateOfflineReportUi } from "./render-offline-report.js";
+import { updateHelpUi } from "./render-help.js";
 
 // Shared form helpers and the UI update orchestrator.
 
@@ -104,9 +111,9 @@ function updateUi() {
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
   runtime.elements.shell.classList.toggle("main-tabs-right", runtime.state.mainTabPosition !== "bottom");
   applyLanguage();
-  runtime.updateHelpUi?.();
+  updateHelpUi();
   runtime.updateMainTabVisibility?.();
-  runtime.updateTopBar();
+  updateTopBar();
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());
   const vertexGainIncreaseLog10 = runtime.vertexGainIncreaseLog10();
@@ -198,7 +205,7 @@ function updateUi() {
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiLogNumber(runtime.infinityPointGainLog10())} IP`;
   runtime.elements.infinityButton.disabled = infinityCountExact === 0n || !runtime.canInfinity();
-  runtime.updateInfinityUpgradeRows();
+  updateInfinityUpgradeRows();
   const infiniteAngleUnlocked = runtime.state.infiniteAngleUnlocked;
   const infiniteAngleUnlockCostLog10 = runtime.infiniteAngleUnlockCostLog10();
   const infiniteAngleUpgradeCosts = {
@@ -237,8 +244,8 @@ function updateUi() {
       ? runtime.t("locked")
       : `${completed}/${runtime.INFINITY_CHALLENGE_COUNT} ${runtime.t("completed")}`;
   runtime.elements.challengeTabState.textContent = `IC ${completed}/${runtime.INFINITY_CHALLENGE_COUNT}`;
-  runtime.updateChallengeRows();
-  runtime.updateTowerChallengeRows();
+  updateChallengeRows();
+  updateTowerChallengeRows();
   const currentTowerFloor = runtime.towerFloor();
   const nextTowerFloor = runtime.towerNextFloor();
   const nextTowerCostLog10 = runtime.towerNextFloorCostLog10();
@@ -265,16 +272,16 @@ function updateUi() {
   runtime.elements.breakCapButton.disabled = !runtime.canBreakInfiniteCap();
   runtime.elements.breakCapButton.textContent = runtime.state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 
-  runtime.updateAutomationUi();
-  runtime.updateStatisticsUi();
-  runtime.updateOfflineReportUi();
+  updateAutomationUi();
+  updateStatisticsUi();
+  updateOfflineReportUi();
   updateTimelineUi();
 
   const unlockedAchievements = runtime.achievementCount();
   runtime.elements.achievementTabState.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT}`;
   runtime.elements.achievementSummary.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT} ${runtime.t("tabAchievements")}`;
   runtime.elements.achievementBoost.textContent = `×${runtime.achievementGainMultiplier().toFixed(3)}`;
-  runtime.updateAchievementRows();
+  updateAchievementRows();
 
   syncFormControl(runtime.elements.floatingTextToggle, runtime.state.showFloatingText);
   syncFormControl(runtime.elements.lightEffectsToggle, runtime.state.lightEffects);

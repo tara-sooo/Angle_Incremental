@@ -1,4 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { clampOfflineTickCount } from "../core/save.js";
 import "../systems/infinity-point-normalization.js";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
@@ -241,7 +242,7 @@ function applySetting(key, value) {
       runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
     );
   }
-  if (key === "offlineTickCount") runtime.state.offlineTickCount = runtime.clampOfflineTickCount(value);
+  if (key === "offlineTickCount") runtime.state.offlineTickCount = clampOfflineTickCount(value);
   if (key === "showFloatingText" && !value) runtime.state.floatingTexts = [];
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
   if (key === "showFps") runtime.state.showFps = Boolean(value);
@@ -459,11 +460,11 @@ expose("activeEternitySubtab", () => activeEternitySubtab, (value) => { activeEt
 expose("activeInfinitySubtab", () => activeInfinitySubtab, (value) => { activeInfinitySubtab = value; });
 expose("activeChallengeSubtab", () => activeChallengeSubtab, (value) => { activeChallengeSubtab = value; });
 expose("activeStatisticsSubtab", () => activeStatisticsSubtab, (value) => { activeStatisticsSubtab = value; });
-expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
-expose("switchEternitySubtab", () => switchEternitySubtab, (value) => { switchEternitySubtab = value; });
-expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
-expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
-expose("switchStatisticsSubtab", () => switchStatisticsSubtab, (value) => { switchStatisticsSubtab = value; });
+expose("switchMainTab", () => switchMainTab);
+expose("switchEternitySubtab", () => switchEternitySubtab);
+expose("switchInfinitySubtab", () => switchInfinitySubtab);
+expose("switchChallengeSubtab", () => switchChallengeSubtab);
+expose("switchStatisticsSubtab", () => switchStatisticsSubtab);
 expose("helpContextMainTab", () => helpContextMainTab, (value) => { helpContextMainTab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
 expose("mainTabIsUnlocked", () => mainTabIsUnlocked);
@@ -472,4 +473,13 @@ expose("setMainTabVisibility", () => setMainTabVisibility);
 expose("discoverMainTabs", () => discoverMainTabs);
 expose("updateMainTabVisibility", () => updateMainTabVisibility);
 expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
-expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });
+expose("bindEvents", () => bindEvents);
+
+export {
+  switchMainTab,
+  switchEternitySubtab,
+  switchInfinitySubtab,
+  switchChallengeSubtab,
+  switchStatisticsSubtab,
+  bindEvents,
+};

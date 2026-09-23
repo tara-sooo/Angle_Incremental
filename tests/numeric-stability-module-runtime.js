@@ -668,6 +668,11 @@ async function runNumericStabilityModuleRuntimeTest() {
     const runScoreThresholdScenario = async (threshold, unlockedIds, offline) => {
       const instance = await loadRuntime(candidatePath);
       const { runtime, debug } = instance;
+      assert.equal(
+        Object.getOwnPropertyDescriptor(runtime, "currentScoreLog10").set,
+        undefined,
+        "projected achievement checks must not replace the live score function",
+      );
       const { state } = debug;
       state.vertices = 3;
       state.speedLevel = 0;

@@ -585,18 +585,12 @@ function processOfflineVerticesInOrder(start, end, batches) {
 
 function scoreAchievementNeedsOrderedProcessing(projectedScoreLog) {
   if (!Array.isArray(runtime.ACHIEVEMENTS) || typeof runtime.isAchievementUnlocked !== "function") return false;
-  const currentScoreLog10 = runtime.currentScoreLog10;
-  runtime.currentScoreLog10 = () => projectedScoreLog;
-  try {
-    return SCORE_ORDERING_ACHIEVEMENT_IDS.some((id) => {
-      const achievement = runtime.ACHIEVEMENTS[id - 1];
-      return achievement
-        && !runtime.isAchievementUnlocked(id)
-        && achievement.isUnlocked();
-    });
-  } finally {
-    runtime.currentScoreLog10 = currentScoreLog10;
-  }
+  return SCORE_ORDERING_ACHIEVEMENT_IDS.some((id) => {
+    const achievement = runtime.ACHIEVEMENTS[id - 1];
+    return achievement
+      && !runtime.isAchievementUnlocked(id)
+      && achievement.isUnlocked(projectedScoreLog);
+  });
 }
 
 function earlyLayerCostScalingFactor() {
@@ -900,7 +894,7 @@ expose("isLapSpeedSoftcapped", () => isLapSpeedSoftcapped, (value) => { isLapSpe
 expose("lapSpeedSoftcapStart", () => lapSpeedSoftcapStart, (value) => { lapSpeedSoftcapStart = value; });
 expose("lapSpeedSoftcapPower", () => lapSpeedSoftcapPower, (value) => { lapSpeedSoftcapPower = value; });
 expose("lapDuration", () => lapDuration, (value) => { lapDuration = value; });
-expose("currentScoreLog10", () => currentScoreLog10, (value) => { currentScoreLog10 = value; });
+expose("currentScoreLog10", () => currentScoreLog10);
 expose("rawCurrentScoreLog10", () => rawCurrentScoreLog10, (value) => { rawCurrentScoreLog10 = value; });
 expose("scoreExponent", () => scoreExponent, (value) => { scoreExponent = value; });
 expose("effectiveScoreExponent", () => effectiveScoreExponent);

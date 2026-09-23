@@ -129,3 +129,5 @@ expose("setNewsTickerMessage", () => setNewsTickerMessage);
 expose("advanceNewsTickerMessage", () => advanceNewsTickerMessage);
 expose("bindNewsTickerIteration", () => bindNewsTickerIteration);
 expose("updateTopBar", () => updateTopBar);
+
+export { updateTopBar };

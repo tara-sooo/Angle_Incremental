@@ -298,7 +298,9 @@ expose("updateRenderQualityForTest", () => updateRenderQualityForTest);
 expose("requestNextFrame", () => requestNextFrame);
 expose("currentFrameTime", () => currentFrameTime, (value) => { currentFrameTime = value; });
 expose("lastTime", () => lastTime, (value) => { lastTime = value; });
-expose("frame", () => frame, (value) => { frame = value; });
+expose("frame", () => frame);
 expose("update", () => update, (value) => { update = value; });
 expose("advanceOnlineTime", () => advanceOnlineTime, (value) => { advanceOnlineTime = value; });
 expose("drawActiveView", () => drawActiveView);
+
+export { requestNextFrame, frame };

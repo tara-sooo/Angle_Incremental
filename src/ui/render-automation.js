@@ -200,3 +200,5 @@ expose("updateAutomationUi", () => updateAutomationUi);
 expose("infinityRunRecordText", () => infinityRunRecordText);
 expose("eternityRunRecordText", () => eternityRunRecordText);
 expose("updateStatisticsUi", () => updateStatisticsUi);
+
+export { updateAutomationUi, updateStatisticsUi };
