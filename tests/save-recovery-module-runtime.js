@@ -771,6 +771,33 @@ async function runSaveRecoveryModuleRuntimeTest() {
       "a remote update should create a pre-update checkpoint",
     );
 
+    storage.delete(runtime.UPDATE_RELOAD_TARGET_KEY);
+    storage.set(runtime.UPDATE_RELOAD_TIME_KEY, "0");
+    const originalFetch = instance.context.fetch;
+    const originalWindowFetch = instance.context.window.fetch;
+    const remoteVersion = runtime.APP_VERSION + "-remote";
+    let updateRequest = null;
+    const mockFetch = async (url, options) => {
+      updateRequest = { url, options };
+      return { ok: true, json: async () => ({ appVersion: remoteVersion }) };
+    };
+    instance.context.fetch = mockFetch;
+    instance.context.window.fetch = mockFetch;
+    try {
+      await runtime.checkForRemoteUpdate();
+    } finally {
+      instance.context.fetch = originalFetch;
+      instance.context.window.fetch = originalWindowFetch;
+    }
+    assert.equal(updateRequest.options.cache, "no-store", "remote update polling should bypass cache");
+    assert.equal(
+      new URL(instance.context.window.location.href).searchParams.get("v"),
+      remoteVersion,
+      "a newer manifest should reload to its version",
+    );
+    assert.equal(storage.get(runtime.UPDATE_RELOAD_TARGET_KEY), remoteVersion, "the reload target should be persisted");
+    assert.equal(runtime.updateCheckInFlight, false, "the in-flight guard should clear after polling");
+
     runtime.updateUi();
     const firstCheckpointRow = runtime.elements.saveCheckpointList.children[0];
     runtime.updateUi();

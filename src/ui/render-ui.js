@@ -6,6 +6,8 @@ import { updateEternityUi } from "./render-eternity.js";
 
 // Shared form helpers and the UI update orchestrator.
 
+let appliedLanguage = "";
+
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
   runtime.appliedLanguage = runtime.state.language;
@@ -376,6 +378,7 @@ function formatExponentPreview(current, next) {
   return currentText === nextText ? currentText : `${currentText} → ${nextText}`;
 }
 
+expose("appliedLanguage", () => appliedLanguage, (value) => { appliedLanguage = value; });
 expose("applyLanguage", () => applyLanguage, (value) => { applyLanguage = value; });
 expose("syncFormControl", () => syncFormControl, (value) => { syncFormControl = value; });
 expose("clearElement", () => clearElement, (value) => { clearElement = value; });
