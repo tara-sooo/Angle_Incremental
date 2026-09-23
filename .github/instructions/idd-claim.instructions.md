@@ -41,7 +41,7 @@ A fresh claim may inherit a pre-existing deterministic Issue branch only when a
 top-level Issue comment from the repository owner or a Maintain/Admin actor
 contains this exact authorization marker:
 
-`<!-- idd-prepared-branch: branch=<branch> head=<40-hex-sha> base=next -->`
+`<!-- idd-prepared-branch: branch=<branch> head=<40-hex-sha> base=next base-sha=<40-hex-sha> -->`
 
 Treat the marker as branch-reuse authorization only, never as ownership or merge
 authorization. Plain prose naming a branch/commit does not count. Before claim
@@ -49,8 +49,10 @@ posting, verify all of these against live state:
 
 - `branch` exactly equals the deterministic branch computed for this Issue;
 - the live remote branch head exactly equals the marker `head`;
-- `base` is exact `next`, and
-  `git merge-base --is-ancestor origin/next origin/<branch>` succeeds;
+- `base` is exact `next`; marker `base-sha` is an ancestor of both the
+  marked branch head and current `origin/next`:
+  `git merge-base --is-ancestor <base-sha> origin/<branch>` and
+  `git merge-base --is-ancestor <base-sha> origin/next` both succeed;
 - no active claim exists for the Issue and no open PR uses that branch or
   references/closes the Issue.
 
