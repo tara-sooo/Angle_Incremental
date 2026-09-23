@@ -257,7 +257,10 @@ containing this exact marker:
 
 Plain prose naming a branch/commit is not authorization. Verify live state:
 
-1. marker `branch` exactly equals the deterministic branch computed above;
+1. marker `branch` starts with exact `issue/<N>-` for this Issue and has a
+   non-empty suffix. For this exception only, the marker branch is authoritative
+   and need not equal the deterministic slug derived from the current Issue
+   title;
 2. the live remote head exactly equals marker `head`;
 3. marker `base` is exact `next`; marker `base-sha` is an ancestor of
    both the marked branch head and current `origin/next`:
