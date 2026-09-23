@@ -30,9 +30,35 @@ branch.
 
 Before claiming, inspect local worktrees and
 `git/matching-refs/heads/issue/<number>-`. A match is allowed only when it is
-tied to this session's verified claim, a stale claim being taken over, or a
-trusted released claim with the same branch. Otherwise post a hold explaining
-the orphan collision and stop; never delete or reuse it silently.
+tied to this session's verified claim, a stale claim being taken over, a
+trusted released claim with the same branch, or the exact maintainer-prepared
+branch exception below. Otherwise post a hold explaining the orphan collision
+and stop; never delete or reuse it silently.
+
+### Maintainer-prepared branch exception
+
+A fresh claim may inherit a pre-existing deterministic Issue branch only when a
+top-level Issue comment from the repository owner or a Maintain/Admin actor
+contains this exact authorization marker:
+
+`<!-- idd-prepared-branch: branch=<branch> head=<40-hex-sha> base=next -->`
+
+Treat the marker as branch-reuse authorization only, never as ownership or merge
+authorization. Plain prose naming a branch/commit does not count. Before claim
+posting, verify all of these against live state:
+
+- `branch` exactly equals the deterministic branch computed for this Issue;
+- the live remote branch head exactly equals the marker `head`;
+- `base` is exact `next`, and
+  `git merge-base --is-ancestor origin/next origin/<branch>` succeeds;
+- no active claim exists for the Issue and no open PR uses that branch or
+  references/closes the Issue.
+
+If any check is unknown or false, stop. A validated prepared branch is reused
+verbatim, but the session must still post and verify the normal fresh
+`claimed-by` plus activation-nonce before any mutation. Never reset,
+force-push, delete, or silently rewrite the prepared branch to make the checks
+pass.
 
 ## Claim and activation
 
