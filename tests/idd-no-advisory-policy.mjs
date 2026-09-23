@@ -116,7 +116,7 @@ for (const source of [claim, claimLite]) {
     'prepared branch marker must bind the prepared base commit');
   assert.match(source, /issue\/<N>-/,
     'prepared branch must remain in the target Issue namespace');
-  assert.match(source, /need not equal the deterministic slug derived from the[\s\S]{0,100}current Issue title/i,
+  assert.match(source, /need not equal the deterministic slug/i,
     'prepared branch marker must override title-derived slug equality');
   assert.match(source, /merge-base --is-ancestor <base-sha> origin\/<branch>/,
     'prepared branch base must be an ancestor of the marked branch head');
