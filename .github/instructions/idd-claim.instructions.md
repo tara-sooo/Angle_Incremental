@@ -37,9 +37,9 @@ and stop; never delete or reuse it silently.
 
 ### Maintainer-prepared branch exception
 
-A fresh claim may inherit a pre-existing deterministic Issue branch only when a
-top-level Issue comment from the repository owner or a Maintain/Admin actor
-contains this exact authorization marker:
+A fresh claim may inherit a pre-existing Issue branch in the target Issue
+namespace only when a top-level Issue comment from the repository owner or a
+Maintain/Admin actor contains this exact authorization marker:
 
 `<!-- idd-prepared-branch: branch=<branch> head=<40-hex-sha> base=next base-sha=<40-hex-sha> -->`
 
@@ -47,7 +47,10 @@ Treat the marker as branch-reuse authorization only, never as ownership or merge
 authorization. Plain prose naming a branch/commit does not count. Before claim
 posting, verify all of these against live state:
 
-- `branch` exactly equals the deterministic branch computed for this Issue;
+- `branch` starts with exact `issue/<N>-` for this Issue and has a
+  non-empty suffix. For this exception only, the marker's exact branch is
+  authoritative and need not equal the deterministic slug derived from the
+  current Issue title;
 - the live remote branch head exactly equals the marker `head`;
 - `base` is exact `next`; marker `base-sha` is an ancestor of both the
   marked branch head and current `origin/next`:
