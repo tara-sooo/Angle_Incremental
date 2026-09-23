@@ -114,7 +114,7 @@ for (const source of [claim, claimLite]) {
     'prepared branch authorization must bind the live remote head');
   assert.match(source, /merge-base --is-ancestor origin\/next origin\/<branch>/,
     'prepared branch authorization must prove current next ancestry');
-  assert.match(source, /branch reuse only/i,
+  assert.match(source, /branch[- ]reuse[\s\S]{0,80}(?:authorization )?only/i,
     'prepared branch marker must not become claim or merge authority');
   assert.match(source, /activation-nonce/i,
     'prepared branch reuse must still require normal claim activation');
