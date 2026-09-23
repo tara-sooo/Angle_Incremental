@@ -2,6 +2,7 @@ import { runtime, expose } from "../runtime/shared.js";
 import { bindDoubleActivation } from "./node-activation.js?v=0.13.2";
 
 let lastInfinityUpgradeSignature = null;
+let selectedInfinityUpgradeId = "1-1";
 
 function createInfinityUpgradeRows() {
   lastInfinityUpgradeSignature = null;
@@ -125,6 +126,7 @@ function buySelectedInfinityUpgrade() {
   runtime.buyInfinityUpgrade(runtime.selectedInfinityUpgradeId);
 }
 
+expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => { selectedInfinityUpgradeId = value; });
 expose("createInfinityUpgradeRows", () => createInfinityUpgradeRows, (value) => { createInfinityUpgradeRows = value; });
 expose("selectInfinityUpgrade", () => selectInfinityUpgrade);
 expose("infinityUpgradeStateText", () => infinityUpgradeStateText);

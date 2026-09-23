@@ -3,6 +3,12 @@ import "../systems/infinity-point-normalization.js";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
 
+let activeMainTab = "angle";
+let activeEternitySubtab = "milestone";
+let activeInfinitySubtab = "upgrades";
+let activeChallengeSubtab = "ic";
+let activeStatisticsSubtab = "overview";
+
 const MAIN_TAB_UNLOCKS = Object.freeze({
   angle: () => true,
   infinity: () => runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs).includes("infinity"),
@@ -448,6 +454,11 @@ function bindEvents() {
     }
   });
 }
+expose("activeMainTab", () => activeMainTab, (value) => { activeMainTab = value; });
+expose("activeEternitySubtab", () => activeEternitySubtab, (value) => { activeEternitySubtab = value; });
+expose("activeInfinitySubtab", () => activeInfinitySubtab, (value) => { activeInfinitySubtab = value; });
+expose("activeChallengeSubtab", () => activeChallengeSubtab, (value) => { activeChallengeSubtab = value; });
+expose("activeStatisticsSubtab", () => activeStatisticsSubtab, (value) => { activeStatisticsSubtab = value; });
 expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
 expose("switchEternitySubtab", () => switchEternitySubtab, (value) => { switchEternitySubtab = value; });
 expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });

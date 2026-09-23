@@ -13,6 +13,11 @@ const exactIntegerSource = fs.readFileSync(path.join(root, "src", "ui", "format-
 const renderRecoverySource = fs.readFileSync(path.join(root, "src", "ui", "render-save-recovery.js"), "utf8");
 const renderTimelineSource = fs.readFileSync(path.join(root, "src", "ui", "render-timeline.js"), "utf8");
 const renderUiSource = fs.readFileSync(path.join(root, "src", "ui", "render-ui.js"), "utf8");
+const runtimeOwnerNames = ["clock.js", "update-check.js", "automation.js", "browser-lifecycle.js", "game-loop.js", "debug-adapter.js"];
+const runtimeOwnerSources = Object.fromEntries(runtimeOwnerNames.map((name) => [
+  name,
+  fs.readFileSync(path.join(root, "src", "runtime", name), "utf8"),
+]));
 const imports = [...mainSource.matchAll(/^import "\.\/([^\"]+)";$/gm)]
   .map((entry) => `src/${entry[1]}`);
 const expectedOrder = [
@@ -45,6 +50,12 @@ const expectedOrder = [
   "src/systems/eternity.js",
   "src/systems/timeline.js",
   "src/core/offline-progress.js",
+  "src/runtime/clock.js",
+  "src/runtime/update-check.js",
+  "src/runtime/automation.js",
+  "src/runtime/browser-lifecycle.js",
+  "src/runtime/game-loop.js",
+  "src/runtime/debug-adapter.js",
 ];
 
 assert.deepStrictEqual(
@@ -60,6 +71,16 @@ assert.match(offlineProgressSource, /expose\("processOfflineElapsed"/);
 assert.doesNotMatch(mainSource, /^(?:async )?function processOfflineElapsed\(/m);
 assert.doesNotMatch(mainSource, /^let offline(?:Processing|Report)\b/m);
 assert.doesNotMatch(mainSource, /^function (?:offlineSnapshot|offlineCoreHitPlan|runOfflineEventBoundaryEngine)\(/m);
+assert.doesNotMatch(mainSource, /^(?:async )?function (?:monotonicClockNow|syncServerClock|checkForRemoteUpdate|runLayerAutomation|handleVisibilityChange|frame|renderGameToText)\(/m);
+assert.match(runtimeOwnerSources["clock.js"], /^async function syncServerClock\(/m);
+assert.match(runtimeOwnerSources["update-check.js"], /^async function checkForRemoteUpdate\(/m);
+assert.match(runtimeOwnerSources["automation.js"], /^function runLayerAutomation\(/m);
+assert.match(runtimeOwnerSources["browser-lifecycle.js"], /^async function handleVisibilityChange\(/m);
+assert.match(runtimeOwnerSources["game-loop.js"], /^function frame\(/m);
+assert.match(runtimeOwnerSources["debug-adapter.js"], /^function renderGameToText\(/m);
+for (const source of Object.values(runtimeOwnerSources)) {
+  assert.doesNotMatch(source, /^import .*\.\/(?:clock|update-check|automation|browser-lifecycle|game-loop|debug-adapter)\.js/m);
+}
 assert.match(i18nSource, /^import \{ ETERNITY_TEXT \} from "\.\/eternity-i18n\.js";$/m);
 assert.match(eternityI18nSource, /^export const ETERNITY_TEXT = \{/m);
 assert.doesNotMatch(eternityI18nSource, /runtime|Object\.assign/);
@@ -92,6 +113,10 @@ assert.match(indexSource, /"\.\/src\/ui\/render-eternity\.js": "\.\/src\/ui\/ren
 assert.match(indexSource, /"\.\/src\/ui\/format-exact-integer\.js": "\.\/src\/ui\/format-exact-integer\.js\?v=0\.13\.2"/);
 assert.match(indexSource, /"\.\/src\/ui\/render-save-recovery\.js": "\.\/src\/ui\/render-save-recovery\.js\?v=0\.13\.2"/);
 assert.match(indexSource, /"\.\/src\/ui\/render-timeline\.js": "\.\/src\/ui\/render-timeline\.js\?v=0\.13\.2"/);
+for (const name of runtimeOwnerNames) {
+  const entry = '"./src/runtime/' + name + '": "./src/runtime/' + name + '?v=0.13.2"';
+  assert.ok(indexSource.includes(entry), name + " must use the canonical app cache version");
+}
 assert.equal(fs.existsSync(path.join(root, "game.js")), false, "the removed classic entrypoint must stay absent");
 
 for (const moduleName of [
