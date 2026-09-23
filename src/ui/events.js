@@ -409,7 +409,11 @@ function bindEvents() {
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
   window.addEventListener("storage", runtime.handleStorageChange);
-  if (document.addEventListener) document.addEventListener("visibilitychange", runtime.handleVisibilityChange);
+  if (document.addEventListener) document.addEventListener("visibilitychange", () => runtime.handleVisibilityChange());
+  window.addEventListener("pagehide", () => runtime.handleVisibilityChange(true));
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && !document.hidden) runtime.handleVisibilityChange(false);
+  });
   window.addEventListener("resize", runtime.resizeCanvas);
   window.addEventListener("resize", runtime.resizeInfiniteAngleCanvas);
   const canvasResizeObserver = window.ResizeObserver && runtime.canvas.parentElement

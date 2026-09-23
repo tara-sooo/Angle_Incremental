@@ -768,13 +768,13 @@ function handleStorageChange(event) {
   return handleSaveConflict();
 }
 
-async function handleVisibilityChange() {
+async function handleVisibilityChange(hidden = document.hidden) {
   if (runtime.offlineProcessing) return;
   if (runtime.saveConflictMode) {
-    if (!document.hidden) await handleSaveConflict();
+    if (!hidden) await handleSaveConflict();
     return;
   }
-  if (document.hidden) {
+  if (hidden) {
     const transactionSnapshot = runtime.snapshotOfflineTransaction();
     const retryBaseline = {
       savedAt: offlineBaselineTimestamp,
