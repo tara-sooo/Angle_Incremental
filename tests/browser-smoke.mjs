@@ -15,6 +15,7 @@ const expectedModulePaths = [
   "/src/core/numbers.js",
   "/src/core/save.js",
   "/src/core/save-code.js",
+  "/src/core/offline-progress.js",
   "/src/systems/achievements.js",
   "/src/systems/tower.js",
   "/src/ui/render-canvas.js",
