@@ -44,7 +44,7 @@ const ACHIEVEMENTS = [
     title: { ja: "スケーリングは始まっている", en: "Scaling Has Begun" },
     condition: { ja: "所持スコアがe30を超える", en: "Hold more than 1e30 score." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.currentScoreLog10() > 30,
+    isUnlocked: (scoreLog10 = runtime.currentScoreLog10()) => scoreLog10 > 30,
   },
   {
     title: { ja: "増幅、増幅、増幅", en: "Boost, Boost, Boost" },
@@ -110,7 +110,7 @@ const ACHIEVEMENTS = [
     title: { ja: "大雑把", en: "Roughly" },
     condition: { ja: "e314スコアに到達", en: "Reach 1e314 score." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.currentScoreLog10() >= 314,
+    isUnlocked: (scoreLog10 = runtime.currentScoreLog10()) => scoreLog10 >= 314,
   },
   {
     title: { ja: "固めのカップ麺", en: "Firm Cup Noodles" },
@@ -176,7 +176,7 @@ const ACHIEVEMENTS = [
     title: { ja: "これでもいい", en: "This Is Fine Too" },
     condition: { ja: "スコアが1e628を超える", en: "Reach more than 1e628 score." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.currentScoreLog10() > 628,
+    isUnlocked: (scoreLog10 = runtime.currentScoreLog10()) => scoreLog10 > 628,
   },
   {
     title: { ja: "SDGsよりは簡単な課題", en: "An Easier Goal Than the SDGs" },
@@ -212,7 +212,7 @@ const ACHIEVEMENTS = [
     title: { ja: "道しるべを残す", en: "Leave a Signpost" },
     condition: { ja: "スコアがe2450を超える", en: "Reach more than 1e2450 score." },
     reward: { ja: "", en: "" },
-    isUnlocked: () => runtime.currentScoreLog10() > 2450,
+    isUnlocked: (scoreLog10 = runtime.currentScoreLog10()) => scoreLog10 > 2450,
   },
   {
     title: { ja: "ちょっぴり豪邸", en: "A Slightly Luxurious Mansion" },

@@ -192,3 +192,10 @@ expose("createChallengeRows", () => createChallengeRows);
 expose("updateChallengeRows", () => updateChallengeRows);
 expose("createTowerChallengeRows", () => createTowerChallengeRows);
 expose("updateTowerChallengeRows", () => updateTowerChallengeRows);
+
+export {
+  createChallengeRows,
+  updateChallengeRows,
+  createTowerChallengeRows,
+  updateTowerChallengeRows,
+};

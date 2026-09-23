@@ -162,4 +162,4 @@ export function updateSaveRecoveryUi() {
   });
 }
 
-expose("updateSaveRecoveryUi", () => updateSaveRecoveryUi, (value) => { updateSaveRecoveryUi = value; });
+expose("updateSaveRecoveryUi", () => updateSaveRecoveryUi);

@@ -180,3 +180,5 @@ expose("monotonicClockNowMs", () => monotonicClockNow);
 expose("syncServerClock", () => syncServerClock);
 expose("offlineElapsedFromSave", () => offlineElapsedFromSave);
 expose("rebaseLocalClock", () => rebaseLocalClock);
+
+export { syncServerClock };

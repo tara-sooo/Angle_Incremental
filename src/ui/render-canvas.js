@@ -366,8 +366,10 @@ expose("vertexPoint", () => vertexPoint, (value) => { vertexPoint = value; });
 expose("polygonPoints", () => polygonPoints, (value) => { polygonPoints = value; });
 expose("pointPosition", () => pointPosition, (value) => { pointPosition = value; });
 expose("drawBackground", () => drawBackground, (value) => { drawBackground = value; });
-expose("draw", () => draw, (value) => { draw = value; });
-expose("resizeCanvas", () => resizeCanvas, (value) => { resizeCanvas = value; });
-expose("drawInfiniteAngle", () => drawInfiniteAngle, (value) => { drawInfiniteAngle = value; });
-expose("resizeInfiniteAngleCanvas", () => resizeInfiniteAngleCanvas, (value) => { resizeInfiniteAngleCanvas = value; });
+expose("draw", () => draw);
+expose("resizeCanvas", () => resizeCanvas);
+expose("drawInfiniteAngle", () => drawInfiniteAngle);
+expose("resizeInfiniteAngleCanvas", () => resizeInfiniteAngleCanvas);
 expose("canvasCacheStats", () => canvasCacheStats);
+
+export { draw, resizeCanvas, drawInfiniteAngle, resizeInfiniteAngleCanvas };

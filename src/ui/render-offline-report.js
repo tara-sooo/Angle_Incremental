@@ -170,3 +170,5 @@ function updateOfflineReportUi() {
 
 expose("updateOfflineReportUi", () => updateOfflineReportUi);
 expose("formatOfflineTime", () => formatOfflineTime);
+
+export { updateOfflineReportUi };

@@ -1,4 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { clampOfflineTickCount } from "./save.js";
 
 let offlineProcessing = false;
 let offlineReport = null;
@@ -1295,7 +1296,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
     offlineDiagnostics = null;
 
     if (!clockAnomaly) {
-      const tickCount = runtime.clampOfflineTickCount(runtime.state.offlineTickCount);
+      const tickCount = clampOfflineTickCount(runtime.state.offlineTickCount);
       configuredTicks = tickCount;
       simulatedSeconds = trustedElapsed;
       requestedTicks = Math.max(

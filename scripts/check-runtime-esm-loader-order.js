@@ -8,11 +8,15 @@ const i18nSource = fs.readFileSync(path.join(root, "src", "data", "i18n.js"), "u
 const eternityI18nSource = fs.readFileSync(path.join(root, "src", "data", "eternity-i18n.js"), "utf8");
 const eventsSource = fs.readFileSync(path.join(root, "src", "ui", "events.js"), "utf8");
 const offlineProgressSource = fs.readFileSync(path.join(root, "src", "core", "offline-progress.js"), "utf8");
+const saveSource = fs.readFileSync(path.join(root, "src", "core", "save.js"), "utf8");
+const timeFluxSource = fs.readFileSync(path.join(root, "src", "systems", "time-flux.js"), "utf8");
 const renderEternitySource = fs.readFileSync(path.join(root, "src", "ui", "render-eternity.js"), "utf8");
 const exactIntegerSource = fs.readFileSync(path.join(root, "src", "ui", "format-exact-integer.js"), "utf8");
 const renderRecoverySource = fs.readFileSync(path.join(root, "src", "ui", "render-save-recovery.js"), "utf8");
 const renderTimelineSource = fs.readFileSync(path.join(root, "src", "ui", "render-timeline.js"), "utf8");
 const renderUiSource = fs.readFileSync(path.join(root, "src", "ui", "render-ui.js"), "utf8");
+const angleSource = fs.readFileSync(path.join(root, "src", "systems", "angle.js"), "utf8");
+const achievementsSource = fs.readFileSync(path.join(root, "src", "systems", "achievements.js"), "utf8");
 const runtimeOwnerNames = ["clock.js", "update-check.js", "automation.js", "browser-lifecycle.js", "game-loop.js", "debug-adapter.js"];
 const runtimeOwnerSources = Object.fromEntries(runtimeOwnerNames.map((name) => [
   name,
@@ -20,51 +24,61 @@ const runtimeOwnerSources = Object.fromEntries(runtimeOwnerNames.map((name) => [
 ]));
 const imports = [...mainSource.matchAll(/^import "\.\/([^\"]+)";$/gm)]
   .map((entry) => `src/${entry[1]}`);
-const expectedOrder = [
+const expectedLegacySideEffectImports = [
   "src/ui/dom.js",
   "src/core/constants.js",
   "src/data/i18n.js",
   "src/data/infinity-data.js",
   "src/core/state.js",
   "src/core/numbers.js",
-  "src/core/save.js",
   "src/core/save-code.js",
   "src/systems/achievements.js",
   "src/systems/tower.js",
-  "src/ui/render-canvas.js",
-  "src/ui/render-topbar.js",
-  "src/ui/render-challenges.js",
-  "src/ui/render-infinity.js",
-  "src/ui/render-achievements.js",
-  "src/ui/render-automation.js",
-  "src/ui/render-offline-report.js",
-  "src/ui/render-help.js",
-  "src/ui/render-eternity.js",
   "src/ui/render-ui.js",
   "src/systems/angle.js",
   "src/systems/generation.js",
   "src/systems/core-boost.js",
   "src/systems/infinity.js",
   "src/systems/infinite-angle.js",
-  "src/ui/events.js",
   "src/systems/eternity.js",
   "src/systems/timeline.js",
   "src/core/offline-progress.js",
-  "src/runtime/clock.js",
-  "src/runtime/update-check.js",
   "src/runtime/automation.js",
   "src/runtime/browser-lifecycle.js",
-  "src/runtime/game-loop.js",
   "src/runtime/debug-adapter.js",
 ];
 
 assert.deepStrictEqual(
   imports,
-  expectedOrder,
-  "ESM side-effect imports must match the canonical runtime order",
+  expectedLegacySideEffectImports,
+  "remaining legacy side-effect imports must stay in their required entrypoint order",
 );
 assert.match(mainSource, /^import \{ runtime, expose \} from "\.\/runtime\/shared\.js";/m);
-assert.match(mainSource, /^import "\.\/ui\/render-eternity\.js";$/m);
+function assertNamedImports(source, modulePath, names) {
+  const statements = source.match(/^import\s*\{[^}]*\}\s*from\s*"[^"]+";$/gm) || [];
+  const statement = statements.find((candidate) => candidate.endsWith('from "' + modulePath + '";'));
+  assert.ok(statement, "missing named import from " + modulePath);
+  const importedNames = statement.match(/\{([\s\S]*?)\}/)[1].split(/[,\s]+/).filter(Boolean);
+  for (const name of names) {
+    assert.ok(importedNames.includes(name), name + " must be imported from " + modulePath);
+  }
+}
+assertNamedImports(mainSource, "./core/save.js", ["loadGame"]);
+assertNamedImports(mainSource, "./ui/render-canvas.js", ["draw", "drawInfiniteAngle", "resizeCanvas", "resizeInfiniteAngleCanvas"]);
+assertNamedImports(mainSource, "./ui/render-challenges.js", ["createChallengeRows", "createTowerChallengeRows"]);
+assertNamedImports(mainSource, "./ui/render-infinity.js", ["createInfinityUpgradeRows"]);
+assertNamedImports(mainSource, "./ui/render-achievements.js", ["createAchievementRows"]);
+assertNamedImports(mainSource, "./ui/events.js", ["bindEvents", "switchMainTab", "switchEternitySubtab", "switchInfinitySubtab", "switchChallengeSubtab", "switchStatisticsSubtab"]);
+assertNamedImports(mainSource, "./runtime/clock.js", ["syncServerClock"]);
+assertNamedImports(mainSource, "./runtime/update-check.js", ["showUpdateModalIfNeeded", "checkForRemoteUpdate"]);
+assertNamedImports(mainSource, "./runtime/game-loop.js", ["requestNextFrame", "frame"]);
+assert.doesNotMatch(mainSource, /runtime\.(?:syncServerClock|bindEvents|createChallengeRows|createTowerChallengeRows|createInfinityUpgradeRows|createAchievementRows|loadGame|switchMainTab|switchEternitySubtab|switchInfinitySubtab|switchChallengeSubtab|switchStatisticsSubtab|resizeCanvas|resizeInfiniteAngleCanvas|showUpdateModalIfNeeded|checkForRemoteUpdate|draw|drawInfiniteAngle|requestNextFrame|frame)\b/);
+assertNamedImports(eventsSource, "../core/save.js", ["clampOfflineTickCount"]);
+assertNamedImports(offlineProgressSource, "./save.js", ["clampOfflineTickCount"]);
+assert.doesNotMatch(saveSource, /runtime\.clampOfflineTickCount/);
+assert.doesNotMatch(offlineProgressSource, /runtime\.clampOfflineTickCount/);
+assert.doesNotMatch(eventsSource, /runtime\.clampOfflineTickCount/);
+assert.doesNotMatch(timeFluxSource, /clampOfflineTickCount/);
 assert.match(offlineProgressSource, /^function processOfflineElapsed\(/m);
 assert.match(offlineProgressSource, /^async function processOfflineElapsedInternal\(/m);
 assert.match(offlineProgressSource, /expose\("processOfflineElapsed"/);
@@ -89,6 +103,14 @@ assert.match(renderUiSource, /^import \{ updateEternityUi \} from "\.\/render-et
 assert.match(renderUiSource, /^import \{ formatExactInteger \} from "\.\/format-exact-integer\.js";$/m);
 assert.match(renderUiSource, /^import \{ updateSaveRecoveryUi \} from "\.\/render-save-recovery\.js";$/m);
 assert.match(renderUiSource, /^import \{ updateTimelineUi \} from "\.\/render-timeline\.js";$/m);
+assertNamedImports(renderUiSource, "./render-topbar.js", ["updateTopBar"]);
+assertNamedImports(renderUiSource, "./render-challenges.js", ["updateChallengeRows", "updateTowerChallengeRows"]);
+assertNamedImports(renderUiSource, "./render-infinity.js", ["updateInfinityUpgradeRows"]);
+assertNamedImports(renderUiSource, "./render-achievements.js", ["updateAchievementRows"]);
+assertNamedImports(renderUiSource, "./render-automation.js", ["updateAutomationUi", "updateStatisticsUi"]);
+assertNamedImports(renderUiSource, "./render-offline-report.js", ["updateOfflineReportUi"]);
+assertNamedImports(renderUiSource, "./render-help.js", ["updateHelpUi"]);
+assert.doesNotMatch(renderUiSource, /runtime\.(?:updateTopBar|updateChallengeRows|updateTowerChallengeRows|updateInfinityUpgradeRows|updateAchievementRows|updateAutomationUi|updateStatisticsUi|updateOfflineReportUi|updateHelpUi)\b/);
 assert.match(renderUiSource, /updateEternityUi\(\);/);
 assert.match(renderUiSource, /updateTimelineUi\(\);[\s\S]*updateSaveRecoveryUi\(\);/);
 assert.doesNotMatch(
@@ -103,6 +125,14 @@ assert.match(renderTimelineSource, /^export function updateTimelineUi\(/m);
 assert.match(renderTimelineSource, /selectedTimelineNodeId/);
 assert.match(renderTimelineSource, /expose\("updateTimelineUi"/);
 assert.match(renderTimelineSource, /expose\("selectTimelineNode"/);
+assert.match(offlineProgressSource, /runtime\.updateUi = batchedUpdateUi;/);
+assert.match(offlineProgressSource, /runtime\.saveGame = batchedSaveGame;/);
+assert.doesNotMatch(angleSource, /runtime\.currentScoreLog10\s*=/);
+assert.match(angleSource, /achievement\.isUnlocked\(projectedScoreLog\)/);
+assert.match(achievementsSource, /isUnlocked: \(scoreLog10 = runtime\.currentScoreLog10\(\)\) => scoreLog10 > 30/);
+assert.match(achievementsSource, /isUnlocked: \(scoreLog10 = runtime\.currentScoreLog10\(\)\) => scoreLog10 >= 314/);
+assert.match(achievementsSource, /isUnlocked: \(scoreLog10 = runtime\.currentScoreLog10\(\)\) => scoreLog10 > 628/);
+assert.match(achievementsSource, /isUnlocked: \(scoreLog10 = runtime\.currentScoreLog10\(\)\) => scoreLog10 > 2450/);
 assert.doesNotMatch(renderEternitySource, /wrapUpdateUi|runtime\.updateUi\s*=/);
 
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
