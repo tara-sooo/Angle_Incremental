@@ -253,14 +253,16 @@ A maintainer-prepared branch is a narrow fresh-claim exception. It requires a
 top-level Issue comment from the repository owner or a Maintain/Admin actor
 containing this exact marker:
 
-`<!-- idd-prepared-branch: branch=<branch> head=<40-hex-sha> base=next -->`
+`<!-- idd-prepared-branch: branch=<branch> head=<40-hex-sha> base=next base-sha=<40-hex-sha> -->`
 
 Plain prose naming a branch/commit is not authorization. Verify live state:
 
 1. marker `branch` exactly equals the deterministic branch computed above;
 2. the live remote head exactly equals marker `head`;
-3. marker `base` is exact `next` and
-   `git merge-base --is-ancestor origin/next origin/<branch>` succeeds;
+3. marker `base` is exact `next`; marker `base-sha` is an ancestor of
+   both the marked branch head and current `origin/next`:
+   `git merge-base --is-ancestor <base-sha> origin/<branch>` and
+   `git merge-base --is-ancestor <base-sha> origin/next` both succeed;
 4. there is no active claim and no open PR using that branch or
    referencing/closing the Issue.
 
