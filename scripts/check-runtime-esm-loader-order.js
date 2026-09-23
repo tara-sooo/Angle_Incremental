@@ -7,6 +7,7 @@ const mainSource = fs.readFileSync(path.join(root, "src", "main.js"), "utf8");
 const i18nSource = fs.readFileSync(path.join(root, "src", "data", "i18n.js"), "utf8");
 const eternityI18nSource = fs.readFileSync(path.join(root, "src", "data", "eternity-i18n.js"), "utf8");
 const eventsSource = fs.readFileSync(path.join(root, "src", "ui", "events.js"), "utf8");
+const offlineProgressSource = fs.readFileSync(path.join(root, "src", "core", "offline-progress.js"), "utf8");
 const renderEternitySource = fs.readFileSync(path.join(root, "src", "ui", "render-eternity.js"), "utf8");
 const exactIntegerSource = fs.readFileSync(path.join(root, "src", "ui", "format-exact-integer.js"), "utf8");
 const renderRecoverySource = fs.readFileSync(path.join(root, "src", "ui", "render-save-recovery.js"), "utf8");
@@ -43,6 +44,7 @@ const expectedOrder = [
   "src/ui/events.js",
   "src/systems/eternity.js",
   "src/systems/timeline.js",
+  "src/core/offline-progress.js",
 ];
 
 assert.deepStrictEqual(
@@ -52,6 +54,12 @@ assert.deepStrictEqual(
 );
 assert.match(mainSource, /^import \{ runtime, expose \} from "\.\/runtime\/shared\.js";/m);
 assert.match(mainSource, /^import "\.\/ui\/render-eternity\.js";$/m);
+assert.match(offlineProgressSource, /^function processOfflineElapsed\(/m);
+assert.match(offlineProgressSource, /^async function processOfflineElapsedInternal\(/m);
+assert.match(offlineProgressSource, /expose\("processOfflineElapsed"/);
+assert.doesNotMatch(mainSource, /^(?:async )?function processOfflineElapsed\(/m);
+assert.doesNotMatch(mainSource, /^let offline(?:Processing|Report)\b/m);
+assert.doesNotMatch(mainSource, /^function (?:offlineSnapshot|offlineCoreHitPlan|runOfflineEventBoundaryEngine)\(/m);
 assert.match(i18nSource, /^import \{ ETERNITY_TEXT \} from "\.\/eternity-i18n\.js";$/m);
 assert.match(eternityI18nSource, /^export const ETERNITY_TEXT = \{/m);
 assert.doesNotMatch(eternityI18nSource, /runtime|Object\.assign/);
@@ -79,6 +87,7 @@ assert.doesNotMatch(renderEternitySource, /wrapUpdateUi|runtime\.updateUi\s*=/);
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.match(indexSource, /<script type="module" src="src\/main\.js[^\"]*"><\/script>/);
 assert.match(indexSource, /"\.\/src\/data\/eternity-i18n\.js": "\.\/src\/data\/eternity-i18n\.js\?v=0\.13\.2"/);
+assert.match(indexSource, /"\.\/src\/core\/offline-progress\.js": "\.\/src\/core\/offline-progress\.js\?v=0\.13\.2"/);
 assert.match(indexSource, /"\.\/src\/ui\/render-eternity\.js": "\.\/src\/ui\/render-eternity\.js\?v=0\.13\.2"/);
 assert.match(indexSource, /"\.\/src\/ui\/format-exact-integer\.js": "\.\/src\/ui\/format-exact-integer\.js\?v=0\.13\.2"/);
 assert.match(indexSource, /"\.\/src\/ui\/render-save-recovery\.js": "\.\/src\/ui\/render-save-recovery\.js\?v=0\.13\.2"/);
