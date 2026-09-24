@@ -28,7 +28,11 @@ A0-T target → A4.5 suitability → A5 claim
 ```
 
 The phase files are short operational contracts. Read the one matching the
-current state; do not load unrelated phase variants.
+current state; do not load unrelated phase variants. A4.5 Autonomy evaluates
+the next bounded executable segment rather than requiring the whole Issue to be
+human-free: a later explicit human merge/approval boundary may still PASS when
+the pre-boundary work is concrete and verifiable, and the worker must stop at
+that later gate.
 
 ## Safety invariants
 
