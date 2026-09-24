@@ -104,6 +104,21 @@ for (const pattern of [/A0-T/, /exactly one/, /no fallback/i, /suitability/]) {
 for (const pattern of [/seven checks/i, /state_reason/, /Duplicate\/superseded/, /Actionability/, /Verifiability/]) {
   assert.match(suitability, pattern);
 }
+for (const pattern of [
+  /next executable implementation segment/i,
+  /does not fail A4\.5 by itself/i,
+  /release\/x\.y\.z -> main/,
+  /re-fetchable/i,
+  /planning-only progress/i,
+]) {
+  assert.match(suitability, pattern,
+    'A4.5 must allow bounded autonomous work before an explicit downstream human handoff');
+}
+assert.doesNotMatch(
+  suitability,
+  /\| Autonomy \| no external coordination is required to implement it \|/,
+  'A4.5 must not require the entire Issue lifecycle to be human-free',
+);
 for (const pattern of [/deterministic branch/i, /issue\/<number>-<slug>/, /supersedes/, /O_EXCL|wx/, /activation marker/i, /open PR/i]) {
   assert.match(claim, pattern);
 }
