@@ -1,6 +1,8 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { bindDoubleActivation } from "./node-activation.js?v=0.14.0";
 
 let lastInfinityUpgradeSignature = null;
+let selectedInfinityUpgradeId = "1-1";
 
 function createInfinityUpgradeRows() {
   lastInfinityUpgradeSignature = null;
@@ -33,7 +35,11 @@ function createInfinityUpgradeRows() {
       button.className = "infinity-upgrade-node ui-tree-node";
       button.type = "button";
       button.dataset.upgrade = upgrade.id;
-      button.addEventListener("click", () => runtime.selectInfinityUpgrade(upgrade.id));
+      bindDoubleActivation(button, {
+        id: upgrade.id,
+        onActivate: (id) => runtime.selectInfinityUpgrade(id),
+        onDoubleActivate: (id) => runtime.buyInfinityUpgrade(id),
+      });
       const name = document.createElement("strong");
       name.className = "infinity-upgrade-name";
       const meta = document.createElement("span");
@@ -88,7 +94,7 @@ function updateInfinityUpgradeRows() {
     runtime.state.infinityUpgradeMask,
     runtime.state.infinityPointsExact,
     runtime.state.infinityPointsLog10,
-    runtime.state.infinityCount,
+    runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount").toString(),
     runtime.state.language,
     runtime.state.numberFormat,
     runtime.selectedInfinityUpgradeId,
@@ -120,9 +126,12 @@ function buySelectedInfinityUpgrade() {
   runtime.buyInfinityUpgrade(runtime.selectedInfinityUpgradeId);
 }
 
-expose("createInfinityUpgradeRows", () => createInfinityUpgradeRows, (value) => { createInfinityUpgradeRows = value; });
+expose("selectedInfinityUpgradeId", () => selectedInfinityUpgradeId, (value) => { selectedInfinityUpgradeId = value; });
+expose("createInfinityUpgradeRows", () => createInfinityUpgradeRows);
 expose("selectInfinityUpgrade", () => selectInfinityUpgrade);
 expose("infinityUpgradeStateText", () => infinityUpgradeStateText);
 expose("updateInfinityUpgradeDetail", () => updateInfinityUpgradeDetail);
 expose("updateInfinityUpgradeRows", () => updateInfinityUpgradeRows);
 expose("buySelectedInfinityUpgrade", () => buySelectedInfinityUpgrade);
+
+export { createInfinityUpgradeRows, updateInfinityUpgradeRows };

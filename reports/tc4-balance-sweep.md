@@ -117,7 +117,7 @@ Adaptive order differs from fixed-60: **no**
 | `src/main.js` | render_game_to_text state.count | requirement/reset/history |
 | `src/systems/infinity.js` | resetBelowInfinity | requirement/reset/history |
 | `src/systems/infinity.js` | applyStartingCoreBoosts | requirement/reset/history |
-| `src/systems/balance-core-boost.js` | canonicalCoreBoostGainIncreaseBaseForCount | benefit |
+| `src/systems/core-boost.js` | coreBoostGainIncreaseBaseForCount | benefit |
 | `src/systems/angle.js` | lapSpeedSoftcapStart | benefit |
 | `src/systems/angle.js` | lapSpeedSoftcapPower | benefit |
 | `src/systems/angle.js` | earlyLayerCostScalingFactor | benefit |

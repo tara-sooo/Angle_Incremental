@@ -1,11 +1,10 @@
-import { runtime } from "../runtime/shared.js";
-
-const ETERNITY_TEXT = {
+export const ETERNITY_TEXT = {
   ja: {
     eternity: "Eternity",
     eternityTab: "Eternity",
     eternityRequirementCompact: "TC4クリア + {ip} IP",
     eternityCurrentIp: "現在IP",
+    eternityPendingGain: "次回Eternity獲得量",
     eternityPerform: "Eternityする",
     eternityPerformUnavailable: "Eternity条件未達成",
     eternityMilestoneTab: "Milestone",
@@ -14,7 +13,7 @@ const ETERNITY_TEXT = {
     timelineEarned: "獲得TF",
     timelineAvailable: "使用可能TF",
     timelineSpent: "使用済みTF",
-    timelineScoreTrack: "Score",
+    timelineScoreTrack: "スコア",
     timelineIpTrack: "Infinity Point",
     timelineEternityTrack: "Eternity",
     timelineClaims: "獲得数",
@@ -33,7 +32,8 @@ const ETERNITY_TEXT = {
     timelineNodeNotEnoughTf: "TF不足（必要: {cost} TF）",
     timelineNodeAlternativeLocked: "別ルート選択済み",
     timelineNodeMissingPrerequisites: "前提ノード未達成: {nodes}",
-    timelineNodeInactive: "未購入（効果なし）",
+    timelineNodeMissingAnyPrerequisite: "いずれかの前提ノードが必要",
+    timelineNodeAnyPrerequisite: "{era}のいずれかのノード",
     timelineRealCurrentEffect: "現在のInfinity数獲得倍率: {multiplier}",
     timelineParallelCurrentEffect: "現在の倍率: {multiplier}（IC8後 {time}）",
     timelinePurchase: "ノードを購入",
@@ -64,11 +64,11 @@ const ETERNITY_TEXT = {
     eternityMilestone4Name: "4 効率的なウラン235の探し方",
     eternityMilestone4Effect: "核増幅に必要なコストを^0.9",
     eternityMilestone5Name: "5 自動植林",
-    eternityMilestone5Effect: "IUの自動化を解放",
+    eternityMilestone5Effect: "IUの自動化を解放し、IAは自動で解放される",
     eternityMilestone6Name: "6 有限回の無限チャレンジを0に",
-    eternityMilestone6Effect: "ICは全て最初からクリアされた状態になる",
+    eternityMilestone6Effect: "ICは全て最初からクリアされた状態になり、Break Infinite Capは自動で解放される",
     eternityMilestone7Name: "7 ワンポイントチャレンジ",
-    eternityMilestone7Effect: "TCは解放された瞬間にクリアされる",
+    eternityMilestone7Effect: "4までのTCは解放された瞬間にクリアされる",
     eternityMilestone8Name: "8 バベル・オブ・インフィニット",
     eternityMilestone8Effect: "IAの自動購入とTowerの自動建設を解放",
     eternityMilestone9Name: "9 煩悩まみれ",
@@ -81,6 +81,7 @@ const ETERNITY_TEXT = {
     eternityTab: "Eternity",
     eternityRequirementCompact: "TC4 clear + {ip} IP",
     eternityCurrentIp: "Current IP",
+    eternityPendingGain: "Next Eternity gain",
     eternityPerform: "Perform Eternity",
     eternityPerformUnavailable: "Eternity requirements not met",
     eternityMilestoneTab: "Milestone",
@@ -108,7 +109,8 @@ const ETERNITY_TEXT = {
     timelineNodeNotEnoughTf: "Not enough TF (need {cost} TF)",
     timelineNodeAlternativeLocked: "Alternative route selected",
     timelineNodeMissingPrerequisites: "Missing prerequisites: {nodes}",
-    timelineNodeInactive: "Inactive (not purchased)",
+    timelineNodeMissingAnyPrerequisite: "One prerequisite required",
+    timelineNodeAnyPrerequisite: "One of the {era} nodes",
     timelineRealCurrentEffect: "Current Infinity count multiplier: {multiplier}",
     timelineParallelCurrentEffect: "Current multiplier: {multiplier} (since IC8: {time})",
     timelinePurchase: "Purchase node",
@@ -139,11 +141,11 @@ const ETERNITY_TEXT = {
     eternityMilestone4Name: "4 An Efficient Way to Find Uranium-235",
     eternityMilestone4Effect: "Set the Nuclear Amplification cost to ^0.9",
     eternityMilestone5Name: "5 Automatic Afforestation",
-    eternityMilestone5Effect: "Unlock IU automation",
+    eternityMilestone5Effect: "Unlock IU automation and automatically unlock IA at its normal requirement",
     eternityMilestone6Name: "6 Finite Infinity Challenges",
-    eternityMilestone6Effect: "Start with all ICs already cleared",
+    eternityMilestone6Effect: "Start with all ICs already cleared and automatically break Infinite Cap at its normal requirement",
     eternityMilestone7Name: "7 One-Point Challenges",
-    eternityMilestone7Effect: "Clear each TC when it unlocks",
+    eternityMilestone7Effect: "Automatically clear TC1–TC4 as they unlock",
     eternityMilestone8Name: "8 Babel of Infinite",
     eternityMilestone8Effect: "Unlock IA autobuy and Tower auto-build",
     eternityMilestone9Name: "9 Worldly Desires",
@@ -152,7 +154,3 @@ const ETERNITY_TEXT = {
     eternityMilestone10Effect: "Perform Break Eternity",
   },
 };
-
-Object.entries(ETERNITY_TEXT).forEach(([language, strings]) => {
-  if (runtime.TEXT?.[language]) Object.assign(runtime.TEXT[language], strings);
-});

@@ -50,3 +50,5 @@ function updateAchievementRows() {
 
 expose("createAchievementRows", () => createAchievementRows);
 expose("updateAchievementRows", () => updateAchievementRows);
+
+export { createAchievementRows, updateAchievementRows };

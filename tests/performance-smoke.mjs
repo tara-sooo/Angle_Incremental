@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import { openGamePage, root, startGameTest, writeReport } from "./browser-harness.mjs";
+import {
+  AGGREGATION_STATISTIC,
+  BATCH_COUNT,
+  PERFORMANCE_METRIC_VERSION,
+  TIMED_ITERATIONS,
+  WARMUP_ITERATIONS,
+  aggregatePerformanceMetric,
+  readPerformanceMetricP95,
+} from "../scripts/performance-metrics.mjs";
 
 const reportPath = path.join(root, "output", "performance-smoke.json");
 const budgets = Object.freeze({
@@ -16,27 +25,36 @@ const simulationViewport = viewports[0];
 const simulationDeviceScaleFactor = 1;
 const renderingDeviceScaleFactors = Object.freeze([1, 2]);
 const vertexScenarios = Object.freeze([3, 720, 10000]);
+const measurement = Object.freeze({
+  batchCount: BATCH_COUNT,
+  warmupIterations: WARMUP_ITERATIONS,
+  timedIterations: TIMED_ITERATIONS,
+  aggregateStatistic: AGGREGATION_STATISTIC,
+  resetSemantics: "resetScenario restores deterministic progression counters, gains, scores, timers, and positions before every batch; state advances during that batch's warmup and timed samples",
+});
 
 function collectTimingViolations(report) {
   const violations = [];
-  const check = (result, scenario, track, metric, value, budget) => {
+  const check = (result, scenario, track, metricName, metric, budget) => {
+    const value = readPerformanceMetricP95(metric, PERFORMANCE_METRIC_VERSION);
+    if (metric.budgetMs !== budget) throw new Error(`${track} ${metricName} budget does not match the selected scenario budget`);
     if (value > budget) {
       violations.push(
-        `${result.viewport.name}/DPR${result.deviceScaleFactor}/${track}/${scenario.vertices} ${metric} p95 ${value.toFixed(3)}ms > ${budget}ms`,
+        `${result.viewport.name}/DPR${result.deviceScaleFactor}/${track}/${scenario.vertices} ${metricName} p95 ${value.toFixed(3)}ms > ${budget}ms`,
       );
     }
   };
   for (const result of report.simulationResults) {
     for (const scenario of result.scenarios) {
-      check(result, scenario, "angle", "simulation", scenario.angle.simulation.p95Ms, budgets.simulationP95Ms);
-      check(result, scenario, "infinite-angle", "simulation", scenario.infiniteAngle.simulation.p95Ms, budgets.simulationP95Ms);
+      check(result, scenario, "angle", "simulation", scenario.angle.simulation, budgets.simulationP95Ms);
+      check(result, scenario, "infinite-angle", "simulation", scenario.infiniteAngle.simulation, budgets.simulationP95Ms);
     }
   }
   for (const result of report.renderResults) {
     for (const scenario of result.scenarios) {
       const angleBudget = scenario.vertices >= 10000 ? budgets.highLoadFrameP95Ms : budgets.normalFrameP95Ms;
-      check(result, scenario, "angle", "frame", scenario.angle.frame.p95Ms, angleBudget);
-      check(result, scenario, "infinite-angle", "frame", scenario.infiniteAngle.frame.p95Ms, budgets.highLoadFrameP95Ms);
+      check(result, scenario, "angle", "frame", scenario.angle.frame, angleBudget);
+      check(result, scenario, "infinite-angle", "frame", scenario.infiniteAngle.frame, budgets.highLoadFrameP95Ms);
     }
   }
   return violations;
@@ -49,13 +67,14 @@ export function budgetViolationKey(violation) {
 }
 
 async function measureSimulation(page) {
-  return page.evaluate(({ vertices }) => {
+  return page.evaluate(({ vertices, batchCount, warmupIterations, timedIterations }) => {
     const debug = window.__angleDebug;
     const { state } = debug;
-    function measure(callback, iterations = 120) {
-      for (let index = 0; index < 20; index += 1) callback();
+    const initialState = structuredClone(state);
+    function measure(callback) {
+      for (let index = 0; index < warmupIterations; index += 1) callback();
       const samples = [];
-      for (let index = 0; index < iterations; index += 1) {
+      for (let index = 0; index < timedIterations; index += 1) {
         const startedAt = performance.now();
         callback();
         samples.push(performance.now() - startedAt);
@@ -70,39 +89,41 @@ async function measureSimulation(page) {
         maxMs: sorted[sorted.length - 1],
       };
     }
+    function measureBatches(callback) {
+      const batches = [];
+      for (let index = 0; index < batchCount; index += 1) batches.push(callback());
+      return { batches };
+    }
     function resetScenario(vertices) {
-      state.activeChallenge = 0;
-      state.vertices = vertices;
-      state.speedLevel = 300;
-      state.gainLevel = 100;
-      state.pointProgress = 0;
-      state.totalVertexProgress = 0;
-      state.score = 0;
-      state.scoreLog10 = -Infinity;
-      state.totalScore = 0;
-      state.totalScoreLog10 = -Infinity;
-      state.generationScore = 0;
-      state.generationScoreLog10 = -Infinity;
-      state.floatingTexts = [];
-      state.infiniteAngleUnlocked = true;
-      state.infiniteAngleVertexLevel = vertices - 3;
-      state.infiniteAngleSpeedLevel = 300;
-      state.infiniteAngleGainLevel = 100;
-      state.infiniteAnglePointProgress = 0;
-      state.infiniteAngleTotalVertexProgress = 0;
-      state.infiniteAngleCurrentGain = 1;
-      state.infiniteAngleCurrentGainLog10 = 0;
+      Object.assign(state, structuredClone(initialState), {
+        activeChallenge: 0,
+        activeChallengeTime: 0,
+        activeTowerChallenge: 0,
+        activeTowerChallengeTime: 0,
+        vertices,
+        verticesExact: String(vertices),
+        speedLevel: 300,
+        speedLevelExact: "300",
+        gainLevel: 100,
+        gainLevelExact: "100",
+        infiniteAngleUnlocked: true,
+        infiniteAngleVertexLevel: vertices - 3,
+        infiniteAngleSpeedLevel: 300,
+        infiniteAngleGainLevel: 100,
+      });
     }
     function measureTrack(track, vertices) {
-      resetScenario(vertices);
       if (track === "angle") debug.switchMainTab("angle");
       else {
         debug.switchMainTab("infinity");
         debug.switchInfinitySubtab("angle");
       }
-      return measure(() => {
-        if (track === "angle") debug.update(1 / 60);
-        else debug.updateInfiniteAngle(1 / 60);
+      return measureBatches(() => {
+        resetScenario(vertices);
+        return measure(() => {
+          if (track === "angle") debug.update(1 / 60);
+          else debug.updateInfiniteAngle(1 / 60);
+        });
       });
     }
     return {
@@ -114,17 +135,23 @@ async function measureSimulation(page) {
         infiniteAngle: { simulation: measureTrack("infiniteAngle", vertices) },
       })),
     };
-  }, { vertices: vertexScenarios });
+  }, {
+    vertices: vertexScenarios,
+    batchCount: BATCH_COUNT,
+    warmupIterations: WARMUP_ITERATIONS,
+    timedIterations: TIMED_ITERATIONS,
+  });
 }
 
 async function measureRendering(page, viewport, deviceScaleFactor) {
-  return page.evaluate(({ vertices, viewportData, scaleFactor }) => {
+  return page.evaluate(({ vertices, viewportData, scaleFactor, batchCount, warmupIterations, timedIterations }) => {
     const debug = window.__angleDebug;
     const { state } = debug;
-    function measure(callback, iterations = 120) {
-      for (let index = 0; index < 20; index += 1) callback();
+    const initialState = structuredClone(state);
+    function measure(callback) {
+      for (let index = 0; index < warmupIterations; index += 1) callback();
       const samples = [];
-      for (let index = 0; index < iterations; index += 1) {
+      for (let index = 0; index < timedIterations; index += 1) {
         const startedAt = performance.now();
         callback();
         samples.push(performance.now() - startedAt);
@@ -139,28 +166,28 @@ async function measureRendering(page, viewport, deviceScaleFactor) {
         maxMs: sorted[sorted.length - 1],
       };
     }
+    function measureBatches(callback) {
+      const batches = [];
+      for (let index = 0; index < batchCount; index += 1) batches.push(callback());
+      return { batches };
+    }
     function resetScenario(vertices) {
-      state.activeChallenge = 0;
-      state.vertices = vertices;
-      state.speedLevel = 300;
-      state.gainLevel = 100;
-      state.pointProgress = 0;
-      state.totalVertexProgress = 0;
-      state.score = 0;
-      state.scoreLog10 = -Infinity;
-      state.totalScore = 0;
-      state.totalScoreLog10 = -Infinity;
-      state.generationScore = 0;
-      state.generationScoreLog10 = -Infinity;
-      state.floatingTexts = [];
-      state.infiniteAngleUnlocked = true;
-      state.infiniteAngleVertexLevel = vertices - 3;
-      state.infiniteAngleSpeedLevel = 300;
-      state.infiniteAngleGainLevel = 100;
-      state.infiniteAnglePointProgress = 0;
-      state.infiniteAngleTotalVertexProgress = 0;
-      state.infiniteAngleCurrentGain = 1;
-      state.infiniteAngleCurrentGainLog10 = 0;
+      Object.assign(state, structuredClone(initialState), {
+        activeChallenge: 0,
+        activeChallengeTime: 0,
+        activeTowerChallenge: 0,
+        activeTowerChallengeTime: 0,
+        vertices,
+        verticesExact: String(vertices),
+        speedLevel: 300,
+        speedLevelExact: "300",
+        gainLevel: 100,
+        gainLevelExact: "100",
+        infiniteAngleUnlocked: true,
+        infiniteAngleVertexLevel: vertices - 3,
+        infiniteAngleSpeedLevel: 300,
+        infiniteAngleGainLevel: 100,
+      });
       debug.setRenderQualityForTest("high");
     }
     function canvasSnapshot(selector) {
@@ -176,16 +203,18 @@ async function measureRendering(page, viewport, deviceScaleFactor) {
       };
     }
     function measureTrack(track, vertices) {
-      resetScenario(vertices);
       if (track === "angle") debug.switchMainTab("angle");
       else {
         debug.switchMainTab("infinity");
         debug.switchInfinitySubtab("angle");
       }
-      window.advanceTime(0);
-      const frame = measure(() => window.advanceTime(1000 / 60));
+      const metric = measureBatches(() => {
+        resetScenario(vertices);
+        window.advanceTime(0);
+        return measure(() => window.advanceTime(1000 / 60));
+      });
       return {
-        frame,
+        frame: metric,
         canvas: canvasSnapshot(track === "angle" ? "#gameCanvas" : "#infiniteAngleCanvas"),
       };
     }
@@ -199,7 +228,51 @@ async function measureRendering(page, viewport, deviceScaleFactor) {
         infiniteAngle: measureTrack("infiniteAngle", vertices),
       })),
     };
-  }, { vertices: vertexScenarios, viewportData: viewport, scaleFactor: deviceScaleFactor });
+  }, {
+    vertices: vertexScenarios,
+    viewportData: viewport,
+    scaleFactor: deviceScaleFactor,
+    batchCount: BATCH_COUNT,
+    warmupIterations: WARMUP_ITERATIONS,
+    timedIterations: TIMED_ITERATIONS,
+  });
+}
+
+function finalizeSimulationResults(results) {
+  return results.map((result) => ({
+    ...result,
+    scenarios: result.scenarios.map((scenario) => ({
+      ...scenario,
+      angle: {
+        ...scenario.angle,
+        simulation: aggregatePerformanceMetric(scenario.angle.simulation, budgets.simulationP95Ms),
+      },
+      infiniteAngle: {
+        ...scenario.infiniteAngle,
+        simulation: aggregatePerformanceMetric(scenario.infiniteAngle.simulation, budgets.simulationP95Ms),
+      },
+    })),
+  }));
+}
+
+function finalizeRenderResults(results) {
+  return results.map((result) => ({
+    ...result,
+    scenarios: result.scenarios.map((scenario) => ({
+      ...scenario,
+      angle: {
+        ...scenario.angle,
+        frame: aggregatePerformanceMetric(
+          scenario.angle.frame,
+          scenario.vertices >= 10000 ? budgets.highLoadFrameP95Ms : budgets.normalFrameP95Ms,
+        ),
+      },
+      infiniteAngle: {
+        ...scenario.infiniteAngle,
+        frame: aggregatePerformanceMetric(scenario.infiniteAngle.frame, budgets.highLoadFrameP95Ms),
+      },
+    })),
+  }));
 }
 
 const gameTest = await startGameTest();
@@ -233,6 +306,8 @@ try {
   const report = {
     status: "measured",
     generatedAt: new Date().toISOString(),
+    performanceMetricVersion: PERFORMANCE_METRIC_VERSION,
+    measurement,
     budgets,
     matrix: {
       simulation: {
@@ -250,8 +325,8 @@ try {
         reason: "rendering retains layout, effective-DPR, track, and load timing; input-DPR3 cap is asserted in render-regression",
       },
     },
-    simulationResults,
-    renderResults,
+    simulationResults: finalizeSimulationResults(simulationResults),
+    renderResults: finalizeRenderResults(renderResults),
   };
   const budgetViolations = collectTimingViolations(report);
   report.budgetViolations = budgetViolations;

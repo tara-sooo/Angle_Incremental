@@ -8,7 +8,6 @@ const sourcePaths = Object.freeze({
   manifest: "version.json",
   index: "index.html",
   i18n: "src/data/i18n.js",
-  events: "src/ui/events.js",
   browserSmoke: "tests/browser-smoke.mjs",
   performanceSmoke: "tests/performance-smoke.mjs",
 });
@@ -127,18 +126,6 @@ export function collectVersionConsistencyIssues(sources) {
     if (!jsVersions.some(({ path: assetPath }) => assetPath.endsWith("src/main.js"))) {
       issues.push(issue("index.html main.js cache buster", expected, null));
     }
-  }
-
-  const eventsVersions = extractCacheVersions(
-    sources.events,
-    /["']([^"']+\.js)\?v=([^"'&\s]+)["']/g,
-  );
-  if (eventsVersions.length === 0) {
-    issues.push(issue("src/ui/events.js module cache buster", expected, null));
-  } else {
-    eventsVersions.forEach(({ path: assetPath, version }) => {
-      compareVersion(issues, `src/ui/events.js module cache buster (${assetPath})`, expected, version);
-    });
   }
 
   compareVersion(issues, "index.html update modal fallback", expected, extractHtmlUpdateTitle(sources.index)?.match(/\d+\.\d+\.\d+/)?.[0]);

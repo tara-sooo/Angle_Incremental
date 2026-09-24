@@ -1,9 +1,14 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { clampOfflineTickCount } from "../core/save.js";
 import "../systems/infinity-point-normalization.js";
-import { installNumericStabilityFixes } from "../patches/numeric-stability.js?v=0.13.3";
-import "./render-eternity.js?v=0.13.3";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
+
+let activeMainTab = "angle";
+let activeEternitySubtab = "milestone";
+let activeInfinitySubtab = "upgrades";
+let activeChallengeSubtab = "ic";
+let activeStatisticsSubtab = "overview";
 
 const MAIN_TAB_UNLOCKS = Object.freeze({
   angle: () => true,
@@ -60,24 +65,26 @@ function hasPositiveValue(values) {
 function discoverMainTabs() {
   const state = runtime.state;
   const discovered = [];
-  if (state.eternityCount > 0 || state.infinityCount > 0) discovered.push("infinity");
+  const hasEternity = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount") > 0n;
+  const hasInfinity = runtime.currentExactIntegerState(state, "infinityCountExact", "infinityCount") > 0n;
+  if (hasEternity || hasInfinity) discovered.push("infinity");
   if (
-    state.eternityCount > 0
+    hasEternity
     || runtime.infinityChallengesUnlocked?.() === true
     || state.activeChallenge > 0
     || state.completedChallenges !== 0
     || hasPositiveValue(state.fastestInfinityChallengeTimes)
   ) discovered.push("challenges");
   if (
-    state.eternityCount > 0
+    hasEternity
     || runtime.normalAutomationUnlocked?.() === true
     || runtime.isAchievementUnlocked?.(19) === true
     || runtime.infinityAutomationUnlocked?.() === true
     || runtime.infinityUpgradeAutomationUnlocked?.() === true
     || runtime.eternityMilestoneActive?.("8") === true
   ) discovered.push("automation");
-  if (state.eternityCount > 0 || runtime.towerChallengeUnlocked?.(4) === true) discovered.push("eternity");
-  if (state.eternityCount > 0) discovered.push("timeline");
+  if (hasEternity || runtime.towerChallengeUnlocked?.(4) === true) discovered.push("eternity");
+  if (hasEternity) discovered.push("timeline");
   return runtime.markMainTabsUnlocked(discovered) === true;
 }
 
@@ -235,7 +242,7 @@ function applySetting(key, value) {
       runtime.serverClockAvailable?.() && runtime.serverClockNowMs ? runtime.serverClockNowMs() : 0,
     );
   }
-  if (key === "offlineTickCount") runtime.state.offlineTickCount = runtime.clampOfflineTickCount(value);
+  if (key === "offlineTickCount") runtime.state.offlineTickCount = clampOfflineTickCount(value);
   if (key === "showFloatingText" && !value) runtime.state.floatingTexts = [];
   if (key === "lightEffects" && value) runtime.state.floatingTexts = [];
   if (key === "showFps") runtime.state.showFps = Boolean(value);
@@ -276,7 +283,6 @@ function isEditableKeyboardTarget(target) {
 }
 
 function bindEvents() {
-  installNumericStabilityFixes();
   if (runtime.elements.confirmationModal) {
     runtime.elements.confirmationModal.addEventListener("cancel", (event) => {
       event.preventDefault();
@@ -311,11 +317,6 @@ function bindEvents() {
   runtime.elements.timelineScoreClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("score"));
   runtime.elements.timelineIpClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("ip"));
   runtime.elements.timelineEternityClaimButton?.addEventListener("click", () => runtime.claimTimelineTf?.("eternity"));
-  runtime.elements.timelineTree?.addEventListener("click", (event) => {
-    const nodeButton = event.target?.closest?.(".timeline-node[data-timeline-node]");
-    if (!nodeButton || !runtime.elements.timelineTree.contains(nodeButton)) return;
-    runtime.selectTimelineNode?.(nodeButton.dataset.timelineNode);
-  });
   runtime.elements.timelineNodePurchaseButton?.addEventListener("click", () => {
     const nodeId = runtime.elements.timelineNodePurchaseButton.dataset.timelineNodePurchase;
     if (nodeId) runtime.purchaseTimelineNode?.(nodeId);
@@ -415,7 +416,11 @@ function bindEvents() {
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));
   window.addEventListener("storage", runtime.handleStorageChange);
-  if (document.addEventListener) document.addEventListener("visibilitychange", runtime.handleVisibilityChange);
+  if (document.addEventListener) document.addEventListener("visibilitychange", () => runtime.handleVisibilityChange());
+  window.addEventListener("pagehide", () => runtime.handleVisibilityChange(true));
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted && !document.hidden) runtime.handleVisibilityChange(false);
+  });
   window.addEventListener("resize", runtime.resizeCanvas);
   window.addEventListener("resize", runtime.resizeInfiniteAngleCanvas);
   const canvasResizeObserver = window.ResizeObserver && runtime.canvas.parentElement
@@ -450,11 +455,16 @@ function bindEvents() {
     }
   });
 }
-expose("switchMainTab", () => switchMainTab, (value) => { switchMainTab = value; });
-expose("switchEternitySubtab", () => switchEternitySubtab, (value) => { switchEternitySubtab = value; });
-expose("switchInfinitySubtab", () => switchInfinitySubtab, (value) => { switchInfinitySubtab = value; });
-expose("switchChallengeSubtab", () => switchChallengeSubtab, (value) => { switchChallengeSubtab = value; });
-expose("switchStatisticsSubtab", () => switchStatisticsSubtab, (value) => { switchStatisticsSubtab = value; });
+expose("activeMainTab", () => activeMainTab, (value) => { activeMainTab = value; });
+expose("activeEternitySubtab", () => activeEternitySubtab, (value) => { activeEternitySubtab = value; });
+expose("activeInfinitySubtab", () => activeInfinitySubtab, (value) => { activeInfinitySubtab = value; });
+expose("activeChallengeSubtab", () => activeChallengeSubtab, (value) => { activeChallengeSubtab = value; });
+expose("activeStatisticsSubtab", () => activeStatisticsSubtab, (value) => { activeStatisticsSubtab = value; });
+expose("switchMainTab", () => switchMainTab);
+expose("switchEternitySubtab", () => switchEternitySubtab);
+expose("switchInfinitySubtab", () => switchInfinitySubtab);
+expose("switchChallengeSubtab", () => switchChallengeSubtab);
+expose("switchStatisticsSubtab", () => switchStatisticsSubtab);
 expose("helpContextMainTab", () => helpContextMainTab, (value) => { helpContextMainTab = value; });
 expose("applySetting", () => applySetting, (value) => { applySetting = value; });
 expose("mainTabIsUnlocked", () => mainTabIsUnlocked);
@@ -463,4 +473,13 @@ expose("setMainTabVisibility", () => setMainTabVisibility);
 expose("discoverMainTabs", () => discoverMainTabs);
 expose("updateMainTabVisibility", () => updateMainTabVisibility);
 expose("isEditableKeyboardTarget", () => isEditableKeyboardTarget, (value) => { isEditableKeyboardTarget = value; });
-expose("bindEvents", () => bindEvents, (value) => { bindEvents = value; });
+expose("bindEvents", () => bindEvents);
+
+export {
+  switchMainTab,
+  switchEternitySubtab,
+  switchInfinitySubtab,
+  switchChallengeSubtab,
+  switchStatisticsSubtab,
+  bindEvents,
+};

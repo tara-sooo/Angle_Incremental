@@ -24,12 +24,20 @@ function coreBoostRequirementGrowthPower() {
 }
 
 function coreBoostRequirementLog10() {
-  const multiplier = coreBoostRequirementGrowthPower() ** runtime.state.coreBoostCount;
-  if (!Number.isFinite(multiplier)) return runtime.MAX_TRACKED_LOG10;
-  const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
-  const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
-  const cappedLog10 = Math.min(challengeAdjustedLog10, runtime.MAX_TRACKED_LOG10);
-  return runtime.eternityMilestoneCoreBoostRequirementLog10?.(cappedLog10) ?? cappedLog10;
+  const count = Math.max(0, Math.floor(runtime.state.coreBoostCount));
+  const growthPower = typeof runtime.coreBoostRequirementGrowthPower === "function"
+    ? runtime.coreBoostRequirementGrowthPower()
+    : 2;
+  const multiplier = growthPower ** count;
+  if (Number.isFinite(multiplier)) {
+    const requirementLog10 = Math.log10(runtime.CORE_BOOST_BASE_REQUIREMENT) * multiplier;
+    const challengeAdjustedLog10 = runtime.state.activeChallenge === 8 ? requirementLog10 * 2 : requirementLog10;
+    if (Number.isFinite(challengeAdjustedLog10)) {
+      return runtime.eternityMilestoneCoreBoostRequirementLog10?.(challengeAdjustedLog10)
+        ?? challengeAdjustedLog10;
+    }
+  }
+  return runtime.MAX_GAME_LOG10;
 }
 
 function coreBoostRequirement() {
@@ -58,7 +66,15 @@ function coreBoostGainIncreaseMultiplier() {
 }
 
 function ic8VertexUpgradeCount() {
-  return runtime.state.activeChallenge === 8 ? Math.max(0, runtime.state.ic8VertexUpgradeLevel) : 0;
+  return runtime.state.activeChallenge === 8
+    ? runtime.numberFromExactInteger(
+      runtime.currentExactIntegerState(
+        runtime.state,
+        "ic8VertexUpgradeLevelExact",
+        "ic8VertexUpgradeLevel",
+      ),
+    )
+    : 0;
 }
 
 function ic8VertexScoreExponentBonus(level = ic8VertexUpgradeCount()) {
@@ -101,10 +117,7 @@ function resetBelowCoreBoost() {
   runtime.state.totalScoreLog10 = -Infinity;
   runtime.state.generationScore = 0;
   runtime.state.generationScoreLog10 = -Infinity;
-  runtime.state.vertices = 3;
-  runtime.state.ic8VertexUpgradeLevel = 0;
-  runtime.state.speedLevel = 0;
-  runtime.state.gainLevel = 0;
+  runtime.resetNormalUpgradeLevels?.();
   runtime.state.currentGain = 1;
   runtime.state.currentGainLog10 = 0;
   runtime.state.pointProgress = 0;
@@ -118,6 +131,7 @@ function resetBelowCoreBoost() {
   runtime.state.generationCostFactor = 1;
   runtime.state.currentGenerationRunTime = 0;
   runtime.state.floatingTexts = [];
+  runtime.applyResetStartScore();
 }
 
 function runCoreBoost() {

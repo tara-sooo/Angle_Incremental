@@ -1,5 +1,4 @@
 import { runtime, expose } from "../runtime/shared.js";
-import "../data/eternity-i18n.js?v=0.13.3";
 
 const FIRST_TIER_IDS = Object.freeze(["1-1", "1-2", "1-3"]);
 const MILESTONES = Object.freeze([
@@ -19,14 +18,13 @@ const MILESTONES = Object.freeze([
 
 let eternityRoot = null;
 let eternityTab = null;
-let wrappedUpdateUi = false;
 
 function installEternityStyles() {
   if (document.getElementById("eternityUiStyles")) return;
   const link = document.createElement("link");
   link.id = "eternityUiStyles";
   link.rel = "stylesheet";
-  link.href = new URL("./eternity-ui.css?v=0.13.3", import.meta.url).href;
+  link.href = new URL("./eternity-ui.css?v=0.14.0", import.meta.url).href;
   document.head.append(link);
 }
 
@@ -106,6 +104,10 @@ function installEternityUi() {
             <div>
               <span data-i18n="eternityCurrentIp"></span>
               <strong id="eternityCurrentIp">0 IP</strong>
+            </div>
+            <div>
+              <span data-i18n="eternityPendingGain"></span>
+              <strong id="eternityPendingGain">1</strong>
             </div>
           </div>
           <div class="eternity-action-row dense-action-row ui-action-row">
@@ -225,15 +227,21 @@ function updateMilestoneCard(milestone, availableChoices) {
   }
 }
 
-function updateEternityUi() {
+export function updateEternityUi() {
   if (!installEternityUi()) return;
-  const count = Math.max(0, Math.floor(Number(runtime.state.eternityCount) || 0));
+  const countExact = runtime.currentExactIntegerState(
+    runtime.state,
+    "eternityCountExact",
+    "eternityCount",
+  );
+  const count = runtime.numberFromExactInteger(countExact);
   const ready = runtime.canEternity?.() === true;
   const entitlementCount = Math.max(0, Math.floor(Number(runtime.firstTierMilestoneEntitlementCount?.()) || 0));
   const availableChoices = new Set(runtime.availableEternityMilestoneChoices?.() || []);
 
   const headingCount = eternityRoot.querySelector("#eternityHeadingCount");
   const currentIp = eternityRoot.querySelector("#eternityCurrentIp");
+  const pendingGain = eternityRoot.querySelector("#eternityPendingGain");
   const performButton = eternityRoot.querySelector("#eternityPerformButton");
   const entitlement = eternityRoot.querySelector("#eternityChoiceEntitlement");
   const allOwned = eternityRoot.querySelector("#eternityChoiceAllOwned");
@@ -243,12 +251,22 @@ function updateEternityUi() {
       .replace("{ip}", runtime.formatUiLogNumber(runtime.ETERNITY_REQUIREMENT_LOG10));
   }
 
-  if (headingCount) headingCount.textContent = `Eternity ${runtime.formatUiNumber(count)}`;
+  if (headingCount) {
+    headingCount.textContent = `Eternity ${runtime.formatHeldUiLogNumber(
+      runtime.log10ExactInteger(countExact),
+      countExact.toString(),
+    )}`;
+  }
   if (currentIp) {
     currentIp.textContent = `${runtime.formatHeldUiLogNumber(
       runtime.currentInfinityPointsLog10(),
       runtime.state.infinityPointsExact,
     )} IP`;
+  }
+  if (pendingGain) {
+    pendingGain.textContent = runtime.formatUiLogNumber(
+      runtime.eternityGainLog10?.() ?? runtime.log10Value(runtime.eternityGain?.() ?? 1),
+    );
   }
   if (performButton) {
     performButton.disabled = !ready;
@@ -272,19 +290,7 @@ function updateEternityUi() {
   }
 }
 
-function wrapUpdateUi() {
-  if (wrappedUpdateUi || typeof runtime.updateUi !== "function") return;
-  const baseUpdateUi = runtime.updateUi;
-  runtime.updateUi = (...args) => {
-    const result = baseUpdateUi(...args);
-    updateEternityUi();
-    return result;
-  };
-  wrappedUpdateUi = true;
-}
-
 installEternityUi();
-wrapUpdateUi();
 
 expose("installEternityUi", () => installEternityUi);
 expose("updateEternityUi", () => updateEternityUi);

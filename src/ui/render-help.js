@@ -116,6 +116,9 @@ let selectedTopicId = "";
 let lastContextTopicId = "";
 
 function positiveStateValue(key) {
+  if (key === "infinityCount" || key === "eternityCount") {
+    return runtime.currentExactIntegerState(runtime.state, key + "Exact", key) > 0n;
+  }
   return Number(runtime.state?.[key]) > 0;
 }
 
@@ -232,10 +235,15 @@ function updateHelpUi() {
     heading.id = "helpArticleTitle";
     heading.textContent = runtime.t(selectedTopic.titleKey);
 
-    const body = document.createElement("p");
-    body.className = "help-section-body";
-    body.textContent = runtime.t(selectedTopic.bodyKey);
-    article.append(heading, body);
+    const bodyText = runtime.t(selectedTopic.bodyKey);
+    const paragraphs = Array.isArray(bodyText) ? bodyText : [bodyText];
+    article.append(heading);
+    paragraphs.forEach((paragraphText) => {
+      const body = document.createElement("p");
+      body.className = "help-section-body";
+      body.textContent = paragraphText;
+      article.append(body);
+    });
     sections.append(article);
   }
 
@@ -243,4 +251,6 @@ function updateHelpUi() {
   return true;
 }
 
-expose("updateHelpUi", () => updateHelpUi, (value) => { updateHelpUi = value; });
+expose("updateHelpUi", () => updateHelpUi);
+
+export { updateHelpUi };

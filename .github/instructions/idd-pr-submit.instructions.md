@@ -10,6 +10,16 @@ rebase it onto `origin/next`; if it is already current, skip the no-op rebase.
 Verify HEAD is still on the claimed branch and the implementation commit is
 present. Resolve any conflicts, run fix-validate, and commit the resolution.
 
+### Local performance requested by the Issue
+
+The pre-push gate remains `npm run validate`. If the Issue also requires
+`npm run test:performance` locally, execute it and record the report, but do
+not promote that strict timing command into a pre-push hard gate or apply the
+hosted-CI rerun/hold count to its timing-only result. Use the baseline-aware
+local classifier when regression classification is needed; an
+`local-performance-inconclusive` result proceeds to PR and still requires
+hosted CI.
+
 Run the pre-push gate in the sibling worktree:
 
 ```sh

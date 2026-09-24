@@ -25,8 +25,8 @@ const TIMELINE_NODES = Object.freeze([
       en: "Endless Ice Age",
     }),
     description: Object.freeze({
-      ja: "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×{softcap}でソフトキャップ）",
-      en: "After clearing IC8, IP gain increases by ×3 each second (softcap at ×{softcap}).",
+      ja: "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×{softcap} SC）",
+      en: "After clearing IC8, IP gain increases by ×3 each second (SC at ×{softcap}).",
     }),
   }),
 ]);
