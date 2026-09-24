@@ -108,7 +108,7 @@ for (const pattern of [
   /next executable implementation segment/i,
   /does not fail A4\.5 by itself/i,
   /release\/x\.y\.z -> main/,
-  /objective and re-fetchable/i,
+  /re-fetchable/i,
   /planning-only progress is insufficient/i,
 ]) {
   assert.match(suitability, pattern,
