@@ -49,6 +49,28 @@ each commit run the `fix-validate` gate:
 npm run check:runtime-order && npm run check:syntax
 ```
 
+## Local performance evidence boundary
+
+When an Issue explicitly requires `npm run test:performance` during B/C or
+before push, run it and record its report. The Issue request changes the
+evidence collected, not the workflow gates: `npm run validate` remains the
+normal pre-push/post-fix gate, and the hosted-CI retry/hold rules do not apply
+to a local command.
+
+| local result | B/C action |
+| --- | --- |
+| `local-performance-pass` | record evidence and continue |
+| timing-budget-only failure | record evidence; do not count it as a hosted-CI failure or invoke a rerun/second-failure hold |
+| repeated local timing-budget failures | apply the same evidence-only treatment; failure count alone never invokes hosted-CI hold semantics |
+| `local-performance-regression` | stop for candidate-specific repair |
+| `local-performance-inconclusive` | continue to PR; hosted CI is required |
+| malformed/non-timing report, invalid trusted-base state, or ownership failure | fail closed |
+
+If a strict local timing result needs classification, use
+`npm run test:performance:local` against the trusted `origin/next` state. A
+strict local timing overage alone is not a hold; a baseline-aware
+`local-performance-regression` remains a blocking candidate regression.
+
 ## C — Bounded self-review loop
 
 After the implementation stabilizes, inspect the complete diff and run a

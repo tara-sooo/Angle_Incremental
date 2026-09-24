@@ -66,6 +66,7 @@ const core = read('.github/instructions/idd-overview-core.instructions.md');
 const discover = read('.github/instructions/idd-discover.instructions.md');
 const suitability = read('.github/instructions/idd-suitability.instructions.md');
 const claim = read('.github/instructions/idd-claim.instructions.md');
+const claimLite = read('.github/instructions/lite/idd-claim-lite.instructions.md');
 const work = read('.github/instructions/idd-work.instructions.md');
 const prSubmit = read('.github/instructions/idd-pr-submit.instructions.md');
 const ci = read('.github/instructions/idd-ci.instructions.md');
@@ -105,6 +106,26 @@ for (const pattern of [/seven checks/i, /state_reason/, /Duplicate\/superseded/,
 }
 for (const pattern of [/deterministic branch/i, /issue\/<number>-<slug>/, /supersedes/, /O_EXCL|wx/, /activation marker/i, /open PR/i]) {
   assert.match(claim, pattern);
+}
+for (const source of [claim, claimLite]) {
+  assert.match(source, /idd-prepared-branch:/,
+    'A5 must expose the explicit maintainer-prepared branch marker');
+  assert.match(source, /live remote (?:branch )?head[\s\S]{0,120}(?:marker )?`?head`?/i,
+    'prepared branch authorization must bind the live remote head');
+  assert.match(source, /base-sha=<40-hex-sha>/,
+    'prepared branch marker must bind the prepared base commit');
+  assert.match(source, /issue\/<N>-/,
+    'prepared branch must remain in the target Issue namespace');
+  assert.match(source, /need not equal the deterministic slug/i,
+    'prepared branch marker must override title-derived slug equality');
+  assert.match(source, /merge-base --is-ancestor <base-sha> origin\/<branch>/,
+    'prepared branch base must be an ancestor of the marked branch head');
+  assert.match(source, /merge-base --is-ancestor <base-sha> origin\/next/,
+    'prepared branch base must remain in current next history');
+  assert.match(source, /branch[- ]reuse[\s\S]{0,80}(?:authorization )?only/i,
+    'prepared branch marker must not become claim or merge authority');
+  assert.match(source, /activation-nonce/i,
+    'prepared branch reuse must still require normal claim activation');
 }
 for (const pattern of [/B1/, /B2/, /B3/, /at most three/, /worktree/, /fix-validate/]) {
   assert.match(work, pattern);

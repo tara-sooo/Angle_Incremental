@@ -1,7 +1,12 @@
 # IDD — Current-head CI
 
-Use this file after a push and after every review fix. CI is evidence for the
-current PR head, never for a previous commit.
+Use this file only after a push and after every review fix, for the
+current PR head in hosted CI. CI is evidence for that head, never for a previous commit.
+This phase does not classify local B/C or pre-push commands: a local
+`npm run test:performance` timing overage is not a hosted-CI failure or an
+attempt in the rerun/hold count.
+The hosted performance job's strict `npm run test:performance` absolute
+budgets remain required; a local inconclusive result never waives them.
 
 ## Read and wait
 
@@ -27,7 +32,7 @@ bound, record the SHA and stop for recovery rather than polling forever.
 | --- | --- |
 | all required checks pass for current SHA | continue to review snapshot |
 | code-caused failure | fix, validate, commit, push, and restart CI |
-| infrastructure/flaky failure | rerun that exact run once, then poll again |
+| first infrastructure/flaky failure for the current hosted head | rerun that exact run once, then poll again |
 | second failure, timeout, cancellation, or unknown state | hold and report |
 
 Never treat a skipped, missing, or `continue-on-error` result as a passing

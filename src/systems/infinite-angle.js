@@ -164,14 +164,18 @@ function resetInfiniteAnglePosition() {
   runtime.state.infiniteAngleLastVertexIndex = 0;
 }
 
-function unlockInfiniteAngle() {
+function unlockInfiniteAngle(options = {}) {
+  if (typeof Event !== "undefined" && options instanceof Event) options = {};
   if (!canUnlockInfiniteAngle()) return false;
   if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-infinite-angle", { force: true })) return false;
-  if (!runtime.spendInfinityPoints(infiniteAngleUnlockCostLog10())) return false;
+  if (
+    runtime.eternityMilestoneActive?.("5") !== true
+    && !runtime.spendInfinityPoints(infiniteAngleUnlockCostLog10())
+  ) return false;
   runtime.state.infiniteAngleUnlocked = true;
   resetInfiniteAngleRun();
-  runtime.updateUi();
-  runtime.saveGame("manual");
+  if (options.refresh !== false) runtime.updateUi();
+  if (options.save !== false) runtime.saveGame("manual");
   return true;
 }
 

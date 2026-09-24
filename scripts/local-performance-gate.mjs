@@ -10,8 +10,10 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { PERFORMANCE_METRIC_VERSION, readPerformanceMetricP95 } from "./performance-metrics.mjs";
 
 export const RUN_COUNT = 3;
+const performanceRunTimeoutMs = 10 * 60 * 1000;
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const performanceReportName = path.join("output", "performance-smoke.json");
@@ -45,7 +47,7 @@ function runCommand(command, args, cwd) {
   const result = spawnSync(command, args, {
     cwd,
     stdio: "inherit",
-    timeout: 5 * 60 * 1000,
+    timeout: performanceRunTimeoutMs,
   });
   if (result.error) throw new Error(`${command} ${args.join(" ")} failed: ${result.error.message}`);
   if (result.signal) throw new Error(`${command} ${args.join(" ")} stopped by ${result.signal}`);
@@ -70,6 +72,16 @@ function splitViolations(report) {
 export function collectTimingMeasurements(report) {
   const budgets = report.budgets || {};
   const measurements = [];
+  if (report.performanceMetricVersion !== undefined && report.performanceMetricVersion !== PERFORMANCE_METRIC_VERSION) {
+    throw new Error(`unsupported performance report version: ${report.performanceMetricVersion}`);
+  }
+  const metricP95 = (metric, budgetMs) => {
+    const p95Ms = readPerformanceMetricP95(metric, report.performanceMetricVersion);
+    if (metric?.metricVersion === PERFORMANCE_METRIC_VERSION && metric.budgetMs !== budgetMs) {
+      throw new Error("performance metric budget does not match the report budget");
+    }
+    return p95Ms;
+  };
   const addMeasurement = (scenario, metric, p95Ms, budgetMs) => {
     measurements.push({
       scenario,
@@ -84,8 +96,8 @@ export function collectTimingMeasurements(report) {
     for (const scenario of result.scenarios || []) {
       const prefix = `${result.viewport.name}/DPR${result.deviceScaleFactor}`;
       const metrics = [
-        [`${prefix}/angle/${scenario.vertices}`, "simulation", scenario.angle?.simulation?.p95Ms, budgets.simulationP95Ms],
-        [`${prefix}/infinite-angle/${scenario.vertices}`, "simulation", scenario.infiniteAngle?.simulation?.p95Ms, budgets.simulationP95Ms],
+        [`${prefix}/angle/${scenario.vertices}`, "simulation", metricP95(scenario.angle?.simulation, budgets.simulationP95Ms), budgets.simulationP95Ms],
+        [`${prefix}/infinite-angle/${scenario.vertices}`, "simulation", metricP95(scenario.infiniteAngle?.simulation, budgets.simulationP95Ms), budgets.simulationP95Ms],
       ];
       for (const [scenarioName, metric, p95Ms, budgetMs] of metrics) addMeasurement(scenarioName, metric, p95Ms, budgetMs);
     }
@@ -97,10 +109,10 @@ export function collectTimingMeasurements(report) {
         [
           `${prefix}/angle/${scenario.vertices}`,
           "frame",
-          scenario.angle?.frame?.p95Ms,
+          metricP95(scenario.angle?.frame, scenario.vertices >= 10000 ? budgets.highLoadFrameP95Ms : budgets.normalFrameP95Ms),
           scenario.vertices >= 10000 ? budgets.highLoadFrameP95Ms : budgets.normalFrameP95Ms,
         ],
-        [`${prefix}/infinite-angle/${scenario.vertices}`, "frame", scenario.infiniteAngle?.frame?.p95Ms, budgets.highLoadFrameP95Ms],
+        [`${prefix}/infinite-angle/${scenario.vertices}`, "frame", metricP95(scenario.infiniteAngle?.frame, budgets.highLoadFrameP95Ms), budgets.highLoadFrameP95Ms],
       ];
       for (const [scenarioName, metric, p95Ms, budgetMs] of metrics) addMeasurement(scenarioName, metric, p95Ms, budgetMs);
     }

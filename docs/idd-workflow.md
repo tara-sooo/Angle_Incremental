@@ -38,7 +38,12 @@ current state; do not load unrelated phase variants.
   `idd-claim.lock` immediately before every write.
 - Keep the primary worktree on `next`; implementation happens only in the
   claimed sibling worktree.
-- Use deterministic `issue/<number>-<slug>` branches and stop on collisions.
+- Use deterministic `issue/<number>-<slug>` branches and stop on collisions
+  unless an exact trusted maintainer-prepared-branch marker authorizes the
+  current live head. A prepared branch must stay in the target
+  `issue/<number>-` namespace but may use the marker's slug instead of the
+  current title-derived slug; the exception grants branch reuse only and still
+  requires a normal fresh claim.
 - Treat missing, stale, conflicting, or unknown evidence as fail-closed.
 - Bind the merge command to the freshly checked PR head SHA.
 

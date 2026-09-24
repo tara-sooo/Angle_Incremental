@@ -76,7 +76,7 @@ async function testLegacyDefaults() {
   assert.equal(loaded.debug.state.fastestEternityTime, 0, "legacy saves should default fastest Eternity game time to zero");
   assert.equal(loaded.debug.state.fastestEternityRealTime, 0, "legacy saves should default fastest Eternity real time to zero");
   assert.deepEqual(Array.from(loaded.debug.state.lastEternityRuns), [], "legacy saves should not derive Eternity history from the count");
-  assert.equal(loaded.runtime.SAVE_VERSION, 11, "Milestone 1-3 free-level semantics should use save version 11");
+  assert.equal(loaded.runtime.SAVE_VERSION, 12, "exact discrete progression semantics should use save version 12");
 }
 
 async function testInfiniteAngleFreeLevelSaveMigration() {

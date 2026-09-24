@@ -1,10 +1,21 @@
 import { runtime, expose } from "../runtime/shared.js";
-import { TIMELINE_NODES } from "../data/timeline-tree.js?v=0.13.3";
+import { TIMELINE_NODES } from "../data/timeline-tree.js?v=0.14.0";
 
 const MAX_TIMELINE_COUNT = Number.MAX_SAFE_INTEGER;
 const MAX_ETERNITY_REQUIREMENT_EXPONENT = 1024;
 const TIMELINE_TRACK_IDS = Object.freeze(["score", "ip", "eternity"]);
 const TIMELINE_NODE_BY_ID = new Map(TIMELINE_NODES.map((node) => [node.id, node]));
+// 0.14.0 defers these IDs; dropping them during normalization refunds their old TF cost.
+const DEFERRED_TIMELINE_NODE_IDS = Object.freeze([
+  "Real-BC6000",
+  "Parallel-BC6000",
+  "Real-AD30",
+  "Parallel-AD30",
+]);
+const TIMELINE_BULK_SAFE_NODE_IDS = Object.freeze([
+  "Real-BC16500",
+  "Parallel-BC16500",
+]);
 const PARALLEL_RAW_SOFTCAP_LOG10 = 10;
 const TIMELINE_TRACKS = Object.freeze({
   score: Object.freeze({
@@ -48,6 +59,7 @@ function normalizeTimelinePurchasedNodes(value) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return nodes;
     const id = typeof entry.id === "string" ? entry.id.trim() : "";
     if (!id || seen.has(id)) return nodes;
+    if (DEFERRED_TIMELINE_NODE_IDS.includes(id)) return nodes;
     seen.add(id);
     const definition = timelineNodeById(id);
     const normalized = {
@@ -74,12 +86,16 @@ function normalizeTimelineState() {
   );
 }
 
-function normalizedEternityCount() {
-  return Math.max(0, Math.floor(Number(runtime.state.eternityCount) || 0));
+function currentExactEternityCount() {
+  return runtime.currentExactIntegerState(
+    runtime.state,
+    "eternityCountExact",
+    "eternityCount",
+  );
 }
 
 function timelineDiscovered() {
-  return normalizedEternityCount() > 0
+  return currentExactEternityCount() > 0n
     || runtime.normalizeUnlockedMainTabs?.(runtime.state.unlockedMainTabs)?.includes("timeline") === true;
 }
 
@@ -105,7 +121,7 @@ function timelineEternityRequirement() {
 function timelineCurrentValue(trackId) {
   if (trackId === "score") return runtime.currentScoreLog10?.() ?? Number(runtime.state.scoreLog10);
   if (trackId === "ip") return runtime.currentInfinityPointsLog10?.() ?? Number(runtime.state.infinityPointsLog10);
-  if (trackId === "eternity") return BigInt(normalizedEternityCount());
+  if (trackId === "eternity") return currentExactEternityCount();
   return null;
 }
 
@@ -155,6 +171,13 @@ function timelineNodeIsPurchasedById(nodeId) {
   return node ? timelineNodeIsPurchased(node) : false;
 }
 
+function timelineBulkSimulationAllowed() {
+  normalizeTimelineState();
+  return runtime.state.timelinePurchasedNodes.every((node) => (
+    TIMELINE_BULK_SAFE_NODE_IDS.includes(node.id)
+  ));
+}
+
 function timelineRealOwned() {
   normalizeTimelineState();
   return timelineNodeIsPurchasedById("Real-BC16500");
@@ -181,10 +204,20 @@ function timelineParallelEffectiveLog10(seconds = timelineParallelSecondsSinceIc
     + 10 * Math.log10(1 + (rawLog10 - PARALLEL_RAW_SOFTCAP_LOG10) / 10);
 }
 
-function timelineRealInfinityCountGainMultiplier() {
+function timelineRealBc16500InfinityCountGainMultiplier() {
   if (!timelineRealOwned()) return 1;
   const currentIpLog10 = runtime.currentInfinityPointsLog10?.() ?? -Infinity;
   return Number.isFinite(currentIpLog10) ? Math.max(1, 1 + currentIpLog10) : 1;
+}
+
+function timelineRealInfinityCountGainMultiplierLog10() {
+  normalizeTimelineState();
+  return runtime.log10Value(timelineRealBc16500InfinityCountGainMultiplier());
+}
+
+function timelineRealInfinityCountGainMultiplier() {
+  normalizeTimelineState();
+  return timelineRealBc16500InfinityCountGainMultiplier();
 }
 
 function timelineIpGainMultiplierLog10() {
@@ -225,6 +258,9 @@ function timelineNodeIsPurchased(node) {
 function timelineNodeMissingPrerequisites(node) {
   const ownedIds = new Set(runtime.state.timelinePurchasedNodes.map((purchased) => purchased.id));
   const prerequisites = Array.isArray(node.prerequisites) ? node.prerequisites : [];
+  if (node.prerequisiteMode === "any") {
+    return prerequisites.some((id) => ownedIds.has(id)) ? [] : prerequisites;
+  }
   return prerequisites.filter((id) => !ownedIds.has(id));
 }
 
@@ -346,11 +382,13 @@ expose("timelineNodes", () => timelineNodes);
 expose("timelineNode", () => timelineNode);
 expose("timelineNodeIsPurchased", () => timelineNodeIsPurchased);
 expose("timelineNodeIsPurchasedById", () => timelineNodeIsPurchasedById);
+expose("timelineBulkSimulationAllowed", () => timelineBulkSimulationAllowed);
 expose("timelineRealOwned", () => timelineRealOwned);
 expose("timelineParallelOwned", () => timelineParallelOwned);
 expose("timelineParallelSecondsSinceIc8Clear", () => timelineParallelSecondsSinceIc8Clear);
 expose("timelineParallelRawLog10", () => timelineParallelRawLog10);
 expose("timelineParallelEffectiveLog10", () => timelineParallelEffectiveLog10);
+expose("timelineRealInfinityCountGainMultiplierLog10", () => timelineRealInfinityCountGainMultiplierLog10);
 expose("timelineRealInfinityCountGainMultiplier", () => timelineRealInfinityCountGainMultiplier);
 expose("timelineIpGainMultiplierLog10", () => timelineIpGainMultiplierLog10);
 expose("advanceTimelineRunTime", () => advanceTimelineRunTime);

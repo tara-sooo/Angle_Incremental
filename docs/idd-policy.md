@@ -76,6 +76,19 @@ research層は`npm run validate:research`、full層は`npm run validate:full`で
 実行します。browserの責務は`test:browser-smoke`、`test:browser-features`、
 `test:render-regression`に分離されています。
 
+### ローカル性能とHosted CIの境界
+
+IssueがB/Cまたはpush前に`npm run test:performance`を明示した場合は実行して
+レポートを記録しますが、Issueの要求だけでstrict timingをpre-push hard gateへ
+昇格させません。通常のpre-push/post-fix gateは`npm run validate`です。ローカルの
+timing-budget-only failureやその反復にはHosted CIのrerun／second-failure holdを
+適用しません。分類が必要な場合はtrustedな`origin/next`に対する
+`npm run test:performance:local`を使い、`local-performance-regression`は停止、
+`local-performance-inconclusive`は診断を記録してPRへ進め、Hosted CIを必須にします。
+malformed/non-timing report、trusted base不正、claim/worktree ownership failureは
+従来どおりfail-closedです。push後のcurrent-head Hosted CIだけがstrict absolute
+performance budgetとrerun／second-failure／timeout／unknown holdの権威です。
+
 ## IDD experience memory
 
 Issueごとに`docs/idd-experience/index.md`から関連topicだけを読みます。B2/B3では

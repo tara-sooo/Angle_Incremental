@@ -15,6 +15,7 @@ const expectedModulePaths = [
   "/src/core/numbers.js",
   "/src/core/save.js",
   "/src/core/save-code.js",
+  "/src/core/offline-progress.js",
   "/src/systems/achievements.js",
   "/src/systems/tower.js",
   "/src/ui/render-canvas.js",
@@ -30,13 +31,7 @@ const expectedModulePaths = [
   "/src/systems/core-boost.js",
   "/src/systems/infinity.js",
   "/src/systems/infinite-angle.js",
-  "/src/systems/balance.js",
   "/src/systems/eternity.js",
-  "/src/systems/balance-angle.js",
-  "/src/systems/balance-generation.js",
-  "/src/systems/balance-core-boost.js",
-  "/src/systems/balance-infinity.js",
-  "/src/systems/balance-ui.js",
   "/src/systems/infinity-point-normalization.js",
   "/src/ui/events.js",
 ];
@@ -88,13 +83,13 @@ async function runSmoke() {
       canvas: document.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
       note: document.querySelector("[data-i18n=updateModalNote]")?.textContent?.trim() ?? "",
     }));
-    assert.match(modalCopy.summary, /Eternity Milestone 8/);
-    assert.match(modalCopy.summary, /自動化修正/);
-    assert.match(modalCopy.resetDock, /IA・Tower/);
-    assert.match(modalCopy.resetDock, /Auto Infinity・CB・GR/);
-    assert.match(modalCopy.canvas, /Timelineリスペックの確認をスキップ/);
-    assert.match(modalCopy.note, /初期状態はオフ/);
-    assert.match(modalCopy.note, /Timelineリスペックだけ/);
+    assert.match(modalCopy.summary, /オフライン進行/);
+    assert.match(modalCopy.summary, /重要な節目/);
+    assert.match(modalCopy.resetDock, /セーブ復旧/);
+    assert.match(modalCopy.resetDock, /Eternity後の進行/);
+    assert.match(modalCopy.canvas, /Infinity Upgrade/);
+    assert.match(modalCopy.canvas, /Help/);
+    assert.match(modalCopy.note, /既存のセーブデータ/);
     const desktopButtonInteraction = await page.evaluate(() => {
       const selectors = ["[data-tab=angle]", "#speedUpgrade"];
       return selectors.map((selector) => {

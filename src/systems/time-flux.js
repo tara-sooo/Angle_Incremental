@@ -3,16 +3,6 @@ import { runtime, expose } from "../runtime/shared.js";
 // Time Flux is a persistent online accelerator. Offline progress and TF
 // accumulation are mutually exclusive by design.
 
-function clampOfflineTickCount(value) {
-  return Math.min(
-    runtime.OFFLINE_PROGRESS_MAX_TICKS,
-    Math.max(runtime.OFFLINE_PROGRESS_MIN_TICKS, Math.floor(runtime.sanitizeNumber(
-      value,
-      runtime.OFFLINE_PROGRESS_DEFAULT_TICKS,
-    ))),
-  );
-}
-
 function clampTimeFluxSpeed(value) {
   return Math.min(
     runtime.TIME_FLUX_MAX_SPEED,
@@ -108,7 +98,6 @@ function consumeTimeFlux(seconds) {
   return consumed;
 }
 
-expose("clampOfflineTickCount", () => clampOfflineTickCount, (value) => { clampOfflineTickCount = value; });
 expose("clampTimeFluxSpeed", () => clampTimeFluxSpeed, (value) => { clampTimeFluxSpeed = value; });
 expose("clampTimeFluxCustomSpeed", () => clampTimeFluxCustomSpeed, (value) => { clampTimeFluxCustomSpeed = value; });
 expose("timeFluxCapacitySeconds", () => timeFluxCapacitySeconds, (value) => { timeFluxCapacitySeconds = value; });
