@@ -22,7 +22,7 @@ function dormantTimeFluxValue(value, fallback) {
   return runtime.sanitizeNumber(value, fallback);
 }
 
-function clampOfflineTickCount(value) {
+export function clampOfflineTickCount(value) {
   return Math.min(
     runtime.OFFLINE_PROGRESS_MAX_TICKS,
     Math.max(runtime.OFFLINE_PROGRESS_MIN_TICKS, Math.floor(runtime.sanitizeNumber(
@@ -517,10 +517,6 @@ function legacyInfinityUpgradeRefundLog10(data) {
   return refundLog;
 }
 
-function ic8VertexUpgradeLevelLimit() {
-  return runtime.MAX_GAME_VERTICES || 1_000_000_000_000;
-}
-
 function sanitizeChallengeTimes(value, count) {
   const source = Array.isArray(value) ? value : [];
   return Array.from({ length: count }, (_, index) => Math.max(0, runtime.sanitizeNumber(source[index], 0)));
@@ -544,8 +540,8 @@ function savedChallengeProgress(data) {
 }
 
 function inferUnlockedMainTabs(data) {
-  const eternityCount = runtime.state.eternityCount;
-  const infinityCount = runtime.state.infinityCount;
+  const eternityCount = runtime.currentExactIntegerState(runtime.state, "eternityCountExact", "eternityCount");
+  const infinityCount = runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount");
   const milestoneMask = runtime.state.eternityMilestoneMask;
   const achievementMask = runtime.state.achievementMask;
   const automationSettings = [
@@ -573,24 +569,24 @@ function inferUnlockedMainTabs(data) {
     || runtime.state.tc4FreeCoreBoostLevel > 0;
   const discovered = [];
 
-  if (eternityCount > 0 || infinityCount > 0) discovered.push("infinity");
+  if (eternityCount > 0n || infinityCount > 0n) discovered.push("infinity");
   if (
-    eternityCount > 0
+    eternityCount > 0n
     || savedInfinityUpgradeOwned(data, "4-1")
     || savedChallengeProgress(data)
   ) discovered.push("challenges");
   if (
-    eternityCount > 0
+    eternityCount > 0n
     || savedInfinityUpgradeOwned(data, "1-2")
     || savedInfinityUpgradeOwned(data, "8-1")
     || (milestoneMask & 1) !== 0
-    || eternityCount >= 20
-    || eternityCount >= 81
+    || eternityCount >= 20n
+    || eternityCount >= 81n
     || (achievementMask & (1 << (19 - 1))) !== 0
     || automationEvidence
   ) discovered.push("automation");
-  if (eternityCount > 0 || towerFloor >= tc4UnlockFloor || tc4Progress) discovered.push("eternity");
-  if (eternityCount > 0) discovered.push("timeline");
+  if (eternityCount > 0n || towerFloor >= tc4UnlockFloor || tc4Progress) discovered.push("eternity");
+  if (eternityCount > 0n) discovered.push("timeline");
   runtime.markMainTabsUnlocked(discovered);
 }
 
@@ -625,15 +621,45 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   const generationScore = runtime.hydrateLogResource(data.generationScore, data.generationScoreLog10, runtime.state.scoreLog10);
   runtime.state.generationScore = generationScore.value;
   runtime.state.generationScoreLog10 = generationScore.log;
-  runtime.state.vertices = Math.min(runtime.MAX_RENDERED_VERTICES, Math.max(3, Math.floor(runtime.sanitizeNumber(data.vertices, 3, 3))));
-  runtime.state.ic8VertexUpgradeLevel = Math.max(0, Math.floor(runtime.sanitizeNumber(data.ic8VertexUpgradeLevel, 0)));
-  runtime.state.speedLevel = Math.floor(runtime.sanitizeNumber(data.speedLevel, 0));
-  runtime.state.gainLevel = Math.floor(runtime.sanitizeNumber(data.gainLevel, 0));
+  runtime.hydrateExactIntegerState(
+    runtime.state,
+    "verticesExact",
+    "vertices",
+    data.verticesExact,
+    data.vertices,
+    3n,
+  );
+  runtime.hydrateExactIntegerState(
+    runtime.state,
+    "ic8VertexUpgradeLevelExact",
+    "ic8VertexUpgradeLevel",
+    data.ic8VertexUpgradeLevelExact,
+    data.ic8VertexUpgradeLevel,
+  );
+  runtime.hydrateExactIntegerState(
+    runtime.state,
+    "speedLevelExact",
+    "speedLevel",
+    data.speedLevelExact,
+    data.speedLevel,
+  );
+  runtime.hydrateExactIntegerState(
+    runtime.state,
+    "gainLevelExact",
+    "gainLevel",
+    data.gainLevelExact,
+    data.gainLevel,
+  );
   const currentGain = runtime.hydrateLogResource(data.currentGain, data.currentGainLog10, 0);
   runtime.state.currentGain = currentGain.value || 1;
   runtime.state.currentGainLog10 = Math.max(0, currentGain.log);
   runtime.state.pointProgress = ((runtime.sanitizeNumber(data.pointProgress, 0) % 1) + 1) % 1;
-  runtime.state.totalVertexProgress = runtime.sanitizeNumber(data.totalVertexProgress, runtime.state.pointProgress * runtime.state.vertices);
+  runtime.state.totalVertexProgress = runtime.sanitizeNumber(
+    data.totalVertexProgress,
+    runtime.state.pointProgress * runtime.numberFromExactInteger(
+      runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n),
+    ),
+  );
   runtime.state.lastVertexIndex = Math.floor(runtime.sanitizeNumber(data.lastVertexIndex, Math.floor(runtime.state.totalVertexProgress)));
   runtime.state.generationCount = Math.floor(runtime.sanitizeNumber(data.generationCount, 0));
   const previousGenerationScore = runtime.hydrateLogResource(
@@ -648,13 +674,37 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
     ? runtime.log10Value(runtime.sanitizeNumber(data.generationScoreMultiplier, 1, 1))
     : savedGenerationMultiplierLog;
   runtime.state.generationScoreMultiplier = runtime.valueFromLog10(runtime.state.generationScoreMultiplierLog10);
+  const savedGenerationCostFactor = runtime.sanitizeNumber(
+    data.generationCostFactor,
+    1,
+    runtime.GENERATION_MIN_NEW_COST_FACTOR,
+  );
   runtime.state.generationCostFactor = Math.max(
     runtime.GENERATION_MIN_NEW_COST_FACTOR,
-    Math.min(1, runtime.sanitizeNumber(data.generationCostFactor, 1, runtime.GENERATION_MIN_NEW_COST_FACTOR)),
+    Math.min(1, savedGenerationCostFactor),
   );
+  const savedInfinityUpgradeMask = Math.floor(Number(data.infinityUpgradeMask) || 0);
+  if ((savedInfinityUpgradeMask & (1 << 9)) !== 0) {
+    const parsedGenerationCostFactor = runtime.parseSavedNumber(data.generationCostFactor);
+    if (Number.isFinite(parsedGenerationCostFactor)) {
+      runtime.state.generationCostFactor = Math.max(0.70, Math.min(1, parsedGenerationCostFactor));
+    }
+  }
   runtime.state.coreBoostCount = Math.floor(runtime.sanitizeNumber(data.coreBoostCount, 0));
-  runtime.state.infinityCount = Math.floor(runtime.sanitizeNumber(data.infinityCount, 0));
-  runtime.state.eternityCount = Math.max(0, Math.floor(runtime.sanitizeNumber(data.eternityCount, 0)));
+  runtime.hydrateExactIntegerState(
+    runtime.state,
+    "infinityCountExact",
+    "infinityCount",
+    data.infinityCountExact,
+    data.infinityCount,
+  );
+  runtime.hydrateExactIntegerState(
+    runtime.state,
+    "eternityCountExact",
+    "eternityCount",
+    data.eternityCountExact,
+    data.eternityCount,
+  );
   runtime.state.scoreTfClaims = runtime.normalizeTimelineClaimCount?.(data.scoreTfClaims, 0) ?? 0;
   runtime.state.ipTfClaims = runtime.normalizeTimelineClaimCount?.(data.ipTfClaims, 0) ?? 0;
   runtime.state.eternityTfClaims = runtime.normalizeTimelineClaimCount?.(data.eternityTfClaims, 0) ?? 0;
@@ -815,7 +865,7 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
     Math.min(0.9999999999999999, runtime.sanitizeNumber(data.infinityCountRateRemainder, 0)),
   );
   runtime.state.offlineProgressEnabled = runtime.sanitizeBoolean(data.offlineProgressEnabled, true);
-  runtime.state.offlineTickCount = runtime.clampOfflineTickCount(data.offlineTickCount);
+  runtime.state.offlineTickCount = clampOfflineTickCount(data.offlineTickCount);
   runtime.state.timeFluxCapacityLevel = dormantTimeFluxValue(data.timeFluxCapacityLevel, 0);
   runtime.state.timeFluxGainLevel = dormantTimeFluxValue(data.timeFluxGainLevel, 0);
   runtime.state.timeFlux = dormantTimeFluxValue(data.timeFlux, 0);
@@ -911,21 +961,34 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
     runtime.state.activeChallenge = 0;
     runtime.state.activeChallengeTime = 0;
   }
-  if (runtime.state.activeChallenge === 2 && runtime.state.vertices > 200) {
-    runtime.state.vertices = 200;
+  const currentVertices = runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
+  if (runtime.state.activeChallenge === 2 && currentVertices > 200n) {
+    runtime.setExactIntegerState(runtime.state, "verticesExact", "vertices", 200n);
     runtime.resetVertexProgress();
   }
   if (runtime.state.activeChallenge === 8) {
-    if (!Object.hasOwn(data, "ic8VertexUpgradeLevel") && runtime.state.vertices > 3) {
-      runtime.state.ic8VertexUpgradeLevel = runtime.state.vertices - 3;
+    if (
+      !Object.hasOwn(data, "ic8VertexUpgradeLevel")
+      && !Object.hasOwn(data, "ic8VertexUpgradeLevelExact")
+      && currentVertices > 3n
+    ) {
+      runtime.setExactIntegerState(
+        runtime.state,
+        "ic8VertexUpgradeLevelExact",
+        "ic8VertexUpgradeLevel",
+        currentVertices - 3n,
+      );
     }
-    if (runtime.state.vertices !== 3) runtime.state.vertices = 3;
-    if (runtime.state.ic8VertexUpgradeLevel > ic8VertexUpgradeLevelLimit()) {
-      runtime.state.ic8VertexUpgradeLevel = ic8VertexUpgradeLevelLimit();
+    if (currentVertices !== 3n) {
+      runtime.setExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
     }
     runtime.resetVertexProgress();
-  } else if (runtime.state.ic8VertexUpgradeLevel !== 0) {
-    runtime.state.ic8VertexUpgradeLevel = 0;
+  } else if (runtime.currentExactIntegerState(
+    runtime.state,
+    "ic8VertexUpgradeLevelExact",
+    "ic8VertexUpgradeLevel",
+  ) !== 0n) {
+    runtime.setExactIntegerState(runtime.state, "ic8VertexUpgradeLevelExact", "ic8VertexUpgradeLevel", 0n);
   }
   runtime.state.showFloatingText = data.showFloatingText !== false;
   runtime.state.lightEffects = Boolean(data.lightEffects);
@@ -949,10 +1012,51 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.floatingTexts = [];
 }
 
+function normalizedSavedVertices(data) {
+  const savedExact = runtime.parseExactInteger(data && data.verticesExact, null);
+  const legacy = runtime.parseExactInteger(data && data.vertices, 3n);
+  const raw = savedExact === null ? legacy : savedExact;
+  return raw < 3n ? 3n : raw;
+}
+
+function loadedTowerChallengeIsInvalid(data) {
+  const activeTowerChallenge = Math.min(
+    runtime.TOWER_CHALLENGE_COUNT || 0,
+    Math.max(0, Math.floor(runtime.sanitizeNumber(data && data.activeTowerChallenge, 0))),
+  );
+  return activeTowerChallenge > 0
+    && (!runtime.towerChallengeImplemented?.(activeTowerChallenge)
+      || !runtime.towerChallengeUnlocked?.(activeTowerChallenge));
+}
+
+function restoreVerticesAfterLoad(data) {
+  if (
+    runtime.state.activeChallenge === 2
+    || runtime.state.activeChallenge === 8
+    || loadedTowerChallengeIsInvalid(data)
+  ) return;
+  runtime.setExactIntegerState(
+    runtime.state,
+    "verticesExact",
+    "vertices",
+    normalizedSavedVertices(data),
+  );
+  if (runtime.state.totalVertexProgress > runtime.MAX_VERTEX_PROGRESS_TRACKED) {
+    runtime.normalizeVertexProgress();
+  }
+  const vertices = runtime.numberFromExactInteger(
+    runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n),
+  );
+  runtime.state.lastVertexIndex = Math.floor(runtime.state.pointProgress * vertices) % vertices;
+}
+
 function applySaveData(data, saveVersion = runtime.SAVE_VERSION) {
   const snapshot = snapshotRuntimeState();
   try {
     applySaveDataUnsafe(data, saveVersion);
+    runtime.normalizeEternityMilestoneCompletionState?.();
+    runtime.applyStartingCoreBoosts();
+    restoreVerticesAfterLoad(data);
   } catch (error) {
     restoreRuntimeState(snapshot);
     throw error;
@@ -963,7 +1067,16 @@ function serializeSaveData() {
   runtime.normalizeInfinityPointState();
   runtime.normalizeTowerChallenge4State?.();
   runtime.normalizeTimelineState?.();
-  runtime.state.infinityCount = Math.max(0, Math.floor(runtime.state.infinityCount));
+  [
+    ["verticesExact", "vertices"],
+    ["ic8VertexUpgradeLevelExact", "ic8VertexUpgradeLevel"],
+    ["speedLevelExact", "speedLevel"],
+    ["gainLevelExact", "gainLevel"],
+    ["infinityCountExact", "infinityCount"],
+    ["eternityCountExact", "eternityCount"],
+  ].forEach(([exactField, valueField]) => {
+    runtime.currentExactIntegerState(runtime.state, exactField, valueField);
+  });
   runtime.state.achievementMaskHigh = ((Number(runtime.state.achievementMaskHigh) || 0) >>> 0);
   runtime.state.unlockedMainTabs = runtime.normalizeUnlockedMainTabs(runtime.state.unlockedMainTabs);
   const data = {};
@@ -1088,7 +1201,12 @@ async function loadGame(options = {}) {
   try {
     raw = localStorage.getItem(runtime.SAVE_KEY);
     if (!raw) {
-      runtime.setSaveStatus(runtime.t("noSave"));
+      if (readQuarantineEntry()) {
+        loadRecoveryMode = true;
+        runtime.setSaveStatus(runtime.t("loadRecoveryRequired"));
+      } else {
+        runtime.setSaveStatus(runtime.t("noSave"));
+      }
       return false;
     }
 
@@ -1274,6 +1392,8 @@ function resetSave() {
   finishSaveConflict();
   if (runtime.invalidateVisibilityResume) runtime.invalidateVisibilityResume();
   localStorage.removeItem(runtime.SAVE_KEY);
+  localStorage.removeItem(runtime.SAVE_QUARANTINE_KEY);
+  recoveryRevision += 1;
   lastKnownSaveFingerprint = "";
   lastLocalSaveFingerprint = "";
   runtime.offlineReport = null;
@@ -1292,9 +1412,13 @@ function resetSave() {
     generationScore: 0,
     generationScoreLog10: -Infinity,
     vertices: 3,
+    verticesExact: "3",
     ic8VertexUpgradeLevel: 0,
+    ic8VertexUpgradeLevelExact: "0",
     speedLevel: 0,
+    speedLevelExact: "0",
     gainLevel: 0,
+    gainLevelExact: "0",
     currentGain: 1,
     currentGainLog10: 0,
     pointProgress: 0,
@@ -1308,7 +1432,9 @@ function resetSave() {
     generationCostFactor: 1,
     coreBoostCount: 0,
     infinityCount: 0,
+    infinityCountExact: "0",
     eternityCount: 0,
+    eternityCountExact: "0",
     scoreTfClaims: 0,
     ipTfClaims: 0,
     eternityTfClaims: 0,
@@ -1412,6 +1538,16 @@ function resetSave() {
     lastEarned: 0,
     lastEarnedLog10: -Infinity,
   });
+  [
+    ["verticesExact", "vertices", 3n],
+    ["ic8VertexUpgradeLevelExact", "ic8VertexUpgradeLevel", 0n],
+    ["speedLevelExact", "speedLevel", 0n],
+    ["gainLevelExact", "gainLevel", 0n],
+    ["infinityCountExact", "infinityCount", 0n],
+    ["eternityCountExact", "eternityCount", 0n],
+  ].forEach(([exactField, valueField, value]) => {
+    runtime.setExactIntegerState(runtime.state, exactField, valueField, value);
+  });
   runtime.autoSaveElapsed = 0;
   runtime.setSaveStatus(runtime.t("resetDone"));
   runtime.updateUi();
@@ -1419,7 +1555,7 @@ function resetSave() {
 }
 
 expose("legacyInfinityUpgradeRefundLog10", () => legacyInfinityUpgradeRefundLog10, (value) => { legacyInfinityUpgradeRefundLog10 = value; });
-expose("clampOfflineTickCount", () => clampOfflineTickCount, (value) => { clampOfflineTickCount = value; });
+expose("clampOfflineTickCount", () => clampOfflineTickCount);
 expose("applySaveData", () => applySaveData, (value) => { applySaveData = value; });
 expose("serializeSaveData", () => serializeSaveData, (value) => { serializeSaveData = value; });
 expose("saveGame", () => saveGame, (value) => { saveGame = value; });
@@ -1446,7 +1582,9 @@ expose("restorePreImportSave", () => restorePreImportSave, (value) => { restoreP
 expose("restoreCheckpoint", () => restoreCheckpoint, (value) => { restoreCheckpoint = value; });
 expose("restoreUndoSave", () => restoreUndoSave, (value) => { restoreUndoSave = value; });
 expose("quarantineSave", () => quarantineSave, (value) => { quarantineSave = value; });
-expose("loadGame", () => loadGame, (value) => { loadGame = value; });
+expose("loadGame", () => loadGame);
 expose("retryLoad", () => retryLoad, (value) => { retryLoad = value; });
 expose("restoreQuarantineSave", () => restoreQuarantineSave, (value) => { restoreQuarantineSave = value; });
 expose("resetSave", () => resetSave, (value) => { resetSave = value; });
+
+export { loadGame };

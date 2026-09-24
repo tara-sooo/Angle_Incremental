@@ -17,7 +17,15 @@ function infinityRunRecordText(record, index) {
 }
 
 function eternityRunRecordText(record, index) {
-  return `#${index + 1} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.t("eternityInfinityCountShort")} ${runtime.formatUiNumber(record.infinityCount)}`;
+  const exactCount = runtime.parseExactInteger(
+    record.infinityCountExact,
+    runtime.parseExactInteger(record.infinityCount, 0n),
+  );
+  const countText = runtime.formatHeldUiLogNumber(
+    runtime.log10ExactInteger(exactCount),
+    exactCount.toString(),
+  );
+  return `#${index + 1} ${runtime.t("gameTimeShort")} ${formatInfinityRunTime(record.time)} / ${runtime.t("realTimeShort")} ${formatInfinityRunTime(record.realTime)} / ${runtime.t("eternityInfinityCountShort")} ${countText}`;
 }
 
 function updateAutomationUi() {
@@ -94,7 +102,7 @@ function eternityRunListSignature() {
     runtime.state.language,
     runtime.state.numberFormat,
     runtime.state.timeUnit,
-    records.map((record) => `${record.time}:${record.realTime}:${record.infinityCount}`).join(";"),
+    records.map((record) => `${record.time}:${record.realTime}:${record.infinityCount}:${record.infinityCountExact ?? ""}`).join(";"),
   ].join("|");
 }
 
@@ -192,3 +200,5 @@ expose("updateAutomationUi", () => updateAutomationUi);
 expose("infinityRunRecordText", () => infinityRunRecordText);
 expose("eternityRunRecordText", () => eternityRunRecordText);
 expose("updateStatisticsUi", () => updateStatisticsUi);
+
+export { updateAutomationUi, updateStatisticsUi };

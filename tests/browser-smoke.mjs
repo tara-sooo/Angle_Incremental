@@ -15,6 +15,7 @@ const expectedModulePaths = [
   "/src/core/numbers.js",
   "/src/core/save.js",
   "/src/core/save-code.js",
+  "/src/core/offline-progress.js",
   "/src/systems/achievements.js",
   "/src/systems/tower.js",
   "/src/ui/render-canvas.js",
@@ -30,13 +31,7 @@ const expectedModulePaths = [
   "/src/systems/core-boost.js",
   "/src/systems/infinity.js",
   "/src/systems/infinite-angle.js",
-  "/src/systems/balance.js",
   "/src/systems/eternity.js",
-  "/src/systems/balance-angle.js",
-  "/src/systems/balance-generation.js",
-  "/src/systems/balance-core-boost.js",
-  "/src/systems/balance-infinity.js",
-  "/src/systems/balance-ui.js",
   "/src/systems/infinity-point-normalization.js",
   "/src/ui/events.js",
 ];
@@ -86,15 +81,19 @@ async function runSmoke() {
       summary: document.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
       resetDock: document.querySelector("[data-i18n=updateResetDock]")?.textContent?.trim() ?? "",
       canvas: document.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
+      interaction: document.querySelector("[data-i18n=updateInteraction]")?.textContent?.trim() ?? "",
       note: document.querySelector("[data-i18n=updateModalNote]")?.textContent?.trim() ?? "",
     }));
-    assert.match(modalCopy.summary, /Eternity Milestone 8/);
-    assert.match(modalCopy.summary, /自動化修正/);
-    assert.match(modalCopy.resetDock, /IA・Tower/);
-    assert.match(modalCopy.resetDock, /Auto Infinity・CB・GR/);
-    assert.match(modalCopy.canvas, /Timelineリスペックの確認をスキップ/);
-    assert.match(modalCopy.note, /初期状態はオフ/);
-    assert.match(modalCopy.note, /Timelineリスペックだけ/);
+    assert.match(modalCopy.summary, /オフライン進行/);
+    assert.match(modalCopy.summary, /安定性/);
+    assert.match(modalCopy.resetDock, /Auto Infinity/);
+    assert.match(modalCopy.resetDock, /Core Boost/);
+    assert.match(modalCopy.canvas, /Eternity Milestone 5/);
+    assert.match(modalCopy.canvas, /TC4/);
+    assert.match(modalCopy.interaction, /Infinity Upgrade/);
+    assert.match(modalCopy.interaction, /Help/);
+    assert.match(modalCopy.note, /セーブ復旧/);
+    assert.match(modalCopy.note, /整数値/);
     const desktopButtonInteraction = await page.evaluate(() => {
       const selectors = ["[data-tab=angle]", "#speedUpgrade"];
       return selectors.map((selector) => {

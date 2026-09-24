@@ -4,6 +4,9 @@ import { readFile } from "node:fs/promises";
 const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 const policy = await readFile(new URL("../docs/idd-policy.md", import.meta.url), "utf8");
 const workflow = await readFile(new URL("../.github/workflows/regression.yml", import.meta.url), "utf8");
+const iddWork = await readFile(new URL("../.github/instructions/idd-work.instructions.md", import.meta.url), "utf8");
+const iddPrSubmit = await readFile(new URL("../.github/instructions/idd-pr-submit.instructions.md", import.meta.url), "utf8");
+const iddCi = await readFile(new URL("../.github/instructions/idd-ci.instructions.md", import.meta.url), "utf8");
 
 const researchScripts = [
   "test:tc4-balance",
@@ -40,6 +43,7 @@ for (const step of researchSteps) {
 }
 assert.equal(routineSteps.includes("npm run test:local-performance-gate"), true, "routine validation must retain the deterministic local classifier");
 assert.equal(routineSteps.includes("npm run test:performance:local"), false, "routine validation must not run the wall-clock local comparison");
+assert.equal(routineSteps.includes("npm run test:performance"), false, "routine validation must not run strict hosted timing");
 assert.equal(packageJson.scripts["test:performance:local"], "node scripts/local-performance-gate.mjs", "the local wall-clock diagnostic must remain explicitly runnable");
 assert.deepEqual(fullSteps, ["npm run validate", "npm run test:performance", "npm run test:offline-stress", "npm run validate:research"], "full validation must compose the named layers");
 assert.match(policy, /npm run validate:research/);
@@ -75,5 +79,28 @@ assert.match(performanceJob, /name: performance-diagnostics/);
 assert.match(performanceJob, /output\/performance-smoke\.json/);
 assert.match(offlineStressJob, /name: offline-stress-diagnostics/);
 assert.match(offlineStressJob, /output\/offline-stress\.json/);
+
+assert.match(iddWork, /## Local performance evidence boundary/);
+assert.match(iddWork, /Issue explicitly requires `npm run test:performance`/);
+assert.match(iddWork, /`local-performance-pass`[\s\S]*record evidence and continue/);
+assert.match(iddWork, /timing-budget-only failure[\s\S]*do not count it as a hosted-CI failure[\s\S]*second-failure hold/);
+assert.match(iddWork, /repeated local timing-budget failures[\s\S]*failure count alone never invokes hosted-CI hold semantics/i);
+assert.match(iddWork, /`local-performance-regression`[\s\S]*stop for candidate-specific repair/);
+assert.match(iddWork, /`local-performance-inconclusive`[\s\S]*continue to PR; hosted CI is required/);
+assert.match(iddWork, /malformed\/non-timing report[\s\S]*fail closed/);
+assert.match(iddPrSubmit, /pre-push gate remains `npm run validate`/);
+assert.match(iddPrSubmit, /the Issue also requires[\s\S]*do\s+not promote that strict timing command into a pre-push hard gate/);
+assert.match(iddPrSubmit, /`local-performance-inconclusive`[\s\S]*proceeds to PR[\s\S]*requires\s+hosted CI/);
+assert.match(iddCi, /only after a push/);
+assert.match(iddCi, /current PR\s+head in hosted CI/);
+assert.match(iddCi, /local\s+`npm run test:performance` timing overage[\s\S]*not a hosted-CI failure/);
+assert.match(iddCi, /hosted performance job's strict `npm run test:performance` absolute\s+budgets remain required/);
+assert.match(iddCi, /local inconclusive result never waives them/);
+assert.match(iddCi, /first infrastructure\/flaky failure for the current hosted head[\s\S]*rerun that exact run once/);
+assert.match(iddCi, /second failure, timeout, cancellation, or unknown state[\s\S]*hold and report/);
+assert.match(policy, /ローカル性能とHosted CIの境界/);
+assert.match(policy, /timing-budget-only failure[\s\S]*second-failure hold/);
+assert.match(policy, /local-performance-regression[\s\S]*local-performance-inconclusive/);
+assert.match(policy, /current-head Hosted CI[\s\S]*strict absolute/);
 
 console.log("Validation layer policy passed");

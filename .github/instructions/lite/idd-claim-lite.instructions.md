@@ -51,7 +51,8 @@ Stop and ask the operator when:
 - forced-handoff evidence exists but mismatches live claim/branch/PR
   state, or `forcedHandoff.mode` is not `human-gated`;
 - claim verification (below) fails any race-safe check;
-- branch pre-check (e) finds an orphaned branch with no active claim.
+- branch pre-check (e) finds an orphaned branch with no active claim and no
+  valid maintainer-prepared branch authorization.
 
 Never invent a forced-handoff marker. Only consume already-recorded,
 human-gated forced-handoff evidence from a trusted actor.
@@ -244,11 +245,38 @@ gh api "repos/{owner}/{repo}/git/matching-refs/heads/issue/<N>-" \
 | ---------------------------------------------------------------------- | --------------------------------------------------------------- |
 | No local or remote match                                               | Proceed to claim posting                                        |
 | Match corresponds to an inheritable claim (per (d) above)              | Proceed — expected branch                                       |
+| Exact match passes the maintainer-prepared branch gate below            | Proceed — reuse the prepared branch                             |
 | Match does not correspond, but an active non-stale claim references it | **STOP** — concurrent session                                   |
 | Match does not correspond, and no active claim references it           | **STOP** — hold note, possible orphaned branch; operator review |
 
+A maintainer-prepared branch is a narrow fresh-claim exception. It requires a
+top-level Issue comment from the repository owner or a Maintain/Admin actor
+containing this exact marker:
+
+`<!-- idd-prepared-branch: branch=<branch> head=<40-hex-sha> base=next base-sha=<40-hex-sha> -->`
+
+Plain prose naming a branch/commit is not authorization. Verify live state:
+
+1. marker `branch` starts with exact `issue/<N>-` for this Issue and has a
+   non-empty suffix. For this exception only, the marker branch is authoritative
+   and need not equal the deterministic slug derived from the current Issue
+   title;
+2. the live remote head exactly equals marker `head`;
+3. marker `base` is exact `next`; marker `base-sha` is an ancestor of
+   both the marked branch head and current `origin/next`:
+   `git merge-base --is-ancestor <base-sha> origin/<branch>` and
+   `git merge-base --is-ancestor <base-sha> origin/next` both succeed;
+4. there is no active claim and no open PR using that branch or
+   referencing/closing the Issue.
+
+Unknown or false evidence → **STOP**. The marker authorizes branch reuse only,
+not claim ownership or merge. The fresh claim must still post the normal
+`claimed-by` and activation-nonce and pass Claim verification before any
+mutation. Never reset, force-push, delete, or silently rewrite the prepared
+branch to satisfy this gate.
+
 No remote branch with the computed name may already exist unless it is
-inheritable per the table above.
+inheritable per the table above or passes this exact prepared-branch gate.
 
 ## Claim execution
 
@@ -267,9 +295,10 @@ differently for step 5:
 
 1. **Branch name**: takeover, forced-handoff, or a fresh claim whose
    pre-check (e) scan matched an inheritable branch (released claim,
-   legacy migration source, or matching PR) → reuse it verbatim, never
-   recompute from the title (which may have changed since). No
-   inheritable match → use the name pre-check (e) computed.
+   legacy migration source, matching PR, or validated maintainer-prepared
+   branch) → reuse it verbatim, never recompute from the title (which may
+   have changed since). No inheritable match → use the name pre-check (e)
+   computed.
 2. **`{claim-id}`**: generate a fresh opaque token — **except**
    forced-handoff adopt-verbatim, which reuses the marker's
    `newClaimId` instead.

@@ -78,19 +78,26 @@ async function testTimelineTreePurchases() {
   assert.deepEqual(
     Array.from(runtime.timelineNodes(), (node) => node.id),
     ["Real-BC16500", "Parallel-BC16500"],
-    "the first era should expose exactly the two canonical route nodes",
+    "0.14.0 Timeline should expose only the BC16500 route alternatives",
   );
   assert.deepEqual(
-    Array.from(runtime.timelineNodes(), (node) => [node.era, node.route, node.costTF, Array.from(node.prerequisites)]),
+    Array.from(runtime.timelineNodes(), (node) => [
+      node.era,
+      node.route,
+      node.costTF,
+      node.prerequisiteMode || "all",
+      Array.from(node.prerequisites),
+    ]),
     [
-      ["BC16500", "Real", 1, []],
-      ["BC16500", "Parallel", 1, []],
+      ["BC16500", "Real", 1, "all", []],
+      ["BC16500", "Parallel", 1, "all", []],
     ],
-    "first-era definitions should carry independent route metadata and one-TF costs",
+    "shipped Timeline definitions should retain route and cost metadata",
   );
   assert.equal(runtime.timelineAvailableTf(), 1);
   assert.equal(runtime.canPurchaseTimelineNode("Real-BC16500"), true);
   assert.equal(runtime.canPurchaseTimelineNode("Parallel-BC16500"), true, "either route should be purchasable before a route is selected");
+  assert.equal(runtime.timelineNodeAvailability("Real-BC6000").reason, "unknown-node", "deferred nodes must not be purchasable");
   assert.equal(runtime.purchaseTimelineNode("Real-BC16500", { save: false, update: false }), true);
   assert.equal(state.timelinePurchasedNodes.length, 1);
   assert.deepEqual(
@@ -131,6 +138,7 @@ async function testTimelineTreePurchases() {
     { id: "Parallel-BC16500", era: "BC16500", route: "Parallel", costTF: 1 },
   ], "save/load should preserve the canonical purchased node");
   assert.equal(loaded.runtime.timelineAvailableTf(), 0);
+
 }
 
 async function testResetPersistenceAndRespec() {
@@ -261,8 +269,193 @@ async function testSaveCompatibility() {
   );
 }
 
+async function testDeferredTimelineMigration() {
+  const source = await loadRuntime(candidatePath);
+  const { runtime } = source;
+  const staleSave = runtime.serializeSaveData();
+  staleSave.state.eternityCount = 4;
+  staleSave.state.scoreTfClaims = 20;
+  staleSave.state.ipTfClaims = 0;
+  staleSave.state.eternityTfClaims = 0;
+  staleSave.state.timelinePurchasedNodes = [
+    { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
+    { id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 },
+    { id: "Parallel-BC6000", era: "BC6000", route: "Parallel", costTF: 1 },
+    { id: "Real-AD30", era: "AD30", route: "Real", costTF: 5 },
+    { id: "Parallel-AD30", era: "AD30", route: "Parallel", costTF: 5 },
+  ];
+  staleSave.state.completedChallenges = 1 << (6 - 1);
+  const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(staleSave)]]));
+
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(loaded.debug.state.timelinePurchasedNodes)),
+    [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }],
+    "loading a 0.13-era save should retain shipped BC16500 progress and drop all deferred IDs",
+  );
+  assert.equal(loaded.debug.state.scoreTfClaims, 20, "deferred-node migration must preserve TF claim history");
+  assert.equal(loaded.runtime.timelineSpentTf(), 1, "deferred node costs must not remain silently spent");
+  assert.equal(loaded.runtime.timelineAvailableTf(), 19, "dropping deferred nodes must refund their old TF costs");
+  for (const id of ["Real-BC6000", "Parallel-BC6000", "Real-AD30", "Parallel-AD30"]) {
+    assert.equal(loaded.runtime.timelineNode(id), null, `${id} must not have a shipped definition`);
+    assert.equal(loaded.runtime.timelineNodeAvailability(id).reason, "unknown-node", `${id} must stay unavailable`);
+    assert.equal(loaded.runtime.canPurchaseTimelineNode(id), false, `${id} must not be purchasable`);
+  }
+  loaded.debug.state.towerFloor = 5;
+  assert.equal(loaded.runtime.towerScoreExponent(), 1.25, "deferred Tower effects must not reactivate from stale state");
+  assert.equal(loaded.runtime.eternityGain(), 1, "deferred Eternity effects must not reactivate from stale state");
+  assert.equal(loaded.runtime.timelineBulkSimulationAllowed(), true, "normalized shipped nodes should remain bulk-safe");
+}
+
 function assertClose(actual, expected, tolerance, message) {
+  if (actual === expected) return;
   assert.ok(Math.abs(actual - expected) <= tolerance, `${message}: expected ${expected}, got ${actual}`);
+}
+
+const TIMELINE_BULK_NODE_IDS = [
+  "Real-BC16500",
+  "Parallel-BC16500",
+];
+
+function configureQuietTimelineState(instance, nodes) {
+  const { state } = instance.debug;
+  const { runtime } = instance;
+  Object.assign(state, {
+    activeChallenge: 0,
+    activeTowerChallenge: 0,
+    automationEnabled: false,
+    autoRunInfinity: false,
+    autoRunGeneration: false,
+    autoRunCoreBoost: false,
+    completedChallenges: (1 << (6 - 1)) | (1 << (8 - 1)),
+    timelinePurchasedNodes: nodes.map((id) => ({ id })),
+    timelineParallelSecondsSinceIc8Clear: 5,
+    offlineProgressEnabled: true,
+    offlineTickCount: 120,
+    vertices: 3,
+    speedLevel: 30,
+    gainLevel: 0,
+    currentGain: 1,
+    currentGainLog10: 0,
+    pointProgress: 0,
+    totalVertexProgress: 0,
+    score: Number.MAX_VALUE,
+    scoreLog10: 15000,
+    totalScore: Number.MAX_VALUE,
+    totalScoreLog10: 15000,
+    generationScore: Number.MAX_VALUE,
+    generationScoreLog10: 15000,
+    infiniteCapBroken: true,
+    towerFloor: 10,
+    currentInfinityRunTime: 0,
+    currentEternityRunTime: 0,
+    currentGenerationRunTime: 0,
+    totalPlayTime: 0,
+  });
+  runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 100n);
+  runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 8n);
+  runtime.syncInfinityPointCachesFromExact(10n ** 6n);
+  runtime.updateUi = () => {};
+  runtime.saveGame = () => true;
+  runtime.createCheckpoint = () => true;
+}
+
+async function runQuietTimelineResume(nodes, guarded) {
+  const instance = await loadRuntime(candidatePath);
+  configureQuietTimelineState(instance, nodes);
+  const { debug, runtime } = instance;
+  let report;
+  if (guarded) {
+    runtime.beginOfflineWorkBudget(120);
+    runtime.offlineProcessing = true;
+    try {
+      for (let tick = 0; tick < 120; tick += 1) debug.update(runtime.MAX_SIMULATION_STEP_SECONDS, true);
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+    report = { requestedTicks: 120, processedTicks: 120, simulationIterations: 120, bulkIterations: 0 };
+  } else {
+    report = await debug.processOfflineElapsed(
+      120 * runtime.MAX_SIMULATION_STEP_SECONDS,
+      "timeline-bulk",
+      { clockSource: "server" },
+    );
+  }
+  return {
+    report,
+    values: {
+      scoreLog10: runtime.currentScoreLog10(),
+      totalScoreLog10: runtime.currentTotalScoreLog10(),
+      generationScoreLog10: runtime.currentGenerationScoreLog10(),
+      currentGainLog10: runtime.currentGainLog10(),
+      infinityPointsLog10: runtime.currentInfinityPointsLog10(),
+      infiniteScoreLog10: runtime.currentInfiniteScoreLog10(),
+      infinityCountExact: runtime.currentExactIntegerState(
+        debug.state,
+        "infinityCountExact",
+        "infinityCount",
+      ).toString(),
+      timelineSeconds: debug.state.timelineParallelSecondsSinceIc8Clear,
+      parallelTimerEffectLog10: runtime.timelineParallelEffectiveLog10(),
+      realCountEffectLog10: runtime.timelineRealInfinityCountGainMultiplierLog10(),
+      towerScoreExponent: runtime.towerScoreExponent(),
+      infinityCountGainExact: runtime.infinityCountGainExact().toString(),
+      eternityGainExact: runtime.eternityGainExact().toString(),
+    },
+  };
+}
+
+async function testTimelineBulkSimulation() {
+  const policy = await loadRuntime(candidatePath);
+  const { state } = policy.debug;
+  const { runtime } = policy;
+  for (const id of TIMELINE_BULK_NODE_IDS) {
+    state.timelinePurchasedNodes = [{ id }];
+    assert.equal(runtime.timelineBulkSimulationAllowed(), true, `${id} should be audited as bulk-safe`);
+  }
+  state.timelinePurchasedNodes = [{ id: "future-node" }];
+  assert.equal(runtime.timelineBulkSimulationAllowed(), false, "unknown Timeline effects should remain on the guarded path");
+
+  for (const nodes of [
+    ["Real-BC16500"],
+    ["Parallel-BC16500"],
+  ]) {
+    const bulk = await runQuietTimelineResume(nodes, false);
+    const guarded = await runQuietTimelineResume(nodes, true);
+    assert.equal(bulk.report.requestedTicks, 120, "bulk comparison should request all configured ticks");
+    assert.equal(bulk.report.processedTicks, 120, "bulk comparison should process all configured ticks");
+    assert.ok(bulk.report.simulationIterations < bulk.report.requestedTicks, "quiet Timeline should use fewer full updates");
+    assert.ok(bulk.report.bulkIterations > 0, "quiet Timeline should use bulk updates");
+    assert.equal(guarded.report.simulationIterations, 120, "guarded Timeline should retain one update per tick");
+    assert.equal(guarded.report.bulkIterations, 0, "guarded Timeline should not report bulk updates");
+    for (const [key, tolerance] of [
+      ["scoreLog10", 1e-9],
+      ["totalScoreLog10", 1e-9],
+      ["generationScoreLog10", 1e-9],
+      ["currentGainLog10", 1e-12],
+      ["infinityPointsLog10", 1e-12],
+      ["infiniteScoreLog10", 1e-12],
+      ["timelineSeconds", 1e-9],
+      ["parallelTimerEffectLog10", 1e-12],
+      ["realCountEffectLog10", 1e-12],
+      ["towerScoreExponent", 1e-12],
+    ]) {
+      assertClose(bulk.values[key], guarded.values[key], tolerance, `${key} should match guarded Timeline processing`);
+    }
+    assert.equal(bulk.values.infinityCountGainExact, guarded.values.infinityCountGainExact, "Infinity gain should match at the next boundary");
+    assert.equal(bulk.values.infinityCountExact, guarded.values.infinityCountExact, "Infinity count should match before the next boundary");
+    assert.equal(bulk.values.eternityGainExact, guarded.values.eternityGainExact, "Eternity gain should match without performing Eternity");
+  }
+
+  const eventful = await loadRuntime(candidatePath);
+  configureQuietTimelineState(eventful, ["Parallel-BC16500"]);
+  eventful.debug.state.activeChallenge = 1;
+  const eventfulReport = await eventful.debug.processOfflineElapsed(
+    120 * eventful.runtime.MAX_SIMULATION_STEP_SECONDS,
+    "timeline-eventful",
+    { clockSource: "server" },
+  );
+  assert.equal(eventfulReport.simulationIterations, 120, "active challenges should retain the guarded Timeline path");
+  assert.equal(eventfulReport.bulkIterations, 0, "active challenges must not be bulked");
 }
 
 async function testTimelineEffectsAndTimer() {
@@ -310,6 +503,12 @@ async function testTimelineEffectsAndTimer() {
   state.completedChallenges = 0;
   state.achievementMaskHigh = 0;
 
+  state.timelinePurchasedNodes = [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }];
+  state.towerFloor = 0;
+  state.eternityCount = 1;
+  state.completedChallenges = 0;
+  state.scoreLog10 = 310;
+  state.score = Number.MAX_VALUE;
   runtime.syncInfinityPointCachesFromExact(10n);
   state.infinityCount = 1;
   debug.runInfinity(false);
@@ -410,6 +609,7 @@ async function testTimelineEffectsAndTimer() {
   const loadedReal = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(realSerialized)]]));
   assert.equal(loadedReal.debug.state.timelinePurchasedNodes[0].id, "Real-BC16500", "save/load should preserve Real ownership");
   assert.equal(loadedReal.runtime.timelineRealInfinityCountGainMultiplier(), 2, "save/load should preserve the active Real count effect");
+
 }
 
 async function testTimelineResetSemantics() {
@@ -450,7 +650,9 @@ async function runTimelineModuleRuntimeTest() {
   await testTimelineTreePurchases();
   await testResetPersistenceAndRespec();
   await testSaveCompatibility();
+  await testDeferredTimelineMigration();
   await testTimelineEffectsAndTimer();
+  await testTimelineBulkSimulation();
   await testTimelineResetSemantics();
   console.log("Timeline module runtime tests passed");
 }

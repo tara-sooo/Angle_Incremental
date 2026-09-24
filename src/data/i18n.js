@@ -1,4 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { ETERNITY_TEXT } from "./eternity-i18n.js";
 
 // Localized UI strings and translation lookup.
 
@@ -28,7 +29,7 @@ const TEXT = {
     vertexGain: "頂点通過ごとの増加",
     lapTime: "1周の時間",
     lapSpeed: "ラップ速度",
-    lapSpeedSoftcapped: "軟上限中",
+    lapSpeedSoftcapped: "SC",
     buyAll: "全購入",
     automation: "自動化",
     automationLocked: "IU 1-2で解放",
@@ -236,23 +237,66 @@ const TEXT = {
     helpTopicAutomation: "Automation",
     helpTopicOffline: "Offline Progress",
     helpTopicNotation: "数値表記と設定",
-    helpBodyAngle: "Pointは図形の頂点を通過するたびに増加し、核に着くとScoreを得ます。周回速度は頂点を通る頻度、角の追加は頂点数と獲得式、頂点獲得量は1回の増加量を伸ばします。実効頂点数をnとすると parts = min(floor(sqrt(n)), 10)、partsが2以上なら基礎獲得量は「現在獲得量 ÷ parts」をparts乗する形です。高レベルの価格は段階的に重くなり、上位層の報酬は購入数の実効値を補正します。",
-    helpBodyGeneration: "累計スコアが1,000,000に届くと初回のGenerationが解放されます。2回目以降は、今回のGeneration中スコアが前回の実行値を超える必要があります。実行すると現在のScore、Generation中スコア、通常強化、頂点進行をリセットし、GR回数・前回値・Score倍率・コスト補正を保持します。世代深度 d = max(0, log10(Generation中スコア) - 6) が深いほど倍率と価格改善が伸び、倍率には上限があります。IC8クリア後はGR倍率の式とIP倍率への連動が変わります。",
-    helpBodyCoreBoost: "Core Boostは通常1.00e20 Scoreから実行でき、Generation以下をリセットしてCB回数を増やします。要求値はlog空間でおおむね log10(要求値) = 20 × p^CB回数 として増加し、pは通常2.00です。TC2クリア後はTowerの階数でpが下がり、1.50付近からソフトキャップされます。CBは頂点通過ごとの増加倍率とScore獲得指数を伸ばし、IUやIC5/IC8で計算が変わります。IC8中はCB要求のlog10が2倍になります。",
-    helpBodyInfinity: "Infinityは1.80e308 Scoreで初回は自動実行、以降は手動または自動化で実行します。Infinity未満のScore、通常強化、Generation、CBをリセットし、Infinity回数・IP・IU・IC・Break Infinite Cap・実績・設定・統計、TowerとIAの解放・強化を保持します。Infinity後のScoreはBreak前なら強いソフトキャップ（超過分 × 0.08）がかかります。基本IPは max(1, floor(log10(Score) - 307)) で、実際の獲得量は表示中の報酬補正を含みます。",
-    helpBodyInfinityUpgrades: "Infinity UpgradeはIPで購入する恒久強化です。前提のIUをそろえてから購入し、Infinityでは失われません。IU 1-2は通常強化の自動購入、4-1はInfinity Challenge、8-1はInfinity自動化を解放します。9-1はBreak前のIP式、13-1はInfinity Scoreの扱いを変えるため、ツリーの前提と効果を見ながら購入してください。Eternityでは現在の時代の進行とともにリセットされます。",
-    helpBodyInfinityChallenges: "Infinity ChallengeはIU 4-1後に解放され、制約下でInfinityへ到達するとクリアになります。IC1〜8はそれぞれ別の制約と恒久報酬を持ち、クリア済みでも再挑戦できます。IC7はScoreが高い帯で通常強化を購入できなくし、IC8は頂点数を3に固定し、CB要求log10を2倍にする代わりに専用の角購入レベルで増加量と獲得指数を伸ばします。Tower Challengeとは併用できます。",
-    helpBodyBreakCap: "1.00e350 ScoreでBreak Infinite Capを実行できます。これはInfinityを含む通常のリセットで失われない恒久状態で、Infinity条件の1.80e308は変わりません。Break後はInfinity以降の強いScoreソフトキャップがなくなり、IPの基本式は log2(Score) - 307 系になります。",
-    helpBodyInfiniteAngle: "Infinite Angleは1.00e20 IPの一回払いで解放し、通常の図形とは独立して進行します。IAの核到達でInfinity Scoreを得て、IA倍率は Score 0 では1、以後は max(1, Infinity Score^0.3) が基本です。Infinityでは現在のIA獲得量・位置・Infinity Scoreをリセットしますが、IAの解放と強化レベルは保持します。TC1やIU 13-1でInfinity Scoreの指数が変わります。",
-    helpBodyTower: "Towerは1.00e50 IPから建設でき、階数ごとに通常Scoreの累乗へ +0.05 を加えます。建設コストは階数が上がるほど重くなり、画面ではIPとして表示されます。TowerはInfinityで保持され、次の階数には対応するTower Challengeのクリアが必要です。TC1はInfinity Score、TC2はCB要求量、TC3は通常強化の実効購入数にも階数ボーナスを与えます。",
-    helpBodyTowerChallenges: "Tower ChallengeはFloor 3、5、8、12で順に解放されます。TC1〜3をクリアするまで対応する次のFloorへ進めず、開始・中止時はInfinity以下をリセットします。TC1〜3の目標はそれぞれ1e1000、1e3000、1e5000 Scoreです。TC4は通常強化とIA強化をレベル1までに制限し、専用のA・B・C強化を使って1e7777 Scoreを目指します。TC4クリアは現在のEternity条件になり、EternityでTC進行はリセットされます。",
-    helpBodyEternity: "Eternityは現在のEternity周回でTC4をクリアし、IPが1.80e308以上になると実行できます。実行するとScoreからTower・IA・Infinityまで現在の時代の進行をリセットし、Eternity回数を増やします。実績、Eternity回数とMilestone、Timeline、Time Fragments、設定、統計は保持されます。現行版にEternity Pointはありません。",
-    helpBodyEternityMilestones: "最初の3種（1-1、1-2、1-3）はEternity 1回ごとに未取得の1つを選び、最初の3回で全て取得できます。以降はEternity 5/8/12/20/27/44/81/108/128でMilestone 2〜10が有効になります。1-1は通常自動化、1-2は通常強化の無料レベル、1-3はIAの無料レベル、3はGR/CBの下位リセット抑止、4はCB要求量軽減、5はIU自動購入を与えます。6〜10の効果はMilestone画面で確認できます。",
-    helpBodyTimeline: "Timelineは最初のEternity後に見つかり、Score（必要log10 = 20,000 + 10,000 × 取得数）、IP（400 + 100 × 取得数）、Eternity（必要回数 = 2^(取得数 + 1)）の3トラックからTime Fragments（TF）を個別に獲得します。TFでノードを購入すると効果が有効になります。RealはInfinity数獲得量を元の獲得量 × (1 + log10(IP))にし、ParallelはIC8クリア後にIP獲得量へ毎秒×3を加算します。Parallelのraw log10倍率は10でソフトキャップされ、超過分は10 + 10 × log10(1 + (raw - 10) / 10)になります。同じ時代のRealルートとParallelルートは排他的で、一方を購入すると他方は選べません。Respecは購入済みノードを外してTFを戻し、現在のEternity周回をリセットします。獲得済みTFとTimelineの発見状態は保持されます。",
-    helpBodyResets: "GenerationはThe Angleを、Core BoostはGeneration以下を、InfinityはInfinityより下を、Eternityは現在の時代全体をリセットします。InfinityではIP・IU・IC・Break・Tower・IA強化を保持し、Eternityでは実績・Milestone・Timeline・TF・設定・統計を保持します。Milestone 3が有効ならGRとCB自身は下位進行をリセットしません。Reset前の状態はセーブのチェックポイントから復元できる場合があります。",
-    helpBodyAutomation: "通常強化の自動購入はIU 1-2またはMilestone 1-1、ICの自動完了はIU 4-1、GR/CBの自動実行は実績19、Infinityの自動実行はIU 8-1、IU自動購入はMilestone 5で解放されます。全体スイッチと個別スイッチがあり、GRは倍率・コスト改善・経過秒数、Infinityは獲得IPのしきい値を設定できます。しきい値は現在の数値表記で入力し、チャレンジ中などは安全のため自動実行されません。",
-    helpBodyOffline: "SettingsのOffline Progressを有効にすると、離席時間のゲーム進行と解放済みの自動化を復帰時に適用します。離席時間は実プレイ時間には加算されません。ティック数は1,000〜1,000,000で設定でき、復帰レポートには離席時間と実際に変化した項目を表示します。サーバー時刻が使えない場合はローカル時刻へフォールバックし、時計の不整合があれば報酬を付与しません。無効中の離席時間は後から遡って処理されません。",
-    helpBodyNotation: "Number formatはCompact、Scientific、Detailedから選べます。たとえば同じ値でもCompactは1.00B、Scientificは1.00e9のように表示されます。入力欄の大きなInfinityしきい値も現在の表記で読み書きでき、表記変更は計算結果や保存データを変えません。Time unitは時間表示だけを、上部バー設定はニュース・資源・進捗の表示だけを切り替えます。",
+    helpBodyAngle: [
+      "The AngleではPointが図形の頂点を巡り、核に到達するとScoreを獲得します。",
+      "周回速度は核への到達頻度、角の追加は図形と獲得量、頂点獲得量は1回ごとの増加を強化します。Scoreで通常強化を購入し、3種類の効果を組み合わせて周回を伸ばします。",
+    ],
+    helpBodyGeneration: [
+      "Generationは最初のリセット層です。累計Score 1,000,000で初回が解放され、2回目以降は今回の周回で前回の記録を上回ると実行できます。",
+      "実行するとScore、通常強化、頂点進行など下位の進行をリセットし、Generation回数と世代の強化を残します。",
+    ],
+    helpBodyCoreBoost: [
+      "Core BoostはGenerationより大きなリセットです。通常は1.00e20 Scoreで実行でき、下位の進行をリセットしてThe Angleを強化します。CB回数が増えるほど次の要求が重くなります。",
+    ],
+    helpBodyInfinity: [
+      "Infinityは次の大きなリセット層です。初回は1.80e308 Scoreに到達すると実行でき、以降はボタンまたは解放済みの自動化で開始します。",
+      "ScoreからCore Boostまでの進行をリセットし、IP、Infinity Upgradesなどの恒久進行を残します。",
+    ],
+    helpBodyInfinityUpgrades: [
+      "Infinity UpgradeはIPで購入する恒久強化です。ツリーの前提を満たすと購入でき、通常のInfinityでは失われません。Upgradeには自動化やInfinity Challengeを解放するものもあります。",
+    ],
+    helpBodyInfinityChallenges: [
+      "Infinity Challengeは通常と異なるルールでInfinityを目指す特別な周回です。解放後、各Challengeの制約下でInfinityに到達するとクリアになります。",
+      "初回クリアの報酬は恒久的に残り、クリア済みのChallengeには再挑戦できます。",
+    ],
+    helpBodyBreakCap: [
+      "Break Infinite CapはInfinity後のScore進行を広げる恒久解放です。1.00e350 Scoreで実行でき、Infinity後の強い減速を取り除いて以降のIP獲得を改善します。通常のリセットで失われません。",
+    ],
+    helpBodyInfiniteAngle: [
+      "Infinite Angleは通常の図形とは別に進むもう一つの角です。1.00e20 IPの一回払いで解放し、IAの核に到達するとInfinity Scoreを獲得します。",
+      "Infinityでは現在のIA周回とInfinity Scoreをリセットしますが、解放状態とIA強化は残ります。",
+    ],
+    helpBodyTower: [
+      "TowerはIPを使って階を建て、通常のScore獲得を強化する恒久進行です。建設すると階数と効果が増え、Infinity後も残ります。",
+      "次の階にはTower Challengeなどの条件があることがあります。条件を満たすと、さらにTowerを建設できます。",
+    ],
+    helpBodyTowerChallenges: [
+      "Tower ChallengeはTowerの次の階を開ける特別な挑戦です。開始するとInfinity以下の進行がリセットされ、Challengeごとのルールで目標を目指します。制約、目標、報酬はChallengeごとに異なり、クリアすると対応するTower進行が解放されます。",
+    ],
+    helpBodyEternity: [
+      "Eternityは現在の時代を終えるリセットです。現在の周回でTC4をクリアし、IPが1.80e308以上になると実行できます。",
+      "ScoreからTower・Infinite Angle・Infinityまでの時代の進行をリセットし、Eternity回数を増やします。実績、Milestone、Timeline、Time Fragments、設定、統計などの恒久進行は残ります。",
+    ],
+    helpBodyEternityMilestones: [
+      "Eternity MilestonesはEternityを重ねるほど増える恒久的な利便性と強化です。最初の3回は未取得の3種類から1つずつ選び、以降はEternity回数で解放されます。",
+    ],
+    helpBodyTimeline: [
+      "Timelineは最初のEternity後に解放されます。Score、IP、Eternityの各トラックで条件を満たすとTime Fragments（TF）を獲得でき、Score・IP・EternityはTF獲得で消費されません。TFはTimelineノードの購入に使います。",
+      "同じ時代ではRealとParallelのどちらか一方だけを選べます。Respecは購入済みノードを外してTFを返し、現在のEternity周回をリセットします。",
+    ],
+    helpBodyResets: [
+      "リセットは下位の進行を新しい上位の強化へ交換する仕組みです。リセットする範囲は層ごとに異なり、上位の回数や恒久報酬など一部の進行は保持されます。",
+    ],
+    helpBodyAutomation: [
+      "Automationは解放済みの購入やリセットを自動で行います。全体スイッチと機能ごとのスイッチを設定し、対応する機能では実行条件も調整できます。制約のあるChallenge中は停止する自動化があります。",
+    ],
+    helpBodyOffline: [
+      "Offline ProgressをSettingsで有効にすると、離れている間の時間を使ってゲームを進め、解放済みのAutomationを適用します。設定を無効にしていた時間は後から処理されず、戻ったときに処理時間と変化がレポートに表示されます。",
+    ],
+    helpBodyNotation: [
+      "Notationでは数値の表示形式、時間単位、上部バーの表示を選べます。大きな数値でも読みやすい形式に切り替えられます。",
+      "設定は表示だけを変え、計算結果やセーブ内容は変えません。大きな値を入力するときは現在の数値形式を使います。",
+    ],
     level: "レベル",
     effectiveLevel: "実効",
     vertices: "頂点",
@@ -343,11 +387,12 @@ const TEXT = {
     updateReloadDeferred: "更新待機中：手動リロードしてください",
     resetDone: "リセット済み",
     resetConfirm: "保存済みの進行状況をすべてリセットしますか？",
-    updateTitle: "0.13.3 アップデート",
-    updateSummary: "Eternity Milestone 8の自動化修正とTimelineリスペックの設定追加を含むパッチです。",
-    updateResetDock: "Eternity Milestone 8のIA・Tower自動化が、Auto Infinity・CB・GRと併用しても正常に動作するよう修正しました。",
-    updateCanvas: "設定に「Timelineリスペックの確認をスキップ」を追加しました。",
-    updateModalNote: "初期状態はオフで、Timelineリスペックだけに適用されます。",
+    updateTitle: "0.14.0 アップデート",
+    updateSummary: "オフライン進行、自動化、進行・セーブの安定性を大きく改善しました。",
+    updateResetDock: "Offline Progressを改良し、Auto Infinity・Generation・Core Boost・自動購入などを含む長時間のオフライン進行を効率化しました。",
+    updateCanvas: "Eternity Milestone 5～7、TC4、Auto Generationなどの進行・自動化を修正しました。",
+    updateInteraction: "Infinity Upgrade / Timelineのダブルクリック・ダブルタップ購入、Helpの整理、Timeline表示の改善を行いました。",
+    updateModalNote: "セーブ復旧や大きな整数値の処理を改善しました。",
     updateClose: "閉じる",
     under10ms: "10ミリ秒未満",
     secondsUnit: "秒",
@@ -364,6 +409,7 @@ const TEXT = {
     topBarProgressOption: "進捗状況",
     topBarBlankOption: "ブランク",
     topBarHiddenOption: "隠す",
+    ...ETERNITY_TEXT.ja,
   },
   en: {
     tabAngle: "Angle",
@@ -390,7 +436,7 @@ const TEXT = {
     vertexGain: "Gain per vertex",
     lapTime: "Lap time",
     lapSpeed: "Lap speed",
-    lapSpeedSoftcapped: "softcapped",
+    lapSpeedSoftcapped: "SC",
     buyAll: "Buy All",
     automation: "Automation",
     automationLocked: "Unlocked by IU 1-2",
@@ -598,23 +644,66 @@ const TEXT = {
     helpTopicAutomation: "Automation",
     helpTopicOffline: "Offline Progress",
     helpTopicNotation: "Number format and settings",
-    helpBodyAngle: "The Point gains value at every vertex and awards Score when it reaches the core. Lap speed increases how often vertices are crossed, extra angles increase vertices and the gain expression, and vertex gain raises each increment. With effective vertex count n, parts = min(floor(sqrt(n)), 10); at parts 2 or higher, base gain follows the shape (current gain / parts)^parts. High-level prices scale in stages, while upper layers can change effective upgrade values.",
-    helpBodyGeneration: "Generation first unlocks at 1,000,000 total score. From the second run onward, the current Generation score must beat the previous run. Generating resets current Score, Generation score, normal upgrades, and vertex progress, while keeping the Generation count, previous value, Score multiplier, and cost factor. The depth d = max(0, log10(Generation score) - 6) grows multiplier and price improvements, with a multiplier cap. Clearing IC8 changes the Generation multiplier formula and links it to IP gain.",
-    helpBodyCoreBoost: "Core Boost normally starts at 1.00e20 Score and resets Generation and lower progress while increasing the CB count. Its requirement grows in log space, roughly log10(requirement) = 20 × p^CB count, with p normally 2.00. After TC2, Tower floors lower p and a softcap begins around 1.50. CB raises vertex-gain multiplier and Score-gain exponent; IU and IC5/IC8 change the calculation. During IC8, the CB requirement log10 is doubled.",
-    helpBodyInfinity: "Infinity first runs automatically at 1.80e308 Score, then can be run manually or by automation. It resets Score, normal upgrades, Generation, and CB, while keeping the Infinity count, IP, IU, IC, Break Infinite Cap, achievements, settings, statistics, Tower, and IA unlock/upgrades. Before Break, Score beyond Infinity is under a strong softcap, applying 0.08 to the excess. Base IP is max(1, floor(log10(Score) - 307)), before other displayed reward modifiers.",
-    helpBodyInfinityUpgrades: "Infinity Upgrades are permanent IP purchases with prerequisites. They survive Infinity. IU 1-2 unlocks normal-upgrade autobuy, 4-1 unlocks Infinity Challenges, and 8-1 unlocks Infinity automation. IU 9-1 changes the pre-Break IP formula, while IU 13-1 changes how Infinity Score is used, so follow the tree prerequisites and effects. Eternity resets them with the current era.",
-    helpBodyInfinityChallenges: "Infinity Challenges unlock after IU 4-1. Reach Infinity under each restriction to clear it; first clears grant permanent rewards, and cleared challenges can be replayed. IC7 blocks normal-upgrade purchases above a Score threshold. IC8 fixes vertices at 3 and doubles the CB requirement log10, but its dedicated angle level can raise vertex gain and the Score exponent. Infinity and Tower Challenges can run together.",
-    helpBodyBreakCap: "Break Infinite Cap is available at 1.00e350 Score. It is permanent through normal resets, including Infinity, and the Infinity threshold remains 1.80e308. After breaking it, the strong post-Infinity Score softcap is removed and base IP uses the log2(Score) - 307 family.",
-    helpBodyInfiniteAngle: "Infinite Angle unlocks with a one-time 1.00e20 IP purchase and runs independently from the normal figure. Reaching its core earns Infinity Score; its basic multiplier is 1 at Score 0 and then max(1, Infinity Score^0.3). Infinity resets current IA gain, position, and Infinity Score, but keeps the unlock and upgrade levels. TC1 and IU 13-1 can change the Infinity Score exponent.",
-    helpBodyTower: "The Tower starts at 1.00e50 IP and adds +0.05 per floor to the normal Score exponent. Construction costs rise with each floor and are shown as IP. Tower persists through Infinity, and the next floor can require its corresponding Tower Challenge. TC1 also scales Infinity Score, TC2 lowers CB requirement growth, and TC3 multiplies effective normal-upgrade purchases.",
-    helpBodyTowerChallenges: "Tower Challenges unlock at Floors 3, 5, 8, and 12. TC1-3 gate the next corresponding floor and reset Infinity-and-below progress when started or stopped. Their targets are 1e1000, 1e3000, and 1e5000 Score. TC4 limits normal and IA upgrades to level 1; use its dedicated A, B, and C upgrades to reach 1e7777 Score. TC4 completion is part of the current Eternity requirement and Tower Challenge progress resets at Eternity.",
-    helpBodyEternity: "Eternity is available when the current Eternity run has cleared TC4 and holds at least 1.80e308 IP. It resets the current era from Score through Tower, IA, and Infinity, then increases the Eternity count. Achievements, Eternity count and Milestones, Timeline, Time Fragments, settings, and statistics remain. The current version has no Eternity Point currency.",
-    helpBodyEternityMilestones: "The first three types (1-1, 1-2, 1-3) let you choose one unowned Milestone per Eternity, so the first three Eternities can acquire all three. Milestones 2-10 activate at Eternity counts 5, 8, 12, 20, 27, 44, 81, 108, and 128. 1-1 grants early autobuy, 1-2 grants free normal levels, 1-3 grants free IA levels, 3 preserves GR/CB lower progress, 4 reduces CB requirements, and 5 unlocks IU autobuy. The effects of 6-10 are listed in the Milestone screen.",
-    helpBodyTimeline: "Timeline appears after the first Eternity and awards Time Fragments (TF) from three independent tracks: Score (required log10 = 20,000 + 10,000 × claims), IP (400 + 100 × claims), and Eternity (required count = 2^(claims + 1)). Spend TF on nodes to activate their effects. Real changes Infinity count gain to original gain × (1 + log10(IP)); Parallel adds ×3 to IP gain each second after clearing IC8. Parallel's raw log10 multiplier softcaps at 10; excess uses 10 + 10 × log10(1 + (raw - 10) / 10). Real and Parallel routes are exclusive within an era: purchasing one locks the other. Respec removes purchased nodes, returns their TF, and restarts the current Eternity run. Claimed TF and Timeline discovery remain.",
-    helpBodyResets: "Generation resets The Angle, Core Boost resets Generation and below, Infinity resets everything below Infinity, and Eternity resets the current era. Infinity keeps IP, IU, IC, Break, Tower, and IA upgrades; Eternity keeps achievements, Milestones, Timeline, TF, settings, and statistics. When Milestone 3 is active, GR and CB themselves no longer reset lower progress. Save checkpoints may restore a state from before a reset.",
-    helpBodyAutomation: "Normal-upgrade autobuy unlocks with IU 1-2 or Milestone 1-1. IC auto-clear unlocks with IU 4-1, GR/CB automation with Achievement 19, Infinity automation with IU 8-1, and IU autobuy with Milestone 5. Use the master and per-system switches. Generation thresholds cover multiplier gain, cost improvement, and elapsed time; Infinity uses an IP-gain threshold in the current number format. Automation stays safe by pausing in restricted challenge states.",
-    helpBodyOffline: "Enable Offline Progress in Settings to apply away-time game progress and discovered automation when you return. Away time is not real play time. Choose 1,000 to 1,000,000 ticks; the return report shows away time and the values that actually changed. If server time is unavailable, local time is used with limited protection; clock inconsistencies grant no reward. Time spent while disabled is not applied later.",
-    helpBodyNotation: "Choose Compact, Scientific, or Detailed number format. For example, the same value may appear as 1.00B in Compact or 1.00e9 in Scientific. Large Infinity thresholds can be entered and displayed in the current format; changing format does not change calculations or saves. Time unit affects time labels only, while the top-bar setting switches news, resources, or progress display.",
+    helpBodyAngle: [
+      "The Angle moves the Point around its vertices and awards Score when the Point reaches the core.",
+      "Lap speed makes core visits happen more often, extra angles improve the shape and its gains, and vertex gain raises each step. Spend Score on normal upgrades and combine their three effects to extend the run.",
+    ],
+    helpBodyGeneration: [
+      "Generation is the first reset layer. It unlocks at 1,000,000 total Score, and later runs require the current Generation run to beat the previous one.",
+      "Generating restarts Score, normal upgrades, and lower progress while keeping the Generation count and its permanent improvements.",
+    ],
+    helpBodyCoreBoost: [
+      "Core Boost is a larger reset than Generation. It normally becomes available at 1.00e20 Score; it resets lower progress while making The Angle stronger. Each CB makes the next requirement harder.",
+    ],
+    helpBodyInfinity: [
+      "Infinity is the next major reset layer. The first Infinity becomes available at 1.80e308 Score; later runs can be started from the button or unlocked automation.",
+      "It resets progress through Core Boost but keeps IP, Infinity Upgrades, and other permanent progression.",
+    ],
+    helpBodyInfinityUpgrades: [
+      "Infinity Upgrades are permanent improvements bought with IP. Meet the tree prerequisites; ordinary Infinity resets do not remove them. Some upgrades unlock automation or Infinity Challenges.",
+    ],
+    helpBodyInfinityChallenges: [
+      "Infinity Challenges are special runs with different rules. After they unlock, reach Infinity under a challenge's restriction to clear it.",
+      "First clears grant permanent rewards, and cleared challenges can be replayed.",
+    ],
+    helpBodyBreakCap: [
+      "Break Infinite Cap expands Score progression after Infinity. At 1.00e350 Score, perform the break to remove the strong post-Infinity slowdown and improve later IP gain. It survives normal resets, including Infinity.",
+    ],
+    helpBodyInfiniteAngle: [
+      "Infinite Angle is a second figure that progresses separately from the normal one. Unlock it with a one-time 1.00e20 IP purchase and reach its core to earn Infinity Score.",
+      "Infinity restarts the current IA run and Infinity Score but keeps the unlock and IA upgrades.",
+    ],
+    helpBodyTower: [
+      "Tower is permanent IP-funded progress that strengthens normal Score gain. Build floors to increase its effect, and Tower remains after Infinity.",
+      "Some floors require a Tower Challenge. Completing the requirement unlocks further Tower construction.",
+    ],
+    helpBodyTowerChallenges: [
+      "Tower Challenges open the next parts of the Tower. Starting one resets Infinity-and-below progress, and each challenge asks you to reach its goal under its own rules. Restrictions, goals, and rewards differ by challenge, and clearing one unlocks the corresponding Tower progress.",
+    ],
+    helpBodyEternity: [
+      "Eternity ends the current era with a major reset. It becomes available after the current run clears TC4 and reaches at least 1.80e308 IP.",
+      "It resets progress from Score through Tower, Infinite Angle, and Infinity, then increases the Eternity count. Achievements, Milestones, Timeline, Time Fragments, settings, and statistics remain as permanent or account-level progress.",
+    ],
+    helpBodyEternityMilestones: [
+      "Eternity Milestones add permanent quality-of-life and progression benefits. During the first three Eternities, choose one unowned starter milestone per run; later milestones activate from the Eternity count.",
+    ],
+    helpBodyTimeline: [
+      "Timeline unlocks after the first Eternity. Meeting the requirements on the Score, IP, and Eternity tracks grants Time Fragments (TF); Score, IP, and Eternity are not consumed when you claim TF. Spend TF on Timeline nodes.",
+      "Within an era, choose either Real or Parallel. Respec removes purchased nodes, refunds their TF, and resets the current Eternity run.",
+    ],
+    helpBodyResets: [
+      "Resets trade lower-layer progress for stronger higher-layer progress. Each layer resets a different scope, while some counts and permanent rewards remain available for the next run.",
+    ],
+    helpBodyAutomation: [
+      "Automation repeats unlocked purchases and resets. Enable the master switch, choose individual systems, and set thresholds where available. Some automation pauses during restricted challenges.",
+    ],
+    helpBodyOffline: [
+      "Enable Offline Progress in Settings to apply away-time progress and unlocked automation when you return. Time spent while it is disabled is not applied later, and the return report shows processed time and changes.",
+    ],
+    helpBodyNotation: [
+      "Notation controls number formats, time units, and top-bar display options. Choose the format that makes large values easiest to read.",
+      "These settings change presentation only; they do not change calculations or saves. Use the current number format when entering large values.",
+    ],
     level: "Level",
     effectiveLevel: "Effective",
     vertices: "vertices",
@@ -705,11 +794,12 @@ const TEXT = {
     updateReloadDeferred: "Update waiting: reload manually",
     resetDone: "Reset",
     resetConfirm: "Reset all saved progress?",
-    updateTitle: "Version 0.13.3",
-    updateSummary: "This patch fixes Eternity Milestone 8 automation and adds a Timeline respec setting.",
-    updateResetDock: "Fixed Eternity Milestone 8 IA and Tower automation so it works alongside Auto Infinity, Core Boost, and Generation.",
-    updateCanvas: "Added “Skip Timeline respec confirmation” to Settings.",
-    updateModalNote: "It is off by default and only affects Timeline respec.",
+    updateTitle: "Version 0.14.0",
+    updateSummary: "Offline progress, automation, progression, and save reliability have been substantially improved.",
+    updateResetDock: "Offline Progress now handles long offline sessions more efficiently, including Auto Infinity, Generation, Core Boost, and automated purchases.",
+    updateCanvas: "Progression and automation around Eternity Milestones 5–7, TC4, and Auto Generation have been corrected.",
+    updateInteraction: "Infinity Upgrade and Timeline nodes now support direct double-click and double-tap purchasing, alongside clearer Help and improved Timeline presentation.",
+    updateModalNote: "Save recovery and handling of very large integer progression values have been improved.",
     updateClose: "Close",
     under10ms: "<10 ms",
     secondsUnit: "s",
@@ -726,6 +816,7 @@ const TEXT = {
     topBarProgressOption: "Progress",
     topBarBlankOption: "Blank",
     topBarHiddenOption: "Hide",
+    ...ETERNITY_TEXT.en,
   },
 };
 

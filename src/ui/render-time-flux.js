@@ -5,6 +5,15 @@ function formatFluxTime(seconds) {
   return runtime.formatLongDuration(seconds);
 }
 
+function formatInfinityCountGain(report) {
+  const exact = runtime.parseExactInteger(
+    report.totalInfinityCountGainExact,
+    runtime.parseExactInteger(report.infinityCountAfter, 0n)
+      - runtime.parseExactInteger(report.infinityCountBefore, 0n),
+  );
+  return runtime.formatHeldUiLogNumber(runtime.log10ExactInteger(exact), exact.toString());
+}
+
 function updateOfflineReportUi() {
   const report = runtime.offlineReport;
   const elements = runtime.elements;
@@ -27,10 +36,7 @@ function updateOfflineReportUi() {
   elements.offlineReportTimeFlux.textContent = report.offlineProgressEnabled
     ? formatFluxTime(0)
     : formatFluxTime(report.timeFluxGained);
-  elements.offlineReportInfinity.textContent = `+${Math.max(
-    0,
-    report.infinityCountAfter - report.infinityCountBefore,
-  )}`;
+  elements.offlineReportInfinity.textContent = `+${formatInfinityCountGain(report)}`;
   elements.offlineReportIp.textContent = runtime.formatUiLogNumber(report.infinityPointsAfterLog10);
   elements.offlineReportNote.textContent = report.clockAnomaly
     ? runtime.t("offlineReportClockAnomaly")

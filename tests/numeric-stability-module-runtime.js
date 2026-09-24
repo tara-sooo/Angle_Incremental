@@ -557,6 +557,51 @@ async function runNumericStabilityModuleRuntimeTest() {
   }
 
   {
+    const instance = await loadRuntime(candidatePath);
+    const { runtime } = instance;
+    const { state } = instance.debug;
+    const scoreLog10 = 308 + Math.log10(1.79);
+    const coreHits = 100_000_000_000_000;
+    const targetVertexSteps = coreHits * 3;
+    prepareVertexScenario(instance, {
+      scoreLog10,
+      currentGainLog10: -Infinity,
+      infiniteCapBroken: false,
+    });
+    state.infinityCount = 0;
+    state.infinityCountExact = "0";
+    state.vertices = 3;
+    runtime.vertexGainIncreaseLog10 = () => 277.9;
+    runtime.beginOfflineWorkBudget(1);
+    const individualCoreGainLog10 = 277.9 + Math.log10(targetVertexSteps);
+    assert.ok(
+      scoreLog10 - individualCoreGainLog10 > 15,
+      "the tiny-core-hit fixture must keep each individual hit below log-space significance",
+    );
+
+    let usedBatch;
+    runtime.offlineProcessing = true;
+    try {
+      usedBatch = runtime.processManyVertices(1, targetVertexSteps);
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+
+    assert.equal(usedBatch, true, "the tiny-core-hit fixture must use the batched path");
+    assert.equal(state.infinityCount, 1, "aggregate tiny core hits must complete the first Infinity");
+    assert.equal(state.infinityCountExact, "1", "aggregate tiny core hits must record one exact Infinity");
+    assert.equal(state.lastInfinityRuns[0].ipGain, 1, "the first crossing must not include post-threshold IP gain");
+    assert.ok(
+      state.lastInfinityRuns[0].scoreLog10 >= runtime.INFINITY_REQUIREMENT_LOG10 - 1e-12,
+      "the recorded first crossing must reach the Infinity threshold",
+    );
+    assert.ok(
+      runtime.offlineWorkStats.totalIterations <= runtime.offlineWorkStats.hardCap,
+      "the tiny-core-hit fixture must stay within the bounded batch work budget",
+    );
+  }
+
+  {
     const runAchievementOrderingScenario = async (offline) => {
       const instance = await loadRuntime(candidatePath);
       const { runtime, debug } = instance;
@@ -623,6 +668,11 @@ async function runNumericStabilityModuleRuntimeTest() {
     const runScoreThresholdScenario = async (threshold, unlockedIds, offline) => {
       const instance = await loadRuntime(candidatePath);
       const { runtime, debug } = instance;
+      assert.equal(
+        Object.getOwnPropertyDescriptor(runtime, "currentScoreLog10").set,
+        undefined,
+        "projected achievement checks must not replace the live score function",
+      );
       const { state } = debug;
       state.vertices = 3;
       state.speedLevel = 0;
@@ -678,6 +728,85 @@ async function runNumericStabilityModuleRuntimeTest() {
         targetId <= 31 ? targetMask : targetHighMask,
         `e${threshold} should unlock achievement ${targetId}`,
       );
+    }
+  }
+
+  {
+    const runScoreExponentScenario = async (towerFloor, offline) => {
+      const instance = await loadRuntime(candidatePath);
+      const { runtime, debug } = instance;
+      const { state } = debug;
+      state.vertices = 3;
+      state.speedLevel = 0;
+      state.gainLevel = 0;
+      state.generationCount = 0;
+      state.coreBoostCount = 0;
+      state.infinityCount = 1;
+      state.infinityUpgradeMask = 0;
+      state.activeChallenge = 0;
+      state.activeTowerChallenge = 0;
+      state.completedChallenges = 0;
+      state.achievementMask = [7, 18, 29].reduce((mask, id) => mask | (1 << (id - 1)), 0) >>> 0;
+      state.achievementMaskHigh = 0;
+      state.infiniteAngleUnlocked = false;
+      state.infiniteCapBroken = true;
+      state.towerFloor = towerFloor;
+      state.showFloatingText = false;
+      state.lightEffects = true;
+      state.totalVertexProgress = 2;
+      state.pointProgress = 2 / 3;
+      state.lastVertexIndex = 2;
+      const exponent = runtime.effectiveScoreExponent();
+      const rawCurrentScoreLog10 = (2450 - 0.02) / exponent;
+      const rawVertexGainLog10 = 2450 / exponent;
+      setLogResource(state, "score", rawCurrentScoreLog10);
+      setLogResource(state, "totalScore", -Infinity);
+      setLogResource(state, "generationScore", -Infinity);
+      setLogResource(state, "currentGain", -Infinity);
+
+      const achievement35Bit = 1 << (35 - 32);
+      runtime.vertexGainIncreaseLog10 = () => rawVertexGainLog10
+        + ((state.achievementMaskHigh & achievement35Bit) ? Math.log10(1.01) : 0);
+      let batchUsed = false;
+      const baseProcessManyVertices = runtime.processManyVertices;
+      runtime.processManyVertices = (...args) => {
+        batchUsed = true;
+        return baseProcessManyVertices(...args);
+      };
+
+      runtime.offlineProcessing = offline;
+      try {
+        debug.update(runtime.lapDuration() * 6 / state.vertices, true);
+      } finally {
+        runtime.offlineProcessing = false;
+      }
+      return {
+        exponent,
+        batchUsed,
+        rawScoreLog10: state.scoreLog10,
+        scoreLog10: runtime.currentScoreLog10(),
+        achievementMask: state.achievementMask,
+        achievementMaskHigh: state.achievementMaskHigh,
+        currentGainLog10: runtime.currentGainLog10(),
+      };
+    };
+
+    for (const [towerFloor, label] of [[0, "effective exponent 1"], [20, "effective exponent greater than 1"]]) {
+      const exact = await runScoreExponentScenario(towerFloor, false);
+      const batched = await runScoreExponentScenario(towerFloor, true);
+      assert.equal(exact.exponent, towerFloor === 0 ? 1 : 2, label + ": exponent fixture");
+      assert.equal(exact.batchUsed, false, label + ": exact processing should not use the batch path");
+      assert.equal(batched.batchUsed, true, label + ": offline processing should use the batch path");
+      assertClose(batched.rawScoreLog10, exact.rawScoreLog10, 1e-10, label + ": raw Score");
+      assertClose(batched.scoreLog10, exact.scoreLog10, 1e-10, label + ": effective Score");
+      assert.equal(batched.achievementMask, exact.achievementMask, label + ": achievement state");
+      assert.equal(
+        batched.achievementMaskHigh & (1 << (35 - 32)),
+        1 << (35 - 32),
+        label + ": Achievement 35 should unlock",
+      );
+      assert.equal(batched.achievementMaskHigh, exact.achievementMaskHigh, label + ": achievement timing");
+      assertClose(batched.currentGainLog10, exact.currentGainLog10, 1e-10, label + ": current gain");
     }
   }
 

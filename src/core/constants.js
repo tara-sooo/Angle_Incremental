@@ -9,7 +9,8 @@ const CORE_BOOST_BASE_REQUIREMENT = 1e20;
 const INFINITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
 const ETERNITY_REQUIREMENT_LOG10 = 308 + Math.log10(1.8);
 const BREAK_CAP_REQUIREMENT_LOG10 = 350;
-const MAX_TRACKED_LOG10 = 1000000000;
+const MAX_GAME_LOG10 = Number.MAX_VALUE;
+const MAX_NATIVE_VALUE_LOG10 = Math.log10(Number.MAX_VALUE);
 const MAX_RENDERED_VERTICES = 10000;
 const MAX_DRAW_VERTICES = 720;
 const LAP_SPEED_SUPER_SOFTCAP_START_LOG10 = 22;
@@ -22,8 +23,8 @@ const SAVE_LOAD_FAILURE_KEY = "angle-incremental-save-load-failure";
 const SAVE_PRE_IMPORT_KEY = "angle-incremental-save-pre-import";
 const SAVE_RESTORE_UNDO_KEY = "angle-incremental-save-restore-undo";
 const SAVE_CHECKPOINTS_KEY = "angle-incremental-save-checkpoints";
-const SAVE_VERSION = 11;
-const APP_VERSION = "0.13.3";
+const SAVE_VERSION = 12;
+const APP_VERSION = "0.14.0";
 const SAVE_CODE_PREFIX = "ANGLE_SAVE_V2:";
 const SAVE_CODE_SALT = "angle-incremental-save-code-v2";
 const SAVE_CODE_SECRET = "Angle Incremental local save code obfuscation";
@@ -46,6 +47,8 @@ const MAX_VERTEX_STEPS_PER_FRAME = 5000;
 const MAX_CORE_HITS_PER_FRAME = 64;
 const MAX_EXACT_CORE_HITS = 50000;
 const CORE_HIT_APPROX_SEGMENTS = 2048;
+const MAX_EXACT_BATCH_CORE_HITS = 2048;
+const CORE_HIT_BATCH_APPROX_SEGMENTS = 256;
 // Offline work is reserved per track, then bounded again for small batches and fallbacks.
 const OFFLINE_CORE_HIT_WORK_BUDGET = CORE_HIT_APPROX_SEGMENTS * 4;
 const OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT = 8;
@@ -57,9 +60,9 @@ const LAP_SPEED_SOFTCAP_POWER = 0.5;
 const PRE_GENERATION_LAP_SPEED_SOFTCAP_START = 35;
 const PRE_GENERATION_LAP_SPEED_SOFTCAP_POWER = 0.22;
 const PRE_GENERATION_COST_SCALING = {
-  speed: { startsAfter: 20, logScale: 0.3 },
-  vertex: { startsAfter: 15, logScale: 1.2 },
-  gain: { startsAfter: 12, logScale: 0.55 },
+  speed: { startsAfter: 10, logScale: 0.00140 },
+  vertex: { startsAfter: 8, logScale: 0.00560 },
+  gain: { startsAfter: 6, logScale: 0.00260 },
 };
 const STAGED_UPGRADE_COST_SCALING = [
   { startsAfterLog10: 30, logScale: 0.02 },
@@ -108,7 +111,8 @@ expose("CORE_BOOST_BASE_REQUIREMENT", () => CORE_BOOST_BASE_REQUIREMENT);
 expose("INFINITY_REQUIREMENT_LOG10", () => INFINITY_REQUIREMENT_LOG10);
 expose("ETERNITY_REQUIREMENT_LOG10", () => ETERNITY_REQUIREMENT_LOG10);
 expose("BREAK_CAP_REQUIREMENT_LOG10", () => BREAK_CAP_REQUIREMENT_LOG10);
-expose("MAX_TRACKED_LOG10", () => MAX_TRACKED_LOG10);
+expose("MAX_GAME_LOG10", () => MAX_GAME_LOG10);
+expose("MAX_NATIVE_VALUE_LOG10", () => MAX_NATIVE_VALUE_LOG10);
 expose("MAX_RENDERED_VERTICES", () => MAX_RENDERED_VERTICES);
 expose("MAX_DRAW_VERTICES", () => MAX_DRAW_VERTICES);
 expose("LAP_SPEED_SUPER_SOFTCAP_START_LOG10", () => LAP_SPEED_SUPER_SOFTCAP_START_LOG10);
@@ -145,6 +149,8 @@ expose("MAX_VERTEX_STEPS_PER_FRAME", () => MAX_VERTEX_STEPS_PER_FRAME);
 expose("MAX_CORE_HITS_PER_FRAME", () => MAX_CORE_HITS_PER_FRAME);
 expose("MAX_EXACT_CORE_HITS", () => MAX_EXACT_CORE_HITS);
 expose("CORE_HIT_APPROX_SEGMENTS", () => CORE_HIT_APPROX_SEGMENTS);
+expose("MAX_EXACT_BATCH_CORE_HITS", () => MAX_EXACT_BATCH_CORE_HITS);
+expose("CORE_HIT_BATCH_APPROX_SEGMENTS", () => CORE_HIT_BATCH_APPROX_SEGMENTS);
 expose("OFFLINE_CORE_HIT_WORK_BUDGET", () => OFFLINE_CORE_HIT_WORK_BUDGET);
 expose("OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT", () => OFFLINE_SMALL_CORE_HIT_EXACT_LIMIT);
 expose("OFFLINE_FALLBACK_APPROX_SEGMENTS", () => OFFLINE_FALLBACK_APPROX_SEGMENTS);

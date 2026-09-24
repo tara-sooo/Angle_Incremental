@@ -129,6 +129,7 @@ try {
     compactRequirement: document.querySelector('[data-i18n="eternityRequirementCompact"]')?.textContent,
     compactRequirementCount: document.querySelectorAll('[data-i18n="eternityRequirementCompact"]').length,
     currentIp: document.getElementById("eternityCurrentIp")?.textContent,
+    pendingGain: document.getElementById("eternityPendingGain")?.textContent,
     legacyCount: document.getElementById("eternityCountValue"),
     legacyTc4: document.getElementById("eternityTc4Requirement"),
     legacyIp: document.getElementById("eternityIpRequirement"),
@@ -182,6 +183,7 @@ try {
   assert.equal(initial.compactRequirement, "TC4クリア + 1.80e308 IP", "Eternity should show one compact requirement summary");
   assert.equal(initial.compactRequirementCount, 1, "Eternity should not duplicate its compact requirement");
   assert.equal(initial.currentIp, "0 IP", "Eternity should keep current IP visible");
+  assert.equal(initial.pendingGain, "1", "Eternity should show the canonical base pending gain");
   assert.equal(initial.legacyCount, null, "Eternity should remove the duplicate body count");
   assert.equal(initial.legacyTc4, null, "Eternity should remove the separate TC4 status row");
   assert.equal(initial.legacyIp, null, "Eternity should remove the separate IP status row");
@@ -197,9 +199,9 @@ try {
     "IC7は最初からクリアされた状態になる",
     "GRとCBは何もリセットしない",
     "核増幅に必要なコストを^0.9",
-    "IUの自動化を解放",
-    "ICは全て最初からクリアされた状態になる",
-    "TCは解放された瞬間にクリアされる",
+    "IUの自動化を解放し、IAは自動で解放される",
+    "ICは全て最初からクリアされた状態になり、Break Infinite Capは自動で解放される",
+    "4までのTCは解放された瞬間にクリアされる",
     "IAの自動購入とTowerの自動建設を解放",
     "最初からIPを1000持った状態で開始される",
     "Break Eternityを実行",
@@ -319,9 +321,38 @@ try {
       return { route: node.dataset.route, x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }),
     treeConnector: {
-      borderTop: getComputedStyle(document.querySelector(".timeline-node-grid"), "::before").borderTopWidth,
-      borderLeft: getComputedStyle(document.querySelector(".timeline-node-grid"), "::before").borderLeftWidth,
+      types: Array.from(document.querySelectorAll("[data-timeline-connector]"), (node) => node.dataset.timelineConnector),
+      branchCount: document.querySelectorAll(".timeline-connector-branch").length,
+      bridgeTargets: Array.from(document.querySelectorAll(".timeline-era-bridge"), (node) => [
+        node.dataset.fromEra,
+        node.dataset.toEra,
+      ]),
+      ownedCount: document.querySelectorAll(".timeline-connector-branch.is-owned, .timeline-era-bridge.is-owned").length,
+      splitCenter: getComputedStyle(document.querySelector(".timeline-era-split"), "::before").borderLeftWidth,
+      mergeCenter: getComputedStyle(document.querySelector(".timeline-era-merge"), "::after").borderLeftWidth,
+      branchHorizontal: getComputedStyle(document.querySelector(".timeline-era-split .timeline-connector-branch")).borderTopWidth,
     },
+    treeLayout: (() => {
+      const rect = (node) => node.getBoundingClientRect();
+      const firstEra = document.querySelector('.timeline-era[data-timeline-era="BC16500"]');
+      const realCard = firstEra.querySelector('.timeline-node[data-route="Real"]');
+      const parallelCard = firstEra.querySelector('.timeline-node[data-route="Parallel"]');
+      const realBranch = firstEra.querySelector('.timeline-era-split .timeline-connector-branch[data-route="Real"]');
+      const parallelBranch = firstEra.querySelector('.timeline-era-split .timeline-connector-branch[data-route="Parallel"]');
+      return {
+        headingBottom: rect(firstEra.querySelector(".timeline-era-heading")).bottom,
+        splitTop: rect(firstEra.querySelector(".timeline-era-split")).top,
+        splitBottom: rect(firstEra.querySelector(".timeline-era-split")).bottom,
+        gridTop: rect(firstEra.querySelector(".timeline-node-grid")).top,
+        gridBottom: rect(firstEra.querySelector(".timeline-node-grid")).bottom,
+        mergeTop: rect(firstEra.querySelector(".timeline-era-merge")).top,
+        mergeBottom: rect(firstEra.querySelector(".timeline-era-merge")).bottom,
+        realBranchStart: rect(realBranch).left,
+        realCardCenter: rect(realCard).left + rect(realCard).width / 2,
+        parallelBranchEnd: rect(parallelBranch).right,
+        parallelCardCenter: rect(parallelCard).left + rect(parallelCard).width / 2,
+      };
+    })(),
     detailOrder: Array.from(document.getElementById("timelineNodeDetail")?.children || [], (node) => node.id || node.className),
     repeatedDetailFields: ["timelineNodeDetailEra", "timelineNodeDetailRoute", "timelineNodeDetailCost", "timelineNodeDetailStatus"]
       .some((id) => document.getElementById(id) !== null),
@@ -348,14 +379,14 @@ try {
   assert.equal(timelineInitial.milestoneInactive, true, "Timeline selection should hide the Milestone subpanel");
   assert.equal(timelineInitial.eternityPanelActive, true, "Timeline selection should keep the Eternity main panel active");
   assert.equal(timelineInitial.mainPanelPresent, false, "Timeline should not be addressable as a main panel");
-  assert.equal(timelineInitial.scoreRequirement, "1.00e20,000 Score", "Timeline should show the exact initial Score requirement");
+  assert.equal(timelineInitial.scoreRequirement, "1.00e20,000 スコア", "Timeline should show the exact initial score requirement");
   assert.equal(timelineInitial.ipRequirement, "1.00e400 IP", "Timeline should show the exact initial IP requirement");
   assert.equal(timelineInitial.eternityRequirement, "2", "Timeline should show the exact initial Eternity requirement");
   assert.equal(timelineInitial.scoreDisabled, true, "an unmet Timeline track should disable its claim control");
   assert.equal(timelineInitial.respecTop, true, "Respec should live in the Timeline overview");
   assert.equal(timelineInitial.respecBeforeClaims, true, "Respec should appear before the claim rows");
-  assert.equal(timelineInitial.treeNodeCount, 2, "Timeline should show both first-era route alternatives");
-  assert.equal(timelineInitial.eraCount, 1, "the first era should render as one branching group");
+  assert.equal(timelineInitial.treeNodeCount, 2, "0.14.0 Timeline should show only both BC16500 route alternatives");
+  assert.equal(timelineInitial.eraCount, 1, "the 0.14.0 tree should render one branching group");
   assert.equal(timelineInitial.eraLabel, "BC16500", "the tree should label the visible era");
   assert.equal(timelineInitial.realRoute, "Real");
   assert.equal(timelineInitial.parallelRoute, "Parallel");
@@ -367,7 +398,7 @@ try {
   assert.equal(timelineInitial.detailButtonDisplay, "none", "a hidden node action should leave the Timeline layout");
   assert.match(timelineInitial.realStatus || "", /TF不足/);
   assert.equal(timelineInitial.detailDescription, "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）");
-  assert.match(timelineInitial.detailCurrentEffect || "", /未購入/);
+  assert.equal(timelineInitial.detailCurrentEffect, "", "an unpurchased Timeline node should not render inactive copy");
   assert.equal(timelineInitial.cardDescription, undefined, "compact nodes should not expand long descriptions");
   assert.equal(timelineInitial.repeatedDetailFields, false, "the selected detail should not repeat tree identity and state fields");
   assert.equal(timelineInitial.respecWarning, false, "Respec consequences should be reserved for confirmation");
@@ -381,8 +412,18 @@ try {
   assert.equal(timelineInitial.treeBorder, "0px", "the tree should provide hierarchy without a surrounding card");
   assert.equal(timelineInitial.nodeGridColumns, 2, "desktop Timeline should keep two route columns");
   assert.ok(timelineInitial.nodeRects.every((node) => node.height <= 60), "desktop Timeline nodes should stay compact");
-  assert.equal(timelineInitial.treeConnector.borderTop, "2px", "desktop Timeline should keep its branch connector");
-  assert.equal(timelineInitial.treeConnector.borderLeft, "0px", "desktop Timeline should use a horizontal branch connector");
+  assert.deepEqual(timelineInitial.treeConnector.types, ["split", "merge"], "0.14.0 Timeline should render only the shipped route connectors");
+  assert.equal(timelineInitial.treeConnector.branchCount, 4, "the shipped era should expose incoming and outgoing branches for both routes");
+  assert.deepEqual(timelineInitial.treeConnector.bridgeTargets, [], "deferred eras should not leave inter-era bridges");
+  assert.equal(timelineInitial.treeConnector.ownedCount, 0, "unowned Timeline paths should start neutral");
+  assert.equal(timelineInitial.treeConnector.splitCenter, "2px", "desktop Timeline should keep a visible central split connector");
+  assert.equal(timelineInitial.treeConnector.mergeCenter, "2px", "desktop Timeline should keep a visible central merge connector");
+  assert.equal(timelineInitial.treeConnector.branchHorizontal, "2px", "desktop Timeline should keep visible route branches");
+  assert.ok(timelineInitial.treeLayout.splitTop >= timelineInitial.treeLayout.headingBottom, "Timeline split should follow its era heading");
+  assert.ok(timelineInitial.treeLayout.gridTop >= timelineInitial.treeLayout.splitBottom, "Timeline cards should follow the split connector");
+  assert.ok(timelineInitial.treeLayout.mergeTop >= timelineInitial.treeLayout.gridBottom, "Timeline merge should follow the cards");
+  assert.ok(Math.abs(timelineInitial.treeLayout.realBranchStart - timelineInitial.treeLayout.realCardCenter) <= 1, "Real incoming branch should attach to the Real card center");
+  assert.ok(Math.abs(timelineInitial.treeLayout.parallelBranchEnd - timelineInitial.treeLayout.parallelCardCenter) <= 1, "Parallel incoming branch should attach to the Parallel card center");
   assert.ok(
     timelineInitial.detailOrder.indexOf("timelineNodePurchaseButton") < timelineInitial.detailOrder.indexOf("timelineNodeDetailDescription"),
     "selected Timeline purchase should precede the long description in document order",
@@ -392,6 +433,110 @@ try {
     overscrollBehavior: "auto",
     parentOverflowY: "auto",
   }, "the nested Timeline should defer scrolling to the Eternity panel");
+
+  const pathTest = await openGamePage(gameTest.browser, gameTest.origin, {
+    viewport: { width: 1280, height: 900 },
+  });
+  let timelinePaths;
+  try {
+    timelinePaths = await pathTest.page.evaluate(async () => {
+    const debug = window.__angleDebug;
+    const previousClaims = debug.state.scoreTfClaims;
+    const previousPurchased = debug.state.timelinePurchasedNodes;
+    const previousSave = localStorage.getItem(debug.runtime.SAVE_KEY);
+    const readPath = () => ({
+      availableNodes: Array.from(document.querySelectorAll(".timeline-node.is-available"), (node) => node.dataset.timelineNode),
+      ownedIncoming: Array.from(
+        document.querySelectorAll(".timeline-era-split .timeline-connector-branch.is-owned"),
+        (node) => node.dataset.timelineConnectorNode,
+      ),
+      ownedOutgoing: Array.from(
+        document.querySelectorAll(".timeline-era-merge .timeline-connector-branch.is-owned"),
+        (node) => node.dataset.timelineConnectorNode,
+      ),
+      bridges: Array.from(document.querySelectorAll(".timeline-era-bridge"), (node) => node.classList.contains("is-owned")),
+      ownedCount: document.querySelectorAll(".timeline-connector-branch.is-owned, .timeline-era-bridge.is-owned").length,
+    });
+    const nodes = (ids) => ids.map((id) => ({ id }));
+
+    debug.state.eternityCount = 1;
+    debug.runtime.switchMainTab("eternity");
+    debug.runtime.switchEternitySubtab("timeline");
+    debug.state.scoreTfClaims = 2;
+    debug.state.timelinePurchasedNodes = [];
+    debug.runtime.updateUi();
+    const available = readPath();
+
+    debug.state.timelinePurchasedNodes = nodes(["Real-BC16500"]);
+    debug.runtime.updateUi();
+    const rrp = readPath();
+    const saved = debug.runtime.saveGame("manual");
+
+    debug.state.timelinePurchasedNodes = [];
+    debug.runtime.updateUi();
+    const clearedBeforeLoad = readPath();
+    const loaded = await debug.runtime.loadGame({
+      allowDuringLoadRecovery: true,
+      allowDuringSaveConflict: true,
+    });
+    debug.runtime.updateUi();
+    const restored = readPath();
+
+    debug.state.timelinePurchasedNodes = nodes(["Parallel-BC16500"]);
+    debug.runtime.updateUi();
+    const ppr = readPath();
+    const respec = debug.runtime.respecTimeline({ save: false });
+    const afterRespec = readPath();
+
+    debug.state.scoreTfClaims = previousClaims;
+    debug.state.timelinePurchasedNodes = previousPurchased;
+    debug.runtime.updateUi();
+    if (previousSave === null) localStorage.removeItem(debug.runtime.SAVE_KEY);
+    else localStorage.setItem(debug.runtime.SAVE_KEY, previousSave);
+    return { available, rrp, saved, clearedBeforeLoad, loaded, restored, ppr, respec, afterRespec };
+    });
+  } finally {
+    await pathTest.context.close();
+  }
+  assert.deepEqual(timelinePaths.available, {
+    availableNodes: ["Real-BC16500", "Parallel-BC16500"],
+    ownedIncoming: [],
+    ownedOutgoing: [],
+    bridges: [],
+    ownedCount: 0,
+  }, "availability should not highlight any Timeline path");
+  assert.deepEqual(timelinePaths.rrp, {
+    availableNodes: [],
+    ownedIncoming: ["Real-BC16500"],
+    ownedOutgoing: ["Real-BC16500"],
+    bridges: [],
+    ownedCount: 2,
+  }, "the Real BC16500 path should highlight only its shipped branches");
+  assert.equal(timelinePaths.saved, true, "Timeline path fixture should save through the canonical save flow");
+  assert.deepEqual(timelinePaths.clearedBeforeLoad, {
+    availableNodes: ["Real-BC16500", "Parallel-BC16500"],
+    ownedIncoming: [],
+    ownedOutgoing: [],
+    bridges: [],
+    ownedCount: 0,
+  }, "clearing canonical purchases should clear all connector highlights");
+  assert.equal(timelinePaths.loaded, true, "Timeline path fixture should load through the canonical load flow");
+  assert.deepEqual(timelinePaths.restored, timelinePaths.rrp, "save/load should restore the RRP connector path");
+  assert.deepEqual(timelinePaths.ppr, {
+    availableNodes: [],
+    ownedIncoming: ["Parallel-BC16500"],
+    ownedOutgoing: ["Parallel-BC16500"],
+    bridges: [],
+    ownedCount: 2,
+  }, "the Parallel BC16500 path should switch the shipped route");
+  assert.equal(timelinePaths.respec, true, "Timeline respec should use the canonical reset flow");
+  assert.deepEqual(timelinePaths.afterRespec, {
+    availableNodes: ["Real-BC16500", "Parallel-BC16500"],
+    ownedIncoming: [],
+    ownedOutgoing: [],
+    bridges: [],
+    ownedCount: 0,
+  }, "respec should clear every connector highlight");
 
   const readTimelineOverviewLayout = async (language, width) => {
     await page.setViewportSize({ width, height: 900 });
@@ -479,12 +624,14 @@ try {
     softcap: window.__angleDebug.runtime.formatUiLogNumber(10),
     timelineText: document.querySelector('[data-eternity-panel="timeline"]')?.textContent || "",
     purchaseNode: document.getElementById("timelineNodePurchaseButton")?.dataset.timelineNodePurchase,
+    purchased: window.__angleDebug.state.timelinePurchasedNodes.map((node) => node.id),
   }));
   assert.equal(selectedParallel.selected, "Parallel-BC16500", "clicking a node should move the focused detail");
   assert.equal(selectedParallel.detailName, "終わらない氷河期");
-  assert.equal(selectedParallel.detailDescription, "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×" + selectedParallel.softcap + "でソフトキャップ）");
+  assert.equal(selectedParallel.detailDescription, "IC8をクリアした後、IP獲得量は毎秒×3ずつ増加する（×" + selectedParallel.softcap + " SC）");
   assert.equal(selectedParallel.timelineText.includes("実効log10"), false, "Parallel details should omit effective-log diagnostics");
   assert.equal(selectedParallel.purchaseNode, "Parallel-BC16500");
+  assert.deepEqual(selectedParallel.purchased, [], "a single Timeline activation should select without purchasing");
   await page.click('[data-timeline-node="Real-BC16500"]');
 
   await page.evaluate(() => {
@@ -511,13 +658,96 @@ try {
   }));
   assert.equal(timelineClaimed.claims, 1, "Timeline claim controls should grant one TF");
   assert.equal(timelineClaimed.earned, "1 TF", "Timeline should display earned TF");
-  assert.equal(timelineClaimed.next, "1.00e30,000 Score", "the Score requirement should advance after one claim");
+  assert.equal(timelineClaimed.next, "1.00e30,000 スコア", "the score requirement should advance after one claim");
   assert.equal(timelineClaimed.score, 25000, "claiming TF must not consume Score");
   assert.equal(timelineClaimed.detailButtonDisabled, false, "one available TF should make the selected node purchasable");
   assert.equal(timelineClaimed.detailPurchaseNode, "Real-BC16500");
   assert.equal(timelineClaimed.detailDescription, "Infinity獲得量は現在所持しているIPの数に応じて強化される（元の獲得量 × (1 + log10(IP))）");
-  assert.match(timelineClaimed.detailCurrentEffect || "", /未購入/);
+  assert.equal(timelineClaimed.detailCurrentEffect, "", "an unpurchased Timeline node should not render inactive copy after a claim");
 
+  await page.waitForTimeout(500);
+  await page.locator('.timeline-node[data-timeline-node="Real-BC16500"]').dblclick();
+  const timelineMouseDouble = await page.evaluate(() => ({
+    selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
+    purchased: window.__angleDebug.state.timelinePurchasedNodes.map((node) => node.id),
+    available: document.getElementById("timelineAvailableTf")?.textContent,
+  }));
+  assert.deepEqual(
+    timelineMouseDouble,
+    { selected: "Real-BC16500", purchased: ["Real-BC16500"], available: "0 TF" },
+    "a Timeline mouse double-click should purchase the exact clicked node once",
+  );
+  await page.waitForTimeout(500);
+  assert.equal(
+    await page.evaluate(() => window.__angleDebug.respecTimeline({ save: false })),
+    true,
+    "Timeline respec should reset the direct-purchase fixture",
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  const timelineTouchDouble = await page.evaluate(() => {
+    const nodeFor = (id) => document.querySelector('[data-timeline-node="' + id + '"]');
+    const pointerActivate = (id) => {
+      const node = nodeFor(id);
+      node?.dispatchEvent(new PointerEvent("pointerup", {
+        bubbles: true,
+        pointerType: "touch",
+        button: 0,
+      }));
+      node?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    };
+    const debug = window.__angleDebug;
+    debug.state.scoreTfClaims = 2;
+    debug.runtime.updateUi();
+    pointerActivate("Parallel-BC16500");
+    pointerActivate("Parallel-BC16500");
+    return {
+      selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
+      purchased: debug.state.timelinePurchasedNodes.map((node) => node.id),
+      available: document.getElementById("timelineAvailableTf")?.textContent,
+    };
+  });
+  assert.deepEqual(
+    timelineTouchDouble,
+    { selected: "Parallel-BC16500", purchased: ["Parallel-BC16500"], available: "1 TF" },
+    "a Timeline touch double-tap should purchase the exact tapped node once on mobile",
+  );
+  const timelineCrossNode = await page.evaluate(() => {
+    const nodeFor = (id) => document.querySelector('[data-timeline-node="' + id + '"]');
+    const pointerActivate = (id) => {
+      const node = nodeFor(id);
+      node?.dispatchEvent(new PointerEvent("pointerup", {
+        bubbles: true,
+        pointerType: "touch",
+        button: 0,
+      }));
+      node?.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    };
+    const debug = window.__angleDebug;
+    debug.runtime.respecTimeline({ save: false });
+    debug.state.scoreTfClaims = 2;
+    debug.runtime.updateUi();
+    pointerActivate("Real-BC16500");
+    pointerActivate("Parallel-BC16500");
+    return {
+      selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
+      purchased: debug.state.timelinePurchasedNodes.map((node) => node.id),
+      available: document.getElementById("timelineAvailableTf")?.textContent,
+    };
+  });
+  assert.deepEqual(
+    timelineCrossNode,
+    { selected: "Parallel-BC16500", purchased: [], available: "2 TF" },
+    "two quick Timeline taps on different nodes must not form a double-tap",
+  );
+  await page.waitForTimeout(500);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    debug.runtime.respecTimeline({ save: false });
+    debug.state.scoreTfClaims = 1;
+    debug.runtime.updateUi();
+  });
+  await page.click('[data-timeline-node="Real-BC16500"]');
   await page.click("#timelineNodePurchaseButton");
   const realPurchased = await page.evaluate(() => ({
     purchased: window.__angleDebug.state.timelinePurchasedNodes,
@@ -542,6 +772,13 @@ try {
   assert.equal(realPurchased.purchasedSummary, false);
   assert.match(realPurchased.realCurrentEffect || "", /現在のInfinity数獲得倍率/);
   assert.equal(realPurchased.parallelStatus, "別ルート選択済み");
+
+  await page.locator('.timeline-node[data-timeline-node="Parallel-BC16500"]').dblclick();
+  assert.deepEqual(
+    await page.evaluate(() => window.__angleDebug.state.timelinePurchasedNodes.map((node) => node.id)),
+    ["Real-BC16500"],
+    "direct purchase must keep the canonical same-era route conflict check",
+  );
 
   assert.equal(
     await page.evaluate(() => window.__angleDebug.respecTimeline({ save: false })),
@@ -643,7 +880,7 @@ try {
     effect: document.querySelector('[data-eternity-milestone="6"] .eternity-milestone-effect')?.textContent,
   }));
   assert.equal(milestoneSix.status, "有効", "Milestone 6 should become active at Eternity 27");
-  assert.equal(milestoneSix.effect, "ICは全て最初からクリアされた状態になる", "Milestone 6 should explain the all-completed IC state");
+  assert.equal(milestoneSix.effect, "ICは全て最初からクリアされた状態になり、Break Infinite Capは自動で解放される", "Milestone 6 should explain the all-completed IC and automatic cap state");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -667,7 +904,7 @@ try {
     effect: document.querySelector('[data-eternity-milestone="7"] .eternity-milestone-effect')?.textContent,
   }));
   assert.equal(milestoneSeven.status, "有効", "Milestone 7 should become active at Eternity 44");
-  assert.equal(milestoneSeven.effect, "TCは解放された瞬間にクリアされる", "Milestone 7 should explain auto-completion at unlock");
+  assert.equal(milestoneSeven.effect, "4までのTCは解放された瞬間にクリアされる", "Milestone 7 should explain TC1-TC4 auto-completion at unlock");
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -794,9 +1031,10 @@ try {
   assert.equal(english.title11, "1-1 Spirit of QoL", "Milestone names should have English copy");
   assert.equal(english.title6, "6 Finite Infinity Challenges", "Milestone 6 should have English copy");
   assert.equal(english.effect2, "Start with IC7 already cleared", "Milestone 2 English copy should describe the direct IC7 completion state");
-  assert.equal(english.milestoneEffects[7], "Start with all ICs already cleared", "Milestone 6 English copy should describe the completed IC state");
+  assert.equal(english.milestoneEffects[6], "Unlock IU automation and automatically unlock IA at its normal requirement", "Milestone 5 English copy should describe IA automation");
   assert.equal(english.title7, "7 One-Point Challenges", "Milestone 7 should have English copy");
-  assert.equal(english.milestoneEffects[8], "Clear each TC when it unlocks", "Milestone 7 English copy should describe completion at unlock");
+  assert.equal(english.milestoneEffects[7], "Start with all ICs already cleared and automatically break Infinite Cap at its normal requirement", "Milestone 6 English copy should describe cap automation");
+  assert.equal(english.milestoneEffects[8], "Automatically clear TC1–TC4 as they unlock", "Milestone 7 English copy should describe its explicit completion scope");
   assert.equal(english.title8, "8 Babel of Infinite", "Milestone 8 should have English copy");
   assert.equal(english.milestoneEffects[9], "Unlock IA autobuy and Tower auto-build", "Milestone 8 English copy should describe IA and Tower automation");
   assert.equal(english.title9, "9 Worldly Desires", "Milestone 9 should have English copy");
@@ -810,7 +1048,7 @@ try {
   assert.equal(english.detailLabel, "Selected node");
   assert.equal(english.detailName, "Endless Ice Age");
   assert.ok(english.detailDescription?.includes("×1.00e10"), "Timeline softcap should follow the scientific number setting");
-  assert.match(english.detailCurrentEffect || "", /Inactive/);
+  assert.equal(english.detailCurrentEffect, "", "English unpurchased Timeline nodes should not render inactive copy");
   assert.equal(english.timelineWarning, undefined, "Timeline should not keep a permanent Respec warning");
   assert.equal(english.timelineText.includes("effective log10"), false, "English Timeline should not expose effective-log diagnostics");
   assert.equal(english.purchasedSummary, false, "English Timeline should not render a purchased-node summary");
@@ -846,9 +1084,18 @@ try {
       const rect = node.getBoundingClientRect();
       return { route: node.dataset.route, x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }),
-    treeConnector: {
-      borderTop: getComputedStyle(document.querySelector(".timeline-node-grid"), "::before").borderTopWidth,
-      borderLeft: getComputedStyle(document.querySelector(".timeline-node-grid"), "::before").borderLeftWidth,
+    connectorTypes: Array.from(document.querySelectorAll("[data-timeline-connector]"), (node) => node.dataset.timelineConnector),
+    connectorBranchCount: document.querySelectorAll(".timeline-connector-branch").length,
+    connectorOwnedCount: document.querySelectorAll(".timeline-connector-branch.is-owned, .timeline-era-bridge.is-owned").length,
+    bridgeOwned: Array.from(document.querySelectorAll(".timeline-era-bridge"), (node) => node.classList.contains("is-owned")),
+    connectorRects: Array.from(document.querySelectorAll(".timeline-connector"), (node) => {
+      const rect = node.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }),
+    connectorStyles: {
+      splitCenter: getComputedStyle(document.querySelector(".timeline-era-split"), "::before").borderLeftWidth,
+      mergeCenter: getComputedStyle(document.querySelector(".timeline-era-merge"), "::after").borderLeftWidth,
+      branchHorizontal: getComputedStyle(document.querySelector(".timeline-era-split .timeline-connector-branch")).borderTopWidth,
     },
     claimRows: Array.from(document.querySelectorAll(".timeline-track"), (row) => ({
       width: row.getBoundingClientRect().width,
@@ -867,17 +1114,33 @@ try {
     subtabCodes: Array.from(document.querySelectorAll(".eternity-subtab span"), (node) => node.textContent),
     subtabNavWidth: document.querySelector(".eternity-subtabs")?.scrollWidth || 0,
     subtabClientWidth: document.querySelector(".eternity-subtabs")?.clientWidth || 0,
+    timelineOverflow: (() => {
+      const timeline = document.querySelector('[data-eternity-panel="timeline"]');
+      return {
+        document: document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+        timeline: timeline.scrollWidth <= timeline.clientWidth + 1,
+      };
+    })(),
   }));
   assert.equal(timelineMobile.visible, true, "Timeline should remain usable at a mobile viewport");
   assert.deepEqual(timelineMobile.subtabCodes, ["MS", "TL"], "mobile Eternity subtabs should expose compact codes");
   assert.ok(timelineMobile.subtabNavWidth <= timelineMobile.subtabClientWidth, "mobile Eternity subtabs should fit without horizontal overflow");
   assert.equal(timelineMobile.gridColumnCount, 2, "Timeline nodes should preserve two route columns on mobile");
-  assert.deepEqual(timelineMobile.branchRouteOrder, ["Real", "Parallel"], "Timeline should preserve route order on mobile");
+  assert.deepEqual(timelineMobile.branchRouteOrder, ["Real", "Parallel"], "0.14.0 Timeline should preserve the shipped route order on mobile");
   assert.ok(timelineMobile.nodeRects[0].x < timelineMobile.nodeRects[1].x, "mobile Real and Parallel nodes should retain left/right topology");
   assert.ok(Math.abs(timelineMobile.nodeRects[0].y - timelineMobile.nodeRects[1].y) <= 1, "mobile route nodes should share a tree level");
   assert.ok(timelineMobile.nodeRects.every((node) => node.height <= 60), "mobile Timeline nodes should stay in the compact class");
-  assert.equal(timelineMobile.treeConnector.borderTop, "2px", "mobile Timeline should keep a visible horizontal branch connector");
-  assert.equal(timelineMobile.treeConnector.borderLeft, "0px", "mobile Timeline should not collapse to a vertical list connector");
+  assert.deepEqual(timelineMobile.connectorTypes, ["split", "merge"], "mobile Timeline should render only the shipped connectors");
+  assert.equal(timelineMobile.connectorBranchCount, 4, "mobile Timeline should preserve both route branches for BC16500");
+  assert.deepEqual(timelineMobile.bridgeOwned, [], "mobile Timeline should not render deferred-era paths");
+  assert.ok(timelineMobile.connectorOwnedCount > 0, "mobile Timeline should render purchased path state");
+  assert.deepEqual(timelineMobile.connectorStyles, {
+    splitCenter: "2px",
+    mergeCenter: "2px",
+    branchHorizontal: "2px",
+  }, "mobile Timeline should keep visible split, merge, and route connectors");
+  assert.ok(timelineMobile.connectorRects.every((connector) => connector.width > 0 && connector.height > 0), "mobile Timeline connectors should keep usable geometry");
+  assert.deepEqual(timelineMobile.timelineOverflow, { document: true, timeline: true }, "mobile Timeline connectors should not overflow their panel");
   assert.ok(timelineMobile.claimRows.every((row) => row.buttonWidth < row.width), "mobile Timeline claim actions should remain compact row actions");
   assert.ok(timelineMobile.detailPositions.purchaseTop < timelineMobile.detailPositions.descriptionTop, "mobile selected Timeline purchase should precede the long description");
   assert.ok(

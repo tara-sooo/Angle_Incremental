@@ -1,14 +1,19 @@
 import { runtime, expose } from "../runtime/shared.js";
+import { formatExactInteger } from "./format-exact-integer.js";
+import { updateSaveRecoveryUi } from "./render-save-recovery.js";
+import { updateTimelineUi } from "./render-timeline.js";
+import { updateEternityUi } from "./render-eternity.js";
+import { updateTopBar } from "./render-topbar.js";
+import { updateChallengeRows, updateTowerChallengeRows } from "./render-challenges.js";
+import { updateInfinityUpgradeRows } from "./render-infinity.js";
+import { updateAchievementRows } from "./render-achievements.js";
+import { updateAutomationUi, updateStatisticsUi } from "./render-automation.js";
+import { updateOfflineReportUi } from "./render-offline-report.js";
+import { updateHelpUi } from "./render-help.js";
 
 // Shared form helpers and the UI update orchestrator.
 
-let renderedRecoveryRevision = -1;
-let renderedRecoveryLanguage = "";
-let renderedRecoveryNumberFormat = "";
-let renderedLoadRecoveryMode = false;
-let renderedSaveConflictMode = false;
-let renderedSaveConflictCheckpointReady = false;
-let selectedTimelineNodeId = "";
+let appliedLanguage = "";
 
 function applyLanguage() {
   if (runtime.appliedLanguage === runtime.state.language) return;
@@ -52,170 +57,31 @@ function clearElement(element) {
   }
 }
 
-function formatRecoveryTimestamp(timestamp) {
-  const numeric = Number(timestamp);
-  if (!Number.isFinite(numeric) || numeric <= 0) return runtime.t("recoveryUnknownTime");
-  try {
-    return new Date(numeric).toLocaleString(runtime.state.language === "en" ? "en-US" : "ja-JP");
-  } catch (error) {
-    return runtime.t("recoveryUnknownTime");
-  }
-}
-
 function formatInfiniteAngleLevel(kind) {
   const level = runtime.infiniteAngleEffectiveUpgradeLevel(kind);
   const freeLevel = runtime.infiniteAngleFreeUpgradeLevel(kind);
   return `Lv ${level}${freeLevel > 0 ? ` (+${freeLevel})` : ""}`;
 }
 
-function formatNormalUpgradeTotal(level) {
+function exactNormalUpgradeValue(kind, fallback = 0n) {
+  return runtime.parseExactInteger(runtime.normalUpgradeLevelExact?.(kind), fallback);
+}
+
+function formatNormalUpgradeTotal(level, exactValue = null) {
+  if (exactValue !== null) return formatExactInteger(exactValue);
   return level < 1000 ? runtime.formatSmallDecimal(level) : runtime.formatUiNumber(level);
 }
 
-function formatNormalUpgradeLevel(rawLevel, effectiveLevel, freeLevel) {
-  return freeLevel > 0
-    ? `Lv ${formatNormalUpgradeTotal(effectiveLevel)} (+${freeLevel})`
-    : formatEffectiveLevel(rawLevel, effectiveLevel);
-}
-
-function recoveryReasonText(reason) {
-  const reasonKeys = {
-    periodic: "checkpointReasonPeriodic",
-    "save-conflict": "checkpointReasonSaveConflict",
-    "pre-import": "checkpointReasonPreImport",
-    "pre-update": "checkpointReasonPreUpdate",
-    "pre-reset": "checkpointReasonPreReset",
-    "pre-infinity-challenge": "checkpointReasonPreInfinityChallenge",
-    "pre-break-cap": "checkpointReasonPreBreakCap",
-    "pre-infinite-angle": "checkpointReasonPreInfiniteAngle",
-    "pre-tower-build": "checkpointReasonPreTowerBuild",
-    "pre-tower-challenge": "checkpointReasonPreTowerChallenge",
-    "pre-timeline-respec": "checkpointReasonPreTimelineRespec",
-    "pre-restore": "checkpointReasonPreRestore",
-  };
-  return runtime.t(reasonKeys[reason] || "checkpointReasonOther");
-}
-
-function countBits(value) {
-  let remaining = Math.max(0, Math.floor(Number(value) || 0));
-  let count = 0;
-  while (remaining > 0) {
-    remaining &= remaining - 1;
-    count += 1;
-  }
-  return count;
-}
-
-function countAchievementBits(state) {
-  let count = 0;
-  for (let id = 1; id <= runtime.ACHIEVEMENT_COUNT; id += 1) {
-    const mask = id <= 31 ? state.achievementMask : state.achievementMaskHigh;
-    const bit = 1 << (id <= 31 ? id - 1 : id - 32);
-    if ((((Number(mask) || 0) >>> 0) & bit) !== 0) count += 1;
-  }
-  return count;
-}
-
-function recoveryStateSummary(entry) {
-  const state = entry?.state || {};
-  const infinityPointsLog10 = runtime.sanitizeLog10(
-    state.infinityPointsLog10,
-    runtime.log10Value(Math.max(0, Number(state.infinityPoints) || 0)),
+function formatNormalUpgradeLevel(kind, rawLevel, effectiveLevel, freeLevel, freeExact) {
+  const rawValue = exactNormalUpgradeValue(
+    kind,
+    BigInt(Math.max(0, Math.floor(Number(rawLevel) || 0))),
   );
-  return [
-    `${runtime.t("recoveryInfinity")}: ${runtime.formatUiNumber(state.infinityCount || 0)}`,
-    `${runtime.t("recoveryIp")}: ${runtime.formatHeldUiLogNumber(infinityPointsLog10, state.infinityPointsExact)}`,
-    `${runtime.t("recoveryChallenges")}: ${countBits(state.completedChallenges)}/${runtime.INFINITY_CHALLENGE_COUNT}`,
-    `${runtime.t("recoveryAchievements")}: ${countAchievementBits(state)}/${runtime.ACHIEVEMENT_COUNT}`,
-    `${runtime.t("recoveryIa")}: ${state.infiniteAngleUnlocked ? runtime.t("recoveryUnlocked") : runtime.t("recoveryLocked")}`,
-    `${runtime.t("recoveryTower")}: ${Math.max(0, Math.floor(Number(state.towerFloor) || 0))}`,
-  ].join(" · ");
-}
-
-function updateSaveRecoveryUi() {
-  const elements = runtime.elements;
-  if (!elements.preImportBackupStatus || !elements.saveCheckpointList || !runtime.recoveryEntries) return;
-  const currentRevision = typeof runtime.recoveryRevision === "number" ? runtime.recoveryRevision : null;
-  if (
-    currentRevision !== null
-    && currentRevision === renderedRecoveryRevision
-    && renderedRecoveryLanguage === runtime.state.language
-    && renderedRecoveryNumberFormat === runtime.state.numberFormat
-    && renderedLoadRecoveryMode === Boolean(runtime.loadRecoveryMode)
-    && renderedSaveConflictMode === Boolean(runtime.saveConflictMode)
-    && renderedSaveConflictCheckpointReady === Boolean(runtime.saveConflictCheckpointReady)
-  ) return;
-  const recovery = runtime.recoveryEntries();
-  if (
-    elements.saveRecoveryDetails
-    && (recovery.loadFailure
-      || runtime.loadRecoveryMode
-      || runtime.saveConflictMode
-      || recovery.quarantine
-      || recovery.preImport
-      || recovery.undo)
-  ) {
-    elements.saveRecoveryDetails.open = true;
-  }
-  elements.preImportBackupStatus.textContent = recovery.preImport
-    ? `${runtime.t("preImportBackupAvailable")} ${formatRecoveryTimestamp(recovery.preImport.backedUpAt)}`
-    : runtime.t("noPreImportBackup");
-  if (elements.loadFailureStatus) {
-    const failure = recovery.loadFailure;
-    if (failure) {
-      const stageText = runtime.t(failure.stage === "offline" ? "loadFailureOffline" : "loadFailureApply");
-      const detail = failure.errorMessage ? `: ${failure.errorMessage}` : "";
-      elements.loadFailureStatus.textContent = `${runtime.t("loadFailureDetected")} ${stageText}${detail}`;
-    } else if (runtime.saveConflictMode) {
-      elements.loadFailureStatus.textContent = runtime.t(
-        runtime.saveConflictCheckpointReady ? "saveConflictDetected" : "saveConflictBackupFailed",
-      );
-    } else {
-      elements.loadFailureStatus.textContent = runtime.loadRecoveryMode
-        ? runtime.t("loadRecoveryRequired")
-        : "";
-    }
-  }
-  if (elements.quarantineStatus) {
-    elements.quarantineStatus.textContent = recovery.quarantine
-      ? `${runtime.t("quarantineAvailable")} ${formatRecoveryTimestamp(recovery.quarantine.quarantinedAt)}`
-      : "";
-  }
-  if (elements.retryLoadButton) elements.retryLoadButton.hidden = !runtime.loadRecoveryMode;
-  if (elements.restoreQuarantineButton) elements.restoreQuarantineButton.hidden = !recovery.quarantine;
-  if (elements.restorePreImportButton) elements.restorePreImportButton.hidden = !recovery.preImport;
-  if (elements.restoreUndoButton) elements.restoreUndoButton.hidden = !recovery.undo;
-  renderedRecoveryRevision = currentRevision === null ? renderedRecoveryRevision : currentRevision;
-  renderedRecoveryLanguage = runtime.state.language;
-  renderedRecoveryNumberFormat = runtime.state.numberFormat;
-  renderedLoadRecoveryMode = Boolean(runtime.loadRecoveryMode);
-  renderedSaveConflictMode = Boolean(runtime.saveConflictMode);
-  renderedSaveConflictCheckpointReady = Boolean(runtime.saveConflictCheckpointReady);
-  clearElement(elements.saveCheckpointList);
-  if (recovery.checkpoints.length === 0) {
-    elements.saveCheckpointList.textContent = runtime.t("noCheckpoints");
-    return;
-  }
-  recovery.checkpoints.forEach((entry, index) => {
-    const row = document.createElement("div");
-    row.className = "save-checkpoint-row";
-    const details = document.createElement("div");
-    details.className = "save-checkpoint-details";
-    const title = document.createElement("strong");
-    title.textContent = recoveryReasonText(entry.reason);
-    const timestamp = document.createElement("span");
-    timestamp.textContent = formatRecoveryTimestamp(entry.backedUpAt);
-    const summary = document.createElement("small");
-    summary.textContent = recoveryStateSummary(entry);
-    details.append(title, timestamp, summary);
-    const restoreButton = document.createElement("button");
-    restoreButton.type = "button";
-    restoreButton.className = "reset-button";
-    restoreButton.dataset.checkpointIndex = String(index);
-    restoreButton.textContent = runtime.t("restoreCheckpoint");
-    row.append(details, restoreButton);
-    elements.saveCheckpointList.append(row);
-  });
+  const rawText = formatExactInteger(rawValue);
+  const freeText = formatExactInteger(freeExact, BigInt(Math.max(0, Math.floor(Number(freeLevel) || 0))));
+  return freeLevel > 0
+    ? `Lv ${formatNormalUpgradeTotal(effectiveLevel)} (+${freeText})`
+    : formatEffectiveLevel(rawText, effectiveLevel, rawValue);
 }
 
 function canSpendLog(amountLog) {
@@ -233,263 +99,11 @@ function formatVertexGainIncrease(log10Value) {
   return runtime.formatUiLogNumber(log10Value);
 }
 
-function formatTimelineEternityRequirement() {
-  const claims = runtime.timelineTrackClaimCount("eternity");
-  const requirement = runtime.timelineEternityRequirement();
-  return requirement !== null && requirement <= 1000000n
-    ? requirement.toString()
-    : `2^${claims + 1}`;
-}
-
-function localizedTimelineText(value) {
-  if (!value || typeof value !== "object") return "";
-  return value[runtime.state.language] || value.en || value.ja || "";
-}
-
-function timelineNodeDescriptionText(node) {
-  return localizedTimelineText(node.description).replace("{softcap}", runtime.formatUiLogNumber(10));
-}
-
-function timelineNodeStatusText(availability) {
-  switch (availability.reason) {
-    case "owned":
-      return runtime.t("timelineNodePurchased");
-    case "timeline-locked":
-      return runtime.t("timelineNodeLocked");
-    case "missing-prerequisites":
-      return runtime.t("timelineNodeMissingPrerequisites").replace(
-        "{nodes}",
-        availability.missingPrerequisites.join(", "),
-      );
-    case "route-conflict":
-      return runtime.t("timelineNodeAlternativeLocked");
-    case "insufficient-tf":
-      return runtime.t("timelineNodeNotEnoughTf").replace(
-        "{cost}",
-        String(availability.node.costTF),
-      );
-    default:
-      return runtime.t("timelineNodeAvailable");
-  }
-}
-
-function timelineNodeCurrentEffectText(node, availability) {
-  if (availability.reason !== "owned") return runtime.t("timelineNodeInactive");
-  if (node.id === "Real-BC16500") {
-    return runtime.t("timelineRealCurrentEffect")
-      .replace("{multiplier}", formatMultiplierLog(
-        runtime.log10Value(runtime.timelineRealInfinityCountGainMultiplier?.() ?? 1),
-      ));
-  }
-  if (node.id === "Parallel-BC16500") {
-    const effectiveLog10 = runtime.timelineParallelEffectiveLog10?.() ?? 0;
-    return runtime.t("timelineParallelCurrentEffect")
-      .replace("{multiplier}", formatMultiplierLog(effectiveLog10))
-      .replace("{time}", runtime.formatLongDuration(runtime.timelineParallelSecondsSinceIc8Clear?.() ?? 0));
-  }
-  return runtime.t("timelineNodeInactive");
-}
-
-function timelineNodeRouteClass(route) {
-  return route === "Parallel" ? "timeline-node-route-parallel" : "timeline-node-route-real";
-}
-
-function createTimelineNodeCard(node) {
-  const card = document.createElement("button");
-  card.type = "button";
-  card.className = "timeline-node ui-tree-node";
-  card.dataset.timelineNode = node.id;
-  card.dataset.route = node.route || "";
-  card.setAttribute("aria-controls", "timelineNodeDetail");
-
-  const heading = document.createElement("span");
-  heading.className = "timeline-node-heading";
-  const identity = document.createElement("span");
-  identity.className = "timeline-node-identity";
-  const era = document.createElement("span");
-  era.className = "timeline-node-era";
-  const name = document.createElement("strong");
-  name.className = "timeline-node-name";
-  const route = document.createElement("span");
-  route.className = `timeline-node-route ${timelineNodeRouteClass(node.route)}`;
-  identity.append(era, name);
-  heading.append(identity, route);
-
-  const meta = document.createElement("span");
-  meta.className = "timeline-node-compact-meta";
-  const cost = document.createElement("span");
-  cost.className = "timeline-node-cost";
-  const status = document.createElement("span");
-  status.className = "timeline-node-status";
-  meta.append(cost, status);
-  card.append(heading, meta);
-  return card;
-}
-
-function renderTimelineNodeTree(nodes) {
-  const host = runtime.elements.timelineNodeGrid;
-  if (!host) return;
-  const signature = nodes.map((node) => `${node.id}:${node.era}:${node.route}`).join("|");
-  if (host.dataset.timelineSignature !== signature) {
-    clearElement(host);
-    const eras = new Map();
-    nodes.forEach((node) => {
-      if (!eras.has(node.era)) eras.set(node.era, []);
-      eras.get(node.era).push(node);
-    });
-    eras.forEach((eraNodes, era) => {
-      const eraSection = document.createElement("section");
-      eraSection.className = "timeline-era";
-      eraSection.dataset.timelineEra = era;
-      const eraHeading = document.createElement("h3");
-      eraHeading.className = "timeline-era-heading";
-      eraHeading.textContent = era;
-      const grid = document.createElement("div");
-      grid.className = "timeline-node-grid";
-      eraNodes
-        .slice()
-        .sort((left, right) => (left.route === "Parallel" ? 1 : 0) - (right.route === "Parallel" ? 1 : 0))
-        .forEach((node) => grid.append(createTimelineNodeCard(node)));
-      eraSection.append(eraHeading, grid);
-      host.append(eraSection);
-    });
-    host.dataset.timelineSignature = signature;
-  }
-  runtime.elements.timelineNodeCards = Array.from(host.querySelectorAll(".timeline-node"));
-}
-
-function updateTimelineNodeCard(card, node, availability) {
-  const name = card.querySelector(".timeline-node-name");
-  const era = card.querySelector(".timeline-node-era");
-  const route = card.querySelector(".timeline-node-route");
-  const cost = card.querySelector(".timeline-node-cost");
-  const status = card.querySelector(".timeline-node-status");
-  const selected = node.id === selectedTimelineNodeId;
-  const costText = `${runtime.t("timelineNodeCost")}: ${runtime.formatUiNumber(node.costTF)} TF`;
-  const statusText = timelineNodeStatusText(availability);
-  if (name) name.textContent = localizedTimelineText(node.name);
-  if (era) era.textContent = node.era;
-  if (route) {
-    route.textContent = node.route;
-    route.classList.toggle("timeline-node-route-real", node.route === "Real");
-    route.classList.toggle("timeline-node-route-parallel", node.route === "Parallel");
-  }
-  if (cost) cost.textContent = costText;
-  if (status) status.textContent = statusText;
-  card.dataset.state = availability.reason;
-  card.dataset.route = node.route || "";
-  card.classList.toggle("is-available", availability.canPurchase);
-  card.classList.toggle("is-owned", availability.reason === "owned");
-  card.classList.toggle("is-locked", !availability.canPurchase && availability.reason !== "owned");
-  card.classList.toggle("is-conflict", availability.reason === "route-conflict");
-  card.classList.toggle("is-selected", selected);
-  card.setAttribute("aria-pressed", String(selected));
-  card.setAttribute("aria-label", `${localizedTimelineText(node.name)}, ${node.era}, ${node.route}, ${costText}, ${statusText}`);
-}
-
-function updateTimelineNodeDetail(node, availability) {
-  const detail = runtime.elements.timelineNodeDetail;
-  if (!detail) return;
-  if (!node) {
-    detail.hidden = true;
+function updateUi() {
+  if (runtime.offlineProcessing) {
+    updateEternityUi();
     return;
   }
-  detail.hidden = false;
-  detail.dataset.timelineNode = node.id;
-  detail.dataset.state = availability.reason;
-  detail.classList.toggle("is-available", availability.canPurchase);
-  detail.classList.toggle("is-owned", availability.reason === "owned");
-  detail.classList.toggle("is-locked", !availability.canPurchase && availability.reason !== "owned");
-  detail.classList.toggle("is-conflict", availability.reason === "route-conflict");
-  const prerequisites = Array.isArray(node.prerequisites) ? node.prerequisites : [];
-  if (runtime.elements.timelineNodeDetailHeading) runtime.elements.timelineNodeDetailHeading.textContent = localizedTimelineText(node.name);
-  if (runtime.elements.timelineNodeDetailDescription) runtime.elements.timelineNodeDetailDescription.textContent = timelineNodeDescriptionText(node);
-  if (runtime.elements.timelineNodeDetailCurrentEffect) runtime.elements.timelineNodeDetailCurrentEffect.textContent = timelineNodeCurrentEffectText(node, availability);
-  if (runtime.elements.timelineNodeDetailPrerequisites) runtime.elements.timelineNodeDetailPrerequisites.textContent = prerequisites.length > 0
-    ? prerequisites.join(", ")
-    : runtime.t("timelineNoPrerequisites");
-  if (runtime.elements.timelineNodePurchaseButton) {
-    runtime.elements.timelineNodePurchaseButton.dataset.timelineNodePurchase = node.id;
-    runtime.elements.timelineNodePurchaseButton.hidden = !availability.canPurchase;
-    runtime.elements.timelineNodePurchaseButton.disabled = !availability.canPurchase;
-    runtime.elements.timelineNodePurchaseButton.textContent = runtime.t("timelinePurchase");
-  }
-}
-
-function selectTimelineNode(nodeId) {
-  const node = runtime.timelineNode?.(nodeId);
-  if (!node) return false;
-  selectedTimelineNodeId = node.id;
-  updateTimelineTreeUi();
-  return true;
-}
-
-function updateTimelineTreeUi() {
-  if (typeof runtime.timelineNodeAvailability !== "function" || typeof runtime.timelineNodes !== "function") return;
-  const nodes = runtime.timelineNodes();
-  renderTimelineNodeTree(nodes);
-  if (!nodes.some((node) => node.id === selectedTimelineNodeId)) selectedTimelineNodeId = nodes[0]?.id || "";
-  const selectedNode = runtime.timelineNode?.(selectedTimelineNodeId);
-  runtime.elements.timelineNodeCards.forEach((card) => {
-    const node = runtime.timelineNode?.(card.dataset.timelineNode);
-    if (node) updateTimelineNodeCard(card, node, runtime.timelineNodeAvailability(node.id));
-  });
-  updateTimelineNodeDetail(
-    selectedNode,
-    selectedNode ? runtime.timelineNodeAvailability(selectedNode.id) : null,
-  );
-}
-
-function updateTimelineUi() {
-  if (!runtime.elements.timelineEarnedTf || typeof runtime.timelineEarnedTf !== "function") return;
-  runtime.normalizeTimelineState?.();
-  const earned = runtime.timelineEarnedTf();
-  const available = runtime.timelineAvailableTf();
-  const spent = runtime.timelineSpentTf();
-  runtime.elements.timelineEarnedTf.textContent = `${runtime.formatUiNumber(earned)} TF`;
-  runtime.elements.timelineAvailableTf.textContent = `${runtime.formatUiNumber(available)} TF`;
-  runtime.elements.timelineSpentTf.textContent = `${runtime.formatUiNumber(spent)} TF`;
-
-  const tracks = [
-    {
-      id: "score",
-      claims: runtime.elements.timelineScoreClaims,
-      requirement: runtime.elements.timelineScoreRequirement,
-      button: runtime.elements.timelineScoreClaimButton,
-      requirementText: `${runtime.formatUiLogNumber(runtime.timelineScoreRequirementLog10())} Score`,
-    },
-    {
-      id: "ip",
-      claims: runtime.elements.timelineIpClaims,
-      requirement: runtime.elements.timelineIpRequirement,
-      button: runtime.elements.timelineIpClaimButton,
-      requirementText: `${runtime.formatUiLogNumber(runtime.timelineIpRequirementLog10())} IP`,
-    },
-    {
-      id: "eternity",
-      claims: runtime.elements.timelineEternityClaims,
-      requirement: runtime.elements.timelineEternityRequirement,
-      button: runtime.elements.timelineEternityClaimButton,
-      requirementText: formatTimelineEternityRequirement(),
-    },
-  ];
-  tracks.forEach((track) => {
-    if (track.claims) track.claims.textContent = runtime.formatUiNumber(runtime.timelineTrackClaimCount(track.id));
-    if (track.requirement) track.requirement.textContent = track.requirementText;
-    if (track.button) {
-      track.button.disabled = !runtime.canClaimTimelineTf(track.id);
-      track.button.textContent = runtime.t("timelineClaim");
-    }
-  });
-
-  if (runtime.elements.timelineRespecButton) {
-    runtime.elements.timelineRespecButton.disabled = runtime.timelineDiscovered?.() !== true;
-  }
-  updateTimelineTreeUi();
-}
-
-function updateUi() {
-  if (runtime.offlineProcessing) return;
   const currentCostLogs = runtime.costLogs();
   const unlockedAchievementsNow = runtime.checkAchievements(true);
   const discoveredMainTabs = runtime.discoverMainTabs?.() === true;
@@ -497,9 +111,9 @@ function updateUi() {
   document.documentElement.classList.toggle("light-effects", runtime.state.lightEffects);
   runtime.elements.shell.classList.toggle("main-tabs-right", runtime.state.mainTabPosition !== "bottom");
   applyLanguage();
-  runtime.updateHelpUi?.();
+  updateHelpUi();
   runtime.updateMainTabVisibility?.();
-  runtime.updateTopBar();
+  updateTopBar();
   runtime.elements.scoreValue.textContent = runtime.scoreDisplay();
   runtime.elements.gainValue.textContent = runtime.formatUiLogNumber(runtime.finalScoreGainLog10());
   const vertexGainIncreaseLog10 = runtime.vertexGainIncreaseLog10();
@@ -507,24 +121,40 @@ function updateUi() {
   runtime.elements.lapValue.textContent = runtime.formatDuration(runtime.lapDuration());
   runtime.elements.lapSpeedValue.textContent = formatMultiplierLog(runtime.effectiveLapSpeedLog10());
   if (runtime.isLapSpeedSoftcapped()) runtime.elements.lapSpeedValue.textContent += " " + runtime.t("lapSpeedSoftcapped");
-  const freeNormalUpgradeLevel = runtime.eternityMilestoneNormalUpgradeBonusLevel?.() || 0;
+  const freeNormalUpgradeLevelExact = runtime.parseExactInteger(
+    runtime.eternityMilestoneNormalUpgradeBonusLevelExact?.(),
+    0n,
+  );
+  const freeNormalUpgradeLevel = runtime.numberFromExactInteger(freeNormalUpgradeLevelExact);
   const effectiveSpeedLevel = runtime.effectiveSpeedLevel();
   const effectiveVertexCount = runtime.effectiveVertexCount();
   const effectiveGainLevel = runtime.effectiveGainLevel();
   runtime.elements.speedLevel.textContent = formatNormalUpgradeLevel(
+    "speed",
     runtime.state.speedLevel,
     effectiveSpeedLevel,
     freeNormalUpgradeLevel,
+    freeNormalUpgradeLevelExact,
   );
+  const verticesExact = runtime.currentExactIntegerState(runtime.state, "verticesExact", "vertices", 3n);
+  const vertices = runtime.numberFromExactInteger(verticesExact);
+  const effectiveVertexText = formatNormalUpgradeTotal(effectiveVertexCount);
   runtime.elements.vertexCount.textContent = freeNormalUpgradeLevel > 0
-    ? `${formatNormalUpgradeTotal(effectiveVertexCount)} ${runtime.t("vertices")} (+${freeNormalUpgradeLevel})`
-    : effectiveVertexCount === runtime.state.vertices
-      ? `${runtime.state.vertices} ${runtime.t("vertices")}`
-      : `${effectiveVertexCount} ${runtime.t("vertices")} (${runtime.state.vertices} + ${effectiveVertexCount - runtime.state.vertices})`;
+    ? `${effectiveVertexText} ${runtime.t("vertices")} (+${formatExactInteger(freeNormalUpgradeLevelExact)})`
+    : effectiveVertexCount === vertices
+      ? `${formatExactInteger(verticesExact)} ${runtime.t("vertices")}`
+      : Number.isFinite(vertices)
+        && Number.isFinite(effectiveVertexCount)
+        && Math.abs(vertices) < Number.MAX_SAFE_INTEGER
+        && Math.abs(effectiveVertexCount) < Number.MAX_SAFE_INTEGER
+        ? `${effectiveVertexText} ${runtime.t("vertices")} (${vertices} + ${effectiveVertexCount - vertices})`
+        : `${effectiveVertexText} ${runtime.t("vertices")} (purchased ${formatExactInteger(verticesExact)})`;
   runtime.elements.gainLevel.textContent = formatNormalUpgradeLevel(
+    "gain",
     runtime.state.gainLevel,
     effectiveGainLevel,
     freeNormalUpgradeLevel,
+    freeNormalUpgradeLevelExact,
   );
   runtime.elements.speedCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.speed)}`;
   runtime.elements.vertexCost.textContent = `${runtime.t("cost")} ${runtime.formatUiLogNumber(currentCostLogs.vertex)}`;
@@ -558,9 +188,10 @@ function updateUi() {
   runtime.elements.coreBoostExponent.textContent = formatExponentPreview(runtime.coreBoostGainExponent(), nextCoreBoost.gainExponent);
   runtime.elements.coreBoostButton.disabled = !runtime.canCoreBoost();
 
-  runtime.elements.infinityCount.textContent = runtime.formatUiNumber(runtime.state.infinityCount);
+  const infinityCountExact = runtime.currentExactIntegerState(runtime.state, "infinityCountExact", "infinityCount");
+  runtime.elements.infinityCount.textContent = formatExactInteger(infinityCountExact);
   const infinityReady = runtime.canInfinity();
-  const infinityUnlocked = runtime.state.infinityCount > 0;
+  const infinityUnlocked = infinityCountExact > 0n;
   runtime.elements.infinityTabState.textContent = infinityReady ? "READY" : infinityUnlocked ? "OPEN" : "LOCKED";
   runtime.elements.infinityUnlockNote.hidden = infinityUnlocked;
   runtime.elements.infinityUnlockNote.textContent = runtime.t("infinityUnlockNote")
@@ -573,8 +204,8 @@ function updateUi() {
   const infiniteAngleBoostLog10 = runtime.infiniteAngleBoostLog10();
   runtime.elements.infiniteAngleBoostPanel.textContent = formatMultiplierLog(infiniteAngleBoostLog10);
   runtime.elements.infinityPointGain.textContent = `+${runtime.formatUiLogNumber(runtime.infinityPointGainLog10())} IP`;
-  runtime.elements.infinityButton.disabled = runtime.state.infinityCount === 0 || !runtime.canInfinity();
-  runtime.updateInfinityUpgradeRows();
+  runtime.elements.infinityButton.disabled = infinityCountExact === 0n || !runtime.canInfinity();
+  updateInfinityUpgradeRows();
   const infiniteAngleUnlocked = runtime.state.infiniteAngleUnlocked;
   const infiniteAngleUnlockCostLog10 = runtime.infiniteAngleUnlockCostLog10();
   const infiniteAngleUpgradeCosts = {
@@ -613,8 +244,8 @@ function updateUi() {
       ? runtime.t("locked")
       : `${completed}/${runtime.INFINITY_CHALLENGE_COUNT} ${runtime.t("completed")}`;
   runtime.elements.challengeTabState.textContent = `IC ${completed}/${runtime.INFINITY_CHALLENGE_COUNT}`;
-  runtime.updateChallengeRows();
-  runtime.updateTowerChallengeRows();
+  updateChallengeRows();
+  updateTowerChallengeRows();
   const currentTowerFloor = runtime.towerFloor();
   const nextTowerFloor = runtime.towerNextFloor();
   const nextTowerCostLog10 = runtime.towerNextFloorCostLog10();
@@ -641,16 +272,16 @@ function updateUi() {
   runtime.elements.breakCapButton.disabled = !runtime.canBreakInfiniteCap();
   runtime.elements.breakCapButton.textContent = runtime.state.infiniteCapBroken ? "Cap Broken" : "Break Infinite Cap";
 
-  runtime.updateAutomationUi();
-  runtime.updateStatisticsUi();
-  runtime.updateOfflineReportUi();
+  updateAutomationUi();
+  updateStatisticsUi();
+  updateOfflineReportUi();
   updateTimelineUi();
 
   const unlockedAchievements = runtime.achievementCount();
   runtime.elements.achievementTabState.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT}`;
   runtime.elements.achievementSummary.textContent = `${unlockedAchievements}/${runtime.ACHIEVEMENT_COUNT} ${runtime.t("tabAchievements")}`;
   runtime.elements.achievementBoost.textContent = `×${runtime.achievementGainMultiplier().toFixed(3)}`;
-  runtime.updateAchievementRows();
+  updateAchievementRows();
 
   syncFormControl(runtime.elements.floatingTextToggle, runtime.state.showFloatingText);
   syncFormControl(runtime.elements.lightEffectsToggle, runtime.state.lightEffects);
@@ -677,6 +308,7 @@ function updateUi() {
     rootStyle.setProperty("--fps-counter-height", `${fpsHeight}px`);
   }
   updateSaveRecoveryUi();
+  updateEternityUi();
 }
 
 function setSaveStatus(text) {
@@ -703,9 +335,10 @@ function formatGainExpression(valueLog10) {
   return `(${base} / ${config.divisor})^${exponent}`;
 }
 
-function formatEffectiveLevel(rawLevel, effectiveLevel) {
-  const label = `${runtime.t("level")} ${rawLevel}`;
-  return effectiveLevel === rawLevel
+function formatEffectiveLevel(rawText, effectiveLevel, rawValue = null) {
+  const label = `${runtime.t("level")} ${rawText}`;
+  const projectedRawValue = rawValue === null ? Number(rawText) : runtime.numberFromExactInteger(rawValue);
+  return effectiveLevel === projectedRawValue
     ? label
     : `${label} → ${runtime.t("effectiveLevel")} ${effectiveLevel < 1000
       ? runtime.formatSmallDecimal(effectiveLevel)
@@ -752,15 +385,13 @@ function formatExponentPreview(current, next) {
   return currentText === nextText ? currentText : `${currentText} → ${nextText}`;
 }
 
+expose("appliedLanguage", () => appliedLanguage, (value) => { appliedLanguage = value; });
 expose("applyLanguage", () => applyLanguage, (value) => { applyLanguage = value; });
 expose("syncFormControl", () => syncFormControl, (value) => { syncFormControl = value; });
 expose("clearElement", () => clearElement, (value) => { clearElement = value; });
-expose("updateSaveRecoveryUi", () => updateSaveRecoveryUi, (value) => { updateSaveRecoveryUi = value; });
 expose("canSpendLog", () => canSpendLog, (value) => { canSpendLog = value; });
 expose("canSpend", () => canSpend, (value) => { canSpend = value; });
 expose("formatVertexGainIncrease", () => formatVertexGainIncrease, (value) => { formatVertexGainIncrease = value; });
-expose("updateTimelineUi", () => updateTimelineUi);
-expose("selectTimelineNode", () => selectTimelineNode);
 expose("updateUi", () => updateUi, (value) => { updateUi = value; });
 expose("setSaveStatus", () => setSaveStatus, (value) => { setSaveStatus = value; });
 expose("gainExpressionConfig", () => gainExpressionConfig, (value) => { gainExpressionConfig = value; });
