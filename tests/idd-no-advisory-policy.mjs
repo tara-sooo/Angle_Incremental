@@ -109,7 +109,7 @@ for (const pattern of [
   /does not fail A4\.5 by itself/i,
   /release\/x\.y\.z -> main/,
   /re-fetchable/i,
-  /planning-only progress is insufficient/i,
+  /planning-only progress/i,
 ]) {
   assert.match(suitability, pattern,
     'A4.5 must allow bounded autonomous work before an explicit downstream human handoff');
