@@ -1,5 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
-import { clampOfflineTickCount } from "./save.js";
+import { clampOfflineTickCount } from "./save-format.js";
 
 let offlineProcessing = false;
 let offlineReport = null;
@@ -1079,7 +1079,7 @@ function snapshotOfflineTransaction() {
   };
 }
 
-function restoreOfflineTransaction(snapshot, error, retryBaseline) {
+function restoreOfflineTransaction(snapshot) {
   try {
     runtime.restoreRuntimeState(snapshot.state);
   } catch (restoreError) {
@@ -1096,18 +1096,17 @@ function restoreOfflineTransaction(snapshot, error, retryBaseline) {
     : null;
   setOfflineProcessing(false);
   try {
-    runtime.setOfflineBaseline(retryBaseline.savedAt, retryBaseline.serverSavedAt);
+    runtime.setOfflineBaseline(
+      runtime.localClockNowMs?.() ?? Date.now(),
+      runtime.serverClockAvailable?.() ? runtime.serverClockNowMs?.() ?? 0 : 0,
+    );
   } catch (baselineError) {
     runtime.offlineBaselineTimestamp = snapshot.offlineBaselineTimestamp;
     runtime.offlineBaselineServerTimestamp = snapshot.offlineBaselineServerTimestamp;
   }
   runtime.autoSaveElapsed = 0;
   runtime.lastTime = snapshot.lastTime;
-  try {
-    runtime.enterLoadRecovery("offline", error, null, retryBaseline);
-  } catch (recoveryError) {
-    // The save module sets recovery mode before reporting the diagnostic.
-  }
+  runtime.setSaveStatus(runtime.t("offlineProgressSkipped"));
   try {
     runtime.updateUi();
   } catch (updateError) {
@@ -1203,11 +1202,6 @@ function processOfflineElapsed(elapsedSeconds, source = "resume", clockContext =
 
 async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", clockContext = {}) {
   const transactionSnapshot = snapshotOfflineTransaction();
-  let retryBaseline = {
-    savedAt: transactionSnapshot.offlineBaselineTimestamp,
-    serverSavedAt: transactionSnapshot.offlineBaselineServerTimestamp,
-    saveFingerprint: "",
-  };
   try {
     const numericElapsed = runtime.sanitizeNumber(elapsedSeconds, NaN);
     const invalidElapsed = !Number.isFinite(numericElapsed);
@@ -1216,15 +1210,6 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
       || (runtime.serverClockAvailable() ? "server" : "local-fallback");
     let clockAnomaly = Boolean(clockContext.clockAnomaly) || invalidElapsed;
     if (elapsed <= 0 && !clockAnomaly) return null;
-    retryBaseline = {
-      savedAt: clockContext.retryBaseline?.savedAt ?? transactionSnapshot.offlineBaselineTimestamp,
-      serverSavedAt: clockContext.retryBaseline?.serverSavedAt ?? transactionSnapshot.offlineBaselineServerTimestamp,
-      saveFingerprint: clockContext.retryBaseline
-        ? typeof clockContext.retryBaseline.saveFingerprint === "string"
-          ? clockContext.retryBaseline.saveFingerprint
-          : ""
-        : runtime.currentSaveFingerprint?.() || "",
-    };
     if (!runtime.state.offlineProgressEnabled) {
       offlineDiagnostics = null;
       offlineReport = null;
@@ -1239,11 +1224,7 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
           await runtime.handleSaveConflict();
           return null;
         }
-        restoreOfflineTransaction(
-          transactionSnapshot,
-          new Error("offline progress baseline save failed"),
-          retryBaseline,
-        );
+        restoreOfflineTransaction(transactionSnapshot);
         return null;
       }
       runtime.lastTime = runtime.currentFrameTime();
@@ -1660,18 +1641,14 @@ async function processOfflineElapsedInternal(elapsedSeconds, source = "resume", 
         await runtime.handleSaveConflict();
         return null;
       }
-      restoreOfflineTransaction(
-        transactionSnapshot,
-        new Error("offline progress save failed"),
-        retryBaseline,
-      );
+      restoreOfflineTransaction(transactionSnapshot);
       return null;
     }
     runtime.lastTime = runtime.currentFrameTime();
     if (clockAnomaly) runtime.rebaseLocalClock();
     return offlineReport;
-  } catch (error) {
-    restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
+  } catch {
+    restoreOfflineTransaction(transactionSnapshot);
     return null;
   }
 }

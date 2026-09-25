@@ -142,10 +142,15 @@ export async function runConfirmationRegression(browser, origin, httpFailures) {
       window.advanceTime(0);
       document.querySelector("#saveRecoveryDetails").open = true;
     });
-    const checkpointIndex = await confirmationPage.evaluate(() => window.__angleDebug.recoveryEntries().checkpoints
-      .findIndex((entry) => entry.reason === "confirmation-test" && entry.state.generationCount === 7));
-    assert.notEqual(checkpointIndex, -1, "confirmation checkpoint should be available");
-    const checkpointButton = confirmationPage.locator(`#saveCheckpointList button[data-checkpoint-index="${checkpointIndex}"]`);
+    const restoreBackup = await confirmationPage.evaluate(() => {
+      const entry = window.__angleDebug.recoveryEntries().backups
+        .find((candidate) => candidate.reason === "confirmation-test" && candidate.save.state.generationCount === 7);
+      return entry ? { slot: entry.slot, index: entry.index } : null;
+    });
+    assert.ok(restoreBackup, "confirmation backup should be available");
+    const checkpointButton = confirmationPage.locator(
+      `#saveCheckpointList button[data-backup-slot="${restoreBackup.slot}"][data-backup-index="${restoreBackup.index}"]`,
+    );
     await checkpointButton.click();
     const englishCheckpointModal = await readConfirmation();
     assert.deepEqual(
@@ -159,7 +164,7 @@ export async function runConfirmationRegression(browser, origin, httpFailures) {
       {
         open: true,
         title: "Confirm",
-        message: "Restore this checkpoint? The current state will be kept for undo.",
+        message: "Restore this backup? The current valid save will be kept as a backup.",
         activeId: "confirmationCancelButton",
         nativeConfirmCalls: 0,
       },
@@ -175,6 +180,9 @@ export async function runConfirmationRegression(browser, origin, httpFailures) {
     assert.equal(checkpointConfirmed.open, false, "confirmed checkpoint restore should close the dialog");
     assert.equal(checkpointConfirmed.generationCount, 7, "confirmed checkpoint restore should use the existing recovery action");
     assert.equal(checkpointConfirmed.nativeConfirmCalls, 0, "checkpoint recovery must not call native confirm");
+    await confirmationPage.waitForFunction(() => !window.__angleDebug.runtime.loadInFlight);
+    const offlineReportClose = confirmationPage.locator("#offlineReportClose");
+    if (await offlineReportClose.isVisible()) await offlineReportClose.click();
 
     await confirmationPage.evaluate(() => {
       const { state, switchMainTab } = window.__angleDebug;

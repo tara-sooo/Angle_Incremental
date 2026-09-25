@@ -4,8 +4,6 @@ let offlineBaselineTimestamp = Date.now();
 let offlineBaselineServerTimestamp = 0;
 let visibilityResumeInFlight = false;
 let visibilityResumeGeneration = 0;
-let saveConflictInFlight = null;
-
 function setOfflineProcessingLock(locked) {
   if (!document.querySelectorAll) return;
   document.querySelectorAll("button, input, select, textarea").forEach((control) => {
@@ -25,8 +23,12 @@ function setSaveConflictLock(locked) {
   if (!document.querySelectorAll) return;
   document.querySelectorAll("button, input, select, textarea").forEach((control) => {
     if (!control.dataset) return;
-    const recoveryControl = control.closest?.(".save-recovery")
-      || ["exportSaveCodeButton", "copySaveCodeButton", "saveCodeArea", "resetSaveButton"].includes(control.id);
+    const recoveryControl = [
+      "reloadLatestSaveButton",
+      "exportSaveCodeButton",
+      "copySaveCodeButton",
+      "saveCodeArea",
+    ].includes(control.id);
     const navigationControl = [
       "main-tab",
       "subtab",
@@ -61,43 +63,11 @@ function saveSourceIsCurrent() {
   return runtime.saveSourceIsCurrent ? runtime.saveSourceIsCurrent() : true;
 }
 
-async function reloadAfterSaveConflict() {
-  runtime.offlineReport = null;
-  if (!await runtime.loadGame({
-    allowDuringLoadRecovery: true,
-    allowDuringSaveConflict: true,
-    authoritativeSaveConflict: true,
-  })) return false;
-  runtime.updateUi();
-  runtime.drawActiveView();
-  return true;
-}
-
 async function handleSaveConflict() {
-  if (saveConflictInFlight) return saveConflictInFlight;
   if (runtime.offlineProcessing || runtime.loadInFlight) return false;
-  if (!runtime.saveConflictMode || !runtime.saveConflictCheckpointReady) {
-    if (!runtime.beginSaveConflict()) return false;
-  }
-  saveConflictInFlight = (async () => {
-    const reloaded = await reloadAfterSaveConflict();
-    if (!reloaded) {
-      runtime.updateUi();
-      runtime.drawActiveView();
-      return false;
-    }
-    runtime.finishSaveConflict();
-    runtime.updateUi();
-    runtime.drawActiveView();
-    return true;
-  })().catch(() => {
-    runtime.setSaveStatus(runtime.t("loadFailed"));
-    runtime.updateUi();
-    return false;
-  }).finally(() => {
-    saveConflictInFlight = null;
-  });
-  return saveConflictInFlight;
+  runtime.beginSaveConflict?.();
+  runtime.updateUi();
+  return false;
 }
 
 function handleStorageChange(event) {
@@ -107,18 +77,9 @@ function handleStorageChange(event) {
 }
 
 async function handleVisibilityChange(hidden = document.hidden) {
-  if (runtime.offlineProcessing) return;
-  if (runtime.saveConflictMode) {
-    if (!hidden) await handleSaveConflict();
-    return;
-  }
+  if (runtime.offlineProcessing || runtime.saveConflictMode || runtime.loadRecoveryMode) return;
   if (hidden) {
     const transactionSnapshot = runtime.snapshotOfflineTransaction();
-    const retryBaseline = {
-      savedAt: offlineBaselineTimestamp,
-      serverSavedAt: offlineBaselineServerTimestamp,
-      saveFingerprint: runtime.lastKnownSaveFingerprint || "",
-    };
     try {
       if (!saveSourceIsCurrent()) {
         await handleSaveConflict();
@@ -130,19 +91,14 @@ async function handleVisibilityChange(hidden = document.hidden) {
           await handleSaveConflict();
           return;
         }
-        runtime.restoreOfflineTransaction(
-          transactionSnapshot,
-          new Error("visibility hide save failed"),
-          retryBaseline,
-        );
+        runtime.restoreOfflineTransaction(transactionSnapshot);
       }
-    } catch (error) {
-      runtime.restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
+    } catch {
+      runtime.restoreOfflineTransaction(transactionSnapshot);
     }
     return;
   }
   if (visibilityResumeInFlight) return;
-  if (runtime.loadRecoveryMode) return;
   visibilityResumeInFlight = true;
   const transactionSnapshot = runtime.snapshotOfflineTransaction();
   // Saving while the clock request is pending may rebase the shared baseline.
@@ -152,11 +108,6 @@ async function handleVisibilityChange(hidden = document.hidden) {
   const resumeBaselineSaveFingerprint = runtime.lastKnownSaveFingerprint || "";
   const resumeBaselineSaveRevision = runtime.saveRevision;
   const resumeGeneration = visibilityResumeGeneration;
-  const retryBaseline = {
-    savedAt: resumeBaselineTimestamp,
-    serverSavedAt: resumeBaselineServerTimestamp,
-    saveFingerprint: resumeBaselineSaveFingerprint,
-  };
   try {
     if (!saveSourceIsCurrent()) {
       await handleSaveConflict();
@@ -175,11 +126,7 @@ async function handleVisibilityChange(hidden = document.hidden) {
           await handleSaveConflict();
           return;
         }
-        runtime.restoreOfflineTransaction(
-          transactionSnapshot,
-          new Error("disabled offline progress baseline save failed"),
-          retryBaseline,
-        );
+        runtime.restoreOfflineTransaction(transactionSnapshot);
         return;
       }
       runtime.lastTime = runtime.currentFrameTime();
@@ -196,24 +143,17 @@ async function handleVisibilityChange(hidden = document.hidden) {
       await handleSaveConflict();
       return;
     }
-    // A successful local save may have rebased SAVE_KEY while the clock request was pending.
-    // Retry the captured interval against that latest local save, not its old fingerprint.
-    retryBaseline.saveFingerprint = expectedSaveFingerprint;
-
     const elapsed = runtime.offlineElapsedFromSave(resumeBaselineTimestamp, resumeBaselineServerTimestamp);
     if (elapsed.elapsedSeconds > 0 || elapsed.clockAnomaly) {
-      await runtime.processOfflineElapsed(elapsed.elapsedSeconds, "visibility", {
-        ...elapsed,
-        retryBaseline,
-      });
+      await runtime.processOfflineElapsed(elapsed.elapsedSeconds, "visibility", elapsed);
     } else {
       setOfflineBaseline(
         runtime.localClockNowMs(),
         runtime.serverClockAvailable() ? runtime.serverClockNowMs() : 0,
       );
     }
-  } catch (error) {
-    runtime.restoreOfflineTransaction(transactionSnapshot, error, retryBaseline);
+  } catch {
+    runtime.restoreOfflineTransaction(transactionSnapshot);
   } finally {
     visibilityResumeInFlight = false;
   }

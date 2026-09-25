@@ -191,13 +191,9 @@ const elements = {
   importSaveCodeButton: document.getElementById("importSaveCodeButton"),
   copySaveCodeButton: document.getElementById("copySaveCodeButton"),
   saveRecoveryDetails: document.getElementById("saveRecoveryDetails"),
-  preImportBackupStatus: document.getElementById("preImportBackupStatus"),
   loadFailureStatus: document.getElementById("loadFailureStatus"),
-  quarantineStatus: document.getElementById("quarantineStatus"),
-  retryLoadButton: document.getElementById("retryLoadButton"),
-  restoreQuarantineButton: document.getElementById("restoreQuarantineButton"),
-  restorePreImportButton: document.getElementById("restorePreImportButton"),
-  restoreUndoButton: document.getElementById("restoreUndoButton"),
+  reloadLatestSaveButton: document.getElementById("reloadLatestSaveButton"),
+  startNewSaveButton: document.getElementById("startNewSaveButton"),
   saveCheckpointList: document.getElementById("saveCheckpointList"),
 };
 
