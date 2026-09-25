@@ -1,5 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
-import { bindDoubleActivation } from "./node-activation.js?v=0.13.2";
+import { bindDoubleActivation } from "./node-activation.js?v=0.14.0";
 
 let selectedTimelineNodeId = "";
 

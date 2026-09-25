@@ -81,16 +81,19 @@ async function runSmoke() {
       summary: document.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
       resetDock: document.querySelector("[data-i18n=updateResetDock]")?.textContent?.trim() ?? "",
       canvas: document.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
+      interaction: document.querySelector("[data-i18n=updateInteraction]")?.textContent?.trim() ?? "",
       note: document.querySelector("[data-i18n=updateModalNote]")?.textContent?.trim() ?? "",
     }));
-    assert.match(modalCopy.summary, /確認ダイアログ/);
-    assert.match(modalCopy.summary, /重要操作/);
-    assert.match(modalCopy.resetDock, /Timelineリスペック/);
-    assert.match(modalCopy.resetDock, /ゲーム内確認画面/);
-    assert.match(modalCopy.canvas, /セーブデータ/);
-    assert.match(modalCopy.canvas, /チェックポイント/);
-    assert.match(modalCopy.note, /JavaScriptダイアログ/);
-    assert.match(modalCopy.note, /セーブ形式は11/);
+    assert.match(modalCopy.summary, /オフライン進行/);
+    assert.match(modalCopy.summary, /安定性/);
+    assert.match(modalCopy.resetDock, /Auto Infinity/);
+    assert.match(modalCopy.resetDock, /Core Boost/);
+    assert.match(modalCopy.canvas, /Eternity Milestone 5/);
+    assert.match(modalCopy.canvas, /TC4/);
+    assert.match(modalCopy.interaction, /Infinity Upgrade/);
+    assert.match(modalCopy.interaction, /Help/);
+    assert.match(modalCopy.note, /セーブ復旧/);
+    assert.match(modalCopy.note, /整数値/);
     const desktopButtonInteraction = await page.evaluate(() => {
       const selectors = ["[data-tab=angle]", "#speedUpgrade"];
       return selectors.map((selector) => {
