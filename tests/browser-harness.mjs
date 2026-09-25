@@ -12,12 +12,15 @@ const contentTypes = {
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
   ".svg": "image/svg+xml",
 };
 
 function resolveRequestPath(requestUrl) {
   const pathname = decodeURIComponent(new URL(requestUrl, "http://127.0.0.1").pathname);
-  const relative = path.normalize((pathname === "/" ? "/index.html" : pathname).replace(/^\/+/, ""));
+  const projectPrefix = "/Angle_Incremental";
+  const localPath = pathname === projectPrefix ? "/" : pathname.startsWith(projectPrefix + "/") ? pathname.slice(projectPrefix.length) : pathname;
+  const relative = path.normalize((localPath === "/" ? "/index.html" : localPath).replace(/^\/+/, ""));
   if (relative.startsWith("..") || path.isAbsolute(relative)) return null;
   return path.join(root, relative);
 }

@@ -1,9 +1,20 @@
 import assert from "node:assert/strict";
-import { writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { expectedAppVersion, openGamePage, root, startGameTest, trackPage } from "./browser-harness.mjs";
 
 const reportPath = path.join(root, "browser-smoke-report.json");
+const expectedIconDeclarations = [
+  { rel: "icon", type: "image/png", sizes: "32x32", href: "assets/angle-incremental-icon-32.png" },
+  { rel: "icon", type: "image/png", sizes: "64x64", href: "assets/angle-incremental-icon-64.png" },
+  { rel: "apple-touch-icon", type: "image/png", sizes: "180x180", href: "assets/angle-incremental-icon-180.png" },
+];
+assert.equal(
+  createHash("sha256").update(await readFile(path.join(root, "assets/angle-incremental-icon.png"))).digest("hex"),
+  "4a01b88d084fac2ed1f13952d56c52484fb64f6935ff33db4e3206632b754bc5",
+  "the maintainer-provided source icon must remain byte-for-byte unchanged",
+);
 const expectedModulePaths = [
   "/src/main.js",
   "/src/runtime/shared.js",
@@ -36,6 +47,51 @@ const expectedModulePaths = [
   "/src/ui/events.js",
 ];
 
+async function inspectIconAssets(page) {
+  return page.evaluate(async () => {
+    const declarations = Array.from(document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]')).map((link) => ({
+      rel: link.rel,
+      type: link.type,
+      sizes: link.getAttribute("sizes"),
+      href: link.getAttribute("href"),
+    }));
+    const assets = await Promise.all(declarations.map(async (declaration) => {
+      const url = new URL(declaration.href, document.baseURI).href;
+      const response = await fetch(url, { cache: "no-store" });
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+      return {
+        href: declaration.href,
+        status: response.status,
+        contentType: response.headers.get("content-type"),
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        cornerAlpha: context.getImageData(0, 0, 1, 1).data[3],
+      };
+    }));
+    return { declarations, assets };
+  });
+}
+
+function assertIconAssets(result, servingPath) {
+  assert.deepEqual(result.declarations, expectedIconDeclarations, servingPath + " should declare the expected project-relative icons");
+  assert.equal(result.assets.length, expectedIconDeclarations.length, servingPath + " should load every declared icon");
+  result.assets.forEach((asset, index) => {
+    const expectedSize = Number(expectedIconDeclarations[index].sizes.split("x")[0]);
+    assert.equal(asset.status, 200, servingPath + " should return " + asset.href);
+    assert.equal(asset.contentType?.split(";")[0], "image/png", servingPath + " should serve " + asset.href + " as PNG");
+    assert.equal(asset.width, expectedSize, asset.href + " should have the declared width");
+    assert.equal(asset.height, expectedSize, asset.href + " should have the declared height");
+    assert.equal(asset.cornerAlpha, 0, asset.href + " should pad the artwork with transparency");
+  });
+}
+
 async function runSmoke() {
   const gameTest = await startGameTest();
   const errors = [];
@@ -58,6 +114,7 @@ async function runSmoke() {
   };
 
   trackPage(page, "main", errors, httpFailures);
+  assertIconAssets(await inspectIconAssets(page), "root path");
   page.on("request", (request) => {
     const url = new URL(request.url());
     if (url.origin === localOrigin && url.pathname.startsWith("/src/") && url.pathname.endsWith(".js")) {
@@ -218,6 +275,9 @@ async function runSmoke() {
       assert.equal(mobileTabBar.oneRow, true, "mobile navigation should remain on one row");
       assert.equal(mobileTabBar.allVisibleInStrip, true, "mobile navigation should use the shared scrolling strip");
       assert.ok(mobileTabBar.stripScrollWidth >= mobileTabBar.stripClientWidth, "mobile navigation should keep a measurable scroll surface");
+      await mobilePage.page.goto(localOrigin + "/Angle_Incremental/", { waitUntil: "networkidle" });
+      await mobilePage.page.waitForFunction(() => Boolean(window.__angleDebug?.ready));
+      assertIconAssets(await inspectIconAssets(mobilePage.page), "GitHub Pages project path");
       assert.deepEqual(mobileErrors, [], "mobile smoke should produce no browser errors");
       assert.deepEqual(mobileFailures, [], "mobile smoke should produce no HTTP failures");
     } finally {
