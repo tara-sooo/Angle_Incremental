@@ -12,18 +12,21 @@ present. Resolve any conflicts, run fix-validate, and commit the resolution.
 
 ### Local performance requested by the Issue
 
-The pre-push gate remains `npm run validate`. If the Issue also requires
-`npm run test:performance` locally, execute it and record the report, but do
-not promote that strict timing command into a pre-push hard gate or apply the
-hosted-CI rerun/hold count to its timing-only result. Use the baseline-aware
-local classifier when regression classification is needed; an
-`local-performance-inconclusive` result proceeds to PR and still requires
-hosted CI.
+Select and run the deterministic local validation profile in
+`docs/idd-policy.md`; unknown scope escalates to routine/full. `npm run
+validate` is the routine profile. Install dependencies only when the selected
+profile requires them, and only after acquiring the worktree lock.
 
-Run the pre-push gate in the sibling worktree:
+For the `performance` profile, run `npm run test:performance` and record its
+report. A local timing-only overage is evidence, not a hosted-CI failure or
+hold; use the baseline-aware local classifier when regression classification
+is needed. `local-performance-inconclusive` proceeds to PR, but the strict
+hosted performance gate remains required whenever that profile applies.
+
+Run the selected profile's complete evidence set in the sibling worktree, then
+publish:
 
 ```sh
-npm run validate
 git push -u origin <claimed-branch>
 ```
 

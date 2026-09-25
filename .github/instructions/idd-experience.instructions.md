@@ -9,15 +9,17 @@ This file defines the repository-local experience layer used by IDD. It preserve
 
 Experience is advisory evidence. It never overrides the current Issue, an explicit maintainer decision, the checked-out code/specification, repository policy/configuration, or current test/CI evidence. When experience conflicts with a higher-authority source, follow the higher-authority source and update or supersede the stale experience when that edit is in scope.
 
-## Before B2/B3 — scoped experience lookup
+## After claim — just-in-time scoped context
 
-Before drafting the B2 plan, and again before B3 only when the planned scope changed materially:
+After verified claim/worktree ownership and before B2, load only context needed for the explicit Issue. Repeat before B3 only if the planned scope changes materially:
 
 1. Read `docs/idd-experience/README.md` and the small routing table in `docs/idd-experience/index.md`.
 2. Derive relevant topics from the current Issue, its `## Candidate files` when present, and the files/subsystems the plan is likely to touch.
 3. Open only the matching topic files that currently exist. Do not read every topic file or the whole experience directory by default.
 4. Consider only entries whose scope applies. For `promoted` entries, follow the linked authoritative policy/test/document rather than the historical summary. For `superseded` entries, use them only as provenance.
 5. If an active lesson changes the implementation or verification approach, mention its ID in the B2 plan. If no relevant lesson exists, continue silently; absence of experience is not a blocker and does not require a comment.
+
+A task-specific context pack may be summarized in the session, but is ephemeral and advisory. It cannot replace or override the Issue, policy, canonical files, tests, or live authority checks, and it must not be committed as a workflow artifact. If routing is uncertain or the focused context is insufficient, broaden the lookup.
 
 Do not use repo-wide Issue search as an experience lookup mechanism. Experience lookup is repository-file scoped and does not relax the explicit-target-only Discover policy.
 

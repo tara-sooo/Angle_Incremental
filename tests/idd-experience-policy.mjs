@@ -14,9 +14,11 @@ const gemini = read('GEMINI.md');
 
 assert.match(instruction, /^---[\s\S]*applyTo: "\*\*"[\s\S]*# IDD — Repository Experience/m,
   'shared experience instruction must be auto-loadable on editor instruction surfaces');
-assert.match(instruction, /Before B2\/B3 — scoped experience lookup/);
+assert.match(instruction, /After claim — just-in-time scoped context/);
+assert.match(instruction, /After verified claim\/worktree ownership and before B2/);
 assert.match(instruction, /Open only the matching topic files[\s\S]*Do not read every topic file/i,
   'experience retrieval must stay scoped instead of loading a global memory dump');
+assert.match(instruction, /ephemeral and advisory[\s\S]*broaden the lookup/);
 assert.match(instruction, /current Issue[\s\S]*maintainer decision[\s\S]*code\/specification[\s\S]*policy[\s\S]*test\/CI/i,
   'current authoritative repository evidence must outrank experience');
 assert.match(instruction, /Experience capture is optional/);
