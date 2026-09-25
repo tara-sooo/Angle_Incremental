@@ -6,14 +6,16 @@ ambiguous ownership, review, CI, or branch state.
 
 ## Start sequence
 
-1. Read `idd-overview-core.instructions.md`, the experience contract, and the
-   routed experience topic.
-2. Read `idd-discover.instructions.md` and verify the one explicit Issue.
-3. Read `idd-suitability.instructions.md`; only a passing target reaches
-   `idd-claim.instructions.md`.
-4. Claim the Issue, create the sibling worktree, and acquire its atomic lock.
-5. Read `idd-work.instructions.md` for the plan, implementation, and bounded
-   self-review loop.
+1. Read the ownership/safety core and verify the one explicit Issue with
+   `idd-discover.instructions.md`.
+2. Run only ownership-critical readiness checks before the claim; use
+   `idd-claim.instructions.md` for the A5 race protocol.
+3. Create the sibling worktree and acquire its atomic lock.
+4. After verified ownership, run `idd-suitability.instructions.md`, then load
+   only the scoped experience/context needed for B2 and read
+   `idd-work.instructions.md`.
+5. Plan, implement, self-review, validate, and submit under the active phase
+   contracts.
 
 There is no unattended Issue selection or fallback target. The selected Issue
 and its acceptance criteria are the complete scope.
@@ -21,8 +23,8 @@ and its acceptance criteria are the complete scope.
 ## Active route
 
 ```text
-A0-T target → A4.5 suitability → A5 claim
-→ B1 worktree → B2 plan/critique → B3 implement
+A0-T ownership/safety readiness → A5 claim → B1 worktree/lock
+→ post-claim A4.5 + scoped context → B2 profile-based plan → B3 implement
 → C self-review/fix-validate → D PR to next → CI
 → E snapshot/triage/fix → final live merge gate → merge/completion/cleanup
 ```
@@ -130,12 +132,14 @@ validate/execute scope parity, strict output handling, and that a failed or
 unknown validation cannot reach the write. Prefer the written phase contract
 and direct live evidence when a script is unavailable or disagrees.
 
-## Verification commands
+## Routine validation example
 
 ```sh
 npm run check:runtime-order && npm run check:syntax
 npm run validate
 ```
+Select the deterministic profile documented in `docs/idd-policy.md`;
+`npm run validate` is the routine example, not a universal requirement.
 
 No gameplay, balance, save, UI, release, or deployment change belongs in this
 IDD documentation/policy task.
