@@ -24,7 +24,7 @@ function installEternityStyles() {
   const link = document.createElement("link");
   link.id = "eternityUiStyles";
   link.rel = "stylesheet";
-  link.href = new URL("./eternity-ui.css?v=0.13.2", import.meta.url).href;
+  link.href = new URL("./eternity-ui.css?v=0.14.0", import.meta.url).href;
   document.head.append(link);
 }
 

@@ -137,14 +137,14 @@ assert.doesNotMatch(renderEternitySource, /wrapUpdateUi|runtime\.updateUi\s*=/);
 
 const indexSource = fs.readFileSync(path.join(root, "index.html"), "utf8");
 assert.match(indexSource, /<script type="module" src="src\/main\.js[^\"]*"><\/script>/);
-assert.match(indexSource, /"\.\/src\/data\/eternity-i18n\.js": "\.\/src\/data\/eternity-i18n\.js\?v=0\.13\.2"/);
-assert.match(indexSource, /"\.\/src\/core\/offline-progress\.js": "\.\/src\/core\/offline-progress\.js\?v=0\.13\.2"/);
-assert.match(indexSource, /"\.\/src\/ui\/render-eternity\.js": "\.\/src\/ui\/render-eternity\.js\?v=0\.13\.2"/);
-assert.match(indexSource, /"\.\/src\/ui\/format-exact-integer\.js": "\.\/src\/ui\/format-exact-integer\.js\?v=0\.13\.2"/);
-assert.match(indexSource, /"\.\/src\/ui\/render-save-recovery\.js": "\.\/src\/ui\/render-save-recovery\.js\?v=0\.13\.2"/);
-assert.match(indexSource, /"\.\/src\/ui\/render-timeline\.js": "\.\/src\/ui\/render-timeline\.js\?v=0\.13\.2"/);
+assert.match(indexSource, /"\.\/src\/data\/eternity-i18n\.js": "\.\/src\/data\/eternity-i18n\.js\?v=0\.14\.0"/);
+assert.match(indexSource, /"\.\/src\/core\/offline-progress\.js": "\.\/src\/core\/offline-progress\.js\?v=0\.14\.0"/);
+assert.match(indexSource, /"\.\/src\/ui\/render-eternity\.js": "\.\/src\/ui\/render-eternity\.js\?v=0\.14\.0"/);
+assert.match(indexSource, /"\.\/src\/ui\/format-exact-integer\.js": "\.\/src\/ui\/format-exact-integer\.js\?v=0\.14\.0"/);
+assert.match(indexSource, /"\.\/src\/ui\/render-save-recovery\.js": "\.\/src\/ui\/render-save-recovery\.js\?v=0\.14\.0"/);
+assert.match(indexSource, /"\.\/src\/ui\/render-timeline\.js": "\.\/src\/ui\/render-timeline\.js\?v=0\.14\.0"/);
 for (const name of runtimeOwnerNames) {
-  const entry = '"./src/runtime/' + name + '": "./src/runtime/' + name + '?v=0.13.2"';
+  const entry = '"./src/runtime/' + name + '": "./src/runtime/' + name + '?v=0.14.0"';
   assert.ok(indexSource.includes(entry), name + " must use the canonical app cache version");
 }
 assert.equal(fs.existsSync(path.join(root, "game.js")), false, "the removed classic entrypoint must stay absent");
