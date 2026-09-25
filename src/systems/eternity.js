@@ -1,0 +1,320 @@
+import { runtime, expose } from "../runtime/shared.js";
+
+const FIRST_TIER_MILESTONE_BITS = Object.freeze({
+  "1-1": 1,
+  "1-2": 2,
+  "1-3": 4,
+});
+
+const COUNT_MILESTONE_REQUIREMENTS = Object.freeze({
+  2: 5,
+  3: 8,
+  4: 12,
+  5: 20,
+  6: 27,
+  7: 44,
+  8: 81,
+  9: 108,
+  10: 128,
+});
+
+const FIRST_TIER_MILESTONE_MASK = Object.values(FIRST_TIER_MILESTONE_BITS)
+  .reduce((mask, bit) => mask | bit, 0);
+const FIRST_TIER_MILESTONE_COUNT = Object.keys(FIRST_TIER_MILESTONE_BITS).length;
+
+function currentExactEternityCount() {
+  return runtime.currentExactIntegerState(
+    runtime.state,
+    "eternityCountExact",
+    "eternityCount",
+  );
+}
+
+function normalizeEternityMilestoneMask(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.floor(parsed) & FIRST_TIER_MILESTONE_MASK : 0;
+}
+
+function normalizeEternityMilestoneChoice(value) {
+  return typeof value === "string" && Object.hasOwn(FIRST_TIER_MILESTONE_BITS, value) ? value : "";
+}
+
+function eternityMilestoneActive(id) {
+  const bit = FIRST_TIER_MILESTONE_BITS[id];
+  if (bit) return (normalizeEternityMilestoneMask(runtime.state.eternityMilestoneMask) & bit) !== 0;
+  const requiredCount = COUNT_MILESTONE_REQUIREMENTS[id];
+  return requiredCount !== undefined && currentExactEternityCount() >= BigInt(requiredCount);
+}
+
+function ownedFirstTierMilestoneCount() {
+  const mask = normalizeEternityMilestoneMask(runtime.state.eternityMilestoneMask);
+  return Object.values(FIRST_TIER_MILESTONE_BITS)
+    .reduce((count, bit) => count + ((mask & bit) !== 0 ? 1 : 0), 0);
+}
+
+function firstTierMilestoneEntitlementCount() {
+  const earnedSlots = Number(
+    currentExactEternityCount() < BigInt(FIRST_TIER_MILESTONE_COUNT)
+      ? currentExactEternityCount()
+      : BigInt(FIRST_TIER_MILESTONE_COUNT),
+  );
+  return Math.max(0, earnedSlots - ownedFirstTierMilestoneCount());
+}
+
+function availableEternityMilestoneChoices() {
+  if (firstTierMilestoneEntitlementCount() <= 0) return [];
+  return Object.keys(FIRST_TIER_MILESTONE_BITS).filter((id) => !eternityMilestoneActive(id));
+}
+
+function acquireEternityMilestone(id) {
+  const normalizedId = normalizeEternityMilestoneChoice(id);
+  const bit = FIRST_TIER_MILESTONE_BITS[normalizedId];
+  if (!bit || eternityMilestoneActive(normalizedId) || firstTierMilestoneEntitlementCount() <= 0) return false;
+  runtime.state.eternityMilestoneMask = normalizeEternityMilestoneMask(
+    runtime.state.eternityMilestoneMask,
+  ) | bit;
+  runtime.state.eternityMilestoneChoice = "";
+  return true;
+}
+
+function selectEternityMilestone(id) {
+  return acquireEternityMilestone(id);
+}
+
+function eternityMilestoneNormalUpgradeBonusLevel() {
+  return runtime.numberFromExactInteger(eternityMilestoneNormalUpgradeBonusExact());
+}
+
+function eternityMilestoneNormalUpgradeBonusExact() {
+  return eternityMilestoneActive("1-2")
+    ? runtime.normalizeExactInteger(currentExactEternityCount() * 10n)
+    : 0n;
+}
+
+function eternityMilestoneNormalUpgradeBonusLevelExact() {
+  return eternityMilestoneNormalUpgradeBonusExact().toString();
+}
+
+function eternityMilestonePreservesGenerationReset() {
+  return eternityMilestoneActive("3");
+}
+
+function eternityMilestonePreservesCoreBoostReset() {
+  return eternityMilestoneActive("3");
+}
+
+function eternityMilestoneCoreBoostRequirementLog10(requirementLog10) {
+  return eternityMilestoneActive("4") ? requirementLog10 * 0.9 : requirementLog10;
+}
+
+function normalAutomationUnlocked() {
+  return runtime.hasInfinityUpgrade("1-2") || eternityMilestoneActive("1-1");
+}
+
+function infinityAutomationUnlocked() {
+  return runtime.hasInfinityUpgrade("8-1");
+}
+
+function infinityUpgradeAutomationUnlocked() {
+  return eternityMilestoneActive("5");
+}
+
+function eternityRequirementExact() {
+  return runtime.MAX_EXACT_INFINITY_POINTS;
+}
+
+function eternityIpThresholdMet() {
+  return runtime.currentExactInfinityPoints() >= eternityRequirementExact();
+}
+
+function canEternity() {
+  return eternityIpThresholdMet()
+    && runtime.towerChallenge4CompletedForEternity?.() === true;
+}
+
+function rawEternityGain() {
+  return 1;
+}
+
+function eternityGain() {
+  return runtime.numberFromExactInteger(eternityGainExact());
+}
+
+function eternityGainLog10() {
+  return 0;
+}
+
+function eternityGainExact() {
+  const rawGain = rawEternityGain();
+  if (Number.isFinite(rawGain)) return runtime.normalizeExactInteger(Math.max(1, Math.floor(rawGain)));
+  return runtime.exactIntegerFromLog10(eternityGainLog10());
+}
+
+function addEternityGain(gain) {
+  return runtime.numberFromExactInteger(addEternityGainExact(gain));
+}
+
+function addEternityGainExact(gain) {
+  const current = currentExactEternityCount();
+  const parsedGain = runtime.parseExactInteger(gain, null);
+  const infiniteGain = gain === Infinity
+    || typeof gain === "string" && gain.trim() === "Infinity";
+  const amount = parsedGain === null
+    ? infiniteGain ? runtime.MAX_EXACT_INTEGER : 1n
+    : parsedGain <= 0n ? 1n : parsedGain;
+  return runtime.setExactIntegerState(
+    runtime.state,
+    "eternityCountExact",
+    "eternityCount",
+    current + amount,
+  );
+}
+
+function shouldForceEternity() {
+  return false;
+}
+
+function recordEternityRun() {
+  const elapsed = runtime.sanitizeNumber(runtime.state.currentEternityRunTime, 0);
+  const realElapsed = runtime.sanitizeNumber(runtime.state.currentEternityRealTime, 0);
+  const infinityCount = runtime.currentExactIntegerState(
+    runtime.state,
+    "infinityCountExact",
+    "infinityCount",
+  );
+  const record = {
+    time: elapsed > 0 ? Math.max(elapsed, runtime.MIN_RECORDED_INFINITY_SECONDS) : 0,
+    realTime: realElapsed > 0 ? Math.max(realElapsed, runtime.MIN_RECORDED_INFINITY_SECONDS) : 0,
+    infinityCount: runtime.numberFromExactInteger(infinityCount),
+  };
+  if (infinityCount > BigInt(Number.MAX_SAFE_INTEGER)) record.infinityCountExact = infinityCount.toString();
+  runtime.state.lastEternityRuns.unshift(record);
+  runtime.state.lastEternityRuns = runtime.state.lastEternityRuns.slice(0, 10);
+  if (record.time > 0 && (runtime.state.fastestEternityTime <= 0 || record.time < runtime.state.fastestEternityTime)) {
+    runtime.state.fastestEternityTime = record.time;
+  }
+  if (record.realTime > 0 && (runtime.state.fastestEternityRealTime <= 0 || record.realTime < runtime.state.fastestEternityRealTime)) {
+    runtime.state.fastestEternityRealTime = record.realTime;
+  }
+}
+
+function resetEternityProgression() {
+  runtime.resetBelowInfinity();
+  Object.assign(runtime.state, {
+    coreBoostCount: 0,
+    infinityCount: 0,
+    infinityUpgradeMask: 0,
+    infiniteScore: 0,
+    infiniteScoreLog10: -Infinity,
+    infiniteAngleUnlocked: false,
+    infiniteAngleSpeedLevel: 0,
+    infiniteAngleVertexLevel: 0,
+    infiniteAngleGainLevel: 0,
+    infiniteAngleCurrentGain: 1,
+    infiniteAngleCurrentGainLog10: 0,
+    infiniteAnglePointProgress: 0,
+    infiniteAngleTotalVertexProgress: 0,
+    infiniteAngleLastVertexIndex: 0,
+    towerFloor: 0,
+    ipGainUpgradeLevel: 0,
+    infiniteAngleUpgradeLevel: 0,
+    softcapUpgradeLevel: 0,
+    activeChallenge: 0,
+    completedChallenges: 0,
+    activeChallengeTime: 0,
+    activeTowerChallenge: 0,
+    completedTowerChallenges: 0,
+    activeTowerChallengeTime: 0,
+    tc4BaseGainLevel: 0,
+    tc4BaseGainPriceStep: 0,
+    tc4InfinityScoreVertexGainLevel: 0,
+    tc4InfinityScoreVertexGainPriceStep: 0,
+    tc4FreeCoreBoostLevel: 0,
+    tc4FreeCoreBoostPriceStep: 0,
+    infiniteCapBroken: false,
+    currentInfinityRunTime: 0,
+    currentInfinityRealTime: 0,
+    currentEternityRunTime: 0,
+    currentEternityRealTime: 0,
+    bestInfinityCountPerSecond: 0,
+    infinityCountRateRemainder: 0,
+    ic8VertexDecayElapsed: 0,
+    currentInfinityRunHadGeneration: false,
+    currentInfinityRunHadCoreBoost: false,
+    timelineParallelSecondsSinceIc8Clear: 0,
+    lastEarned: 0,
+    lastEarnedLog10: -Infinity,
+  });
+  runtime.syncInfinityPointCachesFromExact(0n);
+  runtime.setExactIntegerState(runtime.state, "infinityCountExact", "infinityCount", 0n);
+  runtime.resetInfiniteAngleRun?.();
+  runtime.normalizeTowerChallenge4State?.();
+}
+
+function normalizeEternityMilestoneCompletionState() {
+  if (eternityMilestoneActive("2")) {
+    runtime.state.completedChallenges |= 1 << (7 - 1);
+  }
+  if (eternityMilestoneActive("6")) {
+    runtime.state.completedChallenges = (1 << runtime.INFINITY_CHALLENGE_COUNT) - 1;
+  }
+}
+
+function applyEternityRunStartState() {
+  normalizeEternityMilestoneCompletionState();
+  if (eternityMilestoneActive("9")) runtime.syncInfinityPointCachesFromExact(1000n);
+}
+
+function performEternity(options = {}) {
+  if (!canEternity()) return false;
+  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-eternity", { force: true })) return false;
+  const gain = eternityGainExact();
+  recordEternityRun();
+  resetEternityProgression();
+  addEternityGainExact(gain);
+  runtime.markMainTabsUnlocked?.(["timeline"]);
+  applyEternityRunStartState();
+  runtime.state.eternityMilestoneChoice = "";
+  runtime.checkAchievements(true);
+  if (options.update !== false) runtime.updateUi?.();
+  if (options.save !== false) runtime.saveGame?.("manual");
+  return true;
+}
+
+function maybeForceEternity() {
+  return false;
+}
+
+expose("eternityRequirementExact", () => eternityRequirementExact);
+expose("eternityIpThresholdMet", () => eternityIpThresholdMet);
+expose("currentExactEternityCount", () => currentExactEternityCount);
+expose("eternityGainLog10", () => eternityGainLog10);
+expose("eternityGain", () => eternityGain);
+expose("eternityGainExact", () => eternityGainExact);
+expose("addEternityGain", () => addEternityGain);
+expose("addEternityGainExact", () => addEternityGainExact);
+expose("normalizeEternityMilestoneMask", () => normalizeEternityMilestoneMask);
+expose("normalizeEternityMilestoneChoice", () => normalizeEternityMilestoneChoice);
+expose("eternityMilestoneActive", () => eternityMilestoneActive);
+expose("ownedFirstTierMilestoneCount", () => ownedFirstTierMilestoneCount);
+expose("firstTierMilestoneEntitlementCount", () => firstTierMilestoneEntitlementCount);
+expose("availableEternityMilestoneChoices", () => availableEternityMilestoneChoices);
+expose("acquireEternityMilestone", () => acquireEternityMilestone);
+expose("selectEternityMilestone", () => selectEternityMilestone);
+expose("eternityMilestoneNormalUpgradeBonusLevel", () => eternityMilestoneNormalUpgradeBonusLevel);
+expose("eternityMilestoneNormalUpgradeBonusExact", () => eternityMilestoneNormalUpgradeBonusExact);
+expose("eternityMilestoneNormalUpgradeBonusLevelExact", () => eternityMilestoneNormalUpgradeBonusLevelExact);
+expose("eternityMilestonePreservesGenerationReset", () => eternityMilestonePreservesGenerationReset);
+expose("eternityMilestonePreservesCoreBoostReset", () => eternityMilestonePreservesCoreBoostReset);
+expose("eternityMilestoneCoreBoostRequirementLog10", () => eternityMilestoneCoreBoostRequirementLog10);
+expose("normalAutomationUnlocked", () => normalAutomationUnlocked);
+expose("infinityAutomationUnlocked", () => infinityAutomationUnlocked);
+expose("infinityUpgradeAutomationUnlocked", () => infinityUpgradeAutomationUnlocked);
+expose("canEternity", () => canEternity);
+expose("shouldForceEternity", () => shouldForceEternity);
+expose("recordEternityRun", () => recordEternityRun, (value) => { recordEternityRun = value; });
+expose("resetEternityProgression", () => resetEternityProgression);
+expose("normalizeEternityMilestoneCompletionState", () => normalizeEternityMilestoneCompletionState);
+expose("applyEternityRunStartState", () => applyEternityRunStartState);
+expose("performEternity", () => performEternity);
+expose("maybeForceEternity", () => maybeForceEternity);

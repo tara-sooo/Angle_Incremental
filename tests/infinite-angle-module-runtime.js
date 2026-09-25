@@ -1,0 +1,480 @@
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const { loadRuntime } = require("./runtime-harness-esm.js");
+
+const candidatePath = path.join(__dirname, "..", "src", "main.js");
+
+function setInfinityPoints(runtime, amount) {
+  runtime.syncInfinityPointCachesFromExact(BigInt(amount));
+}
+
+function resetInfiniteAngleState(state) {
+  state.infiniteScore = 0;
+  state.infiniteScoreLog10 = -Infinity;
+  state.infiniteAngleCurrentGain = 1;
+  state.infiniteAngleCurrentGainLog10 = 0;
+  state.infiniteAnglePointProgress = 0;
+  state.infiniteAngleTotalVertexProgress = 0;
+  state.infiniteAngleLastVertexIndex = 0;
+}
+
+async function runInfiniteAngleModuleRuntimeTest() {
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    setInfinityPoints(runtime, 100000000000000000000n);
+
+    assert.equal(debug.unlockInfiniteAngle(), true, "IA should unlock at exactly 1e20 IP");
+    assert.equal(state.infiniteAngleUnlocked, true, "IA unlock should persist in state");
+    assert.equal(state.infinityPointsExact, "0", "IA unlock should spend exactly 1e20 IP");
+    assert.equal(runtime.infiniteAngleBoost(), 1, "an empty Infinity Score should be a neutral boost");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    runtime.applySaveData({
+      infiniteScore: 10,
+      infiniteScoreLog10: 1,
+    }, 10);
+    assert.equal(debug.state.infiniteAngleUnlocked, true, "legacy Infinite Score saves should migrate to unlocked IA");
+    assert.equal(debug.state.infiniteScoreLog10, 1, "legacy Infinite Score should remain IA Score");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    state.eternityMilestoneMask = 4;
+    state.infiniteAngleSpeedLevel = 0;
+    state.infiniteAngleVertexLevel = 0;
+    state.infiniteAngleGainLevel = 0;
+    setInfinityPoints(runtime, 1_000_000_000_000_000_000_000n);
+
+    assert.equal(runtime.infiniteAnglePurchasedUpgradeLevel("speed"), 0, "Milestone 1-3 must not invent purchased IA Speed levels");
+    assert.equal(runtime.infiniteAngleFreeUpgradeLevel("speed"), 5, "Milestone 1-3 should provide five free IA Speed levels");
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 5, "IA Speed effective level should include the free levels");
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), 5, "IA Vertex effective level should include the free levels");
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("gain"), 5, "IA Gain effective level should include the free levels");
+    assert.equal(runtime.infiniteAngleVertexCount(), 8, "IA Vertex count should use the effective level");
+    assert.equal(
+      runtime.infiniteAngleRawLapSpeedLog10(),
+      5 * Math.log10(1.22),
+      "IA lap speed should use the effective Speed level",
+    );
+
+    const levelZeroSpeedCost = runtime.infiniteAngleUpgradeCostLog10("speed");
+    assert.equal(levelZeroSpeedCost, 20, "IA price should remain based on purchased level zero");
+    assert.equal(debug.buyInfiniteAngleUpgrade("speed", { refresh: false, save: false }), true, "free IA levels must not block the first paid purchase");
+    assert.equal(state.infiniteAngleSpeedLevel, 1, "an IA purchase should increment only the purchased level");
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("speed"), 6, "one IA purchase should raise the effective level to six");
+    assert.ok(runtime.infiniteAngleUpgradeCostLog10("speed") > levelZeroSpeedCost, "the next IA price should use purchased level one");
+
+    state.infiniteAngleVertexLevel = runtime.MAX_RENDERED_VERTICES - 3 - 5;
+    setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
+    assert.equal(runtime.infiniteAngleEffectiveUpgradeLevel("vertex"), runtime.MAX_RENDERED_VERTICES - 3, "free Vertex levels must count toward the cap");
+    assert.equal(runtime.infiniteAngleVertexCount(), runtime.MAX_RENDERED_VERTICES, "effective Vertex levels must respect the rendered-vertex cap");
+    assert.equal(runtime.canBuyInfiniteAngleUpgrade("vertex"), false, "the Vertex cap must block purchases at the effective maximum");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    state.speedLevel = 7;
+    state.gainLevel = 8;
+    state.vertices = 11;
+    assert.ok(Math.abs(runtime.infiniteAngleUpgradeCostLog10("speed") - 20) < 1e-12, "IA speed should start at 1e20 IP");
+    assert.ok(
+      Math.abs(runtime.infiniteAngleUpgradeCostLog10("vertex") - Math.log10(2.4e20)) < 1e-12,
+      "IA vertex should start at 2.4e20 IP",
+    );
+    assert.ok(
+      Math.abs(runtime.infiniteAngleUpgradeCostLog10("gain") - Math.log10(3.6e20)) < 1e-12,
+      "IA gain should start at 3.6e20 IP",
+    );
+    state.infiniteAngleSpeedLevel = 1;
+    assert.ok(
+      Math.abs(
+        runtime.infiniteAngleUpgradeCostLog10("speed")
+        - (20 + Math.log10(1.4) * 0.11),
+      ) < 1e-12,
+      "IA speed growth should use the softened curve",
+    );
+    state.infiniteAngleSpeedLevel = 50;
+    assert.ok(
+      Math.abs(
+        runtime.infiniteAngleUpgradeCostLog10("speed")
+        - (20 + 50 * Math.log10(1.4) * 0.11 + 25 ** 2 * 0.0005 * 0.35),
+      ) < 0.001,
+      "IA speed should use its softened high-level curve",
+    );
+    state.infiniteAngleVertexLevel = 50;
+    assert.ok(
+      Math.abs(
+        runtime.infiniteAngleUpgradeCostLog10("vertex")
+        - (Math.log10(2.4e20) + 50 * Math.log10(1.5) * 0.11 + 25 ** 2 * 0.0010 * 0.35),
+      ) < 0.001,
+      "IA vertex should use its softened high-level curve",
+    );
+    state.infiniteAngleGainLevel = 50;
+    assert.ok(
+      Math.abs(
+        runtime.infiniteAngleUpgradeCostLog10("gain")
+        - (Math.log10(3.6e20) + 50 * Math.log10(1.45) * 0.11 + 25 ** 2 * 0.0005 * 0.35),
+      ) < 0.001,
+      "IA gain should use its softened high-level curve",
+    );
+    state.infiniteAngleSpeedLevel = 0;
+    state.infiniteAngleVertexLevel = 0;
+    state.infiniteAngleGainLevel = 0;
+    const initialIp = 1000000000000000000000n;
+    const speedCost = runtime.exactInfinityPointsFromCostLog10(runtime.infiniteAngleUpgradeCostLog10("speed"));
+    const vertexCost = runtime.exactInfinityPointsFromCostLog10(runtime.infiniteAngleUpgradeCostLog10("vertex"));
+    const gainCost = runtime.exactInfinityPointsFromCostLog10(runtime.infiniteAngleUpgradeCostLog10("gain"));
+    setInfinityPoints(runtime, initialIp);
+    const spendableIp = runtime.currentExactInfinityPoints();
+
+    assert.equal(debug.buyInfiniteAngleUpgrade("speed"), true, "IA speed upgrade should be payable with IP");
+    state.infiniteAngleCurrentGain = 123;
+    state.infiniteAngleCurrentGainLog10 = Math.log10(123);
+    state.infiniteAnglePointProgress = 0.5;
+    state.infiniteAngleTotalVertexProgress = 7.5;
+    state.infiniteAngleLastVertexIndex = 2;
+    assert.equal(debug.buyInfiniteAngleUpgrade("vertex"), true, "IA vertex upgrade should be payable with IP");
+    assert.equal(state.infiniteAngleCurrentGainLog10, Math.log10(123), "IA vertex upgrades must preserve current gain");
+    assert.equal(state.infiniteAnglePointProgress, 0, "IA vertex upgrades should reset point progress");
+    assert.equal(state.infiniteAngleTotalVertexProgress, 0, "IA vertex upgrades should reset vertex progress");
+    assert.equal(state.infiniteAngleLastVertexIndex, 0, "IA vertex upgrades should reset the vertex index");
+    assert.equal(debug.buyInfiniteAngleUpgrade("gain"), true, "IA gain upgrade should be payable with IP");
+    assert.equal(state.infiniteAngleSpeedLevel, 1, "IA speed level should increase independently");
+    assert.equal(state.infiniteAngleVertexLevel, 1, "IA vertex level should increase independently");
+    assert.equal(state.infiniteAngleGainLevel, 1, "IA gain level should increase independently");
+    assert.equal(runtime.infiniteAngleVertexCount(), 4, "IA vertex upgrades should add one IA vertex");
+    assert.equal(state.speedLevel, 7, "IA speed upgrades must not change TA speed level");
+    assert.equal(state.gainLevel, 8, "IA gain upgrades must not change TA gain level");
+    assert.equal(state.vertices, 11, "IA vertex upgrades must not change TA vertices");
+    assert.equal(
+      runtime.currentExactInfinityPoints(),
+      spendableIp - speedCost - vertexCost - gainCost,
+      "IA upgrades should spend their independent IP costs",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    setInfinityPoints(runtime, 1_000_000_000_000_000_000_000n);
+
+    const purchases = debug.buyAllInfiniteAngleUpgrades();
+    assert.ok(purchases > 0, "IA Buy All should purchase affordable upgrades");
+    assert.ok(state.infiniteAngleSpeedLevel > 0, "IA Buy All should include speed upgrades");
+    assert.ok(state.infiniteAngleVertexLevel > 0, "IA Buy All should include vertex upgrades");
+    assert.ok(state.infiniteAngleGainLevel > 0, "IA Buy All should include gain upgrades");
+    assert.equal(
+      purchases,
+      state.infiniteAngleSpeedLevel + state.infiniteAngleVertexLevel + state.infiniteAngleGainLevel,
+      "IA Buy All should report the number of individual purchases",
+    );
+    assert.ok(runtime.currentExactInfinityPoints() < 1_000_000_000_000_000_000_000n, "IA Buy All should spend IP");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    state.infiniteAngleSpeedLevel = 1000000;
+    setInfinityPoints(runtime, runtime.MAX_EXACT_INFINITY_POINTS);
+    const costLog10 = runtime.infiniteAngleUpgradeCostLog10("speed");
+    const maximumCostLog10 = runtime.log10ExactInfinityPoints(runtime.MAX_EXACT_INFINITY_POINTS);
+
+    assert.ok(costLog10 > maximumCostLog10, "IA costs above the exact IP ceiling should be recognized");
+    assert.equal(runtime.canBuyInfiniteAngleUpgrade("speed"), false, "IA upgrades above the exact IP ceiling must not be affordable");
+    assert.equal(debug.buyInfiniteAngleUpgrade("speed"), false, "IA upgrades above the exact IP ceiling must not be purchasable");
+    assert.equal(runtime.currentExactInfinityPoints(), runtime.MAX_EXACT_INFINITY_POINTS, "an over-ceiling IA purchase must not spend IP");
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    state.infiniteAngleSpeedLevel = 0;
+    state.infiniteAngleVertexLevel = 0;
+    state.infiniteAngleGainLevel = 0;
+    resetInfiniteAngleState(state);
+    state.scoreLog10 = 7;
+    state.totalScoreLog10 = 7;
+    state.generationScoreLog10 = 7;
+    state.generationCount = 4;
+    state.coreBoostCount = 3;
+    state.speedLevel = 7;
+    state.gainLevel = 8;
+    state.vertices = 12;
+
+    const scoreBefore = runtime.currentInfiniteScoreLog10();
+    debug.updateInfiniteAngle(runtime.infiniteAngleLapDuration());
+    assert.ok(runtime.currentInfiniteScoreLog10() > scoreBefore, "IA should earn Infinity Score continuously");
+    assert.ok(
+      Math.abs(runtime.infiniteAngleCurrentGainLog10() - Math.log10(1.033)) < 1e-12,
+      "IA per-vertex gain should use the adjusted 0.011 increase",
+    );
+    assert.equal(state.infiniteAnglePointProgress, 0, "one IA lap should return to the first vertex");
+    assert.equal(state.generationCount, 4, "IA progression must not use Generation state");
+    assert.equal(state.coreBoostCount, 3, "IA progression must not use Core Boost state");
+    assert.equal(state.scoreLog10, 7, "IA progression must not change TA score");
+
+    state.infiniteScore = 10;
+    state.infiniteScoreLog10 = 1;
+    assert.ok(Math.abs(runtime.infiniteAngleBoost() - 10 ** 0.3) < 1e-12, "IA boost should be Infinity Score^0.3");
+    state.infinityUpgradeMask |= 1 << 19;
+    assert.ok(Math.abs(runtime.infiniteAngleBoost() - 10 ** 0.5) < 1e-12, "IU 13-1 should replace the IA boost with Infinity Score^0.5");
+
+    state.generationCount = 0;
+    state.coreBoostCount = 0;
+    state.speedLevel = 0;
+    state.gainLevel = 0;
+    state.vertices = 3;
+    state.infinityCount = 0;
+    state.infinityUpgradeMask = 0;
+    state.achievementMask = 0;
+    assert.ok(
+      Math.abs(runtime.vertexGainIncrease() - 0.01 * 10 ** 0.3) < 1e-12,
+      "Infinity Score^0.3 should multiply TA vertex gain",
+    );
+
+    state.infiniteScore = Number.MAX_VALUE;
+    state.infiniteScoreLog10 = 2000;
+    state.currentGain = 1;
+    state.currentGainLog10 = 0;
+    assert.equal(runtime.infiniteAngleBoostLog10(), 600, "IA boost should remain available as a log value at late-game scores");
+    runtime.passVertex(1);
+    assert.ok(state.currentGainLog10 > 308, "late-game IA boosts must keep normal vertex gain in log space");
+    state.currentGain = 1;
+    state.currentGainLog10 = 0;
+    runtime.processManyVertices(1, 2);
+    assert.ok(state.currentGainLog10 > 308, "late-game IA boosts must keep batched normal vertex gain in log space");
+    runtime.updateUi();
+    assert.match(runtime.elements.vertexGainValue.textContent, /e598/, "late-game vertex gain UI should use the log-backed value");
+
+    resetInfiniteAngleState(state);
+    state.infiniteAngleSpeedLevel = 0;
+    state.infiniteAngleVertexLevel = 0;
+    state.infiniteAngleGainLevel = 0;
+    const largeProgressDelta = runtime.MAX_VERTEX_PROGRESS_TRACKED * 2;
+    const largeProgressSeconds = runtime.infiniteAngleLapDuration() * largeProgressDelta / runtime.infiniteAngleVertexCount();
+    debug.updateInfiniteAngle(largeProgressSeconds);
+    assert.ok(
+      runtime.infiniteAngleCurrentGainLog10() >= Math.log10(0.011 * largeProgressDelta) - 1e-9,
+      "IA should preserve current gain across a progress delta larger than the tracking threshold",
+    );
+    assert.ok(runtime.currentInfiniteScoreLog10() > -Infinity, "IA should preserve score earned across a large progress delta");
+    assert.ok(state.infiniteAngleTotalVertexProgress < runtime.infiniteAngleVertexCount(), "large IA progress should wrap without losing the processed delta");
+
+    state.infiniteAngleSpeedLevel = 1_000_000_000_000;
+    debug.updateInfiniteAngle(1 / 60);
+    assert.equal(Number.isFinite(state.infiniteAngleTotalVertexProgress), true, "extreme IA speed must keep progress finite");
+    assert.equal(Number.isFinite(state.infiniteAnglePointProgress), true, "extreme IA speed must keep point progress finite");
+  }
+
+  {
+    const configureNearApproximationScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 302;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+      state.offlineProgressEnabled = true;
+      state.offlineTickCount = 1000;
+    };
+    const exactInstance = await loadRuntime(candidatePath);
+    configureNearApproximationScenario(exactInstance);
+    const tickSeconds = 2049 * exactInstance.runtime.infiniteAngleLapDuration();
+    exactInstance.debug.updateInfiniteAngle(tickSeconds);
+    const exactScoreLog10 = exactInstance.debug.state.infiniteScoreLog10;
+
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureNearApproximationScenario(offlineInstance);
+    const report = await offlineInstance.debug.processOfflineElapsed(tickSeconds, "test", { clockSource: "server" });
+    assert.equal(report.requestedTicks, 1, "near-threshold IA batches should fit in one offline tick");
+    assert.equal(
+      offlineInstance.debug.state.infiniteScoreLog10,
+      exactScoreLog10,
+      "near-threshold offline IA batches should remain exact",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    state.infiniteAngleVertexLevel = 717;
+    state.infiniteAngleSpeedLevel = 302;
+    state.infiniteAngleGainLevel = 0;
+    resetInfiniteAngleState(state);
+    const coreHitsPerTick = runtime.CORE_HIT_APPROX_SEGMENTS * 2;
+    const exactWorkBudget = runtime.OFFLINE_INFINITE_ANGLE_EXACT_WORK_BUDGET;
+    const simulatedTicks = Math.ceil(exactWorkBudget / coreHitsPerTick) + 1;
+    const tickSeconds = coreHitsPerTick * runtime.infiniteAngleLapDuration();
+    runtime.offlineProcessing = true;
+    try {
+      for (let tick = 0; tick < simulatedTicks; tick += 1) {
+        debug.updateInfiniteAngle(tickSeconds);
+      }
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+    assert.equal(
+      runtime.infiniteAngleOfflineExactIterations,
+      Math.floor(exactWorkBudget / coreHitsPerTick) * coreHitsPerTick,
+      "offline IA exact iterations should stop at the total work budget",
+    );
+  }
+
+  {
+    const configureDirectOfflineScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 99;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+    };
+    const exactInstance = await loadRuntime(candidatePath);
+    configureDirectOfflineScenario(exactInstance);
+    const tickSeconds = 1 / 30;
+    assert.ok(
+      tickSeconds / exactInstance.runtime.infiniteAngleLapDuration() * 720
+        < exactInstance.runtime.MAX_VERTEX_STEPS_PER_FRAME,
+      "direct offline IA regression should stay below the batched vertex threshold",
+    );
+    exactInstance.debug.updateInfiniteAngle(tickSeconds);
+    const exactScoreLog10 = exactInstance.debug.state.infiniteScoreLog10;
+
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureDirectOfflineScenario(offlineInstance);
+    const report = await offlineInstance.debug.processOfflineElapsed(tickSeconds, "test", { clockSource: "server" });
+    assert.equal(report.requestedTicks, 1, "direct offline IA regression should fit in one offline tick");
+    assert.ok(
+      Math.abs(offlineInstance.debug.state.infiniteScoreLog10 - exactScoreLog10) < 1e-10,
+      "direct offline IA batches should preserve exact score results",
+    );
+    assert.ok(
+      offlineInstance.runtime.infiniteAngleOfflineExactIterations > 0,
+      "direct offline IA batches should use the budgeted processing path",
+    );
+  }
+
+  {
+    const configureHighLoadScenario = (instance) => {
+      const { state } = instance.debug;
+      state.infiniteAngleUnlocked = true;
+      state.infiniteAngleVertexLevel = 717;
+      state.infiniteAngleSpeedLevel = 302;
+      state.infiniteAngleGainLevel = 0;
+      resetInfiniteAngleState(state);
+    };
+    const offlineInstance = await loadRuntime(candidatePath);
+    configureHighLoadScenario(offlineInstance);
+    const { debug, runtime } = offlineInstance;
+    const coreHitsPerTick = runtime.CORE_HIT_APPROX_SEGMENTS * 2;
+    const tickSeconds = coreHitsPerTick * runtime.infiniteAngleLapDuration();
+    runtime.offlineProcessing = true;
+    try {
+      debug.updateInfiniteAngle(tickSeconds);
+      debug.updateInfiniteAngle(tickSeconds);
+      assert.ok(
+        runtime.offlineWorkStats.tracks.infiniteAngle.bulkRemaining === 0,
+        "offline IA bulk budget should be exhausted before the reset regression",
+      );
+
+      runtime.resetBelowInfinity();
+      debug.state.infiniteAngleVertexLevel = 717;
+      debug.state.infiniteAngleSpeedLevel = 102;
+      resetInfiniteAngleState(debug.state);
+      const postResetCoreHits = Math.floor((1 / 30) / runtime.infiniteAngleLapDuration());
+      assert.ok(postResetCoreHits >= 5 && postResetCoreHits <= 8, "post-reset regression should use a 5-8 hit IA batch");
+      debug.updateInfiniteAngle(1 / 30);
+    } finally {
+      runtime.offlineProcessing = false;
+    }
+
+    const exactInstance = await loadRuntime(candidatePath);
+    exactInstance.debug.state.infiniteAngleUnlocked = true;
+    exactInstance.debug.state.infiniteAngleVertexLevel = 717;
+    exactInstance.debug.state.infiniteAngleSpeedLevel = 102;
+    resetInfiniteAngleState(exactInstance.debug.state);
+    exactInstance.debug.updateInfiniteAngle(1 / 30);
+
+    assert.ok(
+      Math.abs(debug.state.infiniteScoreLog10 - exactInstance.debug.state.infiniteScoreLog10) < 1e-10,
+      "small IA batches should remain exact after the offline budget is exhausted and Infinity reset",
+    );
+    assert.ok(
+      runtime.offlineWorkStats.tracks.infiniteAngle.smallExactIterations > 0,
+      "post-reset small IA batches should consume the small exact-work allowance",
+    );
+  }
+
+  {
+    const instance = await loadRuntime(candidatePath);
+    const { debug, runtime } = instance;
+    const { state } = debug;
+    state.infiniteAngleUnlocked = true;
+    state.infiniteAngleSpeedLevel = 4;
+    state.infiniteAngleVertexLevel = 5;
+    state.infiniteAngleGainLevel = 6;
+    state.infiniteAngleCurrentGain = 123;
+    state.infiniteAngleCurrentGainLog10 = Math.log10(123);
+    state.infiniteAnglePointProgress = 0.5;
+    state.infiniteAngleTotalVertexProgress = 7.5;
+    state.infiniteAngleLastVertexIndex = 2;
+    state.infiniteScore = 1e12;
+    state.infiniteScoreLog10 = 12;
+
+    runtime.resetBelowInfinity();
+    assert.equal(state.infiniteAngleUnlocked, true, "Infinity should preserve the IA unlock");
+    assert.equal(state.infiniteAngleSpeedLevel, 4, "Infinity should preserve IA speed upgrades");
+    assert.equal(state.infiniteAngleVertexLevel, 5, "Infinity should preserve IA vertex upgrades");
+    assert.equal(state.infiniteAngleGainLevel, 6, "Infinity should preserve IA gain upgrades");
+    assert.equal(state.infiniteScoreLog10, -Infinity, "Infinity should reset Infinity Score");
+    assert.equal(state.infiniteAngleCurrentGainLog10, 0, "Infinity should reset IA current gain");
+    assert.equal(state.infiniteAnglePointProgress, 0, "Infinity should reset IA point progress");
+    assert.equal(state.infiniteAngleTotalVertexProgress, 0, "Infinity should reset IA vertex progress");
+    assert.equal(state.infiniteAngleLastVertexIndex, 0, "Infinity should reset IA vertex index");
+  }
+
+  {
+    const source = await loadRuntime(candidatePath);
+    const { debug } = source;
+    debug.state.infiniteAngleUnlocked = true;
+    debug.state.infiniteAngleSpeedLevel = 3;
+    debug.state.infiniteAngleVertexLevel = 2;
+    debug.state.infiniteAngleGainLevel = 4;
+    debug.state.infiniteScore = 42;
+    debug.state.infiniteScoreLog10 = Math.log10(42);
+    debug.state.infiniteAngleCurrentGain = 17;
+    debug.state.infiniteAngleCurrentGainLog10 = Math.log10(17);
+    debug.saveGame("manual");
+
+    const reloaded = await loadRuntime(candidatePath, source.storage);
+    assert.equal(reloaded.debug.state.infiniteAngleUnlocked, true, "IA unlock should survive a local save");
+    assert.equal(reloaded.debug.state.infiniteAngleSpeedLevel, 3, "IA speed level should survive a local save");
+    assert.equal(reloaded.debug.state.infiniteAngleVertexLevel, 2, "IA vertex level should survive a local save");
+    assert.equal(reloaded.debug.state.infiniteAngleGainLevel, 4, "IA gain level should survive a local save");
+    assert.equal(reloaded.debug.state.infiniteScoreLog10, Math.log10(42), "IA Score should survive a local save");
+    assert.equal(reloaded.debug.state.infiniteAngleCurrentGainLog10, Math.log10(17), "IA current gain should survive a local save");
+  }
+
+  console.log("Infinite Angle module runtime tests passed");
+}
+
+module.exports = { runInfiniteAngleModuleRuntimeTest };

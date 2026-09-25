@@ -1,0 +1,30 @@
+{
+  "_artifactPolicy": "Compact tracked research summary for release history. Full route/search output is reproducible from the corresponding simulator script and Markdown report.",
+  "issue": 117,
+  "title": "Complete TC4 balance evaluation for the eight inconclusive candidates",
+  "researchOnly": true,
+  "sourceIssues": [
+    106,
+    112,
+    114
+  ],
+  "relationshipToIssue98": "Issue #98 remains status:needs-decision; this report selects no production constants.",
+  "targetLog10": 7777,
+  "evaluatedResetPolicies": [
+    "fixed-60",
+    "gain-aware-2x",
+    "threshold-aware"
+  ],
+  "nextSearchRecommendation": {
+    "status": "bounded-recommendation",
+    "direction": "increase B",
+    "basisCandidate": "A0.25-B0.35-C1",
+    "highestMilestone": 1700,
+    "peakScoreLog10": 1813.5620182364562,
+    "gapToE2500": 686.4379817635438,
+    "nextRegion": "one bounded neighboring region only; maintainer decision required before another sweep"
+  },
+  "noProductionChanges": true,
+  "anyReachedE2500": false,
+  "anyReachedE7777": false
+}

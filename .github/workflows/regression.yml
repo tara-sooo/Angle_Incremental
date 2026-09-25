@@ -1,0 +1,103 @@
+name: Regression Suite
+
+on:
+  pull_request:
+    branches:
+      - main
+      - next
+      - "release/**"
+  push:
+    branches:
+      - main
+      - next
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        timeout-minutes: 5
+        run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Verify ESM entrypoint order
+        run: npm run check:runtime-order
+      - name: Check syntax
+        run: npm run check:syntax
+      - name: Check version consistency
+        run: npm run check:version
+      - name: Check IDD review policy
+        run: npm run check:idd-policy
+      - name: Run ESM regression suite
+        run: npm run test:regression
+      - name: Install Chromium for browser validation
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Run browser smoke and feature tests
+        run: npm run test:browser
+      - name: Test local performance gate classifier
+        run: npm run test:local-performance-gate
+      - name: Upload regression diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-diagnostics
+          path: |
+            browser-smoke-report.json
+            output/render-regression.json
+            regression-failure.txt
+          if-no-files-found: warn
+
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        timeout-minutes: 5
+        run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Install Chromium for performance smoke test
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Run hosted performance smoke test
+        run: npm run test:performance
+      - name: Upload performance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-diagnostics
+          path: output/performance-smoke.json
+          if-no-files-found: warn
+
+  offline-stress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        timeout-minutes: 5
+        run: npm ci --prefer-offline --no-audit --no-fund
+      - name: Install Chromium for offline stress test
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Run offline stress test
+        run: npm run test:offline-stress
+      - name: Upload offline stress diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-stress-diagnostics
+          path: output/offline-stress.json
+          if-no-files-found: warn

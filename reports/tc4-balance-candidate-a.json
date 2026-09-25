@@ -1,0 +1,47 @@
+{
+  "_artifactPolicy": "Compact tracked research summary for release history. Full route/search output is reproducible from the corresponding simulator script and Markdown report.",
+  "issue": 112,
+  "title": "Expand TC4 Balance Candidate A reset-strategy search",
+  "researchOnly": true,
+  "sourceIssue": 106,
+  "targetLog10": 7777,
+  "horizonSeconds": 86400,
+  "stepSeconds": 10,
+  "routeSearchLimits": {
+    "maxStates": 20,
+    "maxRoutes": 10
+  },
+  "stallSeconds": 14400,
+  "policyComparisons": [
+    {
+      "policy": {
+        "id": "gain-aware-2x",
+        "type": "gain-aware",
+        "minimumRunSeconds": 60,
+        "minimumIpGainMultiplier": 2
+      },
+      "peakScoreLog10": 1779.0041653518615,
+      "thresholdReached": {
+        "e900": true,
+        "e1700": true,
+        "e2500": false
+      }
+    },
+    {
+      "policy": {
+        "id": "threshold-aware",
+        "type": "threshold-aware",
+        "minimumRunSeconds": 60,
+        "progressWindowSeconds": 120,
+        "progressThresholdLog10": 1,
+        "lookaheadSeconds": 600
+      },
+      "peakScoreLog10": 1779.2488069903904,
+      "thresholdReached": {
+        "e900": true,
+        "e1700": true,
+        "e2500": false
+      }
+    }
+  ]
+}
