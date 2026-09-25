@@ -70,7 +70,6 @@ async function importSaveCode(code) {
     runtime.setSaveStatus(runtime.t("saveConflictDetected"));
     return false;
   }
-  let backupFailed = false;
   try {
     const trimmed = String(code || "").trim();
     if (!trimmed.startsWith(runtime.SAVE_CODE_PREFIX)) throw new Error("bad prefix");
@@ -84,35 +83,12 @@ async function importSaveCode(code) {
       await saveCodeKey(),
       base64UrlToBytes(envelope.d),
     );
-    const parsed = JSON.parse(decoder.decode(new Uint8Array(decrypted)));
-    if (
-      !parsed
-      || !Number.isInteger(parsed.version)
-      || parsed.version <= 0
-      || parsed.version > runtime.SAVE_VERSION
-      || !parsed.state
-      || typeof parsed.state !== "object"
-      || Array.isArray(parsed.state)
-    ) throw new Error("bad save");
-    const currentSave = runtime.serializeSaveData();
-    backupFailed = !runtime.backupCurrentSave("pre-import");
-    if (backupFailed) return false;
-    runtime.applySaveData(parsed.state, parsed.version);
-    runtime.maybeForceEternity?.({ save: false, update: false });
-    if (!runtime.saveGame("manual", { allowDuringLoadRecovery: true })) {
-      runtime.applySaveData(currentSave.state, currentSave.version);
-      runtime.setSaveStatus(runtime.t("saveCodeImportFailed"));
-      return false;
-    }
-    if (runtime.finishLoadRecovery) runtime.finishLoadRecovery();
-    runtime.updateUi();
-    runtime.draw();
+    const parsed = runtime.normalizeStoredSave(JSON.parse(decoder.decode(new Uint8Array(decrypted))));
+    if (!parsed || !await runtime.replaceSave(parsed, "pre-import")) return false;
     runtime.setSaveStatus(runtime.t("saveCodeImported"));
     return true;
   } catch (error) {
-    if (!backupFailed) {
-      runtime.setSaveStatus(cryptoApi() ? runtime.t("saveCodeInvalid") : runtime.t("saveCodeCryptoUnavailable"));
-    }
+    runtime.setSaveStatus(cryptoApi() ? runtime.t("saveCodeInvalid") : runtime.t("saveCodeCryptoUnavailable"));
     return false;
   }
 }

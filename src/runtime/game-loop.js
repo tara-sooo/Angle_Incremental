@@ -137,7 +137,7 @@ function updateRenderQualityForTest(renderCostMs, fps, canvasRendered = true) {
 }
 
 function update(dt, allowOffline = false) {
-  if (runtime.saveConflictMode && !(allowOffline && runtime.loadInFlight)) return;
+  if (runtime.loadRecoveryMode || (runtime.saveConflictMode && !(allowOffline && runtime.loadInFlight))) return;
   if (runtime.offlineProcessing && !allowOffline) return;
   runtime.state.totalPlayTime += dt;
   runtime.state.currentInfinityRunTime += dt;
@@ -201,13 +201,9 @@ function update(dt, allowOffline = false) {
 }
 
 function runRealTimeMaintenance(realSeconds) {
-  if (runtime.offlineProcessing || runtime.saveConflictMode || realSeconds <= 0) return;
-  if (runtime.loadRecoveryMode) {
-    autoSaveElapsed = 0;
-  } else {
-    autoSaveElapsed += realSeconds;
-    if (autoSaveElapsed >= 5) runtime.saveGame("auto");
-  }
+  if (runtime.offlineProcessing || runtime.saveConflictMode || runtime.loadRecoveryMode || realSeconds <= 0) return;
+  autoSaveElapsed += realSeconds;
+  if (autoSaveElapsed >= 5) runtime.saveGame("auto");
 
   updateCheckElapsed += realSeconds;
   if (updateCheckElapsed >= runtime.UPDATE_CHECK_INTERVAL_SECONDS) {
@@ -218,7 +214,7 @@ function runRealTimeMaintenance(realSeconds) {
 }
 
 function advanceOnlineTime(realSeconds) {
-  if (runtime.offlineProcessing || runtime.saveConflictMode) return 0;
+  if (runtime.offlineProcessing || runtime.saveConflictMode || runtime.loadRecoveryMode) return 0;
   const realDt = Math.max(0, runtime.sanitizeNumber(realSeconds, 0));
   if (realDt <= 0) return 0;
   runtime.state.totalRealPlayTime += realDt;
@@ -262,7 +258,7 @@ function frame(now) {
     smoothedFps = smoothedFps === 0 ? instantFps : smoothedFps * 0.9 + instantFps * 0.1;
   }
   lastTime = now;
-  if (document.hidden || runtime.visibilityResumeInFlight || runtime.offlineProcessing || runtime.saveConflictMode) {
+  if (document.hidden || runtime.visibilityResumeInFlight || runtime.offlineProcessing || runtime.saveConflictMode || runtime.loadRecoveryMode) {
     requestNextFrame(frame);
     return;
   }

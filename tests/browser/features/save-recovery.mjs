@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { mkdir } from "node:fs/promises";
+import { expectedAppVersion, stubExternalFonts, trackPage } from "../../browser-harness.mjs";
 
 export async function runOfflineRecoverySurface({ page }) {
   const timeFluxRemoval = await page.evaluate(async () => {
@@ -450,6 +452,144 @@ export async function runOfflineRecoverySurface({ page }) {
   assert.equal(breakCapPlacement.inChallengePanel, false, "Break Infinite Cap control must not be inside the IC panel");
   assert.match(breakCapPlacement.conditionText, /1e350|1.00e350/, "Break Infinite Cap requirement should be visible");
 }
+export async function runSaveRecoveryBoot({ page, browser, origin }) {
+  const backupStore = await page.evaluate(() => {
+    const { runtime, state, createCheckpoint } = window.__angleDebug;
+    state.generationCount = 42;
+    if (!runtime.saveGame("manual")) throw new Error("failed to seed the main save");
+    if (!createCheckpoint("periodic", { force: true })) throw new Error("failed to seed the recovery backup");
+    const backups = JSON.parse(localStorage.getItem("angle-incremental-save-backups"));
+    if (backups?.periodic?.[0]?.save?.state?.generationCount !== 42) {
+      throw new Error("the recovery backup does not contain the seeded save");
+    }
+    return { periodic: [backups.periodic[0]], preUpdate: null, reserve: null };
+  });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const errors = [];
+  const httpFailures = [];
+  try {
+    await stubExternalFonts(context);
+    const recoveryPage = await context.newPage();
+    trackPage(recoveryPage, "save-recovery", errors, httpFailures);
+    await recoveryPage.addInitScript(({ appVersion, backups }) => {
+      window.__iddRafRequests = 0;
+      window.requestAnimationFrame = () => {
+        window.__iddRafRequests += 1;
+        return window.__iddRafRequests;
+      };
+      localStorage.setItem("angle-incremental-seen-version", appVersion);
+      localStorage.removeItem("angle-incremental-save");
+      localStorage.setItem("angle-incremental-save-backups", JSON.stringify(backups));
+    }, { appVersion: expectedAppVersion, backups: backupStore });
+    await recoveryPage.goto(`${origin}/index.html`, { waitUntil: "networkidle" });
+    await recoveryPage.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
+    await recoveryPage.evaluate(() => window.__angleDebug.ready);
+
+    const recoveryState = await recoveryPage.evaluate(() => ({
+      resolution: window.__angleDebug.bootResolution(),
+      recoveryMode: window.__angleDebug.runtime.loadRecoveryMode,
+      settingsActive: document.querySelector('[data-panel="settings"]')?.classList.contains("is-active") ?? false,
+      detailsOpen: document.querySelector("#saveRecoveryDetails")?.open ?? false,
+      statusVisible: Boolean(document.querySelector("#loadFailureStatus")?.getClientRects().length),
+      backupCount: document.querySelectorAll("#saveCheckpointList .save-checkpoint-row").length,
+      startNewVisible: !document.querySelector("#startNewSaveButton")?.hidden,
+      mainRaw: localStorage.getItem("angle-incremental-save"),
+      generationCount: window.__angleDebug.state.generationCount,
+      frameRequests: window.__iddRafRequests,
+    }));
+    assert.equal(recoveryState.resolution, "RECOVERY", "a missing main save with a backup must enter recovery");
+    assert.equal(recoveryState.recoveryMode, true, "boot recovery must stay guarded");
+    assert.equal(recoveryState.settingsActive, true, "recovery boot should open the Settings surface automatically");
+    assert.equal(recoveryState.detailsOpen, true, "recovery details should open automatically");
+    assert.equal(recoveryState.statusVisible, true, "the recovery explanation should be visible");
+    assert.equal(recoveryState.backupCount, 1, "the unified backup should be listed");
+    assert.equal(recoveryState.startNewVisible, true, "recovery should offer an explicit new-save action");
+    assert.equal(recoveryState.mainRaw, null, "recovery boot must not establish a new main save");
+    assert.equal(recoveryState.generationCount, 0, "recovery boot must not load backup progress implicitly");
+    assert.equal(recoveryState.frameRequests, 0, "gameplay must not start before recovery is resolved");
+    await mkdir("output/playwright", { recursive: true });
+    await recoveryPage.screenshot({ path: "output/playwright/issue-459-recovery-desktop.png" });
+
+    await recoveryPage.setViewportSize({ width: 390, height: 844 });
+    await recoveryPage.locator("#saveRecoveryDetails").scrollIntoViewIfNeeded();
+    const mobileSurface = await recoveryPage.evaluate(() => {
+      const details = document.querySelector("#saveRecoveryDetails")?.getBoundingClientRect();
+      const restore = document.querySelector("#saveCheckpointList [data-backup-slot]")?.getBoundingClientRect();
+      return {
+        detailsVisible: Boolean(details && details.top >= 0 && details.bottom <= innerHeight),
+        restoreVisible: Boolean(restore && restore.width > 0 && restore.left >= 0 && restore.right <= innerWidth),
+        restoreHeight: restore?.height ?? 0,
+      };
+    });
+    assert.equal(mobileSurface.detailsVisible, true, "mobile recovery details should fit the viewport after reveal");
+    assert.equal(mobileSurface.restoreVisible, true, "the mobile restore control should remain within the viewport");
+    assert.ok(mobileSurface.restoreHeight >= 40, "the mobile restore control should remain touch-friendly");
+    await recoveryPage.screenshot({ path: "output/playwright/issue-459-recovery-mobile.png" });
+
+    await recoveryPage.locator('#saveCheckpointList [data-backup-slot="periodic"][data-backup-index="0"]').click();
+    await recoveryPage.waitForFunction(() => document.querySelector("#confirmationModal")?.open === true);
+    await recoveryPage.locator("#confirmationConfirmButton").click();
+    await recoveryPage.waitForFunction(() => (
+      window.__angleDebug.bootResolution() === "NORMAL"
+      && window.__angleDebug.state.generationCount === 42
+      && !window.__angleDebug.runtime.loadRecoveryMode
+    ));
+    const restoredState = await recoveryPage.evaluate(() => ({
+      main: JSON.parse(localStorage.getItem("angle-incremental-save")),
+      frameRequests: window.__iddRafRequests,
+    }));
+    assert.equal(restoredState.main.state.generationCount, 42, "explicit restore should write and load the selected backup");
+    assert.ok(restoredState.frameRequests > 0, "resolving recovery should start the game loop");
+
+    await recoveryPage.waitForFunction(() => !window.__angleDebug.runtime.loadInFlight);
+    const offlineReportClose = recoveryPage.locator("#offlineReportClose");
+    if (await offlineReportClose.isVisible()) await offlineReportClose.click();
+    await recoveryPage.evaluate(() => {
+      const { runtime } = window.__angleDebug;
+      document.querySelector("#saveRecoveryDetails").open = false;
+      runtime.switchMainTab("angle");
+      const updated = JSON.parse(localStorage.getItem(runtime.SAVE_KEY));
+      updated.state.generationCount = 84;
+      updated.savedAt = Date.now();
+      localStorage.setItem(runtime.SAVE_KEY, JSON.stringify(updated));
+      runtime.handleStorageChange({ key: runtime.SAVE_KEY });
+    });
+    const conflictState = await recoveryPage.evaluate(() => ({
+      conflicted: window.__angleDebug.runtime.saveConflictMode,
+      settingsActive: document.querySelector('[data-panel="settings"]')?.classList.contains("is-active") ?? false,
+      detailsOpen: document.querySelector("#saveRecoveryDetails")?.open ?? false,
+      reloadVisible: !document.querySelector("#reloadLatestSaveButton")?.hidden,
+      exportEnabled: !document.querySelector("#exportSaveCodeButton")?.disabled,
+      currentGenerationCount: window.__angleDebug.state.generationCount,
+      latestGenerationCount: JSON.parse(localStorage.getItem("angle-incremental-save")).state.generationCount,
+    }));
+    assert.equal(conflictState.conflicted, true, "a changed main save should lock the current tab");
+    assert.equal(conflictState.settingsActive, true, "conflict detection should reveal its resolution controls");
+    assert.equal(conflictState.detailsOpen, true, "conflict details should open automatically");
+    assert.equal(conflictState.reloadVisible, true, "conflict should offer explicit reload-latest");
+    assert.equal(conflictState.exportEnabled, true, "conflict should leave current-state export available");
+    assert.equal(conflictState.currentGenerationCount, 42, "conflict detection must not auto-load the other tab");
+    assert.equal(conflictState.latestGenerationCount, 84);
+    await recoveryPage.locator("#exportSaveCodeButton").click();
+    await recoveryPage.waitForFunction(
+      () => document.querySelector("#saveCodeArea")?.value.startsWith("ANGLE_SAVE_V2:"),
+      null,
+      { timeout: 5000, polling: 100 },
+    );
+    await recoveryPage.locator("#reloadLatestSaveButton").click();
+    await recoveryPage.waitForFunction(() => (
+      !window.__angleDebug.runtime.saveConflictMode
+      && window.__angleDebug.state.generationCount === 84
+    ), null, { timeout: 5000, polling: 100 });
+    assert.equal(JSON.parse(await recoveryPage.evaluate(() => localStorage.getItem("angle-incremental-save"))).state.generationCount, 84,
+      "explicit reload-latest should load the updated save");
+    assert.deepEqual(errors, []);
+    assert.deepEqual(httpFailures, []);
+  } finally {
+    await context.close();
+  }
+}
+
 export async function runSaveCodeRecovery({ page }) {
   await page.evaluate(() => {
     window.__angleFullscreenRequests = 0;
@@ -521,7 +661,8 @@ export async function runSaveCodeRecovery({ page }) {
   );
 
   await page.evaluate(() => {
-    const { state } = window.__angleDebug;
+    const { runtime, state } = window.__angleDebug;
+    if (!runtime.saveGame("manual")) throw new Error("failed to seed the current save before import");
     state.generationCount = 7;
     state.previousGenerationScore = 1e12;
     state.previousGenerationScoreLog10 = 12;
@@ -541,12 +682,24 @@ export async function runSaveCodeRecovery({ page }) {
   });
   await page.locator("#importSaveCodeButton").click();
   await page.waitForFunction(() => window.__angleDebug.state.generationCount === 7);
+  await page.waitForFunction(() => !window.__angleDebug.runtime.loadInFlight);
+  const offlineReportClose = page.locator("#offlineReportClose");
+  if (await offlineReportClose.isVisible()) await offlineReportClose.click();
+  const importedRecovery = await page.evaluate(() => {
+    const reserve = window.__angleDebug.recoveryEntries().backups.find((entry) => entry.slot === "reserve");
+    return {
+      reserveReason: reserve?.reason ?? null,
+      detailsOpen: document.querySelector("#saveRecoveryDetails")?.open ?? true,
+    };
+  });
+  assert.equal(importedRecovery.reserveReason, "pre-import", "import should retain the current valid save in reserve");
+  assert.equal(importedRecovery.detailsOpen, false, "healthy play should keep recovery behind progressive disclosure");
+  await page.locator("#saveRecoveryDetails > summary").click();
   assert.equal(
-    await page.evaluate(() => document.querySelector("#saveRecoveryDetails")?.open ?? false),
+    await page.locator('#saveCheckpointList button[data-backup-slot="reserve"]').isVisible(),
     true,
-    "a successful import should reveal pre-import recovery",
+    "the unified reserve backup should remain actionable",
   );
-  assert.equal(await page.locator("#restorePreImportButton").isVisible(), true, "pre-import recovery should be actionable");
   assert.ok(exportedSaveCodeLength > 20, "save-code export should populate the textarea");
   assert.equal(
     await page.evaluate(() => window.__angleDebug.state.previousGenerationScoreLog10),

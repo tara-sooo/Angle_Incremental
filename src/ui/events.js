@@ -1,5 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
-import { clampOfflineTickCount } from "../core/save.js";
+import { clampOfflineTickCount } from "../core/save-format.js";
 import "../systems/infinity-point-normalization.js";
 
 // Input and settings bindings are installed by src/main.js after all modules are composed.
@@ -389,29 +389,21 @@ function bindEvents() {
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
-  if (runtime.elements.retryLoadButton) runtime.elements.retryLoadButton.addEventListener("click", () => {
+  if (runtime.elements.reloadLatestSaveButton) runtime.elements.reloadLatestSaveButton.addEventListener("click", () => {
     Promise.resolve(runtime.retryLoad()).finally(() => {
       runtime.updateUi();
       runtime.draw();
     });
   });
-  if (runtime.elements.restoreQuarantineButton) runtime.elements.restoreQuarantineButton.addEventListener("click", () => {
-    requestConfirmation("restoreQuarantineConfirm", () => {
-      Promise.resolve(runtime.restoreQuarantineSave()).finally(() => {
-        runtime.updateUi();
-        runtime.draw();
-      });
-    });
-  });
-  if (runtime.elements.restorePreImportButton) runtime.elements.restorePreImportButton.addEventListener("click", () => {
-    requestConfirmation("restorePreImportConfirm", () => runtime.restorePreImportSave());
-  });
-  if (runtime.elements.restoreUndoButton) runtime.elements.restoreUndoButton.addEventListener("click", () => {
-    requestConfirmation("restoreUndoConfirm", () => runtime.restoreUndoSave());
+  if (runtime.elements.startNewSaveButton) runtime.elements.startNewSaveButton.addEventListener("click", () => {
+    requestConfirmation("resetConfirm", () => runtime.resetSave());
   });
   if (runtime.elements.saveCheckpointList) runtime.elements.saveCheckpointList.addEventListener("click", (event) => {
-    const button = event.target?.closest?.("[data-checkpoint-index]");
-    if (button) requestConfirmation("restoreCheckpointConfirm", () => runtime.restoreCheckpoint(button.dataset.checkpointIndex));
+    const button = event.target?.closest?.("[data-backup-slot]");
+    if (button) requestConfirmation("restoreCheckpointConfirm", () => runtime.restoreBackup(
+      button.dataset.backupSlot,
+      button.dataset.backupIndex,
+    ));
   });
   if (runtime.elements.updateModalClose) runtime.elements.updateModalClose.addEventListener("click", runtime.closeUpdateModal);
   window.addEventListener("beforeunload", () => runtime.saveGame("manual"));

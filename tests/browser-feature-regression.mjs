@@ -21,7 +21,7 @@ import {
   runProgressionCore,
   runProgressionGain,
 } from "./browser/features/progression-surfaces.mjs";
-import { runOfflineRecoverySurface, runSaveCodeRecovery } from "./browser/features/save-recovery.mjs";
+import { runOfflineRecoverySurface, runSaveCodeRecovery, runSaveRecoveryBoot } from "./browser/features/save-recovery.mjs";
 import { runOfflineLifecycleRegression } from "./browser/features/offline-lifecycle.mjs";
 import { runTimelineCopyRegression } from "./browser/features/timeline.mjs";
 
@@ -65,6 +65,7 @@ try {
     httpFailures,
   });
   await runInfiniteAngleSurface({ page });
+  await runSaveRecoveryBoot({ page, browser: gameTest.browser, origin: gameTest.origin });
   await runSaveCodeRecovery({ page });
   await runNavigationSettingsDensity({ page });
   await runMobileResponsive({

@@ -202,10 +202,11 @@ async function testSaveCodeImportAndCheckpointRestore() {
   debug.state.eternityMilestoneChoice = "";
   debug.state.achievementMaskHigh = 0;
   debug.state.timeFlux = 0;
-  const checkpointIndex = debug.recoveryEntries().checkpoints
-    .findIndex((entry) => entry.reason === "eternity-save-migration");
-  assert.notEqual(checkpointIndex, -1, "the Eternity checkpoint should be discoverable");
-  assert.equal(debug.restoreCheckpoint(checkpointIndex), true, "checkpoint recovery should use the same Eternity hydration semantics");
+  const checkpoint = debug.recoveryEntries().backups
+    .find((entry) => entry.reason === "eternity-save-migration");
+  assert.ok(checkpoint, "the Eternity reserve should be discoverable");
+  assert.equal(await debug.restoreBackup(checkpoint.slot, checkpoint.index), true,
+    "backup recovery should use the same Eternity hydration semantics");
   assertPersistentFixture(debug.state, runtime, "checkpoint recovery");
 }
 

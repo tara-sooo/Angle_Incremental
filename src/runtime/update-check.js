@@ -44,11 +44,8 @@ function markUpdateDeferred(targetVersion) {
 }
 
 function reloadForRemoteUpdate(targetVersion) {
+  if (runtime.loadRecoveryMode || runtime.saveConflictMode) return;
   const now = Date.now();
-  if (runtime.createCheckpoint && !runtime.createCheckpoint("pre-update", { force: true })) {
-    markUpdateDeferred(targetVersion);
-    return;
-  }
   try {
     const previousTarget = localStorage.getItem(runtime.UPDATE_RELOAD_TARGET_KEY);
     const previousTime = storedUpdateReloadTime();
@@ -60,6 +57,17 @@ function reloadForRemoteUpdate(targetVersion) {
       markUpdateDeferred(targetVersion);
       return;
     }
+  } catch (error) {
+    markUpdateDeferred(targetVersion);
+    return;
+  }
+
+  if (!runtime.saveGame("manual")
+    || (runtime.createCheckpoint && !runtime.createCheckpoint("pre-update", { force: true }))) {
+    markUpdateDeferred(targetVersion);
+    return;
+  }
+  try {
     localStorage.setItem(runtime.UPDATE_RELOAD_TARGET_KEY, targetVersion);
     localStorage.setItem(runtime.UPDATE_RELOAD_TIME_KEY, String(now));
     localStorage.removeItem(runtime.UPDATE_DEFERRED_TARGET_KEY);
@@ -67,8 +75,6 @@ function reloadForRemoteUpdate(targetVersion) {
     markUpdateDeferred(targetVersion);
     return;
   }
-
-  runtime.saveGame("manual");
   const url = new URL(window.location.href);
   url.searchParams.set("v", targetVersion);
   window.location.replace(url.toString());

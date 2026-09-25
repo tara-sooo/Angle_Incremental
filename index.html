@@ -29,6 +29,8 @@
           "./src/core/state.js": "./src/core/state.js?v=0.14.0",
           "./src/core/numbers.js": "./src/core/numbers.js?v=0.14.0",
           "./src/core/save.js": "./src/core/save.js?v=0.14.0",
+          "./src/core/save-format.js": "./src/core/save-format.js?v=0.14.0",
+          "./src/core/save-backups.js": "./src/core/save-backups.js?v=0.14.0",
           "./src/core/save-code.js": "./src/core/save-code.js?v=0.14.0",
           "./src/core/offline-progress.js": "./src/core/offline-progress.js?v=0.14.0",
           "./src/systems/achievements.js": "./src/systems/achievements.js?v=0.14.0",
@@ -909,24 +911,16 @@
               </details>
               <details id="saveRecoveryDetails" class="save-recovery">
                 <summary class="save-recovery-title" data-i18n="saveRecovery">セーブ復旧</summary>
-                <p id="preImportBackupStatus" class="save-recovery-status"></p>
                 <p id="loadFailureStatus" class="save-recovery-status"></p>
-                <p id="quarantineStatus" class="save-recovery-status"></p>
                 <div class="save-recovery-actions">
-                  <button id="retryLoadButton" class="reset-button" type="button" data-i18n="retryLoad" hidden>
-                    再試行
+                  <button id="reloadLatestSaveButton" class="reset-button" type="button" data-i18n="reloadLatestSave" hidden>
+                    最新セーブを読み込む
                   </button>
-                  <button id="restoreQuarantineButton" class="reset-button" type="button" data-i18n="restoreQuarantine" hidden>
-                    隔離データを復元して再読み込み
-                  </button>
-                  <button id="restorePreImportButton" class="reset-button" type="button" data-i18n="restorePreImport" hidden>
-                    インポート前へ戻す
-                  </button>
-                  <button id="restoreUndoButton" class="reset-button" type="button" data-i18n="restoreUndo" hidden>
-                    直前の復元を取り消す
+                  <button id="startNewSaveButton" class="reset-button" type="button" data-i18n="startNewSave" hidden>
+                    新しいセーブを開始
                   </button>
                 </div>
-                <p class="save-recovery-label" data-i18n="saveCheckpoints">チェックポイント</p>
+                <p class="save-recovery-label" data-i18n="saveBackups">バックアップ</p>
                 <div id="saveCheckpointList" class="save-checkpoint-list"></div>
               </details>
               <div class="save-reset-action">
