@@ -55,6 +55,8 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(invalid.runtime.bootResolution, "RECOVERY", "an invalid main save must not become a fresh start");
     assert.equal(invalid.storage.get(invalid.runtime.SAVE_KEY), invalidRaw, "invalid main data must remain untouched");
     assert.equal(invalid.context.animationFrameRequests(), 0);
+    assert.equal(await invalid.runtime.exportSaveBackupFile(), false,
+      "unresolved boot recovery must not export an uninitialized default as a valid backup");
     assert.equal(await invalid.debug.resetSave(), true, "an explicit new-save action should resolve invalid-main recovery");
     assert.equal(invalid.runtime.bootResolution, "NORMAL");
     assert.equal(invalid.debug.state.generationCount, 0);
@@ -134,6 +136,41 @@ async function runSaveRecoveryModuleRuntimeTest() {
     assert.equal(importer.debug.state.generationCount, 0);
     const afterReset = JSON.parse(importer.storage.get(importer.runtime.SAVE_BACKUPS_KEY));
     assert.equal(afterReset.reserve.save.state.generationCount, 77, "reset must remain recoverable through reserve");
+  }
+
+  {
+    const sourceFile = await loadRuntime(candidatePath);
+    sourceFile.debug.state.generationCount = 77;
+    const backupFile = sourceFile.runtime.createSaveBackupFile();
+    const envelope = JSON.parse(backupFile.contents);
+    assert.match(backupFile.filename, /^angle-incremental-save-\d{4}-\d{2}-\d{2}-\d{6}\.json$/);
+    assert.equal(envelope.format, "angle-incremental-save-backup");
+    assert.equal(envelope.formatVersion, 1);
+    assert.equal(envelope.save.version, sourceFile.runtime.SAVE_VERSION);
+    assert.equal(envelope.save.state.generationCount, 77);
+
+    const currentSave = makeSave(sourceFile.runtime, 11);
+    const importer = await loadRuntime(candidatePath, new Map([
+      ["angle-incremental-save", JSON.stringify(currentSave)],
+    ]));
+    importer.runtime.offlineElapsedFromSave = () => ({ elapsedSeconds: 0, clockAnomaly: false });
+    const originalMain = importer.storage.get(importer.runtime.SAVE_KEY);
+    assert.equal(await importer.runtime.importSaveBackupFile(JSON.stringify({ ...envelope, formatVersion: 2 })), false,
+      "an unsupported external-backup format must be rejected");
+    assert.equal(await importer.runtime.importSaveBackupFile(JSON.stringify({
+      ...envelope,
+      save: { ...envelope.save, version: importer.runtime.SAVE_VERSION + 1 },
+    })), false, "a future incompatible save version must be rejected");
+    assert.equal(importer.storage.get(importer.runtime.SAVE_KEY), originalMain,
+      "invalid or incompatible files must leave the current main untouched");
+
+    assert.equal(await importer.runtime.importSaveBackupFile(backupFile.contents), true,
+      "a validated external backup should use the safe replacement path");
+    assert.equal(importer.debug.state.generationCount, 77);
+    const reserve = JSON.parse(importer.storage.get(importer.runtime.SAVE_BACKUPS_KEY)).reserve;
+    assert.equal(reserve.reason, "pre-restore");
+    assert.equal(reserve.save.state.generationCount, 11,
+      "external restore should reserve the previous valid main before replacing it");
   }
 
   {

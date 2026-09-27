@@ -92,11 +92,12 @@ export async function openGamePage(browser, origin, {
   deviceScaleFactor,
   hasTouch = false,
   isMobile = false,
+  acceptDownloads = false,
   seenVersion = expectedAppVersion,
   stubFonts = false,
   freezeAnimationFrame = true,
 }) {
-  const context = await browser.newContext({ viewport, deviceScaleFactor, hasTouch, isMobile });
+  const context = await browser.newContext({ viewport, deviceScaleFactor, hasTouch, isMobile, acceptDownloads });
   if (stubFonts) await stubExternalFonts(context);
   const page = await context.newPage();
   await page.addInitScript(({ appVersion, freezeAnimationFrame: shouldFreezeAnimationFrame }) => {

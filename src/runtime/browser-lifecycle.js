@@ -135,6 +135,7 @@ function setSaveConflictLock(locked) {
     const recoveryControl = [
       "reloadLatestSaveButton",
       "exportSaveCodeButton",
+      "exportSaveBackupFileButton",
       "copySaveCodeButton",
       "saveCodeArea",
     ].includes(control.id);
