@@ -899,6 +899,17 @@
                 <span data-i18n="save">セーブ</span>
                 <strong id="saveStatus">未保存</strong>
               </div>
+              <div class="save-storage-row">
+                <span data-i18n="storageDurabilityLabel">保存領域の状態</span>
+                <strong id="storageDurabilityStatus" aria-live="polite">確認中</strong>
+              </div>
+              <div class="save-storage-row">
+                <span data-i18n="storageEstimateLabel">ストレージ使用量 / 上限（概算。保持の保証ではありません）</span>
+                <strong id="storageEstimateStatus">未取得</strong>
+              </div>
+              <button id="requestPersistentStorageButton" class="reset-button" type="button" data-i18n="requestPersistentStorage" hidden>
+                永続ストレージをリクエスト
+              </button>
               <div class="save-code-actions">
                 <button id="exportSaveCodeButton" class="reset-button" type="button" data-i18n="exportSaveCode">書き出し</button>
                 <button id="importSaveCodeButton" class="reset-button" type="button" data-i18n="importSaveCode">読み込み</button>

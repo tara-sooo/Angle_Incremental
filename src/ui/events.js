@@ -389,6 +389,11 @@ function bindEvents() {
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
+  if (runtime.elements.requestPersistentStorageButton) {
+    runtime.elements.requestPersistentStorageButton.addEventListener("click", () => {
+      runtime.requestStoragePersistence?.();
+    });
+  }
   if (runtime.elements.reloadLatestSaveButton) runtime.elements.reloadLatestSaveButton.addEventListener("click", () => {
     Promise.resolve(runtime.retryLoad()).finally(() => {
       runtime.updateUi();
