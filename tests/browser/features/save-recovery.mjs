@@ -477,6 +477,13 @@ export async function runSaveRecoveryBoot({ page, browser, origin }) {
         window.__iddRafRequests += 1;
         return window.__iddRafRequests;
       };
+      Object.defineProperty(navigator, "storage", {
+        configurable: true,
+        value: {
+          persisted: () => Promise.reject(new Error("storage status unavailable")),
+          estimate: () => Promise.reject(new Error("storage estimate unavailable")),
+        },
+      });
       localStorage.setItem("angle-incremental-seen-version", appVersion);
       localStorage.removeItem("angle-incremental-save");
       localStorage.setItem("angle-incremental-save-backups", JSON.stringify(backups));
@@ -484,10 +491,12 @@ export async function runSaveRecoveryBoot({ page, browser, origin }) {
     await recoveryPage.goto(`${origin}/index.html`, { waitUntil: "networkidle" });
     await recoveryPage.waitForFunction(() => Boolean(window.__angleDebug?.state && window.__angleDebug?.ready));
     await recoveryPage.evaluate(() => window.__angleDebug.ready);
+    await recoveryPage.evaluate(() => window.__angleDebug.runtime.refreshStorageDurability());
 
     const recoveryState = await recoveryPage.evaluate(() => ({
       resolution: window.__angleDebug.bootResolution(),
       recoveryMode: window.__angleDebug.runtime.loadRecoveryMode,
+      storageStatus: window.__angleDebug.runtime.storageDurability.status,
       settingsActive: document.querySelector('[data-panel="settings"]')?.classList.contains("is-active") ?? false,
       detailsOpen: document.querySelector("#saveRecoveryDetails")?.open ?? false,
       statusVisible: Boolean(document.querySelector("#loadFailureStatus")?.getClientRects().length),
@@ -499,6 +508,7 @@ export async function runSaveRecoveryBoot({ page, browser, origin }) {
     }));
     assert.equal(recoveryState.resolution, "RECOVERY", "a missing main save with a backup must enter recovery");
     assert.equal(recoveryState.recoveryMode, true, "boot recovery must stay guarded");
+    assert.equal(recoveryState.storageStatus, "unknown", "Storage API rejection must remain diagnostic-only during recovery");
     assert.equal(recoveryState.settingsActive, true, "recovery boot should open the Settings surface automatically");
     assert.equal(recoveryState.detailsOpen, true, "recovery details should open automatically");
     assert.equal(recoveryState.statusVisible, true, "the recovery explanation should be visible");
@@ -515,15 +525,32 @@ export async function runSaveRecoveryBoot({ page, browser, origin }) {
     const mobileSurface = await recoveryPage.evaluate(() => {
       const details = document.querySelector("#saveRecoveryDetails")?.getBoundingClientRect();
       const restore = document.querySelector("#saveCheckpointList [data-backup-slot]")?.getBoundingClientRect();
+      const storageRows = [...document.querySelectorAll(".save-storage-row")].map((row) => {
+        const label = row.querySelector("span");
+        const value = row.querySelector("strong");
+        const labelRect = label?.getBoundingClientRect();
+        const valueRect = value?.getBoundingClientRect();
+        return {
+          labelWraps: getComputedStyle(label).whiteSpace === "normal",
+          labelFits: label.scrollWidth <= label.clientWidth + 1,
+          labelAndValueDoNotOverlap: labelRect.right <= valueRect.left + 1,
+          valueFits: valueRect.right <= row.getBoundingClientRect().right + 1,
+        };
+      });
       return {
         detailsVisible: Boolean(details && details.top >= 0 && details.bottom <= innerHeight),
         restoreVisible: Boolean(restore && restore.width > 0 && restore.left >= 0 && restore.right <= innerWidth),
         restoreHeight: restore?.height ?? 0,
+        storageRows,
       };
     });
     assert.equal(mobileSurface.detailsVisible, true, "mobile recovery details should fit the viewport after reveal");
     assert.equal(mobileSurface.restoreVisible, true, "the mobile restore control should remain within the viewport");
     assert.ok(mobileSurface.restoreHeight >= 40, "the mobile restore control should remain touch-friendly");
+    assert.equal(mobileSurface.storageRows.length, 2, "mobile save storage diagnostics should render both rows");
+    assert.ok(mobileSurface.storageRows.every((row) => (
+      row.labelWraps && row.labelFits && row.labelAndValueDoNotOverlap && row.valueFits
+    )), "mobile storage diagnostic labels and values should remain readable without overlap");
     await recoveryPage.screenshot({ path: "output/playwright/issue-459-recovery-mobile.png" });
 
     await recoveryPage.locator('#saveCheckpointList [data-backup-slot="periodic"][data-backup-index="0"]').click();
@@ -706,4 +733,150 @@ export async function runSaveCodeRecovery({ page }) {
     12,
     "save-code import should restore the exported state",
   );
+}
+
+export async function runStorageDurability({ page }) {
+  await page.evaluate(() => window.__angleDebug.runtime.switchMainTab("settings"));
+
+  const persistent = await page.evaluate(async () => {
+    const { runtime } = window.__angleDebug;
+    let persistCalls = 0;
+    await runtime.refreshStorageDurability({
+      persisted: async () => true,
+      persist: async () => {
+        persistCalls += 1;
+        return true;
+      },
+    });
+    await runtime.requestStoragePersistence();
+    return {
+      status: runtime.storageDurability.status,
+      persistCalls,
+      requestHidden: document.querySelector("#requestPersistentStorageButton").hidden,
+      estimate: document.querySelector("#storageEstimateStatus").textContent,
+      estimateUnavailable: document.querySelector("#storageEstimateStatus").textContent
+        === runtime.t("storageEstimateUnavailable"),
+    };
+  });
+  assert.equal(persistent.status, "persistent", "an existing persistent grant should be shown");
+  assert.equal(persistent.persistCalls, 0, "an existing persistent grant must not trigger another request");
+  assert.equal(persistent.requestHidden, true);
+  assert.equal(persistent.estimateUnavailable, true, "an absent estimate method should be harmless");
+
+  const slowEstimate = await page.evaluate(async () => {
+    const { runtime } = window.__angleDebug;
+    await runtime.refreshStorageDurability({
+      persisted: async () => false,
+      estimate: () => new Promise(() => {}),
+      persist: async () => false,
+    });
+    return {
+      status: runtime.storageDurability.status,
+      requestVisible: !document.querySelector("#requestPersistentStorageButton").hidden,
+    };
+  });
+  assert.equal(slowEstimate.status, "best-effort", "a pending optional estimate must not delay persistence status");
+  assert.equal(slowEstimate.requestVisible, true, "a pending estimate must not block the explicit request action");
+
+  const grantReady = await page.evaluate(async () => {
+    const { runtime } = window.__angleDebug;
+    window.__iddStoragePersistCalls = 0;
+    await runtime.refreshStorageDurability({
+      persisted: async () => false,
+      estimate: async () => ({ usage: 1_572_864, quota: 8_388_608 }),
+      persist() {
+        window.__iddStoragePersistCalls += 1;
+        return Promise.resolve(true);
+      },
+    });
+    return {
+      status: runtime.storageDurability.status,
+      requestVisible: !document.querySelector("#requestPersistentStorageButton").hidden,
+      estimate: document.querySelector("#storageEstimateStatus").textContent,
+    };
+  });
+  assert.equal(grantReady.status, "best-effort");
+  assert.equal(grantReady.requestVisible, true, "an explicit request should be offered only after a false query");
+  assert.equal(grantReady.estimate, "1.5 MB / 8.0 MB", "estimate values should be exposed as approximate usage/quota");
+  await page.locator("#requestPersistentStorageButton").click();
+  await page.waitForFunction(() => window.__angleDebug.runtime.storageDurability.status === "persistent");
+  const granted = await page.evaluate(() => ({
+    status: window.__angleDebug.runtime.storageDurability.status,
+    calls: window.__iddStoragePersistCalls,
+    requestHidden: document.querySelector("#requestPersistentStorageButton").hidden,
+  }));
+  assert.equal(granted.status, "persistent");
+  assert.equal(granted.calls, 1, "persist() should be called from the explicit button action");
+  assert.equal(granted.requestHidden, true);
+
+  await page.evaluate(async () => {
+    const { runtime } = window.__angleDebug;
+    window.__iddStoragePersistCalls = 0;
+    await runtime.refreshStorageDurability({
+      persisted: async () => false,
+      persist() {
+        window.__iddStoragePersistCalls += 1;
+        return Promise.resolve(false);
+      },
+    });
+  });
+  await page.locator("#requestPersistentStorageButton").click();
+  await page.waitForFunction(() => (
+    window.__angleDebug.runtime.storageDurability.requestAttempted
+    && !window.__angleDebug.runtime.storageDurability.requestPending
+  ));
+  await page.evaluate(() => window.__angleDebug.runtime.requestStoragePersistence());
+  const denied = await page.evaluate(() => ({
+    status: window.__angleDebug.runtime.storageDurability.status,
+    calls: window.__iddStoragePersistCalls,
+    requestHidden: document.querySelector("#requestPersistentStorageButton").hidden,
+  }));
+  assert.equal(denied.status, "best-effort", "denial should leave storage best-effort without affecting play");
+  assert.equal(denied.calls, 1, "a denied request must not be retried automatically in the same page");
+  assert.equal(denied.requestHidden, true);
+
+  const unavailable = await page.evaluate(async () => {
+    const { runtime } = window.__angleDebug;
+    await runtime.refreshStorageDurability(null);
+    await runtime.requestStoragePersistence();
+    return {
+      status: runtime.storageDurability.status,
+      resolution: window.__angleDebug.bootResolution(),
+    };
+  });
+  assert.equal(unavailable.status, "unsupported", "a missing Storage API should be reported as unsupported");
+  assert.equal(unavailable.resolution, "NORMAL", "missing Storage API must not alter boot resolution");
+
+  const rejected = await page.evaluate(async () => {
+    const { runtime } = window.__angleDebug;
+    const saveBefore = localStorage.getItem(runtime.SAVE_KEY);
+    window.__iddStoragePersistCalls = 0;
+    await runtime.refreshStorageDurability({
+      persisted: () => Promise.reject(new Error("query rejected")),
+      estimate: () => Promise.reject(new Error("estimate rejected")),
+      persist() {
+        window.__iddStoragePersistCalls += 1;
+        return Promise.resolve(true);
+      },
+    });
+    await runtime.requestStoragePersistence();
+    const saveSucceeded = runtime.saveGame("manual");
+    return {
+      status: runtime.storageDurability.status,
+      resolution: window.__angleDebug.bootResolution(),
+      saveBefore,
+      saveAfter: localStorage.getItem(runtime.SAVE_KEY),
+      saveSucceeded,
+      persistCalls: window.__iddStoragePersistCalls,
+      estimateUnavailable: document.querySelector("#storageEstimateStatus").textContent
+        === runtime.t("storageEstimateUnavailable"),
+    };
+  });
+  assert.equal(rejected.status, "unknown", "a rejected status query should be non-fatal and reported as unknown");
+  assert.equal(rejected.resolution, "NORMAL", "Storage API rejection must not misclassify a valid save as fresh");
+  assert.ok(rejected.saveBefore, "the valid save should exist before diagnostic failures");
+  assert.ok(rejected.saveAfter, "the valid save should remain after diagnostic failures");
+  assert.equal(rejected.saveSucceeded, true, "normal saving should remain usable after diagnostic failures");
+  assert.equal(rejected.persistCalls, 0, "unknown status must not trigger a persistence request");
+  assert.equal(rejected.estimateUnavailable, true, "a rejected estimate should remain unavailable");
 }

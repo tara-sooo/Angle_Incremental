@@ -72,8 +72,50 @@ function recoveryStateSummary(entry) {
   ].join(" · ");
 }
 
+let renderedStorageDurabilitySignature = "";
+
+function updateStorageDurabilityUi() {
+  const elements = runtime.elements;
+  const durability = runtime.storageDurability || {};
+  const signature = [
+    runtime.state.language,
+    durability.status,
+    durability.usage,
+    durability.quota,
+    durability.canRequest,
+    durability.requestAttempted,
+    durability.requestPending,
+  ].join("|");
+  if (signature === renderedStorageDurabilitySignature) return;
+  if (elements.storageDurabilityStatus) {
+    const statusKeys = {
+      persistent: "storageDurabilityPersistent",
+      "best-effort": "storageDurabilityBestEffort",
+      unsupported: "storageDurabilityUnsupported",
+      unknown: "storageDurabilityUnknown",
+    };
+    elements.storageDurabilityStatus.textContent = runtime.t(statusKeys[durability.status] || "storageDurabilityUnknown");
+  }
+  if (elements.storageEstimateStatus) {
+    const formatBytes = (value) => Number.isFinite(value) && value >= 0
+      ? `${(value / (1024 * 1024)).toFixed(1)} MB`
+      : "—";
+    elements.storageEstimateStatus.textContent = durability.usage === null && durability.quota === null
+      ? runtime.t("storageEstimateUnavailable")
+      : `${formatBytes(durability.usage)} / ${formatBytes(durability.quota)}`;
+  }
+  if (elements.requestPersistentStorageButton) {
+    elements.requestPersistentStorageButton.hidden = durability.status !== "best-effort"
+      || !durability.canRequest
+      || Boolean(durability.requestAttempted);
+    elements.requestPersistentStorageButton.disabled = Boolean(durability.requestPending);
+  }
+  renderedStorageDurabilitySignature = signature;
+}
+
 export function updateSaveRecoveryUi() {
   const elements = runtime.elements;
+  updateStorageDurabilityUi();
   if (!elements.saveCheckpointList || !runtime.recoveryEntries) return;
   const revision = runtime.recoveryRevision;
   if (revision === renderedRecoveryRevision

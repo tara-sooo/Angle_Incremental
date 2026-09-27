@@ -4,6 +4,115 @@ let offlineBaselineTimestamp = Date.now();
 let offlineBaselineServerTimestamp = 0;
 let visibilityResumeInFlight = false;
 let visibilityResumeGeneration = 0;
+let storageDurabilityManager = null;
+let storageDurability = {
+  status: "unknown",
+  usage: null,
+  quota: null,
+  canRequest: false,
+  requestAttempted: false,
+  requestPending: false,
+};
+
+function browserStorageManager() {
+  try {
+    return typeof navigator === "undefined" ? null : navigator.storage || null;
+  } catch {
+    return null;
+  }
+}
+
+function storageMethodAvailable(manager, name) {
+  try {
+    return typeof manager?.[name] === "function";
+  } catch {
+    return false;
+  }
+}
+
+function callStorageMethod(manager, name) {
+  try {
+    const method = manager?.[name];
+    if (typeof method !== "function") return Promise.resolve({ available: false });
+    return Promise.resolve(method.call(manager)).then(
+      (value) => ({ available: true, value }),
+      () => ({ available: true, failed: true }),
+    );
+  } catch {
+    return Promise.resolve({ available: true, failed: true });
+  }
+}
+
+async function refreshStorageDurability(manager = browserStorageManager()) {
+  storageDurabilityManager = manager;
+  const estimateResult = callStorageMethod(manager, "estimate");
+  const persisted = await callStorageMethod(manager, "persisted");
+  const status = !persisted.available
+    ? "unsupported"
+    : persisted.failed || typeof persisted.value !== "boolean"
+      ? "unknown"
+      : persisted.value
+        ? "persistent"
+        : "best-effort";
+  storageDurability = {
+    status,
+    usage: null,
+    quota: null,
+    canRequest: status === "best-effort" && storageMethodAvailable(manager, "persist"),
+    requestAttempted: false,
+    requestPending: false,
+  };
+  runtime.updateUi?.();
+  void estimateResult.then((estimate) => {
+    const estimateData = estimate.value && typeof estimate.value === "object" ? estimate.value : {};
+    const finiteBytes = (value) => Number.isFinite(value) && value >= 0 ? value : null;
+    storageDurability = {
+      ...storageDurability,
+      usage: estimate.failed ? null : finiteBytes(estimateData.usage),
+      quota: estimate.failed ? null : finiteBytes(estimateData.quota),
+    };
+    runtime.updateUi?.();
+  });
+  return storageDurability;
+}
+
+function completeStoragePersistenceRequest(granted) {
+  storageDurability = {
+    ...storageDurability,
+    status: granted ? "persistent" : "best-effort",
+    requestPending: false,
+  };
+  runtime.updateUi?.();
+}
+
+function requestStoragePersistence() {
+  if (storageDurability.status !== "best-effort"
+    || !storageDurability.canRequest
+    || storageDurability.requestAttempted
+    || !storageDurabilityManager) return Promise.resolve(false);
+
+  storageDurability = { ...storageDurability, requestAttempted: true, requestPending: true };
+  let request;
+  try {
+    // Keep persist() in the click stack so browsers can honor user activation.
+    request = storageDurabilityManager.persist();
+  } catch {
+    completeStoragePersistenceRequest(false);
+    return Promise.resolve(false);
+  }
+  runtime.updateUi?.();
+  return Promise.resolve(request).then(
+    (granted) => {
+      completeStoragePersistenceRequest(granted === true);
+      return granted === true;
+    },
+    () => {
+      completeStoragePersistenceRequest(false);
+      return false;
+    },
+  );
+}
+
 function setOfflineProcessingLock(locked) {
   if (!document.querySelectorAll) return;
   document.querySelectorAll("button, input, select, textarea").forEach((control) => {
@@ -169,3 +278,6 @@ expose("handleStorageChange", () => handleStorageChange, (value) => { handleStor
 expose("invalidateVisibilityResume", () => invalidateVisibilityResume);
 expose("handleVisibilityChange", () => handleVisibilityChange, (value) => { handleVisibilityChange = value; });
 expose("visibilityResumeInFlight", () => visibilityResumeInFlight);
+expose("storageDurability", () => storageDurability);
+expose("refreshStorageDurability", () => refreshStorageDurability);
+expose("requestStoragePersistence", () => requestStoragePersistence);

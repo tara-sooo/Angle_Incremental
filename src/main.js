@@ -54,6 +54,7 @@ async function initializeGame() {
   createInfinityUpgradeRows();
   createAchievementRows();
   const bootReady = await loadGame();
+  void runtime.refreshStorageDurability?.();
   const recoveryRequired = runtime.bootResolution === "RECOVERY";
   switchMainTab(recoveryRequired ? "settings" : runtime.activeMainTab);
   switchEternitySubtab(runtime.activeEternitySubtab);
