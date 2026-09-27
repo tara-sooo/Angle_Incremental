@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
-import { expectedAppVersion, stubExternalFonts, trackPage } from "../../browser-harness.mjs";
+import { mkdir, readFile } from "node:fs/promises";
+import { expectedAppVersion, openGamePage, stubExternalFonts, trackPage } from "../../browser-harness.mjs";
 
 export async function runOfflineRecoverySurface({ page }) {
   const timeFluxRemoval = await page.evaluate(async () => {
@@ -587,6 +587,7 @@ export async function runSaveRecoveryBoot({ page, browser, origin }) {
       detailsOpen: document.querySelector("#saveRecoveryDetails")?.open ?? false,
       reloadVisible: !document.querySelector("#reloadLatestSaveButton")?.hidden,
       exportEnabled: !document.querySelector("#exportSaveCodeButton")?.disabled,
+      backupExportEnabled: !document.querySelector("#exportSaveBackupFileButton")?.disabled,
       currentGenerationCount: window.__angleDebug.state.generationCount,
       latestGenerationCount: JSON.parse(localStorage.getItem("angle-incremental-save")).state.generationCount,
     }));
@@ -595,6 +596,7 @@ export async function runSaveRecoveryBoot({ page, browser, origin }) {
     assert.equal(conflictState.detailsOpen, true, "conflict details should open automatically");
     assert.equal(conflictState.reloadVisible, true, "conflict should offer explicit reload-latest");
     assert.equal(conflictState.exportEnabled, true, "conflict should leave current-state export available");
+    assert.equal(conflictState.backupExportEnabled, true, "conflict should leave external-file export available");
     assert.equal(conflictState.currentGenerationCount, 42, "conflict detection must not auto-load the other tab");
     assert.equal(conflictState.latestGenerationCount, 84);
     await recoveryPage.locator("#exportSaveCodeButton").click();
@@ -648,6 +650,8 @@ export async function runSaveCodeRecovery({ page }) {
       summary: document.querySelector("#saveCodeDetails > summary")?.textContent?.trim() ?? "",
       exportText: document.querySelector("#exportSaveCodeButton")?.textContent?.trim() ?? "",
       importText: document.querySelector("#importSaveCodeButton")?.textContent?.trim() ?? "",
+      backupExportText: document.querySelector("#exportSaveBackupFileButton")?.textContent?.trim() ?? "",
+      backupImportText: document.querySelector("#importSaveBackupFileButton")?.textContent?.trim() ?? "",
     });
     state.language = "ja";
     window.advanceTime(0);
@@ -659,8 +663,20 @@ export async function runSaveCodeRecovery({ page }) {
     window.advanceTime(0);
     return { ja, en };
   });
-  assert.deepEqual(saveLabels.ja, { summary: "セーブコード", exportText: "書き出し", importText: "読み込み" }, "Japanese save labels should remain clear");
-  assert.deepEqual(saveLabels.en, { summary: "Save code", exportText: "Export", importText: "Import" }, "English save labels should remain clear");
+  assert.deepEqual(saveLabels.ja, {
+    summary: "セーブコード",
+    exportText: "書き出し",
+    importText: "読み込み",
+    backupExportText: "バックアップファイルを書き出す",
+    backupImportText: "ファイルから復元",
+  }, "Japanese save labels should remain clear");
+  assert.deepEqual(saveLabels.en, {
+    summary: "Save code",
+    exportText: "Export",
+    importText: "Import",
+    backupExportText: "Export backup file",
+    backupImportText: "Restore from file",
+  }, "English save labels should remain clear");
   await page.locator("#importSaveCodeButton").click();
   assert.deepEqual(
     await page.evaluate(() => ({
@@ -733,6 +749,84 @@ export async function runSaveCodeRecovery({ page }) {
     12,
     "save-code import should restore the exported state",
   );
+}
+
+export async function runSaveBackupFileRecovery({ browser, origin, httpFailures }) {
+  const { context, page } = await openGamePage(browser, origin, {
+    viewport: { width: 1280, height: 900 },
+    acceptDownloads: true,
+    seenVersion: "",
+    stubFonts: true,
+  });
+  const errors = [];
+  trackPage(page, "save-backup-file", errors, httpFailures);
+  try {
+    await page.evaluate(() => window.__angleDebug.runtime.closeUpdateModal?.());
+    await page.locator('[data-tab="settings"]').click();
+    await page.evaluate(() => {
+      const { runtime, state } = window.__angleDebug;
+      state.generationCount = 42;
+      state.totalPlayTime = 1234;
+      if (!runtime.saveGame("manual")) throw new Error("failed to seed save before external backup export");
+    });
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.locator("#exportSaveBackupFileButton").click(),
+    ]);
+    assert.match(download.suggestedFilename(), /^angle-incremental-save-\d{4}-\d{2}-\d{2}-\d{6}\.json$/);
+    const downloadPath = await download.path();
+    assert.ok(downloadPath, "the external backup should be a browser download");
+    const contents = await readFile(downloadPath, "utf8");
+    const backup = JSON.parse(contents);
+    assert.equal(backup.format, "angle-incremental-save-backup");
+    assert.equal(backup.formatVersion, 1);
+    assert.equal(backup.save.version, await page.evaluate(() => window.__angleDebug.runtime.SAVE_VERSION));
+    assert.equal(backup.save.state.generationCount, 42);
+
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+    await page.reload({ waitUntil: "networkidle" });
+    await page.waitForFunction(() => window.__angleDebug?.runtime.bootResolution === "FRESH");
+    await page.evaluate(() => window.__angleDebug.runtime.closeUpdateModal?.());
+    assert.equal(await page.evaluate(() => window.__angleDebug.state.generationCount), 0,
+      "clearing site storage should produce a fresh game before file restore");
+    await page.locator("#saveBackupFileInput").setInputFiles({
+      name: download.suggestedFilename(),
+      mimeType: "application/json",
+      buffer: Buffer.from(contents),
+    });
+    await page.waitForFunction(() => (
+      window.__angleDebug.state.generationCount === 42
+      && !window.__angleDebug.runtime.loadInFlight
+      && window.__angleDebug.runtime.bootResolution === "NORMAL"
+    ));
+    assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem("angle-incremental-save"))).version,
+      backup.save.version, "restored backup should retain canonical save-version metadata");
+
+    const currentMain = await page.evaluate(() => {
+      const { runtime, state } = window.__angleDebug;
+      state.generationCount = 84;
+      if (!runtime.saveGame("manual")) throw new Error("failed to seed main before invalid-file check");
+      return localStorage.getItem(runtime.SAVE_KEY);
+    });
+    const incompatible = JSON.stringify({ ...backup, formatVersion: 99 });
+    await page.locator("#saveBackupFileInput").setInputFiles({
+      name: "incompatible-backup.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(incompatible),
+    });
+    await page.waitForFunction(() => (
+      document.querySelector("#saveStatus")?.textContent === window.__angleDebug.runtime.t("saveBackupInvalid")
+    ));
+    assert.equal(await page.evaluate(() => localStorage.getItem("angle-incremental-save")), currentMain,
+      "incompatible file must not change the valid current main save");
+    assert.equal(await page.evaluate(() => window.__angleDebug.state.generationCount), 84);
+    assert.deepEqual(errors, []);
+  } finally {
+    await context.close();
+  }
 }
 
 export async function runStorageDurability({ page }) {

@@ -388,6 +388,15 @@ function bindEvents() {
   ));
   if (runtime.elements.exportSaveCodeButton) runtime.elements.exportSaveCodeButton.addEventListener("click", runtime.exportSaveCode);
   if (runtime.elements.importSaveCodeButton) runtime.elements.importSaveCodeButton.addEventListener("click", runtime.importSaveCodeFromUi);
+  if (runtime.elements.exportSaveBackupFileButton) {
+    runtime.elements.exportSaveBackupFileButton.addEventListener("click", runtime.exportSaveBackupFile);
+  }
+  if (runtime.elements.importSaveBackupFileButton) {
+    runtime.elements.importSaveBackupFileButton.addEventListener("click", () => runtime.elements.saveBackupFileInput?.click());
+  }
+  if (runtime.elements.saveBackupFileInput) {
+    runtime.elements.saveBackupFileInput.addEventListener("change", runtime.importSaveBackupFileFromUi);
+  }
   if (runtime.elements.copySaveCodeButton) runtime.elements.copySaveCodeButton.addEventListener("click", runtime.copySaveCodeFromUi);
   if (runtime.elements.requestPersistentStorageButton) {
     runtime.elements.requestPersistentStorageButton.addEventListener("click", () => {

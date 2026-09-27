@@ -23,6 +23,7 @@ import {
 } from "./browser/features/progression-surfaces.mjs";
 import {
   runOfflineRecoverySurface,
+  runSaveBackupFileRecovery,
   runSaveCodeRecovery,
   runSaveRecoveryBoot,
   runStorageDurability,
@@ -72,6 +73,7 @@ try {
   await runInfiniteAngleSurface({ page });
   await runSaveRecoveryBoot({ page, browser: gameTest.browser, origin: gameTest.origin });
   await runSaveCodeRecovery({ page });
+  await runSaveBackupFileRecovery({ browser: gameTest.browser, origin: gameTest.origin, httpFailures });
   await runNavigationSettingsDensity({ page });
   await runMobileResponsive({
     browser: gameTest.browser,

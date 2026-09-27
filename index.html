@@ -914,6 +914,12 @@
                 <button id="exportSaveCodeButton" class="reset-button" type="button" data-i18n="exportSaveCode">書き出し</button>
                 <button id="importSaveCodeButton" class="reset-button" type="button" data-i18n="importSaveCode">読み込み</button>
               </div>
+              <div class="save-code-actions">
+                <button id="exportSaveBackupFileButton" class="reset-button" type="button" data-i18n="exportSaveBackupFile">バックアップファイルを書き出す</button>
+                <button id="importSaveBackupFileButton" class="reset-button" type="button" data-i18n="importSaveBackupFile">ファイルから復元</button>
+                <input id="saveBackupFileInput" type="file" accept="application/json,.json" hidden />
+              </div>
+              <p class="save-backup-description" data-i18n="saveBackupDescription">書き出したファイルをブラウザ外に保存すると、サイトデータの削除後も復元できます。</p>
               <details id="saveCodeDetails" class="save-code-details">
                 <summary class="save-code-title" data-i18n="saveCode">セーブコード</summary>
                 <label class="save-code-label" for="saveCodeArea" data-i18n="saveCode">セーブコード</label>
