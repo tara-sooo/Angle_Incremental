@@ -1,5 +1,5 @@
 import { runtime, expose } from "../runtime/shared.js";
-import { bindDoubleActivation } from "./node-activation.js?v=0.14.0";
+import { bindDoubleActivation } from "./node-activation.js?v=0.15.0";
 
 let lastInfinityUpgradeSignature = null;
 let selectedInfinityUpgradeId = "1-1";

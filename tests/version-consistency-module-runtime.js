@@ -13,12 +13,20 @@ async function runVersionConsistencyModuleRuntimeTest() {
 
   const expectedVersion = checker.extractAppVersion(sources.constants);
   const alternateVersion = expectedVersion === "0.10.1" ? "0.10.2" : "0.10.1";
-  const upgradedSources = Object.fromEntries(
-    Object.entries(sources).map(([key, source]) => [
-      key,
-      typeof source === "string" ? source.replaceAll(expectedVersion, alternateVersion) : source,
-    ]),
-  );
+  const upgradedSources = {
+    ...Object.fromEntries(
+      Object.entries(sources).map(([key, source]) => [
+        key,
+        typeof source === "string" ? source.replaceAll(expectedVersion, alternateVersion) : source,
+      ]),
+    ),
+    directCacheSources: Object.fromEntries(
+      Object.entries(sources.directCacheSources).map(([key, source]) => [
+        key,
+        typeof source === "string" ? source.replaceAll(expectedVersion, alternateVersion) : source,
+      ]),
+    ),
+  };
   assert.deepEqual(
     checker.collectVersionConsistencyIssues(upgradedSources),
     [],
@@ -33,6 +41,24 @@ async function runVersionConsistencyModuleRuntimeTest() {
   assert.ok(
     mismatchedCssIssues.some((entry) => entry.label.includes("CSS cache buster") && entry.actual === alternateVersion),
     "a mismatched CSS cache buster should identify the target and detected value",
+  );
+
+  const mismatchedDirectCacheSources = {
+    ...sources,
+    directCacheSources: {
+      ...sources.directCacheSources,
+      timelineSystem: sources.directCacheSources.timelineSystem.replace(
+        `?v=${expectedVersion}`,
+        `?v=${alternateVersion}`,
+      ),
+    },
+  };
+  const mismatchedDirectCacheIssues = checker.collectVersionConsistencyIssues(mismatchedDirectCacheSources);
+  assert.ok(
+    mismatchedDirectCacheIssues.some(
+      (entry) => entry.label.includes("direct cache-buster (timelineSystem") && entry.actual === alternateVersion,
+    ),
+    "a mismatched direct module cache buster should identify the module and detected value",
   );
 
   const missingJavaScriptSources = {

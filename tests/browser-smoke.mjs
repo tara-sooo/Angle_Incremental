@@ -125,32 +125,46 @@ async function runSmoke() {
   try {
     const updateModal = page.locator("#updateModal");
     assert.equal(await updateModal.isVisible(), true, "the current-version update modal should appear for a fresh browser profile");
-    assert.equal(
-      await page.locator("#updateModalTitle").textContent(),
-      `${expectedAppVersion} アップデート`,
-      "the update modal should show the current Japanese version",
-    );
-    await page.locator("#updateModalClose").click();
-    await page.waitForFunction(() => document.querySelector("#updateModal")?.hidden === true);
-    assert.equal(await updateModal.isVisible(), false, "closing the update modal should remove it from the rendered page");
-
-    const modalCopy = await page.evaluate(() => ({
+    const readUpdateModalCopy = () => page.evaluate(() => ({
+      title: document.querySelector("#updateModalTitle")?.textContent?.trim() ?? "",
       summary: document.querySelector("[data-i18n=updateSummary]")?.textContent?.trim() ?? "",
       resetDock: document.querySelector("[data-i18n=updateResetDock]")?.textContent?.trim() ?? "",
       canvas: document.querySelector("[data-i18n=updateCanvas]")?.textContent?.trim() ?? "",
       interaction: document.querySelector("[data-i18n=updateInteraction]")?.textContent?.trim() ?? "",
       note: document.querySelector("[data-i18n=updateModalNote]")?.textContent?.trim() ?? "",
     }));
-    assert.match(modalCopy.summary, /オフライン進行/);
-    assert.match(modalCopy.summary, /安定性/);
-    assert.match(modalCopy.resetDock, /Auto Infinity/);
-    assert.match(modalCopy.resetDock, /Core Boost/);
-    assert.match(modalCopy.canvas, /Eternity Milestone 5/);
-    assert.match(modalCopy.canvas, /TC4/);
-    assert.match(modalCopy.interaction, /Infinity Upgrade/);
-    assert.match(modalCopy.interaction, /Help/);
-    assert.match(modalCopy.note, /セーブ復旧/);
-    assert.match(modalCopy.note, /整数値/);
+    const japaneseModalCopy = await readUpdateModalCopy();
+    assert.equal(japaneseModalCopy.title, `${expectedAppVersion} アップデート`, "the update modal should show the current Japanese version");
+    assert.match(japaneseModalCopy.summary, /6つのノード/);
+    assert.match(japaneseModalCopy.resetDock, /Parallelに追加のソフトキャップはありません/);
+    assert.match(japaneseModalCopy.canvas, /ブラウザ保存領域の診断/);
+    assert.match(japaneseModalCopy.canvas, /外部バックアップファイル/);
+    assert.match(japaneseModalCopy.interaction, /ホットキー/);
+    assert.match(japaneseModalCopy.interaction, /モバイルクイック操作/);
+    assert.match(japaneseModalCopy.note, /既存セーブとの互換性/);
+
+    await page.evaluate(() => {
+      window.__angleDebug.state.language = "en";
+      window.__angleDebug.runtime.updateUi();
+    });
+    const englishModalCopy = await readUpdateModalCopy();
+    assert.equal(englishModalCopy.title, `Version ${expectedAppVersion}`, "the update modal should show the current English version");
+    assert.match(englishModalCopy.summary, /six nodes/);
+    assert.match(englishModalCopy.summary, /independent route choices/);
+    assert.match(englishModalCopy.resetDock, /no added softcap/);
+    assert.match(englishModalCopy.canvas, /storage diagnostics/);
+    assert.match(englishModalCopy.canvas, /backup files outside the browser/);
+    assert.match(englishModalCopy.interaction, /hotkeys/);
+    assert.match(englishModalCopy.interaction, /mobile quick actions/);
+    assert.match(englishModalCopy.note, /existing-save compatibility/);
+
+    await page.evaluate(() => {
+      window.__angleDebug.state.language = "ja";
+      window.__angleDebug.runtime.updateUi();
+    });
+    await page.locator("#updateModalClose").click();
+    await page.waitForFunction(() => document.querySelector("#updateModal")?.hidden === true);
+    assert.equal(await updateModal.isVisible(), false, "closing the update modal should remove it from the rendered page");
     const desktopButtonInteraction = await page.evaluate(() => {
       const selectors = ["[data-tab=angle]", "#speedUpgrade"];
       return selectors.map((selector) => {
