@@ -409,6 +409,40 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
 
     await resetSpy(page);
     await prepareQuickAction(page);
+    const reentryButton = page.locator("#quickActionBuyAll");
+    const reentryBox = await reentryButton.boundingBox();
+    assert.ok(reentryBox, "MAX action should have a hit target for the leave/re-entry regression");
+    await page.evaluate(() => {
+      const quick = document.getElementById("quickActionBuyAll");
+      window.__quickActionGeneratedClicks = [];
+      window.__quickActionReentryListener = (event) => {
+        window.__quickActionGeneratedClicks.push({ isTrusted: event.isTrusted, detail: event.detail });
+      };
+      quick.addEventListener("click", window.__quickActionReentryListener, true);
+    });
+    const reentryX = reentryBox.x + reentryBox.width / 2;
+    const reentryY = reentryBox.y + reentryBox.height / 2;
+    await page.mouse.move(reentryX, reentryY);
+    await page.mouse.down();
+    await page.waitForTimeout(60);
+    assert.equal((await readSpy(page)).calls.buyAll.length, 1, "pointerdown should make the immediate canonical attempt");
+    await page.mouse.move(reentryBox.x + reentryBox.width + 80, reentryY);
+    await page.waitForTimeout(80);
+    assert.equal((await readSpy(page)).calls.buyAll.length, 1, "moving out should cancel the repeat session after the zero-delay suppression timer expires");
+    await page.mouse.move(reentryX, reentryY);
+    await page.waitForTimeout(30);
+    await page.mouse.up();
+    await page.waitForTimeout(100);
+    const reentryResult = await page.evaluate(() => {
+      const quick = document.getElementById("quickActionBuyAll");
+      quick.removeEventListener("click", window.__quickActionReentryListener, true);
+      return window.__quickActionGeneratedClicks;
+    });
+    assert.deepEqual(reentryResult, [{ isTrusted: true, detail: 1 }], "re-entering and releasing should produce one trusted native pointer click");
+    assert.equal((await readSpy(page)).calls.buyAll.length, 1, "re-entering and releasing after the suppression timer should not dispatch a second canonical action");
+
+    await resetSpy(page);
+    await prepareQuickAction(page);
     await startSyntheticPointer(page, 62);
     await page.evaluate(() => {
       window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 62, pointerType: "touch", button: 0 }));

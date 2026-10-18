@@ -54,6 +54,7 @@ const ACTIONS = Object.freeze([
 const ACTION_BY_ID = new Map(ACTIONS.map((action) => [action.id, action]));
 const ACTION_BY_KEY = new Map(ACTIONS.map((action) => [action.key, action]));
 let repeatSession = null;
+let pointerSequence = null;
 let clickSuppressionButton = null;
 let clickSuppressionTimer = 0;
 let bound = false;
@@ -129,7 +130,6 @@ function stopRepeating(expectedSession = repeatSession) {
   if (session.delayTimer) window.clearTimeout(session.delayTimer);
   if (session.repeatTimer) window.clearInterval(session.repeatTimer);
   if (session.source === "pointer") {
-    armClickSuppression(session.button);
     try {
       if (session.button?.hasPointerCapture?.(session.pointerId)) {
         session.button.releasePointerCapture(session.pointerId);
@@ -258,6 +258,7 @@ function handlePointerDown(event) {
     pointerId: event.pointerId,
   });
   if (!session) return;
+  pointerSequence = { button, pointerId: event.pointerId };
   try {
     button.setPointerCapture?.(event.pointerId);
   } catch {
@@ -282,7 +283,23 @@ function handlePointerLeave(event) {
   if (session?.source === "pointer" && session.pointerId === event.pointerId) stopRepeating(session);
 }
 
-function handlePointerEnd(event) {
+function handlePointerUp(event) {
+  const sequence = pointerSequence;
+  if (sequence?.pointerId === event.pointerId) {
+    pointerSequence = null;
+    armClickSuppression(sequence.button);
+  }
+  const session = repeatSession;
+  if (session?.source === "pointer" && session.pointerId === event.pointerId) stopRepeating(session);
+}
+
+function handlePointerCancel(event) {
+  if (pointerSequence?.pointerId === event.pointerId) pointerSequence = null;
+  const session = repeatSession;
+  if (session?.source === "pointer" && session.pointerId === event.pointerId) stopRepeating(session);
+}
+
+function handleLostPointerCapture(event) {
   const session = repeatSession;
   if (session?.source === "pointer" && session.pointerId === event.pointerId) stopRepeating(session);
 }
@@ -308,14 +325,14 @@ export function bindQuickActions() {
     button.addEventListener("click", handleQuickActionClick);
     button.addEventListener("pointerdown", handlePointerDown);
     button.addEventListener("pointerleave", handlePointerLeave);
-    button.addEventListener("lostpointercapture", handlePointerEnd);
+    button.addEventListener("lostpointercapture", handleLostPointerCapture);
   });
   window.addEventListener("keydown", handleKeydown, true);
   window.addEventListener("keyup", handleKeyup, true);
   window.addEventListener("pointermove", handlePointerMove, true);
-  window.addEventListener("pointerup", handlePointerEnd, true);
-  window.addEventListener("pointercancel", handlePointerEnd, true);
-  window.addEventListener("lostpointercapture", handlePointerEnd, true);
+  window.addEventListener("pointerup", handlePointerUp, true);
+  window.addEventListener("pointercancel", handlePointerCancel, true);
+  window.addEventListener("lostpointercapture", handleLostPointerCapture, true);
   window.addEventListener("blur", cancelAllForLifecycle);
   window.addEventListener("pagehide", cancelAllForLifecycle);
   document.addEventListener("visibilitychange", () => {
