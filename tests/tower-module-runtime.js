@@ -93,8 +93,18 @@ async function runTowerModuleRuntimeTest() {
   {
     const instance = await loadRuntime(candidatePath);
     const { debug, runtime } = instance;
+    assert.equal(runtime.TOWER_SCORE_EXPONENT_STEP, 0.05, "the global default Tower exponent step must remain unchanged");
+    for (const [floor, expected] of [[0, 1], [1, 1.05], [5, 1.25], [10, 1.5], [12, 1.6]]) {
+      debug.state.towerFloor = floor;
+      debug.state.timelinePurchasedNodes = [];
+      assert.equal(runtime.towerScoreExponent(), expected, `the default Tower exponent should remain +0.05 per floor at Floor ${floor}`);
+    }
+    for (const [floor, expected] of [[0, 1], [1, 1.07], [5, 1.35], [10, 1.7], [12, 1.84]]) {
+      debug.state.towerFloor = floor;
+      debug.state.timelinePurchasedNodes = [{ id: "Parallel-BC6000", era: "BC6000", route: "Parallel", costTF: 1 }];
+      assert.ok(Math.abs(runtime.towerScoreExponent() - expected) < 1e-12, `Parallel-BC6000 should add +0.07 per floor at Floor ${floor}`);
+    }
     debug.state.towerFloor = 5;
-    assert.equal(runtime.towerScoreExponent(), 1.25, "the normal Tower exponent should remain +0.05 per floor");
     debug.state.timelinePurchasedNodes = [{ id: "Parallel-BC16500", era: "BC16500", route: "Parallel", costTF: 1 }];
     assert.equal(runtime.towerScoreExponent(), 1.25, "Parallel-BC16500 should not change the Tower exponent");
   }

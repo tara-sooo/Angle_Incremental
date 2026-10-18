@@ -65,6 +65,30 @@ function timelineNodeCurrentEffectText(node) {
       .replace("{multiplier}", runtime.formatMultiplierLog(effectiveLog10))
       .replace("{time}", runtime.formatLongDuration(runtime.timelineParallelSecondsSinceIc8Clear?.() ?? 0));
   }
+  if (node.id === "Real-BC6000") {
+    return runtime.t("timelineRealBc6000CurrentEffect").replace(
+      "{multiplier}",
+      runtime.formatMultiplierLog(runtime.timelineRealBc6000Ic6RewardMultiplierLog10?.() ?? 0),
+    );
+  }
+  if (node.id === "Parallel-BC6000") {
+    return runtime.t("timelineParallelBc6000CurrentEffect").replace(
+      "{exponent}",
+      runtime.formatSmallDecimal(runtime.towerScoreExponent?.() ?? 1),
+    );
+  }
+  if (node.id === "Real-AD30") {
+    return runtime.t("timelineRealAd30CurrentEffect").replace(
+      "{multiplier}",
+      runtime.formatMultiplierLog(runtime.timelineRealAd30EternityGainMultiplierLog10?.() ?? 0),
+    );
+  }
+  if (node.id === "Parallel-AD30") {
+    return runtime.t("timelineParallelAd30CurrentEffect").replace(
+      "{multiplier}",
+      runtime.formatMultiplierLog(runtime.timelineParallelAd30EternityGainMultiplierLog10?.() ?? 0),
+    );
+  }
   return "";
 }
 
