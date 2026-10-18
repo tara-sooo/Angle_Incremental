@@ -27,6 +27,7 @@ import {
   switchChallengeSubtab,
   switchStatisticsSubtab,
 } from "./ui/events.js";
+import { bindQuickActions } from "./ui/quick-actions.js";
 import "./systems/eternity.js";
 import "./systems/timeline.js";
 import "./core/offline-progress.js";
@@ -64,6 +65,7 @@ async function initializeGame() {
   resizeCanvas();
   resizeInfiniteAngleCanvas();
   runtime.updateUi();
+  if (bootReady) bindQuickActions();
   if (recoveryRequired) runtime.elements.saveRecoveryDetails?.scrollIntoView?.({ block: "center" });
   if (bootReady) {
     showUpdateModalIfNeeded();

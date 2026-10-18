@@ -83,7 +83,7 @@ export async function runHelp({ page, readScrollOwnership }) {
   });
   assert.deepEqual(
     helpUi.fresh.topics,
-    ["angle", "generation", "resets", "offline", "notation"],
+    ["angle", "quick-actions", "generation", "resets", "offline", "notation"],
     "fresh Help should show only immediate and always-available topics",
   );
   assert.equal(helpUi.fresh.navCount, helpUi.fresh.topics.length, "fresh Help navigation should list each visible topic once");
@@ -94,7 +94,7 @@ export async function runHelp({ page, readScrollOwnership }) {
   assert.equal(helpUi.fresh.current, "The Angle と通常強化", "Help should mark the contextual topic");
   assert.ok(helpUi.fresh.paragraphs.length >= 2, "fresh Help should render readable paragraphs");
   assert.doesNotMatch(helpUi.fresh.text, /Infinity Upgrade|Eternity Milestone|Tower Challenge/, "fresh Help should omit undiscovered spoilers");
-  assert.equal(helpUi.upper.topics.length, 17, "upper progression should expose every shipped Help topic");
+  assert.equal(helpUi.upper.topics.length, 18, "upper progression should expose every shipped Help topic");
   assert.equal(helpUi.upper.articleCount, 1, "upper Help should keep one focused article");
   assert.equal(helpUi.upper.anchorCount, 0, "upper Help should keep one navigation model");
   assert.equal(helpUi.upper.accordionCount, 0, "upper Help should keep one content surface");
@@ -195,7 +195,7 @@ export async function runHelp({ page, readScrollOwnership }) {
   await page.setViewportSize({ width: 1280, height: 900 });
   const desktopHelpLayout = await measureHelpLayout();
   const desktopHelpScrollOwnership = await readScrollOwnership(page);
-  assert.equal(desktopHelpLayout.topicCount, 17, "desktop Help should render every discovered topic");
+  assert.equal(desktopHelpLayout.topicCount, 18, "desktop Help should render every discovered topic");
   assert.equal(desktopHelpLayout.articleCount, 1, "desktop Help should render one focused article");
   assert.ok(desktopHelpLayout.paragraphCount >= 1, "desktop Help should render body content");
   assert.equal(desktopHelpLayout.articleTopic, "tower", "desktop Help should retain the contextual topic");
@@ -217,7 +217,7 @@ export async function runHelp({ page, readScrollOwnership }) {
   await page.setViewportSize({ width: 390, height: 844 });
   const mobileHelpLayout = await measureHelpLayout();
   const mobileHelpScrollOwnership = await readScrollOwnership(page);
-  assert.equal(mobileHelpLayout.topicCount, 17, "mobile Help should render every discovered topic");
+  assert.equal(mobileHelpLayout.topicCount, 18, "mobile Help should render every discovered topic");
   assert.equal(mobileHelpLayout.articleCount, 1, "mobile Help should render one focused article");
   assert.ok(mobileHelpLayout.paragraphCount >= 1, "mobile Help should render body content");
   assert.equal(mobileHelpLayout.articleTopic, "tower", "mobile Help should retain the contextual topic");
