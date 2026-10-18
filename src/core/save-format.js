@@ -534,6 +534,8 @@ function applySaveDataUnsafe(data, saveVersion = runtime.SAVE_VERSION) {
   runtime.state.topBarMode = runtime.normalizeChoice(data.topBarMode, ["news", "resources", "progress", "blank", "hidden"], "news");
   runtime.state.mainTabPosition = runtime.normalizeChoice(data.mainTabPosition, ["right", "bottom"], "right");
   runtime.state.showTimeFluxQuickBar = data.showTimeFluxQuickBar !== false;
+  runtime.state.gameplayHotkeysEnabled = runtime.sanitizeBoolean(data.gameplayHotkeysEnabled, true);
+  runtime.state.showMobileQuickActions = runtime.sanitizeBoolean(data.showMobileQuickActions, true);
   runtime.state.skipTimelineRespecConfirmation = runtime.sanitizeBoolean(
     data.skipTimelineRespecConfirmation,
     false,

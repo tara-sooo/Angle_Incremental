@@ -364,7 +364,7 @@ export async function runNavigationSettingsDensity({ page }) {
   assert.equal(desktopSettingsDensity.denseSectionCount, 2, "Settings should use section surfaces for options and tabs");
   assert.equal(desktopSettingsDensity.headingCount, 4, "Settings should expose display, progress, interface, and tab headings");
   assert.equal(desktopSettingsDensity.dividerCount, 2, "Settings should separate option groups with dividers");
-  assert.equal(desktopSettingsDensity.rowCount, 11, "Settings should retain every setting row");
+  assert.equal(desktopSettingsDensity.rowCount, 13, "Settings should retain every setting row");
 
   await page.locator('[data-tab="statistics"]').click();
   const desktopStatisticsDensity = await page.evaluate(() => ({

@@ -10,6 +10,7 @@ import { updateAchievementRows } from "./render-achievements.js";
 import { updateAutomationUi, updateStatisticsUi } from "./render-automation.js";
 import { updateOfflineReportUi } from "./render-offline-report.js";
 import { updateHelpUi } from "./render-help.js";
+import { updateQuickActionsUi } from "./quick-actions.js";
 
 // Shared form helpers and the UI update orchestrator.
 
@@ -102,6 +103,7 @@ function formatVertexGainIncrease(log10Value) {
 function updateUi() {
   if (runtime.offlineProcessing) {
     updateEternityUi();
+    updateQuickActionsUi();
     return;
   }
   const currentCostLogs = runtime.costLogs();
@@ -295,6 +297,8 @@ function updateUi() {
     runtime.elements.skipTimelineRespecConfirmationToggle,
     runtime.state.skipTimelineRespecConfirmation,
   );
+  syncFormControl(runtime.elements.gameplayHotkeysToggle, runtime.state.gameplayHotkeysEnabled);
+  syncFormControl(runtime.elements.mobileQuickActionsToggle, runtime.state.showMobileQuickActions);
   syncFormControl(runtime.elements.offlineProgressToggle, runtime.state.offlineProgressEnabled);
   syncFormControl(runtime.elements.offlineTickInput, runtime.state.offlineTickCount);
   document.documentElement.classList.toggle("show-fps", runtime.state.showFps);
@@ -309,6 +313,7 @@ function updateUi() {
   }
   updateSaveRecoveryUi();
   updateEternityUi();
+  updateQuickActionsUi();
 }
 
 function setSaveStatus(text) {

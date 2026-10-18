@@ -6,6 +6,7 @@ import {
 } from "./browser/features/helpers.mjs";
 import { runConfirmationRegression } from "./browser/features/confirmation.mjs";
 import { runHelp } from "./browser/features/help.mjs";
+import { runQuickActions } from "./browser/features/quick-actions.mjs";
 import {
   runNavigationSettings,
   runNavigationSettingsDensity,
@@ -51,6 +52,7 @@ try {
     if (panel && !panel.hidden) document.querySelector("#offlineReportClose")?.click();
   });
 
+  await runQuickActions({ browser: gameTest.browser, origin: gameTest.origin, errors, httpFailures });
   await runConfirmationRegression(gameTest.browser, gameTest.origin, httpFailures);
   await runTimelineCopyRegression(gameTest.browser, gameTest.origin, httpFailures);
   await runNavigationSettings({ page });

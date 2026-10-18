@@ -58,7 +58,8 @@
           "./src/systems/eternity.js": "./src/systems/eternity.js?v=0.14.0",
           "./src/systems/timeline.js": "./src/systems/timeline.js?v=0.14.0",
           "./src/systems/infinity-point-normalization.js": "./src/systems/infinity-point-normalization.js?v=0.14.0",
-          "./src/ui/events.js": "./src/ui/events.js?v=0.14.0"
+          "./src/ui/events.js": "./src/ui/events.js?v=0.14.0",
+          "./src/ui/quick-actions.js": "./src/ui/quick-actions.js?v=0.14.0"
         }
       }
     </script>
@@ -875,6 +876,14 @@
               <hr class="dense-divider" />
               <h2 class="dense-section-heading" data-i18n="settingsInterfaceSection">インターフェース</h2>
               <div class="setting-row">
+                <label for="gameplayHotkeysToggle" data-i18n="gameplayHotkeysEnabled">ゲームプレイ用ホットキー</label>
+                <input id="gameplayHotkeysToggle" type="checkbox" checked />
+              </div>
+              <div class="setting-row">
+                <label for="mobileQuickActionsToggle" data-i18n="showMobileQuickActions">モバイルクイック操作バーを表示</label>
+                <input id="mobileQuickActionsToggle" type="checkbox" checked />
+              </div>
+              <div class="setting-row">
                 <label for="floatingTextToggle" data-i18n="floatingText">浮遊テキスト</label>
                 <input id="floatingTextToggle" type="checkbox" checked />
               </div>
@@ -951,6 +960,16 @@
           </div>
         </section>
       </div>
+
+      <section id="mobileQuickActions" class="mobile-quick-actions" hidden>
+        <div id="quickActionList" class="mobile-quick-action-list" role="group" aria-label="クイック操作">
+          <button id="quickActionBuyAll" class="mobile-quick-action" type="button" data-quick-action="buyAll" aria-label="全購入 (M)">MAX</button>
+          <button id="quickActionGeneration" class="mobile-quick-action" type="button" data-quick-action="generation" aria-label="世代交代 (G)">GEN</button>
+          <button id="quickActionCoreBoost" class="mobile-quick-action" type="button" data-quick-action="coreBoost" aria-label="核増幅 (B)">CB</button>
+          <button id="quickActionInfinity" class="mobile-quick-action" type="button" data-quick-action="infinity" aria-label="Infinity (I)">INF</button>
+          <button id="quickActionEternity" class="mobile-quick-action" type="button" data-quick-action="eternity" aria-label="Eternity (E)">ETR</button>
+        </div>
+      </section>
     </main>
 
     <section id="offlineReportPanel" class="offline-report" role="dialog" aria-live="polite" hidden>

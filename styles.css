@@ -202,6 +202,11 @@ button {
   display: none;
 }
 
+.mobile-quick-actions,
+.mobile-quick-actions[hidden] {
+  display: none;
+}
+
 .main-tab.is-active {
   color: white;
   border-bottom-color: var(--gold);
@@ -2742,14 +2747,14 @@ canvas {
     height: 100svh;
     min-height: 0;
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
     gap: 6px;
     overflow: hidden;
     padding: 7px 0;
   }
 
   .shell.is-top-bar-hidden {
-    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr) auto auto;
   }
 
   .news-ticker {
@@ -2771,8 +2776,8 @@ canvas {
 
   .main-tabs {
     grid-column: 1;
-    grid-row: 3;
-    order: 2;
+    grid-row: 4;
+    order: 4;
     position: relative;
     z-index: 10;
     display: flex;
@@ -2788,7 +2793,84 @@ canvas {
   }
 
   .shell.is-top-bar-hidden .main-tabs {
+    grid-row: 3;
+  }
+
+  .mobile-quick-actions {
+    grid-column: 1;
+    grid-row: 3;
+    order: 3;
+    display: block;
+    min-width: 0;
+    padding: 2px 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(23, 36, 59, 0.98), rgba(12, 20, 35, 0.98));
+  }
+
+  .shell.is-top-bar-hidden .mobile-quick-actions {
     grid-row: 2;
+  }
+
+  .shell:not(.has-mobile-quick-actions) {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .shell.is-top-bar-hidden:not(.has-mobile-quick-actions) {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .shell:not(.has-mobile-quick-actions) .main-tabs {
+    grid-row: 3;
+  }
+
+  .shell.is-top-bar-hidden:not(.has-mobile-quick-actions) .main-tabs {
+    grid-row: 2;
+  }
+
+  .mobile-quick-actions[hidden] {
+    display: none;
+  }
+
+  .mobile-quick-action-list {
+    display: flex;
+    min-width: 0;
+    gap: 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .mobile-quick-action-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobile-quick-action {
+    flex: 1 0 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    background: rgba(76, 123, 217, 0.16);
+    color: var(--ink);
+    font-size: 0.78rem;
+    font-weight: 900;
+    touch-action: none;
+    user-select: none;
+  }
+
+  .mobile-quick-action.is-unavailable,
+  .mobile-quick-action[aria-disabled="true"] {
+    border-color: var(--line);
+    background: rgba(76, 86, 111, 0.2);
+    color: var(--muted);
+    opacity: 0.68;
+  }
+
+  .mobile-quick-action:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
   }
 
   .shell.is-top-bar-hidden .main-panels {
