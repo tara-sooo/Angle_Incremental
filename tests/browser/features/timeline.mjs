@@ -47,6 +47,7 @@ export async function runTimelineCopyRegression(browser, origin, httpFailures) {
       };
       const readLanguage = (language) => {
         const nodes = {};
+        const expectedAd30Multipliers = {};
         for (const selectedRoute of routeSelections) {
           Object.assign(state, {
             eternityCount: 1,
@@ -70,6 +71,21 @@ export async function runTimelineCopyRegression(browser, origin, httpFailures) {
           switchEternitySubtab("timeline");
           window.advanceTime(0);
           const routeNodes = Object.fromEntries(nodeIds.map((id) => [id, readNode(id)]));
+          if (selectedRoute.includes("Real-AD30")) {
+            expectedAd30Multipliers.real = runtime.formatMultiplierLog(
+              Math.log10(1 + runtime.currentScoreLog10() / 10000),
+            );
+          }
+          if (selectedRoute.includes("Parallel-AD30")) {
+            const exactInfinityCount = runtime.currentExactIntegerState(
+              state,
+              "infinityCountExact",
+              "infinityCount",
+            );
+            expectedAd30Multipliers.parallel = runtime.formatMultiplierLog(
+              Math.log10(1 + runtime.log10ExactInteger(exactInfinityCount) / 2),
+            );
+          }
           for (const id of nodeIds) {
             if (!nodes[id] || selectedRoute.includes(id)) nodes[id] = routeNodes[id];
           }
@@ -78,6 +94,7 @@ export async function runTimelineCopyRegression(browser, origin, httpFailures) {
           scoreTrack: document.querySelector('[data-i18n="timelineScoreTrack"]')?.textContent?.trim() ?? "",
           scoreRequirement: document.querySelector("#timelineScoreRequirement")?.textContent?.trim() ?? "",
           nodes,
+          expectedAd30Multipliers,
         };
       };
 
@@ -178,6 +195,21 @@ export async function runTimelineCopyRegression(browser, origin, httpFailures) {
     assert.match(timelineCopy.english.nodes["Parallel-BC6000"].currentEffect, /Current Tower Score exponent: \^1\.07/);
     assert.match(timelineCopy.english.nodes["Real-AD30"].currentEffect, /Current Eternity gain multiplier/);
     assert.match(timelineCopy.english.nodes["Parallel-AD30"].currentEffect, /Current Eternity gain multiplier/);
+    for (const [localeName, localized] of [
+      ["Japanese", timelineCopy.japanese],
+      ["English", timelineCopy.english],
+    ]) {
+      assert.ok(localized.expectedAd30Multipliers.real, `${localeName} Real-AD30 expected factor should be formatted`);
+      assert.ok(localized.expectedAd30Multipliers.parallel, `${localeName} Parallel-AD30 expected factor should be formatted`);
+      assert.ok(
+        localized.nodes["Real-AD30"].currentEffect.endsWith(localized.expectedAd30Multipliers.real),
+        `${localeName} Real-AD30 current effect should end with the factor from current Score`,
+      );
+      assert.ok(
+        localized.nodes["Parallel-AD30"].currentEffect.endsWith(localized.expectedAd30Multipliers.parallel),
+        `${localeName} Parallel-AD30 current effect should end with the factor from the exact Infinity count`,
+      );
+    }
     const japaneseVisibleCopy = Object.values(timelineCopy.japanese.nodes)
       .flatMap((node) => [node.description, node.currentEffect, node.prerequisites, node.cardStatus])
       .join("\n");
