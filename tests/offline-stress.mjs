@@ -487,8 +487,15 @@ async function measureOfflineStress(page) {
       configureAutoInfinityVariant(ticks, [], 1 << (6 - 1));
     }
 
-    function configureAutoInfinityTimelineDifferential(ticks) {
-      configureAutoInfinityVariant(ticks, ["Real-BC16500"]);
+    function configureAutoInfinityTimelineDifferential(ticks, nodes = ["Real-BC16500"]) {
+      configureAutoInfinityVariant(
+        ticks,
+        nodes,
+        (1 << (6 - 1)) | (1 << (8 - 1)),
+      );
+      state.towerFloor = 12;
+      state.completedTowerChallenges = (1 << 4) - 1;
+      runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
     }
 
     function configureAutoInfinityAutobuyDifferential(ticks) {
@@ -603,6 +610,7 @@ async function measureOfflineStress(page) {
         aggregateHistory = false,
         omitApproximateStateFields = [],
         omitApproximateReportFields = [],
+        performEternityAfter = false,
       } = {},
     ) {
       const approximateStateFields = Object.fromEntries(
@@ -635,6 +643,28 @@ async function measureOfflineStress(page) {
         runtime.offlineReport = null;
         runtime.offlineProcessing = false;
       };
+      const performEternityBoundary = () => {
+        if (!performEternityAfter) return null;
+        const countBefore = runtime.currentExactIntegerState(
+          state,
+          "eternityCountExact",
+          "eternityCount",
+        );
+        const plannedGain = runtime.eternityGainExact();
+        const eligible = runtime.canEternity();
+        const performed = eligible && debug.performEternity({ save: false, update: false });
+        const countAfter = runtime.currentExactIntegerState(
+          state,
+          "eternityCountExact",
+          "eternityCount",
+        );
+        return {
+          eligible,
+          plannedGainExact: plannedGain.toString(),
+          performed,
+          actualGainExact: (countAfter - countBefore).toString(),
+        };
+      };
       let canonical;
       let accelerated;
       try {
@@ -647,9 +677,12 @@ async function measureOfflineStress(page) {
         const canonicalBefore = runtime.offlineSnapshot();
         const canonicalStartedAt = performance.now();
         for (let tick = 0; tick < ticks; tick += 1) debug.update(tickSeconds);
+        const canonicalOfflineAfter = runtime.offlineSnapshot();
+        const canonicalEternityBoundary = performEternityBoundary();
         canonical = {
+          eternityBoundary: canonicalEternityBoundary,
           before: canonicalBefore,
-          after: runtime.offlineSnapshot(),
+          after: canonicalOfflineAfter,
           state: stateProjection(runtime.snapshotRuntimeState(), {
             omitHistory: aggregateHistory,
             approximateFields: approximateStateFields,
@@ -666,7 +699,9 @@ async function measureOfflineStress(page) {
           "differential-" + name,
           { clockSource: "server" },
         );
+        const acceleratedEternityBoundary = performEternityBoundary();
         accelerated = {
+          eternityBoundary: acceleratedEternityBoundary,
           report,
           before: report?.before ?? null,
           after: report?.after ?? runtime.offlineSnapshot(),
@@ -709,6 +744,14 @@ async function measureOfflineStress(page) {
         mismatches,
         approximateReportFields,
       );
+      if (performEternityAfter) {
+        exactMismatch(
+          canonical.eternityBoundary,
+          accelerated.eternityBoundary,
+          "eternityBoundary",
+          mismatches,
+        );
+      }
       if (Math.abs(canonical.normalAutobuyElapsed - accelerated.normalAutobuyElapsed) > 1e-9) {
         mismatches.push({
           path: "normalAutobuyElapsed",
@@ -1632,8 +1675,35 @@ async function measureOfflineStress(page) {
       eventFamilyCounts: offlineDiagnostics?.eventFamilyCounts ?? {},
       wallMilliseconds: performance.now() - offlineStartedAt,
     };
+    const eventfulTimelineRouteResults = {};
+    const eventfulTimelineRoutes = [
+      ["Real", "Real", "Real"],
+      ["Real", "Real", "Parallel"],
+      ["Real", "Parallel", "Real"],
+      ["Real", "Parallel", "Parallel"],
+      ["Parallel", "Real", "Real"],
+      ["Parallel", "Real", "Parallel"],
+      ["Parallel", "Parallel", "Real"],
+      ["Parallel", "Parallel", "Parallel"],
+    ];
+    for (const routes of eventfulTimelineRoutes) {
+      const [firstRoute, secondRoute, thirdRoute] = routes;
+      const nodes = [
+        `${firstRoute}-BC16500`,
+        `${secondRoute}-BC6000`,
+        `${thirdRoute}-AD30`,
+      ];
+      const routeName = routes.join("-").toLowerCase();
+      eventfulTimelineRouteResults[`timelineEventful-${routeName}`] = await runDifferential(
+        `timeline-eventful-${routeName}`,
+        (ticks) => configureAutoInfinityTimelineDifferential(ticks, nodes),
+        12,
+        { reprimeScore: true, aggregateHistory: true, performEternityAfter: true },
+      );
+    }
     const differential = {
       quiet: await runDifferential("quiet", (ticks) => configureDifferentialBase(ticks), 120),
+      ...eventfulTimelineRouteResults,
       timelineReal: await runDifferential(
         "timeline-real",
         (ticks) => configureDifferentialBase(ticks, ["Real-BC16500"]),
@@ -1962,6 +2032,19 @@ try {
     assert.equal(fallback.accelerated.diagnostics.cyclesAggregated, 0, `${name} should not aggregate unsupported cycles`);
     assert.equal(fallback.accelerated.diagnostics.aggregatedTicks, 0, `${name} should not skip unsupported ticks`);
     assert.notEqual(fallback.accelerated.diagnostics.cycleFallbackReason, "", `${name} should record a fallback reason`);
+  }
+  const eventfulTimelineRouteResults = Object.entries(report.offlineStress.differential)
+    .filter(([name]) => name.startsWith("timelineEventful-"));
+  assert.equal(eventfulTimelineRouteResults.length, 8, "all eight Timeline route combinations should run eventful offline differentials");
+  for (const [name, result] of eventfulTimelineRouteResults) {
+    assert.equal(result.comparison.matched, true, `${name} should match guarded canonical offline processing: ${JSON.stringify(result.comparison.mismatches).slice(0, 4000)}`);
+    assert.ok(result.accelerated.diagnostics.eventCounts.infinityExecutions > 0, `${name} should cross actual Infinity reset boundaries`);
+    assert.ok(result.accelerated.diagnostics.eventFamilyCounts.autoInfinity > 0, `${name} should report Auto Infinity boundary events`);
+    for (const boundary of [result.canonical.eternityBoundary, result.accelerated.eternityBoundary]) {
+      assert.equal(boundary.eligible, true, `${name} should be Eternity-ready after offline time`);
+      assert.equal(boundary.performed, true, `${name} should perform the post-offline Eternity boundary`);
+      assert.equal(boundary.plannedGainExact, boundary.actualGainExact, `${name} pending Eternity gain should equal the actual counter increment`);
+    }
   }
   const autoInfinityAutobuy = report.offlineStress.differential.autoInfinityAutobuy;
   assert.equal(autoInfinityAutobuy.comparison.matched, true, "Auto Infinity with normal autobuy should match canonical ordering");
