@@ -281,6 +281,7 @@ async function configureBaseline(instance) {
     autoRunCoreBoost: false,
     autoRunInfinity: false,
   });
+  runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 600000n);
   runtime.syncInfinityPointCachesFromExact(runtime.exactInfinityPointsFromLog10(25));
   const iaPurchaseResults = ["speed", "vertex", "gain"].map((kind) =>
     runtime.buyInfiniteAngleUpgrade(kind, { refresh: false, save: false }),
