@@ -66,20 +66,24 @@ async function testManualTracks() {
 
 async function testTimelineTreePurchases() {
   const locked = await loadRuntime(candidatePath);
-  locked.debug.state.scoreTfClaims = 1;
+  locked.debug.state.scoreTfClaims = 12;
   assert.equal(locked.runtime.timelineNodeAvailability("Real-BC16500").reason, "timeline-locked");
   assert.equal(locked.runtime.canPurchaseTimelineNode("Real-BC16500"), false, "Timeline nodes must stay locked before discovery");
 
   const { debug, runtime } = await loadRuntime(candidatePath);
   const { state } = debug;
   state.eternityCount = 1;
-  state.scoreTfClaims = 1;
+  state.scoreTfClaims = 12;
   runtime.updateUi();
-  assert.deepEqual(
-    Array.from(runtime.timelineNodes(), (node) => node.id),
-    ["Real-BC16500", "Parallel-BC16500"],
-    "0.14.0 Timeline should expose only the BC16500 route alternatives",
-  );
+  const nodeIds = [
+    "Real-BC16500",
+    "Parallel-BC16500",
+    "Real-BC6000",
+    "Parallel-BC6000",
+    "Real-AD30",
+    "Parallel-AD30",
+  ];
+  assert.deepEqual(Array.from(runtime.timelineNodes(), (node) => node.id), nodeIds, "all six Timeline nodes should be defined");
   assert.deepEqual(
     Array.from(runtime.timelineNodes(), (node) => [
       node.era,
@@ -91,27 +95,17 @@ async function testTimelineTreePurchases() {
     [
       ["BC16500", "Real", 1, "all", []],
       ["BC16500", "Parallel", 1, "all", []],
+      ["BC6000", "Real", 1, "any", ["Real-BC16500", "Parallel-BC16500"]],
+      ["BC6000", "Parallel", 1, "any", ["Real-BC16500", "Parallel-BC16500"]],
+      ["AD30", "Real", 5, "any", ["Real-BC6000", "Parallel-BC6000"]],
+      ["AD30", "Parallel", 5, "any", ["Real-BC6000", "Parallel-BC6000"]],
     ],
-    "shipped Timeline definitions should retain route and cost metadata",
+    "Timeline nodes should retain the canonical era, route, cost, and OR prerequisite metadata",
   );
-  assert.equal(runtime.timelineAvailableTf(), 1);
-  assert.equal(runtime.canPurchaseTimelineNode("Real-BC16500"), true);
-  assert.equal(runtime.canPurchaseTimelineNode("Parallel-BC16500"), true, "either route should be purchasable before a route is selected");
-  assert.equal(runtime.timelineNodeAvailability("Real-BC6000").reason, "unknown-node", "deferred nodes must not be purchasable");
-  assert.equal(runtime.purchaseTimelineNode("Real-BC16500", { save: false, update: false }), true);
-  assert.equal(state.timelinePurchasedNodes.length, 1);
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(state.timelinePurchasedNodes[0])),
-    { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
-    "purchases should store the canonical node metadata",
-  );
-  assert.equal(runtime.timelineEarnedTf(), 1, "purchasing must not reduce earned TF");
-  assert.equal(runtime.timelineSpentTf(), 1);
-  assert.equal(runtime.timelineAvailableTf(), 0, "purchasing should spend only available TF");
-  assert.equal(runtime.purchaseTimelineNode("Real-BC16500", { save: false, update: false }), false, "duplicate purchases must be rejected");
-  assert.equal(runtime.timelineNodeAvailability("Parallel-BC16500").reason, "route-conflict");
-  assert.equal(runtime.purchaseTimelineNode("Parallel-BC16500", { save: false, update: false }), false, "the same-era alternative route must be locked");
-  assert.equal(state.scoreTfClaims, 1, "node purchases must not change claim history");
+  assert.equal(runtime.timelineAvailableTf(), 12);
+  assert.equal(runtime.timelineNodeAvailability("Real-BC6000").reason, "missing-prerequisites");
+  assert.equal(runtime.timelineNodeAvailability("Real-AD30").reason, "missing-prerequisites");
+  assert.equal(runtime.timelineNodeAvailability("Parallel-BC16500").reason, "available");
 
   const missingPrerequisite = runtime.timelineNodeAvailability({
     id: "future-node",
@@ -124,21 +118,57 @@ async function testTimelineTreePurchases() {
   assert.equal(
     runtime.timelineNodeHasRouteConflict({ id: "future-parallel", era: "BC14000", route: "Parallel" }),
     false,
-    "a later era may independently choose the opposite route",
+    "different eras may independently choose routes",
   );
 
-  assert.equal(runtime.respecTimeline({ save: false, update: false }), true);
-  assert.equal(runtime.timelineAvailableTf(), 1, "respec should restore the spent TF through derived accounting");
-  assert.equal(runtime.purchaseTimelineNode("Parallel-BC16500", { save: false, update: false }), true, "the other route should be available after respec");
-  assert.equal(runtime.timelineNodeAvailability("Real-BC16500").reason, "route-conflict", "exclusivity should work in the reverse direction");
+  for (const firstRoute of ["Real", "Parallel"]) {
+    for (const secondRoute of ["Real", "Parallel"]) {
+      for (const thirdRoute of ["Real", "Parallel"]) {
+        const instance = await loadRuntime(candidatePath);
+        const { debug: routeDebug, runtime: routeRuntime } = instance;
+        routeDebug.state.eternityCount = 1;
+        routeDebug.state.scoreTfClaims = 12;
+        const chosenIds = [
+          `${firstRoute}-BC16500`,
+          `${secondRoute}-BC6000`,
+          `${thirdRoute}-AD30`,
+        ];
+        for (const id of chosenIds) {
+          assert.equal(routeRuntime.canPurchaseTimelineNode(id), true, `${id} should be available on route ${chosenIds.join(" → ")}`);
+          assert.equal(routeRuntime.purchaseTimelineNode(id, { save: false, update: false }), true);
+        }
+        for (const oppositeId of [
+          `${firstRoute === "Real" ? "Parallel" : "Real"}-BC16500`,
+          `${secondRoute === "Real" ? "Parallel" : "Real"}-BC6000`,
+          `${thirdRoute === "Real" ? "Parallel" : "Real"}-AD30`,
+        ]) {
+          assert.equal(routeRuntime.timelineNodeAvailability(oppositeId).reason, "route-conflict", `${oppositeId} should remain exclusive within its era`);
+        }
+        assert.deepEqual(
+          Array.from(routeDebug.state.timelinePurchasedNodes, (entry) => entry.id),
+          chosenIds,
+          "route choices must remain independent across eras",
+        );
+        assert.equal(routeRuntime.timelineSpentTf(), 7, "a full route should spend 1 + 1 + 5 TF");
+        assert.equal(routeRuntime.timelineAvailableTf(), 5, "remaining TF should derive from canonical node costs");
 
-  const serialized = runtime.serializeSaveData();
-  const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(serialized)]]));
-  assert.deepEqual(JSON.parse(JSON.stringify(loaded.debug.state.timelinePurchasedNodes)), [
-    { id: "Parallel-BC16500", era: "BC16500", route: "Parallel", costTF: 1 },
-  ], "save/load should preserve the canonical purchased node");
-  assert.equal(loaded.runtime.timelineAvailableTf(), 0);
-
+        const serialized = routeRuntime.serializeSaveData();
+        const loaded = await loadRuntime(candidatePath, new Map([[routeRuntime.SAVE_KEY, JSON.stringify(serialized)]]));
+        assert.deepEqual(
+          JSON.parse(JSON.stringify(loaded.debug.state.timelinePurchasedNodes)),
+          chosenIds.map((id) => {
+            const node = loaded.runtime.timelineNode(id);
+            return { id, era: node.era, route: node.route, costTF: node.costTF };
+          }),
+          "save/load should retain canonical metadata for any cross-route build",
+        );
+        assert.equal(loaded.runtime.timelineAvailableTf(), 5);
+        assert.equal(loaded.runtime.respecTimeline({ save: false, update: false }), true);
+        assert.deepEqual(Array.from(loaded.debug.state.timelinePurchasedNodes), []);
+        assert.equal(loaded.runtime.timelineAvailableTf(), 12, "respec should refund all route costs by derivation");
+      }
+    }
+  }
 }
 
 async function testResetPersistenceAndRespec() {
@@ -269,41 +299,236 @@ async function testSaveCompatibility() {
   );
 }
 
-async function testDeferredTimelineMigration() {
+async function testRestoredTimelineSaveMigration() {
   const source = await loadRuntime(candidatePath);
   const { runtime } = source;
-  const staleSave = runtime.serializeSaveData();
-  staleSave.state.eternityCount = 4;
-  staleSave.state.scoreTfClaims = 20;
-  staleSave.state.ipTfClaims = 0;
-  staleSave.state.eternityTfClaims = 0;
-  staleSave.state.timelinePurchasedNodes = [
-    { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
-    { id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 },
-    { id: "Parallel-BC6000", era: "BC6000", route: "Parallel", costTF: 1 },
-    { id: "Real-AD30", era: "AD30", route: "Real", costTF: 5 },
-    { id: "Parallel-AD30", era: "AD30", route: "Parallel", costTF: 5 },
-  ];
-  staleSave.state.completedChallenges = 1 << (6 - 1);
-  const loaded = await loadRuntime(candidatePath, new Map([[runtime.SAVE_KEY, JSON.stringify(staleSave)]]));
-
-  assert.deepEqual(
-    JSON.parse(JSON.stringify(loaded.debug.state.timelinePurchasedNodes)),
-    [{ id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 }],
-    "loading a 0.13-era save should retain shipped BC16500 progress and drop all deferred IDs",
+  const preDeferralSave = runtime.serializeSaveData();
+  Object.assign(preDeferralSave.state, {
+    eternityCount: 4,
+    eternityCountExact: "4",
+    scoreTfClaims: 20,
+    ipTfClaims: 0,
+    eternityTfClaims: 0,
+    score: Number.MAX_VALUE,
+    scoreLog10: 14000,
+    completedChallenges: 1 << (6 - 1),
+    infinityCount: 100,
+    infinityCountExact: "100",
+    timelinePurchasedNodes: [
+      { id: "Real-BC16500", era: "invalid", route: "Parallel", costTF: 99 },
+      { id: "Real-BC6000", era: "invalid", route: "Parallel", costTF: 99 },
+      { id: "Real-AD30", era: "invalid", route: "Parallel", costTF: 99 },
+    ],
+  });
+  const restored = await loadRuntime(
+    candidatePath,
+    new Map([[runtime.SAVE_KEY, JSON.stringify(preDeferralSave)]]),
   );
-  assert.equal(loaded.debug.state.scoreTfClaims, 20, "deferred-node migration must preserve TF claim history");
-  assert.equal(loaded.runtime.timelineSpentTf(), 1, "deferred node costs must not remain silently spent");
-  assert.equal(loaded.runtime.timelineAvailableTf(), 19, "dropping deferred nodes must refund their old TF costs");
-  for (const id of ["Real-BC6000", "Parallel-BC6000", "Real-AD30", "Parallel-AD30"]) {
-    assert.equal(loaded.runtime.timelineNode(id), null, `${id} must not have a shipped definition`);
-    assert.equal(loaded.runtime.timelineNodeAvailability(id).reason, "unknown-node", `${id} must stay unavailable`);
-    assert.equal(loaded.runtime.canPurchaseTimelineNode(id), false, `${id} must not be purchasable`);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(restored.debug.state.timelinePurchasedNodes)),
+    [
+      { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
+      { id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 },
+      { id: "Real-AD30", era: "AD30", route: "Real", costTF: 5 },
+    ],
+    "pre-#426 save IDs should return with canonical era, route, and costs",
+  );
+  assert.equal(restored.runtime.timelineSpentTf(), 7, "restored nodes should spend their canonical 1+1+5 TF");
+  assert.equal(restored.runtime.timelineAvailableTf(), 13, "pre-#426 saves should retain claim history and canonical TF accounting");
+  assert.equal(restored.runtime.timelineRealBc6000Ic6RewardMultiplierLog10(), 4 * Math.log10(1.2));
+  assert.equal(restored.runtime.timelineRealAd30EternityGainMultiplierLog10(), Math.log10(2.4));
+  assert.equal(restored.runtime.eternityGain(), 2, "restored Real-AD30 should use the current formula and floor its gain");
+  assert.equal(restored.runtime.timelineBulkSimulationAllowed(), true, "restored known nodes should be eligible for audited bulk paths");
+  assert.equal(restored.runtime.respecTimeline({ save: false, update: false }), true);
+  assert.deepEqual(Array.from(restored.debug.state.timelinePurchasedNodes), []);
+  assert.equal(restored.runtime.timelineAvailableTf(), 20, "respec should refund every restored node by derived accounting");
+
+  const postDeferralSave = runtime.serializeSaveData();
+  Object.assign(postDeferralSave.state, {
+    eternityCount: 4,
+    eternityCountExact: "4",
+    scoreTfClaims: 20,
+    ipTfClaims: 0,
+    eternityTfClaims: 0,
+    score: Number.MAX_VALUE,
+    scoreLog10: 14000,
+    completedChallenges: 1 << (6 - 1),
+    timelinePurchasedNodes: [
+      { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
+    ],
+  });
+  const postDeferral = await loadRuntime(
+    candidatePath,
+    new Map([[runtime.SAVE_KEY, JSON.stringify(postDeferralSave)]]),
+  );
+  assert.deepEqual(
+    Array.from(postDeferral.debug.state.timelinePurchasedNodes, (entry) => entry.id),
+    ["Real-BC16500"],
+    "post-#426 saves should not invent purchases for the reintroduced eras",
+  );
+  assert.equal(postDeferral.runtime.timelineSpentTf(), 1);
+  assert.equal(postDeferral.runtime.timelineAvailableTf(), 19, "already-refunded #426 saves should not receive a second TF refund");
+  assert.equal(postDeferral.runtime.timelineRealBc6000Ic6RewardMultiplierLog10(), 0);
+  postDeferral.debug.state.towerFloor = 5;
+  assert.equal(postDeferral.runtime.towerScoreExponent(), 1.25, "post-#426 saves should not activate an unpurchased Tower effect");
+  assert.equal(postDeferral.runtime.eternityGain(), 1, "post-#426 saves should not activate an unpurchased AD30 effect");
+  assert.equal(postDeferral.runtime.timelineBulkSimulationAllowed(), true);
+}
+
+async function testRestoredTimelineFormulaAndExactGain() {
+  const { debug, runtime } = await loadRuntime(candidatePath);
+  const { state } = debug;
+  state.timelinePurchasedNodes = [{ id: "Real-BC6000" }];
+  state.completedChallenges = 1 << (6 - 1);
+  for (const eternities of [1n, 2n]) {
+    runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", eternities);
+    const rawLog10 = Number(eternities) * Math.log10(1.2);
+    assert.equal(runtime.timelineRealBc6000RewardRawLog10(), rawLog10);
+    assert.equal(runtime.timelineRealBc6000Ic6RewardMultiplierLog10(), rawLog10, "below ×1e10, the added factor must remain ×1.2^E without baseline subtraction");
+    assertClose(
+      runtime.infinityCountGainLog10(),
+      Math.log10(2) + rawLog10,
+      1e-12,
+      "Real-BC6000 should multiply the existing IC6 ×2 by the additional ×1.2^E",
+    );
+    assert.equal(runtime.infinityCountGain(), Math.floor(2 * 1.2 ** Number(eternities)));
   }
-  loaded.debug.state.towerFloor = 5;
-  assert.equal(loaded.runtime.towerScoreExponent(), 1.25, "deferred Tower effects must not reactivate from stale state");
-  assert.equal(loaded.runtime.eternityGain(), 1, "deferred Eternity effects must not reactivate from stale state");
-  assert.equal(loaded.runtime.timelineBulkSimulationAllowed(), true, "normalized shipped nodes should remain bulk-safe");
+  for (const rawLog10 of [9.999999, 10, 10.000001]) {
+    const expected = rawLog10 <= 10
+      ? rawLog10
+      : 10 + 2 * Math.log10(1 + (rawLog10 - 10) / 2);
+    assertClose(runtime.timelineRealBc6000SoftcapLog10(rawLog10), expected, 1e-12, `IC6 softcap boundary at raw log10 ${rawLog10}`);
+  }
+  runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 126n);
+  assert.ok(runtime.timelineRealBc6000Ic6RewardMultiplierLog10() < 10, "E=126 should remain below the ×1e10 softcap");
+  runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 127n);
+  const cappedIc6Log10 = 10 + 2 * Math.log10(
+    1 + (127 * Math.log10(1.2) - 10) / 2,
+  );
+  assertClose(runtime.timelineRealBc6000Ic6RewardMultiplierLog10(), cappedIc6Log10, 1e-12, "E=127 should enter the threshold-10 strength-2 softcap");
+  state.completedChallenges = 0;
+  assert.equal(runtime.timelineRealBc6000Ic6RewardMultiplierLog10(), 0, "the BC6000 Real factor should stay inactive before IC6 is completed");
+
+  state.timelinePurchasedNodes = [{ id: "Real-AD30" }];
+  runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 7n);
+  for (const [scoreLog10, expectedMultiplier] of [
+    [9000, 1.9],
+    [14000, 2.4],
+    [19000, 2.9],
+    [24000, 3.4],
+    [29000, 3.9],
+  ]) {
+    setScoreLog(state, scoreLog10);
+    assertClose(
+      runtime.timelineRealAd30EternityGainMultiplierLog10(),
+      Math.log10(expectedMultiplier),
+      1e-12,
+      `Real AD30 #474 anchor at Score e${scoreLog10}`,
+    );
+    assert.equal(runtime.eternityGainExact(), BigInt(Math.floor(expectedMultiplier)), "Eternity gain should floor the existing gain times the exact new multiplier");
+    assert.equal(runtime.eternityGainLog10(), Math.log10(Math.floor(expectedMultiplier)), "the pending gain log should represent the normalized integer, not the raw fractional multiplier");
+  }
+  for (const [scoreLog10, expectedGain] of [
+    [9999.999, 1n],
+    [10000, 2n],
+    [10000.001, 2n],
+  ]) {
+    setScoreLog(state, scoreLog10);
+    assert.equal(runtime.eternityGainExact(), expectedGain, `Real AD30 integer boundary at Score e${scoreLog10}`);
+  }
+  state.score = 0;
+  state.scoreLog10 = -Infinity;
+  assert.equal(runtime.timelineRealAd30EternityGainMultiplierLog10(), 0, "nonpositive Score should produce the neutral ×1 multiplier");
+  assert.equal(runtime.eternityGainExact(), 1n);
+  setScoreLog(state, 1e308);
+  assert.ok(Number.isFinite(runtime.timelineRealAd30EternityGainMultiplierLog10()), "huge Score logs should stay finite");
+  assert.ok(runtime.eternityGainExact() > 0n, "huge Score should preserve an exact positive gain");
+
+  state.timelinePurchasedNodes = [{ id: "Parallel-AD30" }];
+  runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 7n);
+  for (const [exponent, expectedMultiplier] of [
+    [3, 2.5],
+    [6, 4],
+    [9, 5.5],
+    [12, 7],
+    [15, 8.5],
+    [100, 51],
+  ]) {
+    runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 10n ** BigInt(exponent));
+    assertClose(
+      10 ** runtime.timelineParallelAd30EternityGainMultiplierLog10(),
+      expectedMultiplier,
+      1e-10,
+      `Parallel AD30 #474 anchor at Infinity count e${exponent}`,
+    );
+    assert.equal(runtime.eternityGainExact(), BigInt(Math.floor(expectedMultiplier)), "Parallel gain should use the uncapped logarithmic multiplier");
+  }
+  for (const [infinityCount, expectedGain] of [
+    [10n ** 10n - 1n, 5n],
+    [10n ** 10n, 6n],
+    [10n ** 10n + 1n, 6n],
+  ]) {
+    runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", infinityCount);
+    assert.equal(runtime.eternityGainExact(), expectedGain, `Parallel AD30 integer boundary at Infinity count ${infinityCount}`);
+  }
+  runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 0n);
+  assert.equal(runtime.timelineParallelAd30EternityGainMultiplierLog10(), 0, "zero Infinity count should use the neutral ×1 multiplier");
+  runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", runtime.MAX_EXACT_INTEGER);
+  assert.ok(Number.isFinite(runtime.timelineParallelAd30EternityGainMultiplierLog10()), "maximum exact Infinity count should stay finite without a legacy softcap");
+  assert.ok(runtime.eternityGainExact() > 0n, "maximum exact Infinity count should retain a positive Eternity gain");
+
+  const overflowOverrides = new Map([
+    ["timelineRealAd30EternityGainMultiplier", () => Number.MAX_VALUE],
+    ["timelineRealAd30EternityGainMultiplierLog10", () => Math.log10(Number.MAX_VALUE)],
+    ["timelineParallelAd30EternityGainMultiplier", () => 2],
+    ["timelineParallelAd30EternityGainMultiplierLog10", () => Math.log10(2)],
+  ]);
+  const originalDescriptors = new Map(
+    Array.from(overflowOverrides.keys(), (name) => [name, Object.getOwnPropertyDescriptor(runtime, name)]),
+  );
+  try {
+    for (const [name, value] of overflowOverrides) {
+      Object.defineProperty(runtime, name, { configurable: true, enumerable: true, value });
+    }
+    runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 0n);
+    assert.equal(
+      runtime.eternityGainExact(),
+      runtime.MAX_EXACT_INTEGER,
+      "overflowing direct multiplier products should use the exact log-space cap fallback",
+    );
+  } finally {
+    for (const [name, descriptor] of originalDescriptors) {
+      Object.defineProperty(runtime, name, descriptor);
+    }
+  }
+
+  state.timelinePurchasedNodes = [{ id: "Real-AD30" }];
+  runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 7n);
+  setScoreLog(state, 14000);
+  markEternityReady(runtime, state);
+  const before = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount");
+  const plannedGain = runtime.eternityGainExact();
+  assert.equal(plannedGain, 2n);
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  const after = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount");
+  assert.equal(after - before, plannedGain, "performEternity should add exactly the canonical planned gain");
+
+  runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", runtime.MAX_EXACT_INTEGER - 1n);
+  const nearLimitBefore = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount");
+  const nearLimitGain = runtime.eternityGainExact();
+  assert.equal(nearLimitGain, 1n, "pending gain should be capped to the current exact-counter headroom");
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  const nearLimitAfter = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount");
+  assert.equal(nearLimitAfter - nearLimitBefore, nearLimitGain, "performEternity should add exactly the available counter headroom");
+
+  const atLimitBefore = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount");
+  assert.equal(runtime.eternityGainExact(), 0n, "the canonical pending gain should be zero when the exact counter is saturated");
+  assert.equal(runtime.eternityGainLog10(), -Infinity, "the displayed pending gain should match a saturated zero increment");
+  markEternityReady(runtime, state);
+  assert.equal(debug.performEternity({ save: false, update: false }), true);
+  const atLimitAfter = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount");
+  assert.equal(atLimitAfter - atLimitBefore, 0n, "a saturated counter cannot receive an unreportable gain");
 }
 
 function assertClose(actual, expected, tolerance, message) {
@@ -314,6 +539,21 @@ function assertClose(actual, expected, tolerance, message) {
 const TIMELINE_BULK_NODE_IDS = [
   "Real-BC16500",
   "Parallel-BC16500",
+  "Real-BC6000",
+  "Parallel-BC6000",
+  "Real-AD30",
+  "Parallel-AD30",
+];
+
+const TIMELINE_ROUTE_COMBINATIONS = [
+  ["Real-BC16500", "Real-BC6000", "Real-AD30"],
+  ["Real-BC16500", "Real-BC6000", "Parallel-AD30"],
+  ["Real-BC16500", "Parallel-BC6000", "Real-AD30"],
+  ["Real-BC16500", "Parallel-BC6000", "Parallel-AD30"],
+  ["Parallel-BC16500", "Real-BC6000", "Real-AD30"],
+  ["Parallel-BC16500", "Real-BC6000", "Parallel-AD30"],
+  ["Parallel-BC16500", "Parallel-BC6000", "Real-AD30"],
+  ["Parallel-BC16500", "Parallel-BC6000", "Parallel-AD30"],
 ];
 
 function configureQuietTimelineState(instance, nodes) {
@@ -415,10 +655,7 @@ async function testTimelineBulkSimulation() {
   state.timelinePurchasedNodes = [{ id: "future-node" }];
   assert.equal(runtime.timelineBulkSimulationAllowed(), false, "unknown Timeline effects should remain on the guarded path");
 
-  for (const nodes of [
-    ["Real-BC16500"],
-    ["Parallel-BC16500"],
-  ]) {
+  for (const nodes of TIMELINE_ROUTE_COMBINATIONS) {
     const bulk = await runQuietTimelineResume(nodes, false);
     const guarded = await runQuietTimelineResume(nodes, true);
     assert.equal(bulk.report.requestedTicks, 120, "bulk comparison should request all configured ticks");
@@ -650,7 +887,8 @@ async function runTimelineModuleRuntimeTest() {
   await testTimelineTreePurchases();
   await testResetPersistenceAndRespec();
   await testSaveCompatibility();
-  await testDeferredTimelineMigration();
+  await testRestoredTimelineSaveMigration();
+  await testRestoredTimelineFormulaAndExactGain();
   await testTimelineEffectsAndTimer();
   await testTimelineBulkSimulation();
   await testTimelineResetSemantics();

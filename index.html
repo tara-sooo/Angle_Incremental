@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="google-site-verification" content="zSq5hy4615W7qXnu3Jrq9N2kkRWllMeHKbDm49Kcg1M" />
     <title>Angle Incremental</title>
-    <link rel="icon" type="image/png" href="assets/angle-incremental-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/angle-incremental-icon-32.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="assets/angle-incremental-icon-64.png" />
+    <link rel="apple-touch-icon" type="image/png" sizes="180x180" href="assets/angle-incremental-icon-180.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800;900&display=swap" rel="stylesheet" />
@@ -29,6 +31,8 @@
           "./src/core/state.js": "./src/core/state.js?v=0.14.0",
           "./src/core/numbers.js": "./src/core/numbers.js?v=0.14.0",
           "./src/core/save.js": "./src/core/save.js?v=0.14.0",
+          "./src/core/save-format.js": "./src/core/save-format.js?v=0.14.0",
+          "./src/core/save-backups.js": "./src/core/save-backups.js?v=0.14.0",
           "./src/core/save-code.js": "./src/core/save-code.js?v=0.14.0",
           "./src/core/offline-progress.js": "./src/core/offline-progress.js?v=0.14.0",
           "./src/systems/achievements.js": "./src/systems/achievements.js?v=0.14.0",
@@ -54,7 +58,8 @@
           "./src/systems/eternity.js": "./src/systems/eternity.js?v=0.14.0",
           "./src/systems/timeline.js": "./src/systems/timeline.js?v=0.14.0",
           "./src/systems/infinity-point-normalization.js": "./src/systems/infinity-point-normalization.js?v=0.14.0",
-          "./src/ui/events.js": "./src/ui/events.js?v=0.14.0"
+          "./src/ui/events.js": "./src/ui/events.js?v=0.14.0",
+          "./src/ui/quick-actions.js": "./src/ui/quick-actions.js?v=0.14.0"
         }
       }
     </script>
@@ -871,6 +876,14 @@
               <hr class="dense-divider" />
               <h2 class="dense-section-heading" data-i18n="settingsInterfaceSection">インターフェース</h2>
               <div class="setting-row">
+                <label for="gameplayHotkeysToggle" data-i18n="gameplayHotkeysEnabled">ゲームプレイ用ホットキー</label>
+                <input id="gameplayHotkeysToggle" type="checkbox" checked />
+              </div>
+              <div class="setting-row">
+                <label for="mobileQuickActionsToggle" data-i18n="showMobileQuickActions">モバイルクイック操作バーを表示</label>
+                <input id="mobileQuickActionsToggle" type="checkbox" checked />
+              </div>
+              <div class="setting-row">
                 <label for="floatingTextToggle" data-i18n="floatingText">浮遊テキスト</label>
                 <input id="floatingTextToggle" type="checkbox" checked />
               </div>
@@ -895,10 +908,27 @@
                 <span data-i18n="save">セーブ</span>
                 <strong id="saveStatus">未保存</strong>
               </div>
+              <div class="save-storage-row">
+                <span data-i18n="storageDurabilityLabel">保存領域の状態</span>
+                <strong id="storageDurabilityStatus" aria-live="polite">確認中</strong>
+              </div>
+              <div class="save-storage-row">
+                <span data-i18n="storageEstimateLabel">ストレージ使用量 / 上限（概算。保持の保証ではありません）</span>
+                <strong id="storageEstimateStatus">未取得</strong>
+              </div>
+              <button id="requestPersistentStorageButton" class="reset-button" type="button" data-i18n="requestPersistentStorage" hidden>
+                永続ストレージをリクエスト
+              </button>
               <div class="save-code-actions">
                 <button id="exportSaveCodeButton" class="reset-button" type="button" data-i18n="exportSaveCode">書き出し</button>
                 <button id="importSaveCodeButton" class="reset-button" type="button" data-i18n="importSaveCode">読み込み</button>
               </div>
+              <div class="save-code-actions">
+                <button id="exportSaveBackupFileButton" class="reset-button" type="button" data-i18n="exportSaveBackupFile">バックアップファイルを書き出す</button>
+                <button id="importSaveBackupFileButton" class="reset-button" type="button" data-i18n="importSaveBackupFile">ファイルから復元</button>
+                <input id="saveBackupFileInput" type="file" accept="application/json,.json" hidden />
+              </div>
+              <p class="save-backup-description" data-i18n="saveBackupDescription">書き出したファイルをブラウザ外に保存すると、サイトデータの削除後も復元できます。</p>
               <details id="saveCodeDetails" class="save-code-details">
                 <summary class="save-code-title" data-i18n="saveCode">セーブコード</summary>
                 <label class="save-code-label" for="saveCodeArea" data-i18n="saveCode">セーブコード</label>
@@ -909,24 +939,16 @@
               </details>
               <details id="saveRecoveryDetails" class="save-recovery">
                 <summary class="save-recovery-title" data-i18n="saveRecovery">セーブ復旧</summary>
-                <p id="preImportBackupStatus" class="save-recovery-status"></p>
                 <p id="loadFailureStatus" class="save-recovery-status"></p>
-                <p id="quarantineStatus" class="save-recovery-status"></p>
                 <div class="save-recovery-actions">
-                  <button id="retryLoadButton" class="reset-button" type="button" data-i18n="retryLoad" hidden>
-                    再試行
+                  <button id="reloadLatestSaveButton" class="reset-button" type="button" data-i18n="reloadLatestSave" hidden>
+                    最新セーブを読み込む
                   </button>
-                  <button id="restoreQuarantineButton" class="reset-button" type="button" data-i18n="restoreQuarantine" hidden>
-                    隔離データを復元して再読み込み
-                  </button>
-                  <button id="restorePreImportButton" class="reset-button" type="button" data-i18n="restorePreImport" hidden>
-                    インポート前へ戻す
-                  </button>
-                  <button id="restoreUndoButton" class="reset-button" type="button" data-i18n="restoreUndo" hidden>
-                    直前の復元を取り消す
+                  <button id="startNewSaveButton" class="reset-button" type="button" data-i18n="startNewSave" hidden>
+                    新しいセーブを開始
                   </button>
                 </div>
-                <p class="save-recovery-label" data-i18n="saveCheckpoints">チェックポイント</p>
+                <p class="save-recovery-label" data-i18n="saveBackups">バックアップ</p>
                 <div id="saveCheckpointList" class="save-checkpoint-list"></div>
               </details>
               <div class="save-reset-action">
@@ -938,6 +960,16 @@
           </div>
         </section>
       </div>
+
+      <section id="mobileQuickActions" class="mobile-quick-actions" hidden>
+        <div id="quickActionList" class="mobile-quick-action-list" role="group" aria-label="クイック操作">
+          <button id="quickActionBuyAll" class="mobile-quick-action" type="button" data-quick-action="buyAll" aria-label="全購入 (M)">MAX</button>
+          <button id="quickActionGeneration" class="mobile-quick-action" type="button" data-quick-action="generation" aria-label="世代交代 (G)">GEN</button>
+          <button id="quickActionCoreBoost" class="mobile-quick-action" type="button" data-quick-action="coreBoost" aria-label="核増幅 (B)">CB</button>
+          <button id="quickActionInfinity" class="mobile-quick-action" type="button" data-quick-action="infinity" aria-label="Infinity (I)">INF</button>
+          <button id="quickActionEternity" class="mobile-quick-action" type="button" data-quick-action="eternity" aria-label="Eternity (E)">ETR</button>
+        </div>
+      </section>
     </main>
 
     <section id="offlineReportPanel" class="offline-report" role="dialog" aria-live="polite" hidden>

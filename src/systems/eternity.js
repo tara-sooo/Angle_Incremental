@@ -132,8 +132,16 @@ function canEternity() {
     && runtime.towerChallenge4CompletedForEternity?.() === true;
 }
 
+function eternityGainMultiplierLog10() {
+  const realMultiplierLog10 = runtime.timelineRealAd30EternityGainMultiplierLog10?.() ?? 0;
+  const parallelMultiplierLog10 = runtime.timelineParallelAd30EternityGainMultiplierLog10?.() ?? 0;
+  return runtime.clampLog10(realMultiplierLog10 + parallelMultiplierLog10);
+}
+
 function rawEternityGain() {
-  return 1;
+  const realMultiplier = runtime.timelineRealAd30EternityGainMultiplier?.() ?? 1;
+  const parallelMultiplier = runtime.timelineParallelAd30EternityGainMultiplier?.() ?? 1;
+  return realMultiplier * parallelMultiplier;
 }
 
 function eternityGain() {
@@ -141,13 +149,21 @@ function eternityGain() {
 }
 
 function eternityGainLog10() {
-  return 0;
+  return runtime.log10ExactInteger(eternityGainExact());
 }
 
 function eternityGainExact() {
+  const availableCounterCapacity = runtime.MAX_EXACT_INTEGER - currentExactEternityCount();
+  if (availableCounterCapacity <= 0n) return 0n;
+
   const rawGain = rawEternityGain();
-  if (Number.isFinite(rawGain)) return runtime.normalizeExactInteger(Math.max(1, Math.floor(rawGain)));
-  return runtime.exactIntegerFromLog10(eternityGainLog10());
+  const requestedGain = Number.isFinite(rawGain)
+    ? runtime.normalizeExactInteger(Math.max(1, Math.floor(rawGain)))
+    : runtime.exactIntegerFromLog10(eternityGainMultiplierLog10());
+  const normalizedGain = requestedGain > 0n ? requestedGain : 1n;
+  return normalizedGain > availableCounterCapacity
+    ? availableCounterCapacity
+    : normalizedGain;
 }
 
 function addEternityGain(gain) {

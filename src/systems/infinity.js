@@ -340,7 +340,10 @@ function infinityCountGainLog10() {
   const multiplierLog10 = timelineMultiplierLog10 === undefined
     ? runtime.log10Value(runtime.timelineRealInfinityCountGainMultiplier?.() ?? 1)
     : timelineMultiplierLog10;
-  return runtime.clampLog10(runtime.log10Value(baseGain) + multiplierLog10);
+  const ic6TimelineMultiplierLog10 = runtime.timelineRealBc6000Ic6RewardMultiplierLog10?.() ?? 0;
+  return runtime.clampLog10(
+    runtime.log10Value(baseGain) + multiplierLog10 + ic6TimelineMultiplierLog10,
+  );
 }
 
 function infinityCountGain() {

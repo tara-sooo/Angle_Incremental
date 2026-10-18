@@ -17,27 +17,34 @@ git worktree add ../<repo>.<branch-with-slashes-replaced-by-dashes> \
 If the claimed worktree already exists, inspect it and reuse it only when its
 branch and lock belong to the current claim. An unlisted path or unrelated
 branch is a hold, not a cleanup target. Immediately after creation, acquire
-the atomic `idd-claim.lock`; only then run:
-
-```sh
-npm ci
-```
+the atomic `idd-claim.lock`. Do not install dependencies by default; run
+`npm ci` only when the selected validation profile requires an installed
+dependency.
 
 Before B2, verify the primary branch is `next`, the sibling is listed, the
 sibling path is the current directory, and its branch is the claimed branch.
 
 ## B2 — Plan checkpoint
 
-Re-fetch the Issue and perform one bounded supersession check: confirm it is
-still open and scan PRs merged at or after the claim timestamp for the Issue's
-named candidate files. If the complete outcome already shipped, verify the
-acceptance criteria on `next`, record the superseding PR, close the Issue, and
-stop; otherwise continue.
+Re-fetch the Issue and perform one bounded supersession check after claim:
+confirm it is open and inspect PRs merged since the claim for scoped files.
+If the complete outcome shipped, verify acceptance on `next`, record the
+superseding PR, close the Issue, and stop; otherwise plan only remaining work.
 
-Post a concrete draft plan to the Issue, critique it for correctness, scope,
-and verification, then post a refined final plan. Revalidate the claim and
-record the plan in the live status digest before writing implementation code.
-No code is written before the final plan comment exists.
+Choose a planning profile from Issue scope and live provenance, not preference:
+
+- **Simple:** deterministic, low-ambiguity sync/docs/metadata work; one concise
+  plan/status entry, with no separate draft and final plan comments.
+- **Standard:** bounded code changes; one plan with a bounded inline critique,
+  without reposting an equivalent plan.
+- **Complex:** cross-system, architectural, high-risk, or materially ambiguous
+  work such as save/progression architecture, balance formulas, broad runtime
+  refactors, or ambiguous cross-system changes; draft, critique for
+  correctness/scope/verification, then refined final.
+
+Unknown scope uses the more thorough profile. Record the selected profile and
+plan in the live status digest before implementation. Do not write code before
+the selected profile's plan checkpoint is complete.
 
 ## B3 — Implement
 
@@ -53,9 +60,9 @@ npm run check:runtime-order && npm run check:syntax
 
 When an Issue explicitly requires `npm run test:performance` during B/C or
 before push, run it and record its report. The Issue request changes the
-evidence collected, not the workflow gates: `npm run validate` remains the
-normal pre-push/post-fix gate, and the hosted-CI retry/hold rules do not apply
-to a local command.
+evidence collected, not gate selection: run the selected performance profile
+and keep the selected pre-push requirements. The routine profile is
+npm run validate; hosted-CI retry/hold rules do not apply to local results.
 
 | local result | B/C action |
 | --- | --- |
