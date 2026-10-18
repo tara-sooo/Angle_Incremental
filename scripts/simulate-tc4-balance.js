@@ -889,6 +889,7 @@ function childNodeFromDecision(runtime, node, result, kind, policy, options) {
 function replayCompactFrontierNode(context, compact, policy, options = context.searchOptions) {
   const { runtime, rootSnapshot, candidate } = context;
   const nodeOptions = { ...options, debug: context.searchOptions.debug };
+  restoreState(runtime.state, rootSnapshot);
   let node = rootSearchNode(runtime, rootSnapshot, candidate, nodeOptions, policy);
   for (const [index, expected] of compact.purchaseSequence.entries()) {
     restoreState(runtime.state, node.snapshot);
