@@ -525,7 +525,7 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
         assert.ok(button.rect.bottom <= layout.nav.rect.top - 5, `${button.id} must not overlap navigation at ${label}`);
         for (const [controlName, control] of [["generation", layout.gameArea.generationButton], ["core boost", layout.gameArea.coreBoostButton]]) {
           if (control.width > 0 && control.height > 0) {
-            assert.equal(rectanglesOverlap(button.rect, control), false, `${button.id} must not cover the ${controlName} control at ${label}`);
+            assert.equal(rectanglesOverlap(button.rect, control), false, `${button.id} must not cover the ${controlName} control at ${label} (action=${JSON.stringify(button.rect)}, control=${JSON.stringify(control)}, panelScrollTop=${layout.gameArea.scrollTop})`);
           }
         }
       }
@@ -804,6 +804,10 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
     assert.ok(touchPan.scrollTop > 0, "vertical touch scrolling through transparent overlay space should reach the game panel");
     assert.equal(touchPan.calls, 0, "a touch gesture outside the action buttons must not activate a quick action");
     await page.evaluate(() => { document.querySelector(".main-panel.is-active").scrollTop = 0; });
+    await page.waitForTimeout(200);
+    await page.evaluate(() => { document.querySelector(".main-panel.is-active").scrollTop = 0; });
+    await page.waitForTimeout(50);
+    assert.equal(await page.evaluate(() => document.querySelector(".main-panel.is-active").scrollTop), 0, "the gameplay panel should settle before the next viewport assertions");
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.evaluate(() => { document.getElementById("quickActionList").scrollLeft = 0; });
