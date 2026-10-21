@@ -419,6 +419,7 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
             unavailableClass: button.classList.contains("is-unavailable"),
             borderRadius: style.borderRadius,
             borderStyle: style.borderStyle,
+            color: style.color,
             backgroundImage: style.backgroundImage,
             boxShadow: style.boxShadow,
             outlineStyle: style.outlineStyle,
@@ -443,7 +444,7 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
         assert.ok(button.rect.width >= 44 && button.rect.height >= 44, "quick-action touch targets should be at least 44×44 px");
       }
       await mkdir(path.join(root, "output"), { recursive: true });
-      await page.screenshot({ path: path.join(root, "output", `issue-473-quick-actions-${width}.png`) });
+      await page.screenshot({ path: path.join(root, "output", `issue-481-after-t32-quick-actions-${width}.png`) });
     }
     await page.setViewportSize({ width: 390, height: 844 });
     const availability = await page.evaluate(() => [
@@ -475,8 +476,13 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
       assert.equal(layout.list.touchAction, "pan-x");
       assert.equal(layout.buttons.length, 5, "all five canonical actions should remain present");
       assert.deepEqual(layout.buttons.map((button) => button.id), ["buyAll", "generation", "coreBoost", "infinity", "eternity"]);
-      assert.equal(layout.buttons[0].borderRadius, "999px", "MAX purchases should use a distinct pill shape");
+      assert.equal(layout.buttons[0].borderRadius, "14px", "MAX purchase should retain a rounded-square shape");
       assert.equal(layout.buttons[1].borderRadius, "50%", "reset actions should be circular");
+      assert.notEqual(layout.buttons[0].color, layout.buttons[1].color, "purchase and reset actions should remain visually distinct without size differences");
+      for (const button of layout.buttons) {
+        assert.equal(button.rect.width, 52, `${button.id} should use the shared 52px control width`);
+        assert.equal(button.rect.height, 52, `${button.id} should use the shared 52px control height`);
+      }
       assert.ok(layout.bar.rect.bottom <= layout.nav.rect.top + 1, `action row should not overlap navigation at ${width}×${height}`);
       assert.ok(layout.bar.rect.top >= layout.panels.bottom - 1, `action row should follow gameplay at ${width}×${height}`);
       assert.ok(layout.documentWidth <= width && layout.bodyWidth <= width, `the document should not overflow at ${width}px`);
@@ -503,7 +509,7 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
       }
       if (screenshotName) {
         await mkdir(path.join(root, "output"), { recursive: true });
-        await page.screenshot({ path: path.join(root, "output", `issue-481-after-${screenshotName}.png`) });
+        await page.screenshot({ path: path.join(root, "output", `issue-481-after-t32-${screenshotName}.png`) });
       }
       return layout;
     };
@@ -776,7 +782,198 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
   }
 }
 
+async function testWideTouchSafeArea({ browser, origin, errors, httpFailures }) {
+  const handle = await openGamePage(browser, origin, {
+    viewport: { width: 1024, height: 1366 },
+    deviceScaleFactor: 1,
+    hasTouch: true,
+    isMobile: true,
+    stubFonts: true,
+    freezeAnimationFrame: true,
+  });
+  const { context, page } = handle;
+  trackPage(page, "quick-actions-wide-touch", errors, httpFailures);
+  const readGeometry = () => page.evaluate(() => {
+    const readRect = (element) => {
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height };
+    };
+    const readStyle = (selector) => {
+      const element = document.querySelector(selector);
+      return element ? getComputedStyle(element) : null;
+    };
+    const shell = document.querySelector(".shell");
+    const shellStyle = getComputedStyle(shell);
+    const tabs = document.querySelector(".main-tabs");
+    const tabsStyle = getComputedStyle(tabs);
+    const fps = readStyle(".fps-counter");
+    const toasts = readStyle(".achievement-toasts");
+    const offline = readStyle(".offline-report");
+    const update = readStyle(".update-modal");
+    const confirmation = readStyle(".confirmation-modal");
+    return {
+      viewport: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        scale: window.visualViewport?.scale ?? 1,
+        coarse: matchMedia("(pointer: coarse)").matches,
+        wideTouch: matchMedia("(min-width: 821px) and (pointer: coarse)").matches,
+      },
+      documentWidth: document.documentElement.scrollWidth,
+      bodyWidth: document.body.scrollWidth,
+      actionDisplay: getComputedStyle(document.getElementById("mobileQuickActions")).display,
+      shell: {
+        rect: readRect(shell),
+        paddingTop: shellStyle.paddingTop,
+        paddingRight: shellStyle.paddingRight,
+        paddingBottom: shellStyle.paddingBottom,
+        paddingLeft: shellStyle.paddingLeft,
+      },
+      tabs: {
+        gridColumnStart: tabsStyle.gridColumnStart,
+        gridRowStart: tabsStyle.gridRowStart,
+      },
+      fps: fps ? { rect: readRect(document.querySelector(".fps-counter")), top: fps.top, right: fps.right } : null,
+      toasts: toasts ? { rect: readRect(document.querySelector(".achievement-toasts")), top: toasts.top, right: toasts.right } : null,
+      offline: offline ? {
+        rect: readRect(document.querySelector(".offline-report")),
+        left: offline.left,
+        right: offline.right,
+        bottom: offline.bottom,
+        width: offline.width,
+        maxHeight: offline.maxHeight,
+      } : null,
+      updatePadding: update ? {
+        top: update.paddingTop,
+        right: update.paddingRight,
+        bottom: update.paddingBottom,
+        left: update.paddingLeft,
+      } : null,
+      confirmation: confirmation ? {
+        width: confirmation.width,
+        maxWidth: confirmation.maxWidth,
+        maxHeight: confirmation.maxHeight,
+      } : null,
+    };
+  });
+
+  try {
+    await page.evaluate(() => window.__angleDebug.runtime.closeUpdateModal?.());
+    const viewportMeta = await page.locator('meta[name="viewport"]').getAttribute("content");
+    assert.match(viewportMeta ?? "", /viewport-fit=cover/, "wide touch viewports must retain the safe-area viewport mode");
+    const baseline = await readGeometry();
+    assert.equal(baseline.viewport.coarse, true, "wide-touch context should expose a coarse pointer");
+    assert.equal(baseline.viewport.wideTouch, true, "safe-area rules should match 821px+ touch viewports");
+    assert.deepEqual(
+      [baseline.shell.paddingTop, baseline.shell.paddingRight, baseline.shell.paddingBottom, baseline.shell.paddingLeft],
+      ["9px", "0px", "9px", "0px"],
+      "zero-inset touch tablets should retain the existing 9px outer gutters",
+    );
+    assert.equal(baseline.tabs.gridColumnStart, "1", "portrait navigation should remain on its existing column");
+    assert.equal(baseline.actionDisplay, "none", "wide portrait touch should not reveal the mobile quick-action row");
+    assert.ok(baseline.documentWidth <= 1024 && baseline.bodyWidth <= 1024, "wide portrait touch should not overflow horizontally");
+
+    // Chromium has no physical notch; inject the CSS aliases to exercise nonzero inset layout math.
+    const insets = { top: 32, right: 40, bottom: 24, left: 36 };
+    await page.evaluate((values) => {
+      const rootStyle = document.documentElement.style;
+      for (const [side, value] of Object.entries(values)) rootStyle.setProperty(`--ui-safe-area-inset-${side}`, `${value}px`);
+      for (const selector of [".fps-counter", ".offline-report"]) {
+        const element = document.querySelector(selector);
+        if (element) element.hidden = false;
+      }
+    }, insets);
+    const safe = await readGeometry();
+    assert.deepEqual(
+      [safe.shell.paddingTop, safe.shell.paddingRight, safe.shell.paddingBottom, safe.shell.paddingLeft],
+      ["32px", "31px", "24px", "27px"],
+      "simulated nonzero insets should protect the shell while retaining its 9px exterior gutter",
+    );
+    const shellContent = {
+      left: safe.shell.rect.left + Number.parseFloat(safe.shell.paddingLeft),
+      right: safe.shell.rect.right - Number.parseFloat(safe.shell.paddingRight),
+      top: safe.shell.rect.top + Number.parseFloat(safe.shell.paddingTop),
+      bottom: safe.shell.rect.bottom - Number.parseFloat(safe.shell.paddingBottom),
+    };
+    assert.ok(shellContent.left >= insets.left - 1 && shellContent.right <= safe.viewport.width - insets.right + 1, "shell content should stay inside simulated side insets");
+    assert.ok(shellContent.top >= insets.top - 1 && shellContent.bottom <= safe.viewport.height - insets.bottom + 1, "shell content should stay inside simulated top/bottom insets");
+    assert.ok(safe.fps && Number.parseFloat(safe.fps.top) >= insets.top + 4, "fixed FPS control should clear the simulated top inset");
+    assert.ok(safe.fps.rect.right <= safe.viewport.width - insets.right - 4 + 1, "fixed FPS control should clear the simulated right inset");
+    assert.ok(safe.toasts && Number.parseFloat(safe.toasts.top) >= insets.top + 4, "achievement toasts should clear the simulated top inset");
+    assert.ok(safe.toasts.rect.right <= safe.viewport.width - insets.right - 4 + 1, "achievement toasts should clear the simulated right inset");
+    assert.ok(safe.offline && safe.offline.rect.left >= insets.left - 1, "offline report should clear the simulated left inset");
+    assert.ok(safe.offline.rect.right <= safe.viewport.width - insets.right + 1, "offline report should clear the simulated right inset");
+    assert.ok(safe.offline.rect.top >= insets.top + 17 && safe.offline.rect.bottom <= safe.viewport.height - insets.bottom - 17, "offline report should stay inside the simulated vertical safe area");
+    assert.deepEqual(safe.updatePadding, { top: "50px", right: "58px", bottom: "42px", left: "54px" }, "update modal content padding should preserve the simulated safe area");
+    assert.equal(safe.confirmation.maxHeight, `${safe.viewport.height - insets.top - insets.bottom - 24}px`, "confirmation dialogs should cap height to the simulated safe viewport");
+
+    await page.setViewportSize({ width: 900, height: 1200 });
+    const narrowerTouch = await readGeometry();
+    assert.equal(narrowerTouch.viewport.wideTouch, true, "coarse portrait viewports above the mobile breakpoint should keep safe-area protection");
+    assert.ok(narrowerTouch.documentWidth <= 900 && narrowerTouch.bodyWidth <= 900, "narrower touch portrait should remain horizontally contained");
+    assert.equal(narrowerTouch.shell.paddingLeft, "27px");
+
+    await page.setViewportSize({ width: 1366, height: 1024 });
+    const landscape = await readGeometry();
+    assert.equal(landscape.tabs.gridColumnStart, "2", "landscape should retain the existing right-side navigation layout");
+    assert.equal(landscape.actionDisplay, "none", "wide landscape touch should not reveal the short-landscape action row");
+    assert.equal(landscape.shell.paddingRight, "31px");
+    assert.ok(landscape.documentWidth <= 1366 && landscape.bodyWidth <= 1366, "wide landscape touch should remain horizontally contained");
+
+    const cdp = await context.newCDPSession(page);
+    try {
+      await cdp.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1.25 });
+      const zoomed = await readGeometry();
+      assert.equal(zoomed.viewport.scale, 1.25, "page-scale zoom should be active for the zoom regression");
+      assert.equal(zoomed.shell.paddingTop, "32px", "page-scale zoom should retain the top safe-area CSS padding");
+      assert.equal(zoomed.shell.paddingRight, "31px", "page-scale zoom should retain the side safe-area CSS padding");
+      assert.ok(zoomed.documentWidth <= zoomed.viewport.width, "page-scale zoom should not introduce document overflow");
+    } finally {
+      await cdp.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1 }).catch(() => {});
+      await cdp.detach();
+    }
+  } finally {
+    await context.close();
+  }
+
+  const desktopHandle = await openGamePage(browser, origin, {
+    viewport: { width: 1280, height: 800 },
+    deviceScaleFactor: 1,
+    hasTouch: false,
+    isMobile: false,
+    stubFonts: true,
+    freezeAnimationFrame: true,
+  });
+  trackPage(desktopHandle.page, "quick-actions-wide-desktop", errors, httpFailures);
+  try {
+    const desktop = await desktopHandle.page.evaluate(() => {
+      const shellStyle = getComputedStyle(document.querySelector(".shell"));
+      const tabsStyle = getComputedStyle(document.querySelector(".main-tabs"));
+      return {
+        coarse: matchMedia("(pointer: coarse)").matches,
+        wideTouch: matchMedia("(min-width: 821px) and (pointer: coarse)").matches,
+        width: window.innerWidth,
+        documentWidth: document.documentElement.scrollWidth,
+        bodyWidth: document.body.scrollWidth,
+        actionDisplay: getComputedStyle(document.getElementById("mobileQuickActions")).display,
+        shellPadding: [shellStyle.paddingTop, shellStyle.paddingRight, shellStyle.paddingBottom, shellStyle.paddingLeft],
+        tabsColumn: tabsStyle.gridColumnStart,
+      };
+    });
+    assert.equal(desktop.coarse, false, "desktop context should retain a fine pointer");
+    assert.equal(desktop.wideTouch, false, "safe-area override must not match ordinary desktop pointers");
+    assert.deepEqual(desktop.shellPadding, ["9px", "0px", "9px", "0px"], "ordinary desktop shell gutters should remain unchanged");
+    assert.equal(desktop.tabsColumn, "2", "ordinary desktop landscape navigation should retain its existing column");
+    assert.equal(desktop.actionDisplay, "none", "ordinary desktop should keep quick actions hidden");
+    assert.ok(desktop.documentWidth <= desktop.width && desktop.bodyWidth <= desktop.width, "ordinary desktop should remain horizontally contained");
+  } finally {
+    await desktopHandle.context.close();
+  }
+}
+
 export async function runQuickActions({ browser, origin, errors, httpFailures }) {
   await testDesktop({ browser, origin, errors, httpFailures });
   await testMobile({ browser, origin, errors, httpFailures });
+  await testWideTouchSafeArea({ browser, origin, errors, httpFailures });
 }

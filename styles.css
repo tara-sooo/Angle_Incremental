@@ -4048,6 +4048,76 @@ canvas {
   }
 }
 
+@media (min-width: 821px) and (pointer: coarse) {
+  :root {
+    --ui-safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --ui-safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --ui-safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --ui-safe-area-inset-left: env(safe-area-inset-left, 0px);
+  }
+
+  .shell {
+    padding: max(9px, var(--ui-safe-area-inset-top))
+      max(0px, calc(var(--ui-safe-area-inset-right) - 9px))
+      max(9px, var(--ui-safe-area-inset-bottom))
+      max(0px, calc(var(--ui-safe-area-inset-left) - 9px));
+  }
+
+  .fps-counter {
+    top: max(15px, calc(var(--ui-safe-area-inset-top) + 4px));
+    right: max(24px, calc(var(--ui-safe-area-inset-right) + 4px));
+  }
+
+  .top-bar-hidden .fps-counter {
+    top: max(18px, calc(var(--ui-safe-area-inset-top) + 4px));
+    right: max(112px, calc(var(--ui-safe-area-inset-right) + 4px));
+  }
+
+  .achievement-toasts {
+    top: max(58px, calc(var(--ui-safe-area-inset-top) + 4px));
+    right: max(112px, calc(var(--ui-safe-area-inset-right) + 4px));
+  }
+
+  .top-bar-hidden .achievement-toasts {
+    top: max(
+      calc(58px + var(--fps-counter-height) + 8px),
+      calc(var(--ui-safe-area-inset-top) + 4px)
+    );
+  }
+
+  .offline-report {
+    left: calc(
+      var(--ui-safe-area-inset-left) +
+      (100vw - var(--ui-safe-area-inset-left) - var(--ui-safe-area-inset-right)) / 2
+    );
+    bottom: max(18px, calc(var(--ui-safe-area-inset-bottom) + 18px));
+    width: min(
+      680px,
+      calc(100vw - var(--ui-safe-area-inset-left) - var(--ui-safe-area-inset-right) - 36px)
+    );
+    max-height: calc(
+      100svh - var(--ui-safe-area-inset-top) - var(--ui-safe-area-inset-bottom) - 36px
+    );
+  }
+
+  .update-modal {
+    padding:
+      max(18px, calc(var(--ui-safe-area-inset-top) + 18px))
+      max(18px, calc(var(--ui-safe-area-inset-right) + 18px))
+      max(18px, calc(var(--ui-safe-area-inset-bottom) + 18px))
+      max(18px, calc(var(--ui-safe-area-inset-left) + 18px));
+  }
+
+  .confirmation-modal {
+    width: min(
+      460px,
+      calc(100vw - var(--ui-safe-area-inset-left) - var(--ui-safe-area-inset-right) - 24px)
+    );
+    max-width: calc(100vw - var(--ui-safe-area-inset-left) - var(--ui-safe-area-inset-right) - 24px);
+    max-height: calc(100svh - var(--ui-safe-area-inset-top) - var(--ui-safe-area-inset-bottom) - 24px);
+  }
+}
+
 @media (max-width: 820px), (min-width: 821px) and (max-width: 1023px) and (max-height: 480px) and (pointer: coarse) {
   #mobileQuickActions:not([hidden]) {
     display: block;
@@ -4112,11 +4182,15 @@ canvas {
   }
 
   #quickActionBuyAll {
-    flex-basis: 64px;
-    width: 64px;
-    min-width: 64px;
+    flex-basis: 52px;
+    width: 52px;
+    min-width: 52px;
     aspect-ratio: auto;
-    border-radius: 999px;
+    border-color: rgba(242, 184, 75, 0.8);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(242, 184, 75, 0.18), rgba(242, 184, 75, 0.04) 48%, rgba(0, 0, 0, 0.14)), var(--panel-strong);
+    color: var(--gold);
+    font-size: 0.72rem;
   }
 
   .mobile-quick-action.is-unavailable,
