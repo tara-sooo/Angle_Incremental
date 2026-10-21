@@ -4224,3 +4224,9 @@ canvas {
     bottom: calc(132px + var(--ui-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 }
+
+@media (max-width: 300px) and (pointer: coarse) {
+  #mobileQuickActions:not([hidden]) {
+    top: calc(-52px - 30px);
+  }
+}
