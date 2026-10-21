@@ -366,12 +366,18 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
       const nav = document.querySelector(".main-tabs");
       const activeTab = nav.querySelector(".main-tab.is-active");
       const panels = document.querySelector(".main-panels");
+      const panel = document.querySelector(".main-panel.is-active");
+      const canvas = document.getElementById("gameCanvas");
+      const generationButton = document.getElementById("generationButton");
+      const coreBoostButton = document.getElementById("coreBoostButton");
+      const toast = document.querySelector(".achievement-toasts");
       const shellStyle = getComputedStyle(shell);
       const barStyle = getComputedStyle(bar);
       const listStyle = getComputedStyle(list);
       const activeTabStyle = activeTab ? getComputedStyle(activeTab) : null;
+      const toastStyle = getComputedStyle(toast);
       return {
-        viewport: { width: window.innerWidth, height: window.innerHeight, coarse: matchMedia("(pointer: coarse)").matches },
+        viewport: { width: window.innerWidth, height: window.innerHeight, scale: window.visualViewport?.scale ?? 1, coarse: matchMedia("(pointer: coarse)").matches },
         documentWidth: document.documentElement.scrollWidth,
         bodyWidth: document.body.scrollWidth,
         shell: {
@@ -407,6 +413,20 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
           } : null,
         },
         panels: read(panels),
+        gameArea: {
+          panel: read(panel),
+          scrollTop: panel.scrollTop,
+          scrollHeight: panel.scrollHeight,
+          clientHeight: panel.clientHeight,
+          overflowY: getComputedStyle(panel).overflowY,
+          canvas: read(canvas),
+          generationButton: read(generationButton),
+          coreBoostButton: read(coreBoostButton),
+        },
+        fixedToast: {
+          visible: toastStyle.display !== "none" && !toast.hidden && read(toast).width > 0 && read(toast).height > 0,
+          rect: read(toast),
+        },
         buttons: Array.from(document.querySelectorAll(".mobile-quick-action"), (button) => {
           const style = getComputedStyle(button);
           return {
@@ -430,9 +450,43 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
         }),
       };
     });
+    const assertNoGameplayOverlap = async (layout, label) => {
+      const { canvas, panel } = layout.gameArea;
+      assert.ok(canvas.width > 0 && canvas.height > 0, `game canvas should be rendered at ${label}`);
+      assert.ok(canvas.height <= panel.height + 1, `game canvas should fit the game panel scrollport at ${label}`);
+      assert.ok(layout.bar.rect.top >= panel.bottom - 1, `action row should follow the game panel at ${label}`);
+      assert.ok(layout.bar.rect.bottom <= layout.nav.rect.top + 1, `action row must remain above navigation at ${label}`);
+      assert.ok(layout.gameArea.overflowY === "auto" || layout.gameArea.overflowY === "scroll", `overflowing game controls should remain reachable by scrolling at ${label}`);
+      const visibleCanvas = {
+        left: Math.max(canvas.left, panel.left),
+        right: Math.min(canvas.right, panel.right),
+        top: Math.max(canvas.top, panel.top),
+        bottom: Math.min(canvas.bottom, panel.bottom),
+      };
+      assert.ok(visibleCanvas.bottom > visibleCanvas.top, `some gameplay canvas should remain visible at ${label}`);
+      const canvasOverlapsBar = visibleCanvas.left < layout.bar.rect.right && visibleCanvas.right > layout.bar.rect.left
+        && visibleCanvas.top < layout.bar.rect.bottom && visibleCanvas.bottom > layout.bar.rect.top;
+      assert.equal(canvasOverlapsBar, false, `the clipped gameplay viewport must not paint beneath the action row at ${label}`);
+      if (canvas.top < panel.top - 1 || canvas.bottom > panel.bottom + 1) {
+        const savedScrollTop = layout.gameArea.scrollTop;
+        await page.evaluate(() => document.getElementById("gameCanvas").scrollIntoView({ block: "center", behavior: "instant" }));
+        const revealed = await readGeometry();
+        assert.ok(revealed.gameArea.canvas.top >= revealed.gameArea.panel.top - 1, `scrolling should reveal the full canvas at ${label}`);
+        assert.ok(revealed.gameArea.canvas.bottom <= revealed.gameArea.panel.bottom + 1, `scrolling should reveal the canvas above the action-row slot at ${label}`);
+        assert.ok(revealed.bar.rect.top >= revealed.gameArea.panel.bottom - 1, `revealing the canvas must not move the action row over gameplay at ${label}`);
+        await page.evaluate((scrollTop) => { document.querySelector(".main-panel.is-active").scrollTop = scrollTop; }, savedScrollTop);
+      }
+      if (layout.fixedToast.visible) {
+        const toast = layout.fixedToast.rect;
+        const bar = layout.bar.rect;
+        const overlaps = toast.left < bar.right && toast.right > bar.left && toast.top < bar.bottom && toast.bottom > bar.top;
+        assert.equal(overlaps, false, `fixed achievement UI should not cover the action-row slot at ${label}`);
+      }
+    };
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       const layout = await readGeometry();
+      await assertNoGameplayOverlap(layout, `${layout.viewport.width}×${layout.viewport.height}`);
       assert.ok(layout.bar.rect.height > 0, `mobile action row should be visible at ${width}px`);
       assert.ok(layout.bar.rect.bottom <= layout.nav.rect.top + 1, `action row should not overlap bottom tabs at ${width}px`);
       assert.ok(layout.bar.rect.top >= layout.panels.bottom - 1, `action row should follow the main panel at ${width}px`);
@@ -444,7 +498,7 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
         assert.ok(button.rect.width >= 44 && button.rect.height >= 44, "quick-action touch targets should be at least 44×44 px");
       }
       await mkdir(path.join(root, "output"), { recursive: true });
-      await page.screenshot({ path: path.join(root, "output", `issue-481-after-t32-quick-actions-${width}.png`) });
+      await page.screenshot({ path: path.join(root, "output", `issue-481-after-t35-verified-quick-actions-${width}.png`) });
     }
     await page.setViewportSize({ width: 390, height: 844 });
     const availability = await page.evaluate(() => [
@@ -468,6 +522,7 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
       await page.setViewportSize({ width, height });
       await setQuickActionAvailability(page, unavailableIds);
       const layout = await readGeometry();
+      await assertNoGameplayOverlap(layout, `${layout.viewport.width}×${layout.viewport.height}`);
       assert.equal(layout.bar.hidden, false, `the action bar should be visible at ${width}×${height}`);
       assert.equal(layout.bar.display, "block");
       assert.equal(layout.bar.borderTopWidth, "0px", "quick actions should not remain inside a bordered navigation-like strip");
@@ -509,7 +564,7 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
       }
       if (screenshotName) {
         await mkdir(path.join(root, "output"), { recursive: true });
-        await page.screenshot({ path: path.join(root, "output", `issue-481-after-t32-${screenshotName}.png`) });
+        await page.screenshot({ path: path.join(root, "output", `issue-481-after-t35-verified-${screenshotName}.png`) });
       }
       return layout;
     };
@@ -562,9 +617,62 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
     await resetSpy(page);
 
     await page.setViewportSize({ width: 844, height: 390 });
+    const landscapeAll = await capturePresentation(844, 390, [], "844x390-landscape-all-available");
     const landscapeMixed = await capturePresentation(844, 390, mixedUnavailable, "844x390-landscape-mixed");
+    assert.equal(landscapeAll.buttons.length, 5);
     assert.equal(landscapeMixed.viewport.coarse, true, "the landscape fixture should be a coarse-pointer touch device");
     assert.equal(landscapeMixed.nav.gridRow, "4", "touch landscape should keep quick actions above navigation");
+
+    await page.evaluate((insets) => {
+      for (const [side, value] of Object.entries(insets)) {
+        document.documentElement.style.setProperty(`--ui-safe-area-inset-${side}`, `${value}px`);
+      }
+    }, { top: 30, right: 40, bottom: 24, left: 36 });
+    const safeLandscape = await readGeometry();
+    await assertNoGameplayOverlap(safeLandscape, "844×390 landscape with simulated safe insets");
+    assert.deepEqual(
+      [safeLandscape.shell.paddingTop, safeLandscape.shell.paddingRight, safeLandscape.shell.paddingBottom, safeLandscape.shell.paddingLeft],
+      ["30px", "31px", "24px", "27px"],
+      "short-landscape shell should use the simulated safe insets and preserve 9px side gutters",
+    );
+    assert.ok(safeLandscape.documentWidth <= 844 && safeLandscape.bodyWidth <= 844, "safe-area landscape should not overflow horizontally");
+
+    await page.evaluate(() => { document.documentElement.style.fontSize = "150%"; });
+    const scaledLandscape = await readGeometry();
+    await assertNoGameplayOverlap(scaledLandscape, "844×390 landscape at 150% text scale");
+    assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize), "24px");
+
+    const landscapeZoom = await context.newCDPSession(page);
+    try {
+      await landscapeZoom.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1.25 });
+      const zoomedLandscape = await readGeometry();
+      assert.equal(zoomedLandscape.viewport.scale, 1.25, "short-landscape page-scale zoom should be active");
+      await assertNoGameplayOverlap(zoomedLandscape, "844×390 landscape with safe insets, text scale, and page zoom");
+    } finally {
+      await landscapeZoom.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1 }).catch(() => {});
+      await landscapeZoom.detach();
+    }
+
+    await page.evaluate(() => {
+      const panel = document.querySelector(".main-panel.is-active");
+      panel.scrollTop = panel.scrollHeight;
+    });
+    const scrolledLandscape = await readGeometry();
+    assert.ok(scrolledLandscape.gameArea.scrollTop > 0, "short-landscape game panel should remain vertically scrollable");
+    for (const [id, control] of [["generation", scrolledLandscape.gameArea.generationButton], ["core boost", scrolledLandscape.gameArea.coreBoostButton]]) {
+      assert.ok(control.height >= 44, `${id} control should keep its minimum touch size`);
+      assert.ok(control.top >= scrolledLandscape.gameArea.panel.top - 1 && control.bottom <= scrolledLandscape.gameArea.panel.bottom + 1, `${id} control should be reachable inside the game panel scrollport`);
+    }
+    assert.ok(scrolledLandscape.bar.rect.top >= scrolledLandscape.gameArea.panel.bottom - 1, "scrolling gameplay must not move the action row over the game panel");
+    assert.ok(scrolledLandscape.bar.rect.bottom <= scrolledLandscape.nav.rect.top + 1, "scrolling gameplay must not move the action row over navigation");
+
+    await page.evaluate(() => {
+      const rootStyle = document.documentElement.style;
+      rootStyle.fontSize = "";
+      for (const side of ["top", "right", "bottom", "left"]) rootStyle.removeProperty(`--ui-safe-area-inset-${side}`);
+      document.querySelector(".main-panel.is-active").scrollTop = 0;
+    });
+    await assertNoGameplayOverlap(await readGeometry(), "restored 844×390 landscape");
     await page.evaluate(() => window.__angleDebug.applySetting("showMobileQuickActions", false));
     await page.waitForFunction(() => document.getElementById("mobileQuickActions").hidden);
     const hiddenLandscape = await readGeometry();

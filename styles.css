@@ -4224,22 +4224,22 @@ canvas {
   }
 
   .fps-counter {
-    top: max(12px, calc(env(safe-area-inset-top, 0px) + 4px));
-    right: max(14px, calc(env(safe-area-inset-right, 0px) + 4px));
+    top: max(12px, calc(var(--ui-safe-area-inset-top, env(safe-area-inset-top, 0px)) + 4px));
+    right: max(14px, calc(var(--ui-safe-area-inset-right, env(safe-area-inset-right, 0px)) + 4px));
   }
 
   .top-bar-hidden .fps-counter {
-    top: max(12px, calc(env(safe-area-inset-top, 0px) + 4px));
-    right: max(12px, calc(env(safe-area-inset-right, 0px) + 4px));
+    top: max(12px, calc(var(--ui-safe-area-inset-top, env(safe-area-inset-top, 0px)) + 4px));
+    right: max(12px, calc(var(--ui-safe-area-inset-right, env(safe-area-inset-right, 0px)) + 4px));
   }
 
   .achievement-toasts {
-    right: max(12px, calc(env(safe-area-inset-right, 0px) + 4px));
-    bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+    right: max(12px, calc(var(--ui-safe-area-inset-right, env(safe-area-inset-right, 0px)) + 4px));
+    bottom: calc(84px + var(--ui-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 
   .shell.has-mobile-quick-actions ~ .achievement-toasts {
-    bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(132px + var(--ui-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
   }
 }
 
@@ -4249,7 +4249,24 @@ canvas {
     grid-template-rows: auto minmax(0, 1fr) auto auto;
     gap: 6px;
     overflow: hidden;
-    padding: max(9px, env(safe-area-inset-top, 0px)) max(0px, calc(env(safe-area-inset-right, 0px) - 9px)) max(9px, env(safe-area-inset-bottom, 0px)) max(0px, calc(env(safe-area-inset-left, 0px) - 9px));
+    padding:
+      max(9px, var(--ui-safe-area-inset-top, env(safe-area-inset-top, 0px)))
+      max(0px, calc(var(--ui-safe-area-inset-right, env(safe-area-inset-right, 0px)) - 9px))
+      max(9px, var(--ui-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+      max(0px, calc(var(--ui-safe-area-inset-left, env(safe-area-inset-left, 0px)) - 9px));
+  }
+
+  .angle-panel .playfield-wrap.ui-playfield {
+    height: min(
+      260px,
+      calc(
+        100svh
+        - max(9px, var(--ui-safe-area-inset-top, env(safe-area-inset-top, 0px)))
+        - max(9px, var(--ui-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)))
+        - 220px
+      )
+    );
+    min-height: 0;
   }
 
   .shell.is-top-bar-hidden {
