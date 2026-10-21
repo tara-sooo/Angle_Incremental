@@ -543,10 +543,12 @@ async function testMobile({ browser, origin, errors, httpFailures }) {
     const assertActionToggleInvariant = async (label, baselineKey) => {
       await page.evaluate(() => window.__angleDebug.applySetting("showMobileQuickActions", false));
       await page.waitForFunction(() => document.getElementById("mobileQuickActions").hidden);
+      await page.waitForTimeout(100);
       const hidden = await readGeometry();
       assert.equal(hidden.shell.hasQuickActions, false, `the hidden setting should clear the quick-action class at ${label}`);
       await page.evaluate(() => window.__angleDebug.applySetting("showMobileQuickActions", true));
       await page.waitForFunction(() => !document.getElementById("mobileQuickActions").hidden);
+      await page.waitForTimeout(100);
       const visible = await readGeometry();
       assert.equal(visible.shell.hasQuickActions, true, `the visible setting should restore the quick-action class at ${label}`);
       assert.deepEqual(gameViewportGeometry(visible), gameViewportGeometry(hidden), `showing mobile actions must not change the game viewport at ${label}`);
