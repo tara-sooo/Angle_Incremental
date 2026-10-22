@@ -8,6 +8,12 @@ const HELP_TOPICS = Object.freeze([
     visible: () => true,
   },
   {
+    id: "quick-actions",
+    titleKey: "helpTopicQuickActions",
+    bodyKey: "helpBodyQuickActions",
+    visible: () => true,
+  },
+  {
     id: "generation",
     titleKey: "helpTopicGeneration",
     bodyKey: "helpBodyGeneration",

@@ -202,6 +202,11 @@ button {
   display: none;
 }
 
+.mobile-quick-actions,
+.mobile-quick-actions[hidden] {
+  display: none;
+}
+
 .main-tab.is-active {
   color: white;
   border-bottom-color: var(--gold);
@@ -2304,6 +2309,13 @@ canvas {
   font-size: 0.84rem;
 }
 
+@media (max-width: 820px) {
+  .save-storage-row span {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 .save-code-label {
   color: var(--muted);
   font-size: 0.84rem;
@@ -2731,6 +2743,7 @@ canvas {
 
 @media (max-width: 820px) {
   .shell {
+    position: relative;
     width: min(100vw - 14px, 620px);
     height: 100svh;
     min-height: 0;
@@ -2738,7 +2751,7 @@ canvas {
     grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 6px;
     overflow: hidden;
-    padding: 7px 0;
+    padding: max(7px, env(safe-area-inset-top, 0px)) max(0px, calc(env(safe-area-inset-right, 0px) - 7px)) max(7px, env(safe-area-inset-bottom, 0px)) max(0px, calc(env(safe-area-inset-left, 0px) - 7px));
   }
 
   .shell.is-top-bar-hidden {
@@ -2782,6 +2795,10 @@ canvas {
 
   .shell.is-top-bar-hidden .main-tabs {
     grid-row: 2;
+  }
+
+  #mobileQuickActions[hidden] {
+    display: none;
   }
 
   .shell.is-top-bar-hidden .main-panels {
@@ -3997,5 +4014,219 @@ canvas {
 
   .shell.main-tabs-right .main-tab.is-active {
     border-left-color: var(--gold);
+  }
+}
+
+@media (min-width: 821px) and (pointer: coarse) {
+  :root {
+    --ui-safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --ui-safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --ui-safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --ui-safe-area-inset-left: env(safe-area-inset-left, 0px);
+  }
+
+  .shell {
+    padding: max(9px, var(--ui-safe-area-inset-top))
+      max(0px, calc(var(--ui-safe-area-inset-right) - 9px))
+      max(9px, var(--ui-safe-area-inset-bottom))
+      max(0px, calc(var(--ui-safe-area-inset-left) - 9px));
+  }
+
+  .fps-counter {
+    top: max(15px, calc(var(--ui-safe-area-inset-top) + 4px));
+    right: max(24px, calc(var(--ui-safe-area-inset-right) + 4px));
+  }
+
+  .top-bar-hidden .fps-counter {
+    top: max(18px, calc(var(--ui-safe-area-inset-top) + 4px));
+    right: max(112px, calc(var(--ui-safe-area-inset-right) + 4px));
+  }
+
+  .achievement-toasts {
+    top: max(58px, calc(var(--ui-safe-area-inset-top) + 4px));
+    right: max(112px, calc(var(--ui-safe-area-inset-right) + 4px));
+  }
+
+  .top-bar-hidden .achievement-toasts {
+    top: max(
+      calc(58px + var(--fps-counter-height) + 8px),
+      calc(var(--ui-safe-area-inset-top) + 4px)
+    );
+  }
+
+  .offline-report {
+    left: calc(
+      var(--ui-safe-area-inset-left) +
+      (100vw - var(--ui-safe-area-inset-left) - var(--ui-safe-area-inset-right)) / 2
+    );
+    bottom: max(18px, calc(var(--ui-safe-area-inset-bottom) + 18px));
+    width: min(
+      680px,
+      calc(100vw - var(--ui-safe-area-inset-left) - var(--ui-safe-area-inset-right) - 36px)
+    );
+    max-height: calc(
+      100svh - var(--ui-safe-area-inset-top) - var(--ui-safe-area-inset-bottom) - 36px
+    );
+  }
+
+  .update-modal {
+    padding:
+      max(18px, calc(var(--ui-safe-area-inset-top) + 18px))
+      max(18px, calc(var(--ui-safe-area-inset-right) + 18px))
+      max(18px, calc(var(--ui-safe-area-inset-bottom) + 18px))
+      max(18px, calc(var(--ui-safe-area-inset-left) + 18px));
+  }
+
+  .confirmation-modal {
+    width: min(
+      460px,
+      calc(100vw - var(--ui-safe-area-inset-left) - var(--ui-safe-area-inset-right) - 24px)
+    );
+    max-width: calc(100vw - var(--ui-safe-area-inset-left) - var(--ui-safe-area-inset-right) - 24px);
+    max-height: calc(100svh - var(--ui-safe-area-inset-top) - var(--ui-safe-area-inset-bottom) - 24px);
+  }
+}
+
+@media (max-width: 820px), (min-width: 821px) and (max-width: 1023px) and (max-height: 480px) and (pointer: coarse) {
+  .shell {
+    position: relative;
+  }
+
+  #mobileQuickActions:not([hidden]) {
+    position: absolute;
+    inset-inline: 0;
+    grid-column: 1;
+    grid-row: 3;
+    top: calc(-52px - 12px);
+    z-index: 9;
+    display: block;
+    min-width: 0;
+    height: 52px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    pointer-events: none;
+  }
+
+  .shell.is-top-bar-hidden #mobileQuickActions:not([hidden]) {
+    grid-row: 2;
+  }
+
+  #mobileQuickActions[hidden] {
+    display: none;
+  }
+
+  .shell:not(:has(.angle-panel.is-active)) #mobileQuickActions:not([hidden]) {
+    display: none;
+  }
+
+  .mobile-quick-action-list {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    height: 52px;
+    min-height: 52px;
+    gap: 1px;
+    padding: 0;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .mobile-quick-action-list::before,
+  .mobile-quick-action-list::after {
+    content: none;
+  }
+
+  .mobile-quick-action {
+    display: grid;
+    flex: 0 0 52px;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+    min-height: 52px;
+    padding: 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.02) 48%, rgba(0, 0, 0, 0.14)), var(--panel-strong);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 3px 0 rgba(0, 0, 0, 0.48), 0 7px 14px rgba(0, 0, 0, 0.22);
+    color: var(--ink);
+    font-size: 0.76rem;
+    font-weight: 900;
+    line-height: 1;
+    white-space: nowrap;
+    touch-action: none;
+    user-select: none;
+    pointer-events: auto;
+  }
+
+  #quickActionBuyAll {
+    flex-basis: 52px;
+    width: 52px;
+    min-width: 52px;
+    aspect-ratio: auto;
+    border-color: rgba(242, 184, 75, 0.8);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(242, 184, 75, 0.18), rgba(242, 184, 75, 0.04) 48%, rgba(0, 0, 0, 0.14)), var(--panel-strong);
+    color: var(--gold);
+    font-size: 0.72rem;
+  }
+
+  .mobile-quick-action.is-unavailable,
+  .mobile-quick-action[aria-disabled="true"],
+  .mobile-quick-action:disabled {
+    border-style: dashed;
+    border-color: var(--muted);
+    background: repeating-linear-gradient(135deg, rgba(157, 170, 198, 0.06) 0 4px, rgba(157, 170, 198, 0.15) 4px 8px), var(--panel);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    color: var(--muted);
+    cursor: not-allowed;
+    filter: grayscale(0.85);
+    opacity: 0.82;
+  }
+
+  .mobile-quick-action:not(:disabled):active {
+    transform: translateY(2px);
+    filter: brightness(1.06);
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(0, 0, 0, 0.48);
+  }
+
+  .mobile-quick-action:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 2px solid var(--gold);
+    outline-offset: -2px;
+  }
+
+  .mobile-quick-action[hidden] {
+    display: none;
+  }
+
+  .fps-counter {
+    top: max(12px, calc(var(--ui-safe-area-inset-top, env(safe-area-inset-top, 0px)) + 4px));
+    right: max(14px, calc(var(--ui-safe-area-inset-right, env(safe-area-inset-right, 0px)) + 4px));
+  }
+
+  .top-bar-hidden .fps-counter {
+    top: max(12px, calc(var(--ui-safe-area-inset-top, env(safe-area-inset-top, 0px)) + 4px));
+    right: max(12px, calc(var(--ui-safe-area-inset-right, env(safe-area-inset-right, 0px)) + 4px));
+  }
+
+  .achievement-toasts {
+    right: max(12px, calc(var(--ui-safe-area-inset-right, env(safe-area-inset-right, 0px)) + 4px));
+    bottom: calc(84px + var(--ui-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  }
+
+  .shell.has-mobile-quick-actions:has(.angle-panel.is-active) ~ .achievement-toasts {
+    bottom: calc(132px + var(--ui-safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)));
+  }
+}
+
+@media (max-width: 300px) and (pointer: coarse) {
+  #mobileQuickActions:not([hidden]) {
+    top: calc(-52px - 30px);
   }
 }

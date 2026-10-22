@@ -12,7 +12,139 @@ on:
       - next
 
 jobs:
+  validation-profile:
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+      contents: read
+      pull-requests: read
+    outputs:
+      regression_profile: ${{ steps.classify.outputs.regression_profile }}
+      performance_required: ${{ steps.classify.outputs.performance_required }}
+      offline_stress_required: ${{ steps.classify.outputs.offline_stress_required }}
+      reason: ${{ steps.classify.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/github-script@v7
+        id: classify
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { execFileSync } = require("node:child_process");
+            const { pathToFileURL } = require("node:url");
+            const classifierPath = process.env.GITHUB_WORKSPACE + "/scripts/idd-validation-profile.mjs";
+            const full = {
+              regressionProfile: "full",
+              performanceRequired: true,
+              offlineStressRequired: true,
+              reason: "Classifier unavailable or evidence unknown; full validation."
+            };
+            let result = full;
+
+            try {
+              const { classifyValidationProfile } = await import(pathToFileURL(classifierPath).href);
+              if (context.eventName === "pull_request" && context.payload.pull_request) {
+                const pr = context.payload.pull_request;
+                const files = await github.paginate(github.rest.pulls.listFiles, {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  per_page: 100
+                });
+                let integrationProof;
+                const sameRepo = pr.head.repo?.full_name ===
+                  context.repo.owner + "/" + context.repo.repo;
+                const validSha = (sha) => /^[0-9a-f]{40}$/i.test(sha || "");
+
+                if (sameRepo && pr.base.ref === "next" &&
+                    validSha(pr.base.sha) && validSha(pr.head.sha)) {
+                  try {
+                    const head = await github.rest.repos.getCommit({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      ref: pr.head.sha
+                    });
+                    const parents = head.data.parents.map((parent) => parent.sha);
+                    if (parents.length === 2 && parents[0] === pr.base.sha) {
+                      execFileSync("git", ["fetch", "--no-tags", "origin", pr.head.sha], { stdio: "ignore" });
+                      execFileSync("git", [
+                        "fetch", "--no-tags", "origin",
+                        "refs/heads/main:refs/remotes/origin/idd-validation-main"
+                      ], { stdio: "ignore" });
+                      execFileSync("git", [
+                        "merge-base", "--is-ancestor", parents[1],
+                        "refs/remotes/origin/idd-validation-main"
+                      ], { stdio: "ignore" });
+                      const mergedTree = execFileSync(
+                        "git", ["merge-tree", "--write-tree", parents[0], parents[1]],
+                        { encoding: "utf8" }
+                      ).trim().split(/\s+/)[0];
+                      const headTree = execFileSync(
+                        "git", ["rev-parse", pr.head.sha + "^{tree}"],
+                        { encoding: "utf8" }
+                      ).trim();
+                      const hasSourceChecks = async (sha) => {
+                        const runs = await github.paginate(github.rest.checks.listForRef, {
+                          owner: context.repo.owner,
+                          repo: context.repo.repo,
+                          ref: sha,
+                          per_page: 100
+                        });
+                        const latest = new Map();
+                        for (const run of runs.filter((item) =>
+                          item.head_sha === sha && item.app?.slug === "github-actions")) {
+                          const previous = latest.get(run.name);
+                          const updatedAt = Date.parse(run.updated_at);
+                          if (!Number.isFinite(updatedAt)) return false;
+                          if (previous && updatedAt === Date.parse(previous.updated_at) && run.id !== previous.id) return false;
+                          if (!previous || updatedAt > Date.parse(previous.updated_at)) {
+                            latest.set(run.name, run);
+                          }
+                        }
+                        return ["regression", "performance", "offline-stress"].every((name) => {
+                          const run = latest.get(name);
+                          return run?.status === "completed" && run.conclusion === "success";
+                        });
+                      };
+                      integrationProof = {
+                        baseRef: pr.base.ref,
+                        baseSha: pr.base.sha,
+                        parents,
+                        secondParentOnMain: true,
+                        mergeTreeMatches: mergedTree === headTree,
+                        sourceChecks: {
+                          base: await hasSourceChecks(pr.base.sha),
+                          main: await hasSourceChecks(parents[1])
+                        }
+                      };
+                    }
+                  } catch (error) {
+                    core.warning("Integration-only proof unavailable; use heavier profile: " + error.message);
+                  }
+                }
+
+                result = classifyValidationProfile({
+                  eventName: context.eventName,
+                  baseRef: pr.base.ref,
+                  paths: files.map((file) => file.filename),
+                  labels: pr.labels.map((label) => label.name),
+                  integrationProof
+                });
+              }
+            } catch (error) {
+              core.warning("Validation profile classification failed closed: " + error.message);
+            }
+            core.setOutput("regression_profile", result.regressionProfile);
+            core.setOutput("performance_required", String(result.performanceRequired));
+            core.setOutput("offline_stress_required", String(result.offlineStressRequired));
+            core.setOutput("reason", result.reason);
+
   regression:
+    needs: validation-profile
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,25 +154,46 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - name: Install dependencies
+        if: ${{ needs.validation-profile.result != 'success' || (needs.validation-profile.outputs.regression_profile != 'docs-policy' && needs.validation-profile.outputs.regression_profile != 'integration-only') }}
         timeout-minutes: 5
         run: npm ci --prefer-offline --no-audit --no-fund
       - name: Verify ESM entrypoint order
+        if: ${{ needs.validation-profile.result != 'success' || (needs.validation-profile.outputs.regression_profile != 'docs-policy' && needs.validation-profile.outputs.regression_profile != 'integration-only') }}
         run: npm run check:runtime-order
       - name: Check syntax
+        if: ${{ needs.validation-profile.result != 'success' || (needs.validation-profile.outputs.regression_profile != 'docs-policy' && needs.validation-profile.outputs.regression_profile != 'integration-only') }}
         run: npm run check:syntax
       - name: Check version consistency
+        if: ${{ needs.validation-profile.result != 'success' || (needs.validation-profile.outputs.regression_profile != 'docs-policy' && needs.validation-profile.outputs.regression_profile != 'integration-only') }}
         run: npm run check:version
       - name: Check IDD review policy
+        if: ${{ needs.validation-profile.result != 'success' || (needs.validation-profile.outputs.regression_profile != 'docs-policy' && needs.validation-profile.outputs.regression_profile != 'integration-only') }}
         run: npm run check:idd-policy
       - name: Run ESM regression suite
+        if: ${{ needs.validation-profile.result != 'success' || (needs.validation-profile.outputs.regression_profile != 'docs-policy' && needs.validation-profile.outputs.regression_profile != 'integration-only') }}
         run: npm run test:regression
       - name: Install Chromium for browser validation
+        if: ${{ needs.validation-profile.result != 'success' || (needs.validation-profile.outputs.regression_profile != 'docs-policy' && needs.validation-profile.outputs.regression_profile != 'integration-only') }}
         timeout-minutes: 5
         run: npx playwright install chromium
       - name: Run browser smoke and feature tests
+        if: ${{ needs.validation-profile.result != 'success' || (needs.validation-profile.outputs.regression_profile != 'docs-policy' && needs.validation-profile.outputs.regression_profile != 'integration-only') }}
         run: npm run test:browser
       - name: Test local performance gate classifier
+        if: ${{ needs.validation-profile.result != 'success' || (needs.validation-profile.outputs.regression_profile != 'docs-policy' && needs.validation-profile.outputs.regression_profile != 'integration-only') }}
         run: npm run test:local-performance-gate
+      - name: Run docs-policy or integration-only checks
+        if: ${{ needs.validation-profile.result == 'success' && (needs.validation-profile.outputs.regression_profile == 'docs-policy' || needs.validation-profile.outputs.regression_profile == 'integration-only') }}
+        env:
+          IDD_VALIDATION_PROFILE: ${{ needs.validation-profile.outputs.regression_profile }}
+        run: |
+          git diff --check HEAD^1 HEAD
+          npm run check:idd-policy
+          if [ "$IDD_VALIDATION_PROFILE" = "integration-only" ]; then
+            npm run check:version
+          else
+            npm run check:syntax
+          fi
       - name: Upload regression diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -53,22 +206,35 @@ jobs:
           if-no-files-found: warn
 
   performance:
+    needs: validation-profile
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.performance_required != 'false' }}
       - uses: actions/setup-node@v4
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.performance_required != 'false' }}
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - name: Install dependencies
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.performance_required != 'false' }}
         timeout-minutes: 5
         run: npm ci --prefer-offline --no-audit --no-fund
       - name: Install Chromium for performance smoke test
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.performance_required != 'false' }}
         timeout-minutes: 5
         run: npx playwright install chromium
       - name: Run hosted performance smoke test
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.performance_required != 'false' }}
         run: npm run test:performance
+      - name: Performance not applicable
+        if: ${{ needs.validation-profile.result == 'success' && needs.validation-profile.outputs.performance_required == 'false' }}
+        env:
+          REASON: ${{ needs.validation-profile.outputs.reason }}
+        run: |
+          echo "Not applicable for this change: $REASON"
       - name: Upload performance diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -78,22 +244,35 @@ jobs:
           if-no-files-found: warn
 
   offline-stress:
+    needs: validation-profile
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.offline_stress_required != 'false' }}
       - uses: actions/setup-node@v4
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.offline_stress_required != 'false' }}
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: package-lock.json
       - name: Install dependencies
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.offline_stress_required != 'false' }}
         timeout-minutes: 5
         run: npm ci --prefer-offline --no-audit --no-fund
       - name: Install Chromium for offline stress test
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.offline_stress_required != 'false' }}
         timeout-minutes: 5
         run: npx playwright install chromium
       - name: Run offline stress test
+        if: ${{ needs.validation-profile.result != 'success' || needs.validation-profile.outputs.offline_stress_required != 'false' }}
         run: npm run test:offline-stress
+      - name: Offline stress not applicable
+        if: ${{ needs.validation-profile.result == 'success' && needs.validation-profile.outputs.offline_stress_required == 'false' }}
+        env:
+          REASON: ${{ needs.validation-profile.outputs.reason }}
+        run: |
+          echo "Not applicable for this change: $REASON"
       - name: Upload offline stress diagnostics
         if: always()
         uses: actions/upload-artifact@v4

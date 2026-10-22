@@ -27,6 +27,7 @@ import {
   switchChallengeSubtab,
   switchStatisticsSubtab,
 } from "./ui/events.js";
+import { bindQuickActions } from "./ui/quick-actions.js";
 import "./systems/eternity.js";
 import "./systems/timeline.js";
 import "./core/offline-progress.js";
@@ -38,6 +39,13 @@ import { requestNextFrame, frame } from "./runtime/game-loop.js";
 import "./runtime/debug-adapter.js";
 
 let japaneseFontReady = false;
+let gameLoopStarted = false;
+
+function startGameLoop() {
+  if (gameLoopStarted) return;
+  gameLoopStarted = true;
+  requestNextFrame(frame);
+}
 
 async function initializeGame() {
   await syncServerClock();
@@ -46,8 +54,10 @@ async function initializeGame() {
   createTowerChallengeRows();
   createInfinityUpgradeRows();
   createAchievementRows();
-  await loadGame();
-  switchMainTab(runtime.activeMainTab);
+  const bootReady = await loadGame();
+  void runtime.refreshStorageDurability?.();
+  const recoveryRequired = runtime.bootResolution === "RECOVERY";
+  switchMainTab(recoveryRequired ? "settings" : runtime.activeMainTab);
   switchEternitySubtab(runtime.activeEternitySubtab);
   switchInfinitySubtab(runtime.activeInfinitySubtab);
   switchChallengeSubtab(runtime.activeChallengeSubtab);
@@ -55,8 +65,12 @@ async function initializeGame() {
   resizeCanvas();
   resizeInfiniteAngleCanvas();
   runtime.updateUi();
-  showUpdateModalIfNeeded();
-  checkForRemoteUpdate();
+  if (bootReady) bindQuickActions();
+  if (recoveryRequired) runtime.elements.saveRecoveryDetails?.scrollIntoView?.({ block: "center" });
+  if (bootReady) {
+    showUpdateModalIfNeeded();
+    checkForRemoteUpdate();
+  }
   if (document.fonts) {
     document.fonts.ready.then(() => {
       japaneseFontReady = true;
@@ -67,9 +81,10 @@ async function initializeGame() {
   } else {
     japaneseFontReady = true;
   }
-  requestNextFrame(frame);
+  if (bootReady) startGameLoop();
 }
 
 expose("japaneseFontReady", () => japaneseFontReady, (value) => { japaneseFontReady = value; });
+expose("startGameLoop", () => startGameLoop);
 
 window.__angleDebug.ready = initializeGame();

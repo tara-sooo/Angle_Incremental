@@ -6,7 +6,6 @@ let renderedRecoveryLanguage = "";
 let renderedRecoveryNumberFormat = "";
 let renderedLoadRecoveryMode = false;
 let renderedSaveConflictMode = false;
-let renderedSaveConflictCheckpointReady = false;
 
 function formatRecoveryTimestamp(timestamp) {
   const numeric = Number(timestamp);
@@ -21,7 +20,6 @@ function formatRecoveryTimestamp(timestamp) {
 function recoveryReasonText(reason) {
   const reasonKeys = {
     periodic: "checkpointReasonPeriodic",
-    "save-conflict": "checkpointReasonSaveConflict",
     "pre-import": "checkpointReasonPreImport",
     "pre-update": "checkpointReasonPreUpdate",
     "pre-reset": "checkpointReasonPreReset",
@@ -32,6 +30,7 @@ function recoveryReasonText(reason) {
     "pre-tower-challenge": "checkpointReasonPreTowerChallenge",
     "pre-timeline-respec": "checkpointReasonPreTimelineRespec",
     "pre-restore": "checkpointReasonPreRestore",
+    "legacy-quarantine": "checkpointReasonOther",
   };
   return runtime.t(reasonKeys[reason] || "checkpointReasonOther");
 }
@@ -57,15 +56,12 @@ function countAchievementBits(state) {
 }
 
 function recoveryStateSummary(entry) {
-  const state = entry?.state || {};
+  const state = entry?.save?.state || {};
   const infinityPointsLog10 = runtime.sanitizeLog10(
     state.infinityPointsLog10,
     runtime.log10Value(Math.max(0, Number(state.infinityPoints) || 0)),
   );
-  const infinityCountExact = runtime.parseExactInteger(
-    state.infinityCountExact,
-    runtime.parseExactInteger(state.infinityCount, 0n),
-  );
+  const infinityCountExact = runtime.parseExactInteger(state.infinityCountExact, 0n);
   return [
     `${runtime.t("recoveryInfinity")}: ${formatExactInteger(infinityCountExact)}`,
     `${runtime.t("recoveryIp")}: ${runtime.formatHeldUiLogNumber(infinityPointsLog10, state.infinityPointsExact)}`,
@@ -76,71 +72,83 @@ function recoveryStateSummary(entry) {
   ].join(" · ");
 }
 
+let renderedStorageDurabilitySignature = "";
+
+function updateStorageDurabilityUi() {
+  const elements = runtime.elements;
+  const durability = runtime.storageDurability || {};
+  const signature = [
+    runtime.state.language,
+    durability.status,
+    durability.usage,
+    durability.quota,
+    durability.canRequest,
+    durability.requestAttempted,
+    durability.requestPending,
+  ].join("|");
+  if (signature === renderedStorageDurabilitySignature) return;
+  if (elements.storageDurabilityStatus) {
+    const statusKeys = {
+      persistent: "storageDurabilityPersistent",
+      "best-effort": "storageDurabilityBestEffort",
+      unsupported: "storageDurabilityUnsupported",
+      unknown: "storageDurabilityUnknown",
+    };
+    elements.storageDurabilityStatus.textContent = runtime.t(statusKeys[durability.status] || "storageDurabilityUnknown");
+  }
+  if (elements.storageEstimateStatus) {
+    const formatBytes = (value) => Number.isFinite(value) && value >= 0
+      ? `${(value / (1024 * 1024)).toFixed(1)} MB`
+      : "—";
+    elements.storageEstimateStatus.textContent = durability.usage === null && durability.quota === null
+      ? runtime.t("storageEstimateUnavailable")
+      : `${formatBytes(durability.usage)} / ${formatBytes(durability.quota)}`;
+  }
+  if (elements.requestPersistentStorageButton) {
+    elements.requestPersistentStorageButton.hidden = durability.status !== "best-effort"
+      || !durability.canRequest
+      || Boolean(durability.requestAttempted);
+    elements.requestPersistentStorageButton.disabled = Boolean(durability.requestPending);
+  }
+  renderedStorageDurabilitySignature = signature;
+}
+
 export function updateSaveRecoveryUi() {
   const elements = runtime.elements;
-  if (!elements.preImportBackupStatus || !elements.saveCheckpointList || !runtime.recoveryEntries) return;
-  const currentRevision = typeof runtime.recoveryRevision === "number" ? runtime.recoveryRevision : null;
-  if (
-    currentRevision !== null
-    && currentRevision === renderedRecoveryRevision
+  updateStorageDurabilityUi();
+  if (!elements.saveCheckpointList || !runtime.recoveryEntries) return;
+  const revision = runtime.recoveryRevision;
+  if (revision === renderedRecoveryRevision
     && renderedRecoveryLanguage === runtime.state.language
     && renderedRecoveryNumberFormat === runtime.state.numberFormat
     && renderedLoadRecoveryMode === Boolean(runtime.loadRecoveryMode)
-    && renderedSaveConflictMode === Boolean(runtime.saveConflictMode)
-    && renderedSaveConflictCheckpointReady === Boolean(runtime.saveConflictCheckpointReady)
-  ) return;
+    && renderedSaveConflictMode === Boolean(runtime.saveConflictMode)) return;
+
   const recovery = runtime.recoveryEntries();
-  if (
-    elements.saveRecoveryDetails
-    && (recovery.loadFailure
-      || runtime.loadRecoveryMode
-      || runtime.saveConflictMode
-      || recovery.quarantine
-      || recovery.preImport
-      || recovery.undo)
-  ) {
+  if (elements.saveRecoveryDetails && (runtime.loadRecoveryMode || runtime.saveConflictMode)) {
     elements.saveRecoveryDetails.open = true;
   }
-  elements.preImportBackupStatus.textContent = recovery.preImport
-    ? `${runtime.t("preImportBackupAvailable")} ${formatRecoveryTimestamp(recovery.preImport.backedUpAt)}`
-    : runtime.t("noPreImportBackup");
   if (elements.loadFailureStatus) {
-    const failure = recovery.loadFailure;
-    if (failure) {
-      const stageText = runtime.t(failure.stage === "offline" ? "loadFailureOffline" : "loadFailureApply");
-      const detail = failure.errorMessage ? `: ${failure.errorMessage}` : "";
-      elements.loadFailureStatus.textContent = `${runtime.t("loadFailureDetected")} ${stageText}${detail}`;
-    } else if (runtime.saveConflictMode) {
-      elements.loadFailureStatus.textContent = runtime.t(
-        runtime.saveConflictCheckpointReady ? "saveConflictDetected" : "saveConflictBackupFailed",
-      );
-    } else {
-      elements.loadFailureStatus.textContent = runtime.loadRecoveryMode
-        ? runtime.t("loadRecoveryRequired")
+    elements.loadFailureStatus.textContent = runtime.saveConflictMode
+      ? runtime.t("saveConflictDetected")
+      : runtime.loadRecoveryMode
+        ? runtime.t(recovery.mainInvalid ? "invalidSaveRecovery" : recovery.legacyRecovery ? "legacySaveRecovery" : "loadRecoveryRequired")
         : "";
-    }
   }
-  if (elements.quarantineStatus) {
-    elements.quarantineStatus.textContent = recovery.quarantine
-      ? `${runtime.t("quarantineAvailable")} ${formatRecoveryTimestamp(recovery.quarantine.quarantinedAt)}`
-      : "";
-  }
-  if (elements.retryLoadButton) elements.retryLoadButton.hidden = !runtime.loadRecoveryMode;
-  if (elements.restoreQuarantineButton) elements.restoreQuarantineButton.hidden = !recovery.quarantine;
-  if (elements.restorePreImportButton) elements.restorePreImportButton.hidden = !recovery.preImport;
-  if (elements.restoreUndoButton) elements.restoreUndoButton.hidden = !recovery.undo;
-  renderedRecoveryRevision = currentRevision === null ? renderedRecoveryRevision : currentRevision;
+  if (elements.reloadLatestSaveButton) elements.reloadLatestSaveButton.hidden = !runtime.saveConflictMode;
+  if (elements.startNewSaveButton) elements.startNewSaveButton.hidden = !runtime.loadRecoveryMode;
+  renderedRecoveryRevision = revision;
   renderedRecoveryLanguage = runtime.state.language;
   renderedRecoveryNumberFormat = runtime.state.numberFormat;
   renderedLoadRecoveryMode = Boolean(runtime.loadRecoveryMode);
   renderedSaveConflictMode = Boolean(runtime.saveConflictMode);
-  renderedSaveConflictCheckpointReady = Boolean(runtime.saveConflictCheckpointReady);
+
   runtime.clearElement(elements.saveCheckpointList);
-  if (recovery.checkpoints.length === 0) {
-    elements.saveCheckpointList.textContent = runtime.t("noCheckpoints");
+  if (!recovery.backups.length) {
+    elements.saveCheckpointList.textContent = runtime.t("noSaveBackups");
     return;
   }
-  recovery.checkpoints.forEach((entry, index) => {
+  recovery.backups.forEach((entry) => {
     const row = document.createElement("div");
     row.className = "save-checkpoint-row";
     const details = document.createElement("div");
@@ -148,15 +156,17 @@ export function updateSaveRecoveryUi() {
     const title = document.createElement("strong");
     title.textContent = recoveryReasonText(entry.reason);
     const timestamp = document.createElement("span");
-    timestamp.textContent = formatRecoveryTimestamp(entry.backedUpAt);
+    timestamp.textContent = formatRecoveryTimestamp(entry.createdAt);
     const summary = document.createElement("small");
     summary.textContent = recoveryStateSummary(entry);
     details.append(title, timestamp, summary);
     const restoreButton = document.createElement("button");
     restoreButton.type = "button";
     restoreButton.className = "reset-button";
-    restoreButton.dataset.checkpointIndex = String(index);
-    restoreButton.textContent = runtime.t("restoreCheckpoint");
+    restoreButton.dataset.backupSlot = entry.slot;
+    restoreButton.dataset.backupIndex = String(entry.index);
+    restoreButton.textContent = runtime.t("restoreSaveBackup");
+    restoreButton.hidden = Boolean(runtime.saveConflictMode);
     row.append(details, restoreButton);
     elements.saveCheckpointList.append(row);
   });

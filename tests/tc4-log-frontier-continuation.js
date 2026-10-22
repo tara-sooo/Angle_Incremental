@@ -39,7 +39,7 @@ async function main() {
     stages: [{ summary: { truncated: true, truncationReason: "route-cap" } }],
   }, "gain-aware-2x"), true);
 
-  const context = await prepareCandidate(candidate, {
+  const prepareOptions = {
     maxSeconds: 120,
     stepSeconds: 10,
     maxStates: 1,
@@ -47,36 +47,62 @@ async function main() {
     stallSeconds: 60,
     targetLog10: TARGET_LOG10,
     continuationMaxStates: 2,
-  });
+  };
+  const context = await prepareCandidate(candidate, prepareOptions);
+  const rootContext = await prepareCandidate(candidate, prepareOptions);
+  assert.equal(JSON.stringify(rootContext.rootSnapshot), JSON.stringify(context.rootSnapshot), "replay contexts must share the same root state");
   const options = { ...context.searchOptions, captureContinuation: true };
+  const rootOptions = { ...rootContext.searchOptions, captureContinuation: true };
   const partial = runSearch(context.runtime, context.rootSnapshot, candidate, options, context.collision, false, policy);
   assert.equal(partial.truncationReason, "state-cap");
   assert.ok(partial.frontier.length > 0);
+  assert.notEqual(JSON.stringify(context.runtime.state), JSON.stringify(context.rootSnapshot), "the state-cap search should leave runtime mutated before replay");
+  const replayedFromRoot = replayCompactFrontierNode(rootContext, partial.frontier[0], policy, rootOptions);
   const replayed = replayCompactFrontierNode(context, partial.frontier[0], policy, options);
+  const replayResult = (node) => JSON.stringify({
+    snapshot: node.snapshot,
+    elapsed: node.elapsed,
+    events: node.events,
+    purchases: node.purchases,
+    peakScoreAt: node.peakScoreAt,
+    peakScoreLog10: node.peakScoreLog10,
+    peakInfiniteScoreLog10: node.peakInfiniteScoreLog10,
+    lastProgressAt: node.lastProgressAt,
+    policyState: node.policyState,
+    milestoneTimes: node.milestoneTimes,
+    milestoneSnapshots: node.milestoneSnapshots,
+  });
+  assert.equal(
+    replayResult(replayed),
+    replayResult(replayedFromRoot),
+    "compact frontier replay must be independent of the runtime state left by search",
+  );
   assert.equal(replayed.purchases.length, partial.frontier[0].purchaseSequence.length);
   assert.throws(() => replayCompactFrontierNode(context, {
     ...partial.frontier[0],
     levels: { ...partial.frontier[0].levels, baseGain: 99 },
   }, policy, options), /frontier replay mismatch/);
 
+  const checkpointContext = await prepareCandidate(candidate, prepareOptions);
+  const checkpointOptions = { ...checkpointContext.searchOptions, captureContinuation: true };
   let progress;
-  const checkpointed = runSearch(context.runtime, context.rootSnapshot, candidate, {
-    ...options,
+  const checkpointed = runSearch(checkpointContext.runtime, checkpointContext.rootSnapshot, candidate, {
+    ...checkpointOptions,
     maxStates: 1,
     checkpointInterval: 1,
     onProgress: (state) => {
       progress = serializeSearchState(state);
     },
-  }, context.collision, false, policy);
+  }, checkpointContext.collision, false, policy);
   assert.equal(checkpointed.truncationReason, "state-cap");
   assert.ok(progress);
-  const resumedOptions = { ...options, maxStates: 2 };
+  const resumedOptions = { ...checkpointOptions, maxStates: 2 };
   const resumed = runSearch(
-    context.runtime,
-    context.rootSnapshot,
+    checkpointContext.runtime,
+    checkpointContext.rootSnapshot,
     candidate,
     resumedOptions,
-    context.collision,
+    checkpointContext.collision,
     false,
     policy,
     {
@@ -91,11 +117,11 @@ async function main() {
     },
   );
   const resumedAgain = runSearch(
-    context.runtime,
-    context.rootSnapshot,
+    checkpointContext.runtime,
+    checkpointContext.rootSnapshot,
     candidate,
     resumedOptions,
-    context.collision,
+    checkpointContext.collision,
     false,
     policy,
     {

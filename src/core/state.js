@@ -172,6 +172,8 @@ const state = {
   topBarMode: "news",
   mainTabPosition: "right",
   showTimeFluxQuickBar: true,
+  gameplayHotkeysEnabled: true,
+  showMobileQuickActions: true,
   skipTimelineRespecConfirmation: false,
   hiddenTabs: [],
   unlockedMainTabs: [],
@@ -179,6 +181,17 @@ const state = {
   lastEarned: 0,
   lastEarnedLog10: -Infinity,
 };
+
+const DEFAULT_STATE = Object.fromEntries(Object.entries(state).map(([key, value]) => [
+  key,
+  Array.isArray(value) ? [...value] : value,
+]));
+
+function resetState() {
+  Object.entries(DEFAULT_STATE).forEach(([key, value]) => {
+    state[key] = Array.isArray(value) ? [...value] : value;
+  });
+}
 
 const SAVE_FIELDS = [
   "score",
@@ -307,6 +320,8 @@ const SAVE_FIELDS = [
   "topBarMode",
   "mainTabPosition",
   "showTimeFluxQuickBar",
+  "gameplayHotkeysEnabled",
+  "showMobileQuickActions",
   "skipTimelineRespecConfirmation",
   "hiddenTabs",
   "unlockedMainTabs",
@@ -318,6 +333,7 @@ function normalizeChoice(value, allowed, fallback) {
   return allowed.includes(value) ? value : fallback;
 }
 expose("state", () => state);
+expose("resetState", () => resetState);
 expose("SAVE_FIELDS", () => SAVE_FIELDS);
 expose("MAIN_TAB_IDS", () => MAIN_TAB_IDS);
 expose("MAIN_TAB_DISCOVERY_IDS", () => MAIN_TAB_DISCOVERY_IDS);

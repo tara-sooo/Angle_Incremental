@@ -5,8 +5,12 @@ current PR head in hosted CI. CI is evidence for that head, never for a previous
 This phase does not classify local B/C or pre-push commands: a local
 `npm run test:performance` timing overage is not a hosted-CI failure or an
 attempt in the rerun/hold count.
-The hosted performance job's strict `npm run test:performance` absolute
-budgets remain required; a local inconclusive result never waives them.
+When the current-head validation profile requires performance evidence, the
+hosted performance job's strict `npm run test:performance` absolute budgets
+remain mandatory; a local inconclusive result never waives them. For a
+classifier-confirmed non-applicable profile, that same stable job must
+complete successfully with its reason and without dependency/browser setup.
+Classifier failure or unknown input runs the heavier profile, not a skip.
 
 ## Read and wait
 
