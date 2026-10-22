@@ -12,10 +12,9 @@ performed.
 ## Normal route
 
 ```text
-explicit target → readiness → suitability → claim → sibling worktree
-→ plan/critique → implement → bounded self-review and validation
-→ PR to next → current-head CI → review/fix loop
-→ one final live merge gate → merge → completion evidence and cleanup
+explicit target → ownership/safety readiness → claim → sibling worktree
+→ post-claim suitability/context → profile-based plan and validation
+→ implement → bounded self-review → PR/current-head CI → live merge gate
 ```
 
 Read this file first, then the phase file for the current step. The active
@@ -94,13 +93,16 @@ or from a branch different from the active claim.
 
 ## Repository commands
 
-The values in `.github/idd/config.json` override this table:
+The commands in `.github/idd/config.json` provide available defaults;
+profile selection in
+`docs/idd-policy.md` narrows or adds evidence when the Issue scope requires it.
 
 | purpose | command |
 | --- | --- |
-| install | `npm ci` |
+| install after lock, when required | `npm ci` |
 | fix-validate | `npm run check:runtime-order && npm run check:syntax` |
-| pre-push/post-fix | `npm run validate` |
+| routine validation | `npm run validate` |
+`npm run validate` is the routine profile, not a universal pre-push requirement.
 
 ## Branch boundary
 
@@ -112,8 +114,9 @@ transition PRs, and unknown bases are human-controlled and fail closed.
 
 | state | read next |
 | --- | --- |
-| explicit Issue supplied | `idd-discover` → `idd-suitability` → `idd-claim` |
-| claim and branch/worktree, no PR | `idd-work` |
+| explicit Issue supplied | `idd-discover` → `idd-claim` |
+| claim/worktree, suitability/context not checked, no PR | `idd-suitability` → routed experience → `idd-work` |
+| claim/worktree, suitability/context checked, no PR | `idd-work` |
 | PR created or CI pending | `idd-pr-submit` → `idd-ci` |
 | PR has review activity | `idd-review-snapshot` → `idd-review-triage` or `idd-review-fix` |
 | ready to merge | `idd-pre-merge` → `idd-merge-handoff` → `idd-merge` |

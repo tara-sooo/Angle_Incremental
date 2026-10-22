@@ -116,6 +116,7 @@ class FakeElement {
 
 function createContext(initialStorage = new Map()) {
   const elements = new Map();
+  let animationFrameRequests = 0;
   const document = {
     createElement: (tag) => {
       const element = new FakeElement(tag);
@@ -209,7 +210,10 @@ function createContext(initialStorage = new Map()) {
     window: {
       addEventListener() {},
       removeEventListener() {},
-      requestAnimationFrame() {},
+      requestAnimationFrame() {
+        animationFrameRequests += 1;
+        return animationFrameRequests;
+      },
       setTimeout(callback) {
         callback();
         return 0;
@@ -241,11 +245,15 @@ function createContext(initialStorage = new Map()) {
   context.window.localStorage = context.localStorage;
   context.window.URL = URL;
   context.window.Math = Math;
-  context.window.requestAnimationFrame = () => {};
+  context.window.requestAnimationFrame = () => {
+    animationFrameRequests += 1;
+    return animationFrameRequests;
+  };
   context.window.setTimeout = (callback) => {
     callback();
     return 0;
   };
+  context.animationFrameRequests = () => animationFrameRequests;
   return { context, storage };
 }
 

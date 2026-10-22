@@ -6,6 +6,7 @@ import {
 } from "./browser/features/helpers.mjs";
 import { runConfirmationRegression } from "./browser/features/confirmation.mjs";
 import { runHelp } from "./browser/features/help.mjs";
+import { runQuickActions } from "./browser/features/quick-actions.mjs";
 import {
   runNavigationSettings,
   runNavigationSettingsDensity,
@@ -21,7 +22,13 @@ import {
   runProgressionCore,
   runProgressionGain,
 } from "./browser/features/progression-surfaces.mjs";
-import { runOfflineRecoverySurface, runSaveCodeRecovery } from "./browser/features/save-recovery.mjs";
+import {
+  runOfflineRecoverySurface,
+  runSaveBackupFileRecovery,
+  runSaveCodeRecovery,
+  runSaveRecoveryBoot,
+  runStorageDurability,
+} from "./browser/features/save-recovery.mjs";
 import { runOfflineLifecycleRegression } from "./browser/features/offline-lifecycle.mjs";
 import { runTimelineCopyRegression } from "./browser/features/timeline.mjs";
 
@@ -45,6 +52,7 @@ try {
     if (panel && !panel.hidden) document.querySelector("#offlineReportClose")?.click();
   });
 
+  await runQuickActions({ browser: gameTest.browser, origin: gameTest.origin, errors, httpFailures });
   await runConfirmationRegression(gameTest.browser, gameTest.origin, httpFailures);
   await runTimelineCopyRegression(gameTest.browser, gameTest.origin, httpFailures);
   await runNavigationSettings({ page });
@@ -65,7 +73,9 @@ try {
     httpFailures,
   });
   await runInfiniteAngleSurface({ page });
+  await runSaveRecoveryBoot({ page, browser: gameTest.browser, origin: gameTest.origin });
   await runSaveCodeRecovery({ page });
+  await runSaveBackupFileRecovery({ browser: gameTest.browser, origin: gameTest.origin, httpFailures });
   await runNavigationSettingsDensity({ page });
   await runMobileResponsive({
     browser: gameTest.browser,
@@ -73,6 +83,7 @@ try {
     httpFailures,
     readUiContract,
   });
+  await runStorageDurability({ page });
 
   assert.deepEqual(errors, []);
   assert.deepEqual(httpFailures, [], "browser smoke should not have HTTP failures");

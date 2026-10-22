@@ -1,7 +1,8 @@
 # IDD — Claim phase (A5)
 
-Read this file after the explicit-target and suitability gates. A claim is
-local to the selected Issue and its deterministic branch.
+Read this file after explicit-target ownership/safety readiness. Run the full
+non-ownership suitability gate after verified claim and worktree ownership.
+A claim is local to the selected Issue and its deterministic branch.
 
 ## Pre-checks
 

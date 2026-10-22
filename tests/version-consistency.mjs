@@ -11,6 +11,12 @@ const sourcePaths = Object.freeze({
   browserSmoke: "tests/browser-smoke.mjs",
   performanceSmoke: "tests/performance-smoke.mjs",
 });
+const directCacheSourcePaths = Object.freeze({
+  timelineSystem: "src/systems/timeline.js",
+  eternityUi: "src/ui/render-eternity.js",
+  infinityUi: "src/ui/render-infinity.js",
+  timelineUi: "src/ui/render-timeline.js",
+});
 
 async function readOptionalFile(rootDir, relativePath) {
   try {
@@ -21,13 +27,24 @@ async function readOptionalFile(rootDir, relativePath) {
 }
 
 export async function loadVersionSources(rootDir = repositoryRoot) {
-  const entries = await Promise.all(
-    Object.entries(sourcePaths).map(async ([key, relativePath]) => [
-      key,
-      await readOptionalFile(rootDir, relativePath),
-    ]),
-  );
-  return Object.fromEntries(entries);
+  const [entries, directCacheEntries] = await Promise.all([
+    Promise.all(
+      Object.entries(sourcePaths).map(async ([key, relativePath]) => [
+        key,
+        await readOptionalFile(rootDir, relativePath),
+      ]),
+    ),
+    Promise.all(
+      Object.entries(directCacheSourcePaths).map(async ([key, relativePath]) => [
+        key,
+        await readOptionalFile(rootDir, relativePath),
+      ]),
+    ),
+  ]);
+  return {
+    ...Object.fromEntries(entries),
+    directCacheSources: Object.fromEntries(directCacheEntries),
+  };
 }
 
 export function extractAppVersion(constantsSource) {
@@ -96,6 +113,12 @@ function extractJavaScriptCacheVersions(indexSource) {
   ];
 }
 
+function extractDirectCacheVersions(source) {
+  if (typeof source !== "string") return [];
+  return [...source.matchAll(/["'`]([^"'`]+\.(?:js|css))\?v=([^"'`\s]+)["'`]/g)]
+    .map((match) => ({ path: match[1], version: match[2] || null }));
+}
+
 export function collectVersionConsistencyIssues(sources) {
   const issues = [];
   const expected = extractAppVersion(sources.constants);
@@ -126,6 +149,17 @@ export function collectVersionConsistencyIssues(sources) {
     if (!jsVersions.some(({ path: assetPath }) => assetPath.endsWith("src/main.js"))) {
       issues.push(issue("index.html main.js cache buster", expected, null));
     }
+  }
+
+  for (const [sourceName, source] of Object.entries(sources.directCacheSources || {})) {
+    const directCacheVersions = extractDirectCacheVersions(source);
+    if (directCacheVersions.length === 0) {
+      issues.push(issue(`direct cache-buster source (${sourceName})`, expected, null));
+      continue;
+    }
+    directCacheVersions.forEach(({ path: assetPath, version }) => {
+      compareVersion(issues, `direct cache-buster (${sourceName}: ${assetPath})`, expected, version);
+    });
   }
 
   compareVersion(issues, "index.html update modal fallback", expected, extractHtmlUpdateTitle(sources.index)?.match(/\d+\.\d+\.\d+/)?.[0]);

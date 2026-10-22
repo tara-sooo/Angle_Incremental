@@ -249,7 +249,7 @@ async function configureBaseline(instance) {
   const persistent = {
     towerFloor: 12,
     completedTowerChallenges: 0b111,
-    activeTowerChallenge: 4,
+    activeTowerChallenge: 0,
     completedChallenges: allChallenges,
     infinityUpgradeMask: allInfinityUpgrades,
     infiniteCapBroken: true,
@@ -281,14 +281,23 @@ async function configureBaseline(instance) {
     autoRunCoreBoost: false,
     autoRunInfinity: false,
   });
+  runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 600000n);
   runtime.syncInfinityPointCachesFromExact(runtime.exactInfinityPointsFromLog10(25));
-  const iaPurchases = runtime.buyAllInfiniteAngleUpgrades({ refresh: false, save: false });
-  assert.equal(iaPurchases, 3, "the Floor-12 fixture must afford exactly the legal IA level-1 purchases");
+  const iaPurchaseResults = ["speed", "vertex", "gain"].map((kind) =>
+    runtime.buyInfiniteAngleUpgrade(kind, { refresh: false, save: false }),
+  );
+  assert.deepEqual(
+    iaPurchaseResults,
+    [true, true, true],
+    "the Floor-12 fixture must buy one IA level in each track before activating TC4",
+  );
   assert.deepEqual(
     [state.infiniteAngleSpeedLevel, state.infiniteAngleVertexLevel, state.infiniteAngleGainLevel],
     [1, 1, 1],
   );
-  assert.equal(runtime.towerChallenge4AllowsNormalUpgrade("speed"), true);
+  state.activeTowerChallenge = 4;
+  runtime.resetBelowInfinity();
+  assert.equal(runtime.towerChallenge4AllowsNormalUpgrade("speed"), false);
   assert.equal(runtime.towerChallenge4AllowsInfiniteAngleUpgrade("speed"), false);
   assert.equal(runtime.towerChallenge4UpgradePriceLog10("baseGain"), 100);
 
@@ -303,7 +312,7 @@ async function configureBaseline(instance) {
     infinityCount: state.infinityCount,
     achievementMask: state.achievementMask,
     infiniteAngleUnlocked: state.infiniteAngleUnlocked,
-    iaPurchaseCount: iaPurchases,
+    iaPurchaseCount: iaPurchaseResults.filter(Boolean).length,
     iaLevels: {
       speed: state.infiniteAngleSpeedLevel,
       vertex: state.infiniteAngleVertexLevel,
@@ -880,6 +889,7 @@ function childNodeFromDecision(runtime, node, result, kind, policy, options) {
 function replayCompactFrontierNode(context, compact, policy, options = context.searchOptions) {
   const { runtime, rootSnapshot, candidate } = context;
   const nodeOptions = { ...options, debug: context.searchOptions.debug };
+  restoreState(runtime.state, rootSnapshot);
   let node = rootSearchNode(runtime, rootSnapshot, candidate, nodeOptions, policy);
   for (const [index, expected] of compact.purchaseSequence.entries()) {
     restoreState(runtime.state, node.snapshot);

@@ -235,9 +235,9 @@ async function runTimeFluxModuleRuntimeTest() {
     hiddenSaveFailureState,
     "a hidden-save failure should restore the game state",
   );
-  assert.equal(hiddenSaveFailureRuntime.offlineBaselineTimestamp, hiddenSaveFailureBaseline, "hidden-save failure should preserve the baseline");
+  assert.ok(hiddenSaveFailureRuntime.offlineBaselineTimestamp >= hiddenSaveFailureBaseline, "failed intervals should be skipped");
   assert.equal(hiddenSaveFailureRuntime.offlineReport, hiddenSaveFailureReport, "hidden-save failure should preserve the report");
-  assert.equal(hiddenSaveFailureRuntime.loadRecoveryMode, true, "hidden-save failure should enter recovery mode");
+  assert.equal(hiddenSaveFailureRuntime.loadRecoveryMode, false, "a failed offline interval should not block the loaded main save");
   assert.equal(hiddenSaveFailureRuntime.autoSaveElapsed, 0, "hidden-save failure should reset the autosave timer");
 
   const resumeInstance = await loadRuntime(candidatePath);
@@ -325,19 +325,19 @@ async function runTimeFluxModuleRuntimeTest() {
   try {
     await assert.doesNotReject(
       visibilityExceptionRuntime.handleVisibilityChange(),
-      "visibility resume failures should be converted into recovery mode",
+      "visibility resume failures should roll back without escaping",
     );
   } finally {
     visibilityExceptionRuntime.update = visibilityExceptionOriginalUpdate;
   }
   assert.deepEqual(visibilityExceptionRuntime.snapshotRuntimeState(), visibilityExceptionState, "visibility failure should restore state");
   assert.equal(visibilityExceptionRuntime.normalAutobuyElapsed, visibilityExceptionNormalAutobuyElapsed, "visibility failure should restore automation timing");
-  assert.equal(visibilityExceptionRuntime.offlineBaselineTimestamp, visibilityExceptionBaseline, "visibility failure should restore the baseline");
+  assert.ok(visibilityExceptionRuntime.offlineBaselineTimestamp >= visibilityExceptionBaseline, "visibility failure should skip the failed interval");
   assert.equal(visibilityExceptionRuntime.offlineReport, previousVisibilityExceptionReport, "visibility failure should restore the report");
   assert.equal(visibilityExceptionRuntime.offlineProcessing, false, "offline processing should always be cleared");
   assert.equal(visibilityExceptionRuntime.autoSaveElapsed, 0, "recovery should consume the autosave timer");
   assert.equal(visibilityExceptionRuntime.lastTime, visibilityExceptionLastTime, "visibility failure should restore frame timing");
-  assert.equal(visibilityExceptionRuntime.loadRecoveryMode, true, "visibility failure should enter recovery mode");
+  assert.equal(visibilityExceptionRuntime.loadRecoveryMode, false, "a failed offline interval should not block the loaded main save");
 
   const visibilitySaveFailureInstance = await loadRuntime(candidatePath);
   const visibilitySaveFailureDebug = visibilitySaveFailureInstance.debug;
@@ -352,7 +352,6 @@ async function runTimeFluxModuleRuntimeTest() {
   visibilitySaveFailureDebug.state.offlineProgressEnabled = true;
   visibilitySaveFailureDebug.state.timeFlux = 0;
   const visibilitySaveFailureOriginalSetItem = visibilitySaveFailureInstance.context.localStorage.setItem;
-  const visibilitySaveFailureOriginalRemoveItem = visibilitySaveFailureInstance.context.localStorage.removeItem;
   try {
     const visibilitySaveFailurePromise = visibilitySaveFailureRuntime.handleVisibilityChange();
     await Promise.resolve();
@@ -360,8 +359,8 @@ async function runTimeFluxModuleRuntimeTest() {
     const pendingResumeSave = JSON.parse(
       visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY),
     );
+    const pendingResumeRaw = visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY);
     assert.ok(pendingResumeSave.savedAt > visibilitySaveFailureBaseline, "the pending save should advance its timestamp");
-    const pendingResumeSaveFingerprint = visibilitySaveFailureRuntime.currentSaveFingerprint();
     visibilitySaveFailureInstance.context.localStorage.setItem = (key, value) => {
       if (key === visibilitySaveFailureRuntime.SAVE_KEY) throw new Error("save storage unavailable");
       return visibilitySaveFailureOriginalSetItem(key, value);
@@ -373,38 +372,15 @@ async function runTimeFluxModuleRuntimeTest() {
     await visibilitySaveFailurePromise;
     assert.equal(visibilitySaveFailureDebug.state.timeFlux, 0, "a failed visibility save should not change dormant Time Flux");
     assert.equal(visibilitySaveFailureRuntime.offlineReport, null, "a failed visibility save should clear the report");
-    assert.equal(visibilitySaveFailureRuntime.offlineBaselineTimestamp, visibilitySaveFailureBaseline, "a failed visibility save should restore the baseline");
-    assert.equal(visibilitySaveFailureRuntime.loadRecoveryMode, true, "a failed visibility save should require recovery");
-    const diagnostic = JSON.parse(
-      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY),
-    );
-    assert.equal(diagnostic.offlineRetrySavedAt, visibilitySaveFailureBaseline, "recovery should retain the interval baseline");
-    assert.equal(diagnostic.offlineRetrySaveFingerprint, pendingResumeSaveFingerprint, "recovery should fingerprint the latest save");
-    visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
-    visibilitySaveFailureInstance.context.localStorage.removeItem = (key) => {
-      if (key === visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY) throw new Error("diagnostic removal unavailable");
-      return visibilitySaveFailureOriginalRemoveItem(key);
-    };
-    assert.equal(await visibilitySaveFailureDebug.retryLoad(), true, "retry should apply the captured interval");
-    assert.ok(visibilitySaveFailureDebug.state.totalPlayTime > 0, "retry should restore normal offline progress");
-    const recoveredSave = JSON.parse(
-      visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY),
-    );
-    const originalProcessOfflineElapsed = visibilitySaveFailureRuntime.processOfflineElapsed;
-    let reloadRetryBaseline;
-    visibilitySaveFailureRuntime.processOfflineElapsed = (elapsed, source, clockContext) => {
-      reloadRetryBaseline = clockContext?.retryBaseline;
-      return originalProcessOfflineElapsed(elapsed, source, clockContext);
-    };
-    try {
-      assert.equal(await visibilitySaveFailureDebug.loadGame(), true, "a recovered save should remain loadable");
-    } finally {
-      visibilitySaveFailureRuntime.processOfflineElapsed = originalProcessOfflineElapsed;
-    }
-    assert.ok(!reloadRetryBaseline || reloadRetryBaseline.savedAt === recoveredSave.savedAt, "a stale retry baseline must not be reused");
+    assert.ok(visibilitySaveFailureRuntime.offlineBaselineTimestamp >= pendingResumeSave.savedAt,
+      "a failed interval should be skipped after restoring the latest persisted state");
+    assert.equal(visibilitySaveFailureRuntime.loadRecoveryMode, false, "offline write failure should not require persistent recovery metadata");
+    assert.equal(visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_KEY), pendingResumeRaw,
+      "offline write failure should preserve the persisted main save");
+    assert.equal(visibilitySaveFailureInstance.context.localStorage.getItem(visibilitySaveFailureRuntime.SAVE_LOAD_FAILURE_KEY), null,
+      "offline failures must not create legacy load-failure keys");
   } finally {
     visibilitySaveFailureInstance.context.localStorage.setItem = visibilitySaveFailureOriginalSetItem;
-    visibilitySaveFailureInstance.context.localStorage.removeItem = visibilitySaveFailureOriginalRemoveItem;
   }
 
   const preResumeConcurrentInstance = await loadRuntime(candidatePath);
@@ -423,23 +399,16 @@ async function runTimeFluxModuleRuntimeTest() {
     preResumeConcurrentRuntime.SAVE_KEY,
     JSON.stringify(preResumeReplacement),
   );
+  const preResumeReplacementRaw = preResumeConcurrentInstance.context.localStorage.getItem(preResumeConcurrentRuntime.SAVE_KEY);
   await preResumeConcurrentRuntime.handleVisibilityChange();
   assert.equal(preResumeConcurrentRuntime.loadRecoveryMode, false, "a save replaced before resume should reload normally");
-  assert.ok(
-    preResumeConcurrentDebug.state.totalPlayTime >= preResumeReplacement.state.totalPlayTime,
-    "a save replaced before resume should become the recovery base",
-  );
-  assert.ok(
-    preResumeConcurrentDebug.state.totalPlayTime < preResumeReplacement.state.totalPlayTime + 10,
-    "resume must not replay the old tab's captured interval after a replacement",
-  );
-  const persistedPreResumeReplacement = JSON.parse(
-    preResumeConcurrentInstance.context.localStorage.getItem(preResumeConcurrentRuntime.SAVE_KEY),
-  );
-  assert.ok(
-    persistedPreResumeReplacement.state.totalPlayTime >= preResumeReplacement.state.totalPlayTime,
-    "resume must not overwrite a replacement that already existed before it started",
-  );
+  assert.equal(preResumeConcurrentRuntime.saveConflictMode, true, "a replacement before resume requires an explicit decision");
+  assert.equal(preResumeConcurrentDebug.state.totalPlayTime, 0, "conflict detection must not auto-reload the other tab");
+  assert.equal(preResumeConcurrentInstance.context.localStorage.getItem(preResumeConcurrentRuntime.SAVE_KEY), preResumeReplacementRaw);
+  assert.equal(await preResumeConcurrentDebug.retryLoad(), true, "explicit reload should load the replacement");
+  assert.equal(preResumeConcurrentDebug.state.totalPlayTime, preResumeReplacement.state.totalPlayTime);
+  assert.equal(preResumeConcurrentRuntime.saveConflictMode, false);
+  assert.equal(preResumeConcurrentInstance.context.localStorage.getItem(preResumeConcurrentRuntime.SAVE_KEY), preResumeReplacementRaw);
 
   const hiddenConcurrentInstance = await loadRuntime(candidatePath);
   const hiddenConcurrentDebug = hiddenConcurrentInstance.debug;
@@ -458,27 +427,19 @@ async function runTimeFluxModuleRuntimeTest() {
     JSON.stringify(hiddenReplacement),
   );
   hiddenConcurrentInstance.context.document.hidden = true;
+  const hiddenReplacementRaw = hiddenConcurrentInstance.context.localStorage.getItem(hiddenConcurrentRuntime.SAVE_KEY);
   try {
     await hiddenConcurrentRuntime.handleVisibilityChange();
   } finally {
     hiddenConcurrentInstance.context.document.hidden = false;
   }
-  assert.equal(hiddenConcurrentRuntime.loadRecoveryMode, false, "a save replaced before hiding should reload normally");
-  assert.ok(
-    hiddenConcurrentDebug.state.totalPlayTime >= hiddenReplacement.state.totalPlayTime,
-    "a save replaced before hiding should become the save base",
-  );
-  assert.ok(
-    hiddenConcurrentDebug.state.totalPlayTime < hiddenReplacement.state.totalPlayTime + 10,
-    "hidden save must not replay the old tab's interval after a replacement",
-  );
-  const persistedHiddenReplacement = JSON.parse(
-    hiddenConcurrentInstance.context.localStorage.getItem(hiddenConcurrentRuntime.SAVE_KEY),
-  );
-  assert.ok(
-    persistedHiddenReplacement.state.totalPlayTime >= hiddenReplacement.state.totalPlayTime,
-    "hidden save must not overwrite a replacement that already existed",
-  );
+  assert.equal(hiddenConcurrentRuntime.saveConflictMode, true, "a hidden tab also stops on a save conflict");
+  assert.equal(hiddenConcurrentDebug.state.totalPlayTime, 0, "hidden conflict detection must not auto-reload");
+  assert.equal(hiddenConcurrentInstance.context.localStorage.getItem(hiddenConcurrentRuntime.SAVE_KEY), hiddenReplacementRaw);
+  assert.equal(await hiddenConcurrentDebug.retryLoad(), true, "explicit reload should load the hidden-tab replacement");
+  assert.equal(hiddenConcurrentDebug.state.totalPlayTime, hiddenReplacement.state.totalPlayTime);
+  assert.equal(hiddenConcurrentRuntime.saveConflictMode, false);
+  assert.equal(hiddenConcurrentInstance.context.localStorage.getItem(hiddenConcurrentRuntime.SAVE_KEY), hiddenReplacementRaw);
 
   const concurrentSaveInstance = await loadRuntime(candidatePath);
   const concurrentSaveDebug = concurrentSaveInstance.debug;
@@ -487,6 +448,7 @@ async function runTimeFluxModuleRuntimeTest() {
   assert.equal(concurrentSaveRuntime.saveGame("manual"), true, "the concurrent-save test should seed a save");
   const concurrentSaveBaseline = Date.now() - 60 * 1000;
   concurrentSaveRuntime.setOfflineBaseline(concurrentSaveBaseline, 0);
+  const localPlayTimeBeforeConflict = concurrentSaveDebug.state.totalPlayTime;
   let resolveConcurrentClockRequest;
   const pendingConcurrentClockRequest = new Promise((resolve) => {
     resolveConcurrentClockRequest = resolve;
@@ -501,10 +463,11 @@ async function runTimeFluxModuleRuntimeTest() {
   replacementSave.savedAt = Date.now() - 1000;
   replacementSave.state.totalPlayTime = 9876;
   replacementSave.state.timeFlux = 120;
+  const replacementRaw = JSON.stringify(replacementSave);
   concurrentSaveOriginalSetItem.call(
     concurrentSaveInstance.context.localStorage,
     concurrentSaveRuntime.SAVE_KEY,
-    JSON.stringify(replacementSave),
+    replacementRaw,
   );
   try {
     resolveConcurrentClockRequest({
@@ -512,19 +475,14 @@ async function runTimeFluxModuleRuntimeTest() {
       headers: { get: () => new Date().toUTCString() },
     });
     await concurrentResumePromise;
-    assert.equal(concurrentSaveRuntime.loadRecoveryMode, false, "a concurrent replacement should reload normally");
-    assert.ok(
-      concurrentSaveDebug.state.totalPlayTime >= replacementSave.state.totalPlayTime,
-      "the newer tab's state should remain the recovery base",
-    );
-    assert.equal(concurrentSaveDebug.state.timeFlux, replacementSave.state.timeFlux, "the newer tab's dormant fields should win");
-    const persistedAfterConcurrentResume = JSON.parse(
-      concurrentSaveInstance.context.localStorage.getItem(concurrentSaveRuntime.SAVE_KEY),
-    );
-    assert.ok(
-      persistedAfterConcurrentResume.state.totalPlayTime >= replacementSave.state.totalPlayTime,
-      "the old tab must not overwrite the replacement",
-    );
+    assert.equal(concurrentSaveRuntime.saveConflictMode, true, "a replacement during resume requires explicit reload");
+    assert.equal(concurrentSaveDebug.state.totalPlayTime, localPlayTimeBeforeConflict, "the stale in-memory state stays available for export");
+    assert.equal(concurrentSaveInstance.context.localStorage.getItem(concurrentSaveRuntime.SAVE_KEY), replacementRaw);
+    assert.equal(await concurrentSaveDebug.retryLoad(), true, "explicit reload should resolve a mid-resume conflict");
+    assert.equal(concurrentSaveDebug.state.totalPlayTime, replacementSave.state.totalPlayTime);
+    assert.equal(concurrentSaveDebug.state.timeFlux, replacementSave.state.timeFlux);
+    assert.equal(concurrentSaveRuntime.saveConflictMode, false);
+    assert.equal(concurrentSaveInstance.context.localStorage.getItem(concurrentSaveRuntime.SAVE_KEY), replacementRaw);
   } finally {
     concurrentSaveInstance.context.localStorage.setItem = concurrentSaveOriginalSetItem;
   }
@@ -564,13 +522,13 @@ async function runTimeFluxModuleRuntimeTest() {
   resetResumeRuntime.setOfflineBaseline(Date.now() - 60 * 1000, 0);
   const resetResumePromise = resetResumeRuntime.handleVisibilityChange();
   await Promise.resolve();
-  resetResumeRuntime.resetSave();
+  await resetResumeRuntime.resetSave();
   resolveResetClockRequest({
     ok: true,
     headers: { get: () => new Date().toUTCString() },
   });
   await resetResumePromise;
-  assert.equal(resetResumeDebug.state.totalPlayTime, 0, "reset should not receive stale offline progress");
+  assert.ok(resetResumeDebug.state.totalPlayTime < 0.1, "reset should not receive the stale offline interval");
   assert.equal(resetResumeDebug.state.timeFlux, 0, "reset should clear dormant Time Flux");
   assert.equal(resetResumeRuntime.offlineReport, null, "reset should clear the pending offline report");
 

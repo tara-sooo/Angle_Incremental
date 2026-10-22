@@ -385,8 +385,8 @@ try {
   assert.equal(timelineInitial.scoreDisabled, true, "an unmet Timeline track should disable its claim control");
   assert.equal(timelineInitial.respecTop, true, "Respec should live in the Timeline overview");
   assert.equal(timelineInitial.respecBeforeClaims, true, "Respec should appear before the claim rows");
-  assert.equal(timelineInitial.treeNodeCount, 2, "0.14.0 Timeline should show only both BC16500 route alternatives");
-  assert.equal(timelineInitial.eraCount, 1, "the 0.14.0 tree should render one branching group");
+  assert.equal(timelineInitial.treeNodeCount, 6, "Timeline should restore both route alternatives across three eras");
+  assert.equal(timelineInitial.eraCount, 3, "the Timeline should render three branching era groups");
   assert.equal(timelineInitial.eraLabel, "BC16500", "the tree should label the visible era");
   assert.equal(timelineInitial.realRoute, "Real");
   assert.equal(timelineInitial.parallelRoute, "Parallel");
@@ -412,9 +412,17 @@ try {
   assert.equal(timelineInitial.treeBorder, "0px", "the tree should provide hierarchy without a surrounding card");
   assert.equal(timelineInitial.nodeGridColumns, 2, "desktop Timeline should keep two route columns");
   assert.ok(timelineInitial.nodeRects.every((node) => node.height <= 60), "desktop Timeline nodes should stay compact");
-  assert.deepEqual(timelineInitial.treeConnector.types, ["split", "merge"], "0.14.0 Timeline should render only the shipped route connectors");
-  assert.equal(timelineInitial.treeConnector.branchCount, 4, "the shipped era should expose incoming and outgoing branches for both routes");
-  assert.deepEqual(timelineInitial.treeConnector.bridgeTargets, [], "deferred eras should not leave inter-era bridges");
+  assert.deepEqual(
+    timelineInitial.treeConnector.types,
+    ["split", "merge", "bridge", "split", "merge", "bridge", "split", "merge"],
+    "Timeline should render route connectors and bridges across all three eras",
+  );
+  assert.equal(timelineInitial.treeConnector.branchCount, 12, "each era should expose incoming and outgoing branches for both routes");
+  assert.deepEqual(
+    timelineInitial.treeConnector.bridgeTargets,
+    [["BC16500", "BC6000"], ["BC6000", "AD30"]],
+    "restored eras should be connected in Timeline order",
+  );
   assert.equal(timelineInitial.treeConnector.ownedCount, 0, "unowned Timeline paths should start neutral");
   assert.equal(timelineInitial.treeConnector.splitCenter, "2px", "desktop Timeline should keep a visible central split connector");
   assert.equal(timelineInitial.treeConnector.mergeCenter, "2px", "desktop Timeline should keep a visible central merge connector");
@@ -502,39 +510,39 @@ try {
     availableNodes: ["Real-BC16500", "Parallel-BC16500"],
     ownedIncoming: [],
     ownedOutgoing: [],
-    bridges: [],
+    bridges: [false, false],
     ownedCount: 0,
   }, "availability should not highlight any Timeline path");
   assert.deepEqual(timelinePaths.rrp, {
-    availableNodes: [],
+    availableNodes: ["Real-BC6000", "Parallel-BC6000"],
     ownedIncoming: ["Real-BC16500"],
     ownedOutgoing: ["Real-BC16500"],
-    bridges: [],
+    bridges: [false, false],
     ownedCount: 2,
-  }, "the Real BC16500 path should highlight only its shipped branches");
+  }, "the Real BC16500 path should unlock either route in BC6000");
   assert.equal(timelinePaths.saved, true, "Timeline path fixture should save through the canonical save flow");
   assert.deepEqual(timelinePaths.clearedBeforeLoad, {
     availableNodes: ["Real-BC16500", "Parallel-BC16500"],
     ownedIncoming: [],
     ownedOutgoing: [],
-    bridges: [],
+    bridges: [false, false],
     ownedCount: 0,
   }, "clearing canonical purchases should clear all connector highlights");
   assert.equal(timelinePaths.loaded, true, "Timeline path fixture should load through the canonical load flow");
   assert.deepEqual(timelinePaths.restored, timelinePaths.rrp, "save/load should restore the RRP connector path");
   assert.deepEqual(timelinePaths.ppr, {
-    availableNodes: [],
+    availableNodes: ["Real-BC6000", "Parallel-BC6000"],
     ownedIncoming: ["Parallel-BC16500"],
     ownedOutgoing: ["Parallel-BC16500"],
-    bridges: [],
+    bridges: [false, false],
     ownedCount: 2,
-  }, "the Parallel BC16500 path should switch the shipped route");
+  }, "the Parallel BC16500 path should unlock either route in BC6000");
   assert.equal(timelinePaths.respec, true, "Timeline respec should use the canonical reset flow");
   assert.deepEqual(timelinePaths.afterRespec, {
     availableNodes: ["Real-BC16500", "Parallel-BC16500"],
     ownedIncoming: [],
     ownedOutgoing: [],
-    bridges: [],
+    bridges: [false, false],
     ownedCount: 0,
   }, "respec should clear every connector highlight");
 
@@ -616,7 +624,7 @@ try {
     debug.runtime.updateUi();
   });
 
-  await page.click('[data-timeline-node="Parallel-BC16500"]');
+  await page.click('.timeline-node[data-timeline-node="Parallel-BC16500"]');
   const selectedParallel = await page.evaluate(() => ({
     selected: document.querySelector('.timeline-node[aria-pressed="true"]')?.dataset.timelineNode,
     detailName: document.getElementById("timelineNodeDetailHeading")?.textContent,
@@ -632,7 +640,7 @@ try {
   assert.equal(selectedParallel.timelineText.includes("実効log10"), false, "Parallel details should omit effective-log diagnostics");
   assert.equal(selectedParallel.purchaseNode, "Parallel-BC16500");
   assert.deepEqual(selectedParallel.purchased, [], "a single Timeline activation should select without purchasing");
-  await page.click('[data-timeline-node="Real-BC16500"]');
+  await page.click('.timeline-node[data-timeline-node="Real-BC16500"]');
 
   await page.evaluate(() => {
     const debug = window.__angleDebug;
@@ -747,7 +755,7 @@ try {
     debug.state.scoreTfClaims = 1;
     debug.runtime.updateUi();
   });
-  await page.click('[data-timeline-node="Real-BC16500"]');
+  await page.click('.timeline-node[data-timeline-node="Real-BC16500"]');
   await page.click("#timelineNodePurchaseButton");
   const realPurchased = await page.evaluate(() => ({
     purchased: window.__angleDebug.state.timelinePurchasedNodes,
@@ -1126,13 +1134,25 @@ try {
   assert.deepEqual(timelineMobile.subtabCodes, ["MS", "TL"], "mobile Eternity subtabs should expose compact codes");
   assert.ok(timelineMobile.subtabNavWidth <= timelineMobile.subtabClientWidth, "mobile Eternity subtabs should fit without horizontal overflow");
   assert.equal(timelineMobile.gridColumnCount, 2, "Timeline nodes should preserve two route columns on mobile");
-  assert.deepEqual(timelineMobile.branchRouteOrder, ["Real", "Parallel"], "0.14.0 Timeline should preserve the shipped route order on mobile");
-  assert.ok(timelineMobile.nodeRects[0].x < timelineMobile.nodeRects[1].x, "mobile Real and Parallel nodes should retain left/right topology");
-  assert.ok(Math.abs(timelineMobile.nodeRects[0].y - timelineMobile.nodeRects[1].y) <= 1, "mobile route nodes should share a tree level");
+  assert.deepEqual(
+    timelineMobile.branchRouteOrder,
+    ["Real", "Parallel", "Real", "Parallel", "Real", "Parallel"],
+    "mobile Timeline should preserve Real/Parallel route order in all three eras",
+  );
+  for (let index = 0; index < timelineMobile.nodeRects.length; index += 2) {
+    const real = timelineMobile.nodeRects[index];
+    const parallel = timelineMobile.nodeRects[index + 1];
+    assert.ok(real.x < parallel.x, `mobile Real and Parallel nodes should retain left/right topology in pair ${index / 2 + 1}`);
+    assert.ok(Math.abs(real.y - parallel.y) <= 1, `mobile route nodes should share a tree level in pair ${index / 2 + 1}`);
+  }
   assert.ok(timelineMobile.nodeRects.every((node) => node.height <= 60), "mobile Timeline nodes should stay in the compact class");
-  assert.deepEqual(timelineMobile.connectorTypes, ["split", "merge"], "mobile Timeline should render only the shipped connectors");
-  assert.equal(timelineMobile.connectorBranchCount, 4, "mobile Timeline should preserve both route branches for BC16500");
-  assert.deepEqual(timelineMobile.bridgeOwned, [], "mobile Timeline should not render deferred-era paths");
+  assert.deepEqual(
+    timelineMobile.connectorTypes,
+    ["split", "merge", "bridge", "split", "merge", "bridge", "split", "merge"],
+    "mobile Timeline should render three era splits/merges and two bridges",
+  );
+  assert.equal(timelineMobile.connectorBranchCount, 12, "mobile Timeline should preserve incoming and outgoing route branches in all three eras");
+  assert.deepEqual(timelineMobile.bridgeOwned, [false, false], "mobile Timeline bridges should remain unowned until a later-era node is purchased");
   assert.ok(timelineMobile.connectorOwnedCount > 0, "mobile Timeline should render purchased path state");
   assert.deepEqual(timelineMobile.connectorStyles, {
     splitCenter: "2px",
@@ -1199,6 +1219,58 @@ try {
   }));
   assert.equal(mobile.visible, true, "Eternity top-level panel should remain usable at a mobile viewport");
   assert.ok(mobile.width > 0 && mobile.firstButtonWidth > 0, "Eternity information controls should keep a visible mobile layout");
+
+  const pendingEternity = await page.evaluate(() => {
+    const debug = window.__angleDebug;
+    const { state, runtime } = debug;
+    Object.assign(state, {
+      language: "en",
+      eternityCount: 7,
+      scoreTfClaims: 7,
+      ipTfClaims: 0,
+      eternityTfClaims: 0,
+      timelinePurchasedNodes: [
+        { id: "Real-BC16500", era: "BC16500", route: "Real", costTF: 1 },
+        { id: "Real-BC6000", era: "BC6000", route: "Real", costTF: 1 },
+        { id: "Real-AD30", era: "AD30", route: "Real", costTF: 5 },
+      ],
+      completedChallenges: (1 << (6 - 1)) | (1 << (8 - 1)),
+      completedTowerChallenges: (1 << runtime.TOWER_CHALLENGE_COUNT) - 1,
+      towerFloor: 0,
+      score: Number.MAX_VALUE,
+      scoreLog10: 15000,
+    });
+    runtime.setExactIntegerState(state, "eternityCountExact", "eternityCount", 7n);
+    runtime.setExactIntegerState(state, "infinityCountExact", "infinityCount", 100n);
+    runtime.syncInfinityPointCachesFromExact(runtime.MAX_EXACT_INFINITY_POINTS);
+    runtime.appliedLanguage = "";
+    debug.switchMainTab("eternity");
+    debug.switchEternitySubtab("milestone");
+    runtime.updateUi();
+    const plannedGain = runtime.eternityGainExact();
+    return {
+      canEternity: runtime.canEternity(),
+      plannedGainExact: plannedGain.toString(),
+      expectedPendingText: runtime.formatUiLogNumber(runtime.log10ExactInteger(plannedGain)),
+      pendingText: document.getElementById("eternityPendingGain")?.textContent?.trim() ?? "",
+      beforeCountExact: runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount").toString(),
+      performDisabled: document.getElementById("eternityPerformButton")?.disabled ?? true,
+    };
+  });
+  assert.equal(pendingEternity.canEternity, true, "exact pending-gain regression should meet Eternity conditions");
+  assert.equal(pendingEternity.plannedGainExact, "2", "Real-AD30 should normalize a 2.5× current-Score multiplier to the canonical exact increment");
+  assert.equal(pendingEternity.pendingText, pendingEternity.expectedPendingText, "pending Eternity UI should render the canonical exact planned gain");
+  assert.equal(pendingEternity.performDisabled, false, "exact pending-gain regression should enable the perform action");
+  await page.click("#eternityPerformButton");
+  const performedEternity = await page.evaluate(() => {
+    const { state, runtime } = window.__angleDebug;
+    const afterCount = runtime.currentExactIntegerState(state, "eternityCountExact", "eternityCount");
+    return {
+      afterCountExact: afterCount.toString(),
+      actualGainExact: (afterCount - BigInt("7")).toString(),
+    };
+  });
+  assert.equal(performedEternity.actualGainExact, pendingEternity.plannedGainExact, "actual Eternity count increment should equal the displayed exact plan");
 
   console.log("Eternity UI browser test passed");
 } finally {
